@@ -241,6 +241,45 @@ function extract_aiml_memory_context()::String
     end
 end
 
+# ==============================================================================
+# IMMUNE GATE HELPER — REUSABLE GUARD FOR ALL STRUCTURE-STORING COMMANDS
+# ==============================================================================
+
+"""
+immune_gate(cmd_name::String, input_text::String; is_critical::Bool=true)::Bool
+
+GRUG: Reusable immune gate. Runs immune_scan! on input_text for any command that
+stores structure. Returns true if input passed, false if rejected.
+Logs status and records to message history on rejection. NO SILENT FAILURES.
+Non-immune errors are warned but do NOT block (immune system crash ≠ command block).
+"""
+function immune_gate(cmd_name::String, input_text::String; is_critical::Bool=true)::Bool
+    node_count = lock(() -> length(NODE_MAP), NODE_LOCK)
+    try
+        status, sig = ImmuneSystem.immune_scan!(input_text, node_count; is_critical=is_critical)
+        if status == :deleted
+            println("[IMMUNE] ⛔ $cmd_name REJECTED by immune system (sig=0x$(string(sig, base=16)))")
+            add_message_to_history!("System", "⛔ $cmd_name input rejected by immune system: deleted", false)
+            return false
+        end
+        if status != :immature
+            println("[IMMUNE] 🛡  $cmd_name scan: $status (sig=0x$(string(sig, base=16)))")
+        end
+        return true
+    catch e
+        if e isa ImmuneSystem.ImmuneError
+            println("[IMMUNE] ⛔ $cmd_name REJECTED by immune system: $(e.info)")
+            add_message_to_history!("System", "⛔ $cmd_name input rejected by immune system: $(e.kind)", false)
+            return false
+        else
+            # GRUG: Immune system itself broke. Log it but don't block the command.
+            # Non-fatal: immune failure should not kill the cave.
+            @warn "[IMMUNE] Immune scan threw unexpected error for $cmd_name (non-fatal): $e"
+            return true
+        end
+    end
+end
+
 # GRUG DOC 3.9: SUPERPOSITION ORCHESTRATOR!
 """
 ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
@@ -286,8 +325,28 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
         error("!!! FATAL: Grug math broke! Max confidence produced zero sure votes! !!!")
     end
 
-    # GRUG: Primary action is first in sorted sure_votes = highest confidence winner.
-    primary_vote = sure_votes[1]
+    # GRUG: TIE-BREAKING! If multiple rocks sit at the same confidence, pick random winner.
+    # Old behavior: always picked sure_votes[1] (first in sort order = arbitrary for ties).
+    # New behavior: shuffle the tied group, random winner. Deterministic if only one winner.
+    if length(sure_votes) > 1
+        # GRUG: Identify the TRUE ties — rocks at exactly the same confidence as the leader.
+        # "Within 0.05" already got them into sure_votes. Now find the subset that are
+        # dead-equal to the max (within floating-point epsilon). Those are the real tied rocks.
+        top_conf = sure_votes[1].confidence
+        tied_votes = Vote[v for v in sure_votes if abs(v.confidence - top_conf) < 1e-9]
+
+        if length(tied_votes) > 1
+            # GRUG: RANDOM TIE-BREAK! Shuffle the tied rocks and pick one.
+            shuffle!(tied_votes)
+            primary_vote = tied_votes[1]
+            println("[ORCHESTRATOR] 🎲  TIE DETECTED! $(length(tied_votes)) rocks at confidence $(round(top_conf, digits=3)). Random winner: $(primary_vote.node_id)")
+        else
+            # GRUG: No exact tie. Highest confidence rock wins cleanly.
+            primary_vote = sure_votes[1]
+        end
+    else
+        primary_vote = sure_votes[1]
+    end
 
     node = lock(() -> get(NODE_MAP, primary_vote.node_id, nothing), NODE_LOCK)
     if isnothing(node)
@@ -323,6 +382,13 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     sure_str   = join([v.action for v in sure_votes], ", ")
     unsure_str = isempty(unsure_votes) ? "None" : join([v.action for v in unsure_votes], ", ")
 
+    # GRUG: VOTE CERTAINTY — SURE if primary stands alone at top, UNSURE if ties exist.
+    # Tied alternatives = other sure_votes that were NOT picked as primary.
+    tied_alternatives = Vote[v for v in sure_votes if v.node_id != primary_vote.node_id]
+    vote_certainty = isempty(tied_alternatives) ? "SURE" : "UNSURE"
+    tied_alt_str = isempty(tied_alternatives) ? "None" :
+        join(["$(v.node_id)($(v.action),conf=$(round(v.confidence, digits=2)))" for v in tied_alternatives], ", ")
+
     # GRUG: Read rule board. Swap shape-shifter words for real context chunks.
     # NOW STOCHASTIC: each rule fires based on its fire_probability.
     # This is where Grug JIT-compiles math into human language with natural variation!
@@ -346,6 +412,8 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             processed = replace(processed, "{NODE_ID}"        => primary_vote.node_id)
             processed = replace(processed, "{MEMORY}"         => memory_str)
             processed = replace(processed, "{LOBE_CONTEXT}"   => lobe_str)
+            processed = replace(processed, "{VOTE_CERTAINTY}"     => vote_certainty)
+            processed = replace(processed, "{TIED_ALTERNATIVES}"  => tied_alt_str)
             push!(evaluated_rules, processed)
         end
     catch e
@@ -398,6 +466,32 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     out *= "User Triples: $u_triples\n"
     out *= "Node Triples: $n_triples\n"
     out *= "Anti-Match Detected: $(primary_vote.antimatch)\n"
+    out *= "--- VOTE CERTAINTY ---\n"
+    out *= "Certainty: $vote_certainty\n"
+    if !isempty(tied_alternatives)
+        out *= "Tied Alternatives (not selected):\n"
+        for tv in tied_alternatives
+            tv_node = lock(() -> get(NODE_MAP, tv.node_id, nothing), NODE_LOCK)
+            tv_triples_str = if !isnothing(tv_node) && !isempty(tv_node.relational_patterns)
+                join(["($(t.subject), $(t.relation), $(t.object))" for t in tv_node.relational_patterns], ", ")
+            else
+                "None"
+            end
+            out *= "  🪨 $(tv.node_id) | action=$(tv.action) | conf=$(round(tv.confidence, digits=2)) | relations=$tv_triples_str\n"
+        end
+    end
+    if !isempty(unsure_votes)
+        out *= "Other Possibilities (strong but not winners):\n"
+        for uv in unsure_votes
+            uv_node = lock(() -> get(NODE_MAP, uv.node_id, nothing), NODE_LOCK)
+            uv_triples_str = if !isnothing(uv_node) && !isempty(uv_node.relational_patterns)
+                join(["($(t.subject), $(t.relation), $(t.object))" for t in uv_node.relational_patterns], ", ")
+            else
+                "None"
+            end
+            out *= "  🔸 $(uv.node_id) | action=$(uv.action) | conf=$(round(uv.confidence, digits=2)) | relations=$uv_triples_str\n"
+        end
+    end
     out *= "--- AIML MEMORY BANK ---\n$memory_str\n"
     out *= "=========================================\n"
     out *= "🗣️ STOCHASTIC GENERATION (JIT AIML):\n$jit_response\n"
@@ -2290,27 +2384,7 @@ function run_cli()
 
                 # GRUG: IMMUNE SYSTEM GATE — scan grow input before touching anything!
                 # /grow is a CRITICAL command (modifies node population). Full immune scan.
-                node_count = lock(() -> length(NODE_MAP), NODE_LOCK)
-                immune_passed = true
-                try
-                    status, _sig = ImmuneSystem.immune_scan!(json_text, node_count; is_critical=true)
-                    if status == :deleted
-                        immune_passed = false
-                    end
-                    if status != :immature
-                        println("[IMMUNE] 🛡  /grow scan: $status (sig=0x$(string(_sig, base=16)))")
-                    end
-                catch e
-                    if e isa ImmuneSystem.ImmuneError
-                        println("[IMMUNE] ⛔ /grow REJECTED by immune system: $(e.info)")
-                        add_message_to_history!("System", "⛔ /grow input rejected by immune system: $(e.kind)", false)
-                        immune_passed = false
-                    else
-                        # GRUG: Immune system itself broke. Log it but don't block growth.
-                        # Non-fatal: immune failure should not kill the cave.
-                        @warn "[IMMUNE] Immune scan threw unexpected error (non-fatal): $e"
-                    end
-                end
+                immune_passed = immune_gate("/grow", json_text; is_critical=true)
 
                 if immune_passed
                     println("--> Grug unpacking JSON node seeds...")
@@ -2336,12 +2410,22 @@ function run_cli()
                 # GRUG: /addRule - add a stochastic orchestration rule.
                 # Optional [prob=X.XX] suffix sets fire probability (default 1.0).
                 rule_text = String(m_rule.captures[1])
-                println("⚙️ ", add_orchestration_rule!(rule_text))
+                # GRUG: IMMUNE GATE — rules are stored structure!
+                if !immune_gate("/addRule", rule_text; is_critical=false)
+                    println("⛔ /addRule blocked by immune system.")
+                else
+                    println("⚙️ ", add_orchestration_rule!(rule_text))
+                end
 
             elseif !isnothing(m_pin)
                 pin_text = String(m_pin.captures[1])
-                add_message_to_history!("User_Pinned", pin_text, true)
-                println("📌 Grug pinned text to Memory Wall!")
+                # GRUG: IMMUNE GATE — pinned memory is stored structure!
+                if !immune_gate("/pin", pin_text; is_critical=false)
+                    println("⛔ /pin blocked by immune system.")
+                else
+                    add_message_to_history!("User_Pinned", pin_text, true)
+                    println("📌 Grug pinned text to Memory Wall!")
+                end
 
             elseif !isnothing(m_nodes)
                 # GRUG: /nodes - show full node map status (strength, neighbors, graves, etc.)
@@ -2424,16 +2508,26 @@ function run_cli()
                 # Example: /addVerb triggers causal
                 verb_word  = String(m_addverb.captures[1])
                 verb_class = String(m_addverb.captures[2])
-                SemanticVerbs.add_verb!(verb_word, verb_class)
-                println("🔧 Verb '$(verb_word)' added to class '$(verb_class)'. Active immediately.")
+                # GRUG: IMMUNE GATE — verb registry is stored structure!
+                if !immune_gate("/addVerb", verb_word * " " * verb_class; is_critical=false)
+                    println("⛔ /addVerb blocked by immune system.")
+                else
+                    SemanticVerbs.add_verb!(verb_word, verb_class)
+                    println("🔧 Verb '$(verb_word)' added to class '$(verb_class)'. Active immediately.")
+                end
 
             elseif !isnothing(m_addrelclass)
                 # GRUG: /addRelationClass <name> - create a new verb class bucket.
                 # After this, user can /addVerb <word> <name> to populate it.
                 # Example: /addRelationClass epistemic
                 class_name = String(m_addrelclass.captures[1])
-                SemanticVerbs.add_relation_class!(class_name)
-                println("🗂  Relation class '$(class_name)' created. Use /addVerb to populate.")
+                # GRUG: IMMUNE GATE — relation class registry is stored structure!
+                if !immune_gate("/addRelationClass", class_name; is_critical=false)
+                    println("⛔ /addRelationClass blocked by immune system.")
+                else
+                    SemanticVerbs.add_relation_class!(class_name)
+                    println("🗂  Relation class '$(class_name)' created. Use /addVerb to populate.")
+                end
 
             elseif !isnothing(m_addsynonym)
                 # GRUG: /addSynonym <canonical> <alias> - register a synonym normalization.
@@ -2442,8 +2536,13 @@ function run_cli()
                 # Example: /addSynonym causes triggers
                 canonical_verb = String(m_addsynonym.captures[1])
                 alias_verb     = String(m_addsynonym.captures[2])
-                SemanticVerbs.add_synonym!(canonical_verb, alias_verb)
-                println("📖 Synonym registered: '$(alias_verb)' → '$(canonical_verb)'. Normalization active.")
+                # GRUG: IMMUNE GATE — synonym map is stored structure!
+                if !immune_gate("/addSynonym", canonical_verb * " " * alias_verb; is_critical=false)
+                    println("⛔ /addSynonym blocked by immune system.")
+                else
+                    SemanticVerbs.add_synonym!(canonical_verb, alias_verb)
+                    println("📖 Synonym registered: '$(alias_verb)' → '$(canonical_verb)'. Normalization active.")
+                end
 
             elseif !isnothing(m_listverbs)
                 # GRUG: /listVerbs - show all registered verb classes and their verbs + synonyms.
@@ -2468,8 +2567,13 @@ function run_cli()
                 # Example: /newLobe language "natural language processing"
                 lobe_id_new  = String(m_newlobe.captures[1])
                 lobe_subject = String(strip(m_newlobe.captures[2]))
-                Lobe.create_lobe!(lobe_id_new, lobe_subject)
-                println("\U0001f9e0 Lobe '$(lobe_id_new)' created for subject: '$(lobe_subject)'. Cap: $(Lobe.LOBE_NODE_CAP) nodes.")
+                # GRUG: IMMUNE GATE — lobe creation is stored structure!
+                if !immune_gate("/newLobe", lobe_id_new * " " * lobe_subject; is_critical=false)
+                    println("⛔ /newLobe blocked by immune system.")
+                else
+                    Lobe.create_lobe!(lobe_id_new, lobe_subject)
+                    println("\U0001f9e0 Lobe '$(lobe_id_new)' created for subject: '$(lobe_subject)'. Cap: $(Lobe.LOBE_NODE_CAP) nodes.")
+                end
 
             elseif !isnothing(m_connectlobes)
                 # GRUG: /connectLobes <id_a> <id_b> - link two lobes bidirectionally.
@@ -2477,8 +2581,13 @@ function run_cli()
                 # Example: /connectLobes language emotion
                 lobe_a = String(m_connectlobes.captures[1])
                 lobe_b = String(m_connectlobes.captures[2])
-                Lobe.connect_lobes!(lobe_a, lobe_b)
-                println("\U0001f517 Lobes '$(lobe_a)' \u2194 '$(lobe_b)' connected.")
+                # GRUG: IMMUNE GATE — lobe connections are stored structure!
+                if !immune_gate("/connectLobes", lobe_a * " " * lobe_b; is_critical=false)
+                    println("⛔ /connectLobes blocked by immune system.")
+                else
+                    Lobe.connect_lobes!(lobe_a, lobe_b)
+                    println("\U0001f517 Lobes '$(lobe_a)' \u2194 '$(lobe_b)' connected.")
+                end
 
             elseif !isnothing(m_lobegrow)
                 # GRUG: /lobeGrow <lobe_id> <json_packet> - grow a node directly into a lobe.
@@ -2488,25 +2597,7 @@ function run_cli()
                 lobe_json      = String(strip(m_lobegrow.captures[2]))
 
                 # GRUG: IMMUNE SYSTEM GATE — scan lobeGrow input before touching anything!
-                lobegrow_immune_passed = true
-                node_count_lg = lock(() -> length(NODE_MAP), NODE_LOCK)
-                try
-                    lg_status, lg_sig = ImmuneSystem.immune_scan!(lobe_json, node_count_lg; is_critical=true)
-                    if lg_status == :deleted
-                        lobegrow_immune_passed = false
-                    end
-                    if lg_status != :immature
-                        println("[IMMUNE] \U0001f6e1  /lobeGrow scan: $lg_status (sig=0x$(string(lg_sig, base=16)))")
-                    end
-                catch e
-                    if e isa ImmuneSystem.ImmuneError
-                        println("[IMMUNE] \u26d4 /lobeGrow REJECTED by immune system: $(e.info)")
-                        add_message_to_history!("System", "\u26d4 /lobeGrow input rejected by immune system: $(e.kind)", false)
-                        lobegrow_immune_passed = false
-                    else
-                        @warn "[IMMUNE] Immune scan threw unexpected error for /lobeGrow (non-fatal): $e"
-                    end
-                end
+                lobegrow_immune_passed = immune_gate("/lobeGrow", lobe_json; is_critical=true)
 
                 if !lobegrow_immune_passed
                     # GRUG: Immune system said no. Skip growth.
@@ -2653,6 +2744,10 @@ function run_cli()
                 # Register a word/phrase as inhibited. Filtered from input before scanning.
                 inhibit_word   = String(strip(m_neginhibit.captures[1]))
                 inhibit_reason = isnothing(m_neginhibit.captures[2]) ? "" : String(strip(m_neginhibit.captures[2]))
+                # GRUG: IMMUNE GATE — inhibition list is stored structure!
+                if !immune_gate("/negativeThesaurus add", inhibit_word; is_critical=false)
+                    println("⛔ /negativeThesaurus add blocked by immune system.")
+                else
                 try
                     InputQueue.add_inhibition!(inhibit_word; reason=inhibit_reason)
                     println("🚫 Inhibition registered: '$(inhibit_word)'" * (isempty(inhibit_reason) ? "" : "  reason: $(inhibit_reason)"))
@@ -2664,6 +2759,7 @@ function run_cli()
                         println("!!! NEGATIVETHESAURUS ERROR: $e !!!")
                     end
                 end
+                end  # GRUG: End immune_gate else block for /negativeThesaurus add
 
             elseif !isnothing(m_negremove)
                 # GRUG: /negativeThesaurus remove <word>
@@ -2733,10 +2829,15 @@ function run_cli()
                 spec_path = String(strip(m_loadspecimen.captures[1]))
                 add_message_to_history!("System", "/loadSpecimen $spec_path", false)
 
-                println("--> Grug thawing specimen from file...")
-                result_summary = load_specimen_from_file!(spec_path)
-                println("\n$result_summary")
-                add_message_to_history!("System", result_summary, false)
+                # GRUG: IMMUNE GATE — loadSpecimen replaces ENTIRE brain! CRITICAL!
+                if !immune_gate("/loadSpecimen", spec_path; is_critical=true)
+                    println("⛔ /loadSpecimen blocked by immune system.")
+                else
+                    println("--> Grug thawing specimen from file...")
+                    result_summary = load_specimen_from_file!(spec_path)
+                    println("\n$result_summary")
+                    add_message_to_history!("System", result_summary, false)
+                end
 
             elseif !isnothing(m_nodeattach)
                 # GRUG: /nodeAttach <target_id> <attach_id1> <pattern1> [<attach_id2> <pattern2> ...]
@@ -2750,6 +2851,10 @@ function run_cli()
                 #
                 # GRUG: Use a regex to extract pairs of (node_id, pattern) after target_id.
                 raw_args = String(strip(m_nodeattach.captures[1]))
+                # GRUG: IMMUNE GATE — node attachments are stored structure!
+                if !immune_gate("/nodeAttach", raw_args; is_critical=false)
+                    println("⛔ /nodeAttach blocked by immune system.")
+                else
                 
                 # GRUG: Tokenize respecting quoted strings
                 tokens = String[]
@@ -2808,6 +2913,7 @@ function run_cli()
                     println("   → $r")
                 end
                 add_message_to_history!("System", "/nodeAttach: $(join(results, " | "))", false)
+                end  # GRUG: End immune_gate else block for /nodeAttach
 
             elseif !isnothing(m_nodedetach)
                 # GRUG: /nodeDetach <target_id> <attach_id>
@@ -2831,6 +2937,10 @@ function run_cli()
                 #
                 # GRUG: Tokenize respecting quoted strings (same as /nodeAttach)
                 raw_args = String(strip(m_imgnodeattach.captures[1]))
+                # GRUG: IMMUNE GATE — image node attachments are stored structure!
+                if !immune_gate("/imgnodeAttach", raw_args; is_critical=false)
+                    println("⛔ /imgnodeAttach blocked by immune system.")
+                else
                 tokens = String[]
                 remaining = raw_args
                 while !isempty(remaining)
@@ -2886,6 +2996,7 @@ function run_cli()
                 println("🖼️🔗 /imgnodeAttach complete:")
                 println("   → $result")
                 add_message_to_history!("System", "/imgnodeAttach: $result", false)
+                end  # GRUG: End immune_gate else block for /imgnodeAttach
 
             elseif !isnothing(m_imgnodedetach)
                 # GRUG: /imgnodeDetach <target_id> <attach_id>

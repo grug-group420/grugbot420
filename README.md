@@ -310,6 +310,36 @@ Both chatter and phagy share the same slow idle timer and the same 1000+ node po
 
 ---
 
+## Vote Tie-Breaking & Certainty
+
+When multiple nodes compete for the same response slot, ties happen. The orchestrator now handles them explicitly instead of silently picking the first sorted result.
+
+### How It Works
+
+1. **Sure Basket**: All votes within 0.05 of the max confidence are bucketed as "sure" candidates.
+
+2. **Exact Tie Detection**: Within the sure basket, votes at the *exact* same confidence (within floating-point epsilon) are identified as tied.
+
+3. **Random Winner**: When ties exist, the tied group is shuffled and one is picked at random. No more deterministic first-in-sort-order bias.
+
+4. **SURE vs UNSURE**: If the primary winner stands alone at the top, the vote is classified as `SURE`. If ties existed, it's `UNSURE`. This classification is available to AIML rules via `{VOTE_CERTAINTY}`.
+
+5. **Tied Alternatives**: Non-selected tied winners are listed at the bottom of the response with their node ID, action, confidence, and relational triples — so you can see what the other tied rocks looked like.
+
+6. **Runner-Up Possibilities**: Unsure votes (below the sure threshold but kept via coinflip) are listed as "Other Possibilities" with their relations.
+
+### AIML Rule Tags
+
+Two new tags are available in `/addRule` templates:
+
+| Tag | Expands To |
+|---|---|
+| `{VOTE_CERTAINTY}` | `SURE` or `UNSURE` — whether a tie existed |
+| `{TIED_ALTERNATIVES}` | Comma-separated list of tied non-winners with their actions and confidence |
+
+Example rule: `/addRule When {VOTE_CERTAINTY} is UNSURE, also consider: {TIED_ALTERNATIVES} [prob=0.8]`
+
+---
 
 ## Specimen Immune System
 
@@ -317,7 +347,7 @@ Once a specimen reaches maturity (≥ 1000 nodes), an automata-based immune syst
 
 ### How It Works
 
-1. **AST Scan**: Every `/grow` and `/lobeGrow` command gets a high-resolution structural scan before touching anything. The scan produces an AST signature — a structural fingerprint of the input.
+1. **AST Scan**: Every structure-storing command gets a high-resolution structural scan before touching anything. The scan produces an AST signature — a structural fingerprint of the input.
 
 2. **Hopfield Immune Memory**: Non-funky signatures are stored in an attractor memory. Repeated safe inputs strengthen their basin, making future recognition instant.
 
@@ -341,13 +371,33 @@ Once a specimen reaches maturity (≥ 1000 nodes), an automata-based immune syst
 
 ### CLI Integration
 
-The immune system gates `/grow` and `/lobeGrow` commands automatically. When it rejects an input, you'll see:
+The immune system gates **all structure-storing commands** automatically. Gated commands (critical gates marked with ⚡):
+
+| Command | Gate | Notes |
+|---|---|---|
+| `/grow` | ⚡ Critical | Modifies node population |
+| `/lobeGrow` | ⚡ Critical | Grows nodes into lobes |
+| `/loadSpecimen` | ⚡ Critical | Replaces entire brain state |
+| `/addRule` | Standard | Stores AIML orchestration rules |
+| `/pin` | Standard | Stores pinned memory |
+| `/addVerb` | Standard | Modifies verb registry |
+| `/addRelationClass` | Standard | Creates verb class buckets |
+| `/addSynonym` | Standard | Modifies synonym map |
+| `/newLobe` | Standard | Creates lobe structure |
+| `/connectLobes` | Standard | Links lobes bidirectionally |
+| `/negativeThesaurus add` | Standard | Adds inhibition entries |
+| `/nodeAttach` | Standard | Modifies node attachments |
+| `/imgnodeAttach` | Standard | Modifies image node attachments |
+
+**Exempt commands** (read-only or destructive-remove-only): `/mission`, `/wrong`, `/explicit`, `/nodes`, `/status`, `/lobes`, `/listVerbs`, `/thesaurus`, `/help`, `/arousal`, `/saveSpecimen`, `/attachments`, `/tableStatus`, `/tableMatch`, `/nodeDetach`, `/imgnodeDetach`, `/negativeThesaurus remove/flush/list/check`.
+
+When the immune system rejects an input, you'll see:
 
 ```
 [IMMUNE] ⛔ /grow REJECTED by immune system: Funky input failed patching and was deleted
 ```
 
-Immune state (Hopfield memory + ledger) is saved/restored with `/saveSpecimen` and `/loadSpecimen`.
+All gates use the shared `immune_gate()` helper — no copy-pasted immune logic. Immune state (Hopfield memory + ledger) is saved/restored with `/saveSpecimen` and `/loadSpecimen`.
 
 Full specification: [`docs/immune_system.html`](./docs/immune_system.html)
 

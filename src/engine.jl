@@ -2116,7 +2116,9 @@ const ALLOWED_RULE_TAGS = Set([
     "{CONFIDENCE}",
     "{NODE_ID}",
     "{MEMORY}",
-    "{LOBE_CONTEXT}"
+    "{LOBE_CONTEXT}",
+    "{VOTE_CERTAINTY}",
+    "{TIED_ALTERNATIVES}"
 ])
 
 """
