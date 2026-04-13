@@ -381,7 +381,7 @@ function attempt_patch(input_text::String, sig::UInt64; t_max::Float64=PATCH_TIM
     reasonable_length = 1 <= length(tokens) <= 500
 
     # Check 3: Character encoding sanity (no excessive control characters)
-    control_chars = count(c -> iscontrol(c) && c != '\n' && c != '\r' && c != '\t', text)
+    control_chars = count(c -> iscntrl(c) && c != '\n' && c != '\r' && c != '\t', text)
     clean_encoding = control_chars <= 2
 
     # GRUG: Time check — don't exceed our budget
