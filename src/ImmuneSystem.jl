@@ -260,7 +260,7 @@ function immune_ast_signature(input_text::String)::UInt64
 
     # 3. Character class ratio: alpha vs numeric vs punctuation
     text_flat = join(tokens, " ")
-    n_alpha = count(isalpha, text_flat)
+    n_alpha = count(isletter, text_flat)
     n_digit = count(isdigit, text_flat)
     n_punct = count(c -> ispunct(c), text_flat)
     n_total = max(length(text_flat), 1)
