@@ -58,6 +58,11 @@ using .ChatterMode
 include("PhagyMode.jl")
 using .PhagyMode
 
+# GRUG: Immune system — must be included before engine.jl so engine can use it.
+# Scans all growth/ledger inputs for funky patterns before they touch anything.
+include("ImmuneSystem.jl")
+using .ImmuneSystem
+
 include("engine.jl")
 include("Main.jl")
 
@@ -71,5 +76,6 @@ export sdf_to_signal, JITGPU
 export add_verb!, add_relation_class!, add_synonym!
 export create_lobe!, connect_lobes!, lobe_grow!
 export create_lobe_table!
+export immune_scan!, get_immune_status, get_ledger_entries
 
 end # module GrugBot420

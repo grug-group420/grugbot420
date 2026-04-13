@@ -60,6 +60,13 @@ if !isdefined(@__MODULE__, :InputQueue)
     using .InputQueue
 end
 
+# GRUG: Bring the Immune System into the cave!
+# GRUG: Guard against double-include if ImmuneSystem already loaded by caller.
+if !isdefined(@__MODULE__, :ImmuneSystem)
+    include("ImmuneSystem.jl")
+    using .ImmuneSystem
+end
+
 using Base64: base64decode
 
 # ==============================================================================
@@ -1191,10 +1198,16 @@ function save_specimen_to_file!(filepath::String)::String
     # ── METADATA ──────────────────────────────────────────────────
     # GRUG: Version bumped to 2.1 — added trajectory, temporal_coherence, morph_cooldowns.
     # Academic: v2.1 is backward-compatible with v2.0 on load (new keys are optional).
+    # —— 18. IMMUNE SYSTEM STATE ————————————————————————————
+    # GRUG: Save immune Hopfield memory + ledger so specimen remembers what was safe/funky.
+    # Academic: Without this, the immune system resets on every load —
+    # losing all learned safe signatures and audit history.
+    specimen["immune_system"] = ImmuneSystem.serialize_immune_state()
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.1",
+        "version"    => "2.2",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.1"
+        "format"     => "grugbot420-specimen-v2.2"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -1321,7 +1334,7 @@ function load_specimen_from_file!(filepath::String)::String
                         "lobes", "node_to_lobe_idx", "lobe_tables",
                         "verb_registry", "thesaurus_seeds", "inhibitions",
                         "arousal", "id_counters", "brainstem", "attachments",
-                        "trajectory", "temporal_coherence", "morph_cooldowns", "_meta"])
+                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
             push!(validation_errors, "Unknown top-level key '$key'")
@@ -1337,7 +1350,7 @@ function load_specimen_from_file!(filepath::String)::String
 
     # GRUG: Type checks for critical dict sections
     for k in ["node_to_lobe_idx", "verb_registry", "thesaurus_seeds", "arousal", "id_counters", "brainstem",
-             "trajectory", "morph_cooldowns", "_meta"]
+             "trajectory", "morph_cooldowns", "immune_system", "_meta"]
         if haskey(specimen, k) && !isa(specimen[k], Dict)
             push!(validation_errors, "'$k' must be an object")
         end
@@ -1451,6 +1464,10 @@ function load_specimen_from_file!(filepath::String)::String
     lock(ChatterMode.MORPH_COOLDOWN_LOCK) do
         empty!(ChatterMode.MORPH_COOLDOWN_MAP)
     end
+
+    # Wipe immune system state
+    # GRUG: Clear all immune memory. Specimen will bring its own.
+    ImmuneSystem.reset_immune_state!()
 
     println("  ✅ Cave wiped clean. Beginning restore...")
 
@@ -1947,6 +1964,21 @@ function load_specimen_from_file!(filepath::String)::String
         println("  ⏳ Morph cooldowns restored ($n_cooldowns active)")
     end
 
+    # —— 4.18 IMMUNE SYSTEM STATE ——————————————————————————————
+    if haskey(specimen, "immune_system") && isa(specimen["immune_system"], Dict)
+        ImmuneSystem.deserialize_immune_state!(specimen["immune_system"])
+        n_immune_sigs = lock(ImmuneSystem.IMMUNE_HOPFIELD_LOCK) do
+            length(ImmuneSystem.IMMUNE_HOPFIELD)
+        end
+        n_immune_log = lock(ImmuneSystem.LEDGER_LOCK) do
+            length(ImmuneSystem.IMMUNE_LEDGER)
+        end
+        counts["immune_signatures"] = n_immune_sigs
+        counts["immune_ledger"] = n_immune_log
+        println("  🛡 Immune system restored ($n_immune_sigs signatures, $n_immune_log ledger entries)")
+    end
+
+
     # ══════════════════════════════════════════════════════════════════════
     # PHASE 5: BUILD SUMMARY SCROLL
     # ══════════════════════════════════════════════════════════════════════
@@ -2255,24 +2287,50 @@ function run_cli()
                 # Regex pre-screens JSON for image binary patterns before parsing.
                 json_text = String(m_grow.captures[1])
                 add_message_to_history!("System", "/grow [JSON MAP PACKET]", false)
-                
-                println("--> Grug unpacking JSON node seeds...")
 
-                # GRUG: Check if the grow packet contains image binary data.
-                # If pattern field has image binary, flag it as image node automatically.
-                is_img, img_sig = maybe_convert_image_input(json_text)
-                if is_img
-                    println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
-                    # GRUG: The JSON node grower in Engine.jl handles is_image_node flag.
-                    # Image binary in pattern will be stored as SDF signal.
-                    # Caller must set "is_image_node": true in the JSON for this to work.
+                # GRUG: IMMUNE SYSTEM GATE — scan grow input before touching anything!
+                # /grow is a CRITICAL command (modifies node population). Full immune scan.
+                node_count = lock(() -> length(NODE_MAP), NODE_LOCK)
+                immune_passed = true
+                try
+                    status, _sig = ImmuneSystem.immune_scan!(json_text, node_count; is_critical=true)
+                    if status == :deleted
+                        immune_passed = false
+                    end
+                    if status != :immature
+                        println("[IMMUNE] 🛡  /grow scan: $status (sig=0x$(string(_sig, base=16)))")
+                    end
+                catch e
+                    if e isa ImmuneSystem.ImmuneError
+                        println("[IMMUNE] ⛔ /grow REJECTED by immune system: $(e.info)")
+                        add_message_to_history!("System", "⛔ /grow input rejected by immune system: $(e.kind)", false)
+                        immune_passed = false
+                    else
+                        # GRUG: Immune system itself broke. Log it but don't block growth.
+                        # Non-fatal: immune failure should not kill the cave.
+                        @warn "[IMMUNE] Immune scan threw unexpected error (non-fatal): $e"
+                    end
                 end
 
-                new_ids = grow_nodes_from_packet(json_text)
-                
-                success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes: [$(join(new_ids, ", "))]"
-                println(success_msg)
-                add_message_to_history!("System", success_msg, false)
+                if immune_passed
+                    println("--> Grug unpacking JSON node seeds...")
+
+                    # GRUG: Check if the grow packet contains image binary data.
+                    # If pattern field has image binary, flag it as image node automatically.
+                    is_img, img_sig = maybe_convert_image_input(json_text)
+                    if is_img
+                        println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
+                        # GRUG: The JSON node grower in Engine.jl handles is_image_node flag.
+                        # Image binary in pattern will be stored as SDF signal.
+                        # Caller must set "is_image_node": true in the JSON for this to work.
+                    end
+
+                    new_ids = grow_nodes_from_packet(json_text)
+
+                    success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes: [$(join(new_ids, ", "))]"
+                    println(success_msg)
+                    add_message_to_history!("System", success_msg, false)
+                end
 
             elseif !isnothing(m_rule)
                 # GRUG: /addRule - add a stochastic orchestration rule.
@@ -2428,7 +2486,31 @@ function run_cli()
                 # Example: /lobeGrow language {"pattern":"hello","action_packet":"{...}"}
                 target_lobe_id = String(m_lobegrow.captures[1])
                 lobe_json      = String(strip(m_lobegrow.captures[2]))
-                if !haskey(Lobe.LOBE_REGISTRY, target_lobe_id)
+
+                # GRUG: IMMUNE SYSTEM GATE — scan lobeGrow input before touching anything!
+                lobegrow_immune_passed = true
+                node_count_lg = lock(() -> length(NODE_MAP), NODE_LOCK)
+                try
+                    lg_status, lg_sig = ImmuneSystem.immune_scan!(lobe_json, node_count_lg; is_critical=true)
+                    if lg_status == :deleted
+                        lobegrow_immune_passed = false
+                    end
+                    if lg_status != :immature
+                        println("[IMMUNE] \U0001f6e1  /lobeGrow scan: $lg_status (sig=0x$(string(lg_sig, base=16)))")
+                    end
+                catch e
+                    if e isa ImmuneSystem.ImmuneError
+                        println("[IMMUNE] \u26d4 /lobeGrow REJECTED by immune system: $(e.info)")
+                        add_message_to_history!("System", "\u26d4 /lobeGrow input rejected by immune system: $(e.kind)", false)
+                        lobegrow_immune_passed = false
+                    else
+                        @warn "[IMMUNE] Immune scan threw unexpected error for /lobeGrow (non-fatal): $e"
+                    end
+                end
+
+                if !lobegrow_immune_passed
+                    # GRUG: Immune system said no. Skip growth.
+                elseif !haskey(Lobe.LOBE_REGISTRY, target_lobe_id)
                     println("\u26a0  /lobeGrow: Lobe '$(target_lobe_id)' does not exist. Use /newLobe first.")
                 elseif Lobe.lobe_is_full(target_lobe_id)
                     println("!!! LOBE FULL: Lobe '$(target_lobe_id)' has reached its node cap. Cannot grow more nodes! Use /newLobe to add a new lobe. !!!")

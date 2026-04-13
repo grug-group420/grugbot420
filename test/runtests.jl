@@ -22,6 +22,7 @@ const ALL_TESTS = [
     "test_smoke.jl",
     "test_phagy.jl",
     "test_node_attach.jl",
+    "test_immune.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

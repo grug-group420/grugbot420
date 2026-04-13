@@ -1,6 +1,6 @@
 # 🧠 grugbot420
 
-[![CI](https://github.com/marshalldavidson61-arch/grugbot420/actions/workflows/CI.yml/badge.svg)](https://github.com/marshalldavidson61-arch/grugbot420/actions/workflows/CI.yml)
+[![CI](https://github.com/grug-group420/grugbot420/actions/workflows/CI.yml/badge.svg)](https://github.com/grug-group420/grugbot420/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Julia](https://img.shields.io/badge/Julia-1.9%2B-blue.svg)](https://julialang.org)
 
@@ -311,6 +311,48 @@ Both chatter and phagy share the same slow idle timer and the same 1000+ node po
 ---
 
 
+## Specimen Immune System
+
+Once a specimen reaches maturity (≥ 1000 nodes), an automata-based immune system activates to protect the node population from funky inputs. This is not adversarial security — it's biological: tolerance-based, stochastic, and imperfect by design.
+
+### How It Works
+
+1. **AST Scan**: Every `/grow` and `/lobeGrow` command gets a high-resolution structural scan before touching anything. The scan produces an AST signature — a structural fingerprint of the input.
+
+2. **Hopfield Immune Memory**: Non-funky signatures are stored in an attractor memory. Repeated safe inputs strengthen their basin, making future recognition instant.
+
+3. **Funky Detection**: If a signature doesn't match known patterns in the immune Hopfield memory, it's flagged as funky.
+
+4. **Population Coinflip**: Funky inputs trigger an automata population (1/3 of node count). Each agent coinflips independently (50/50) before intervening — this prevents explosion.
+
+5. **Quarantine → Patch → Delete**: Materialized agents quarantine the input, attempt structural patching within a stochastic timer, and delete on failure.
+
+6. **No Silent Failures**: Every decision — funky detection, coinflip skip, patch success, patch failure, deletion — is logged in an append-only immune ledger. Nothing happens in the dark.
+
+### Key Constants
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `MATURITY_THRESHOLD` | 1000 | Immune system sleeps below this node count |
+| `AUTOMATA_POPULATION_RATIO` | 1/3 | Automata count = nodes ÷ 3 |
+| `COINFLIP_PROBABILITY` | 0.5 | Per-agent materialization probability |
+| `PATCH_TIMEOUT_SECONDS` | 2.0 | Max time for patch attempt (± 0.5s jitter) |
+| `HOPFIELD_FAMILIARITY_THRESHOLD` | 3 | Sightings needed before a signature is "strongly known" |
+
+### CLI Integration
+
+The immune system gates `/grow` and `/lobeGrow` commands automatically. When it rejects an input, you'll see:
+
+```
+[IMMUNE] ⛔ /grow REJECTED by immune system: Funky input failed patching and was deleted
+```
+
+Immune state (Hopfield memory + ledger) is saved/restored with `/saveSpecimen` and `/loadSpecimen`.
+
+Full specification: [`docs/immune_system.html`](./docs/immune_system.html)
+
+---
+
 ## File Reference
 
 | File | Role |
@@ -330,6 +372,7 @@ Both chatter and phagy share the same slow idle timer and the same 1000+ node po
 | `src/ImageSDF.jl` | `JITGPU(binary)` — real KernelAbstractions.jl GPU kernel dispatch for image→SDF conversion. CPU reference path (`image_to_sdf_params`) kept for backward compat. |
 | `src/SemanticVerbs.jl` | Live mutable verb registry: causal, spatial, temporal classes + runtime synonyms. |
 | `src/ActionTonePredictor.jl` | Pre-vote input classifier: predicts action type and tone, nudges arousal and confidence weights. |
+| `src/ImmuneSystem.jl` | Specimen immune system: automata-based anomaly handling for growth/ledger commands. AST scanning, Hopfield immune memory, quarantine-patch-delete pipeline. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---
@@ -337,6 +380,8 @@ Both chatter and phagy share the same slow idle timer and the same 1000+ node po
 ## Documentation
 
 Open `grugbot_whitepaper.html` in a browser for the full technical whitepaper covering architecture, formal mathematics, all subsystems, and design rationale.
+
+See [`docs/immune_system.html`](./docs/immune_system.html) for the immune system specification (grug analogy, academic details, math/lambda, flowchart).
 
 ---
 
