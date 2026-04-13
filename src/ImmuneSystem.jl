@@ -322,7 +322,7 @@ function detect_funky(sig::UInt64, input_text::String)::Bool
         # JSON-shaped inputs: check for balanced brackets (rough check)
         open_count = count(c -> c == '{' || c == '[', text)
         close_count = count(c -> c == '}' || c == ']', text)
-        if abs(open_count - close_count) > 1
+        if open_count != close_count
             return true  # GRUG: Unbalanced brackets = funky!
         end
         # GRUG: If seen before even once (not strongly), still give benefit of doubt
