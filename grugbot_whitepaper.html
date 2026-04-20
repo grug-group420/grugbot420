@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.5</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -222,6 +222,8 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#chatter">13. ChatterMode: Gossip Sessions</a></li>
         <li><a href="#semantic-verbs">14. SemanticVerbs: Runtime Verb Registry</a></li>
         <li><a href="#action-tone">15. ActionTonePredictor: Input Classification</a></li>
+        <li><a href="#full-lobe-scanner">15.5 FullLobeScanner: Phase-Gated Lobe Sweep</a> <span class="new-badge">v7.5</span></li>
+        <li><a href="#immune-thread-pool">15.6 ImmuneThreadPool: Hardened Task Execution</a> <span class="new-badge">v7.5</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -848,6 +850,172 @@ Verb classes include <code>causal</code>, <code>spatial</code>, <code>temporal</
 misaligned nodes get <1.0. This biases voting toward contextually appropriate responses.</p>
 
 <!-- ================================================================ -->
+<h2 id="full-lobe-scanner">15.5 FullLobeScanner: Phase-Gated Lobe Sweep <span class="new-badge">v7.5</span></h2>
+
+<p>
+The <strong>FullLobeScanner</strong> is a phase-gated associative memory scanner that sweeps an entire lobe's
+feature-vector space to find pattern matches and semantically related nodes. Unlike <code>scan_specimens</code>
+(which works on the flat <code>NODE_MAP</code>), FullLobeScanner operates on a <code>Dict{String, Vector{Float64}}</code>
+feature dictionary and produces typed match results with spreading-activation semantics.
+</p>
+
+<div class="grug-box">
+    <p>Grug need BIG scan. Not just one node at a time. WHOLE LOBE scan. But not too big — Grug have limit.
+    <strong>1000 nodes max</strong> in active set. No runaway! Also Grug like <strong>phases</strong>. One phase at a time.
+    No skipping ahead. No going back. Very organized. And <strong>AIML wait for DONE signal</strong> — no premature
+    talk! Grug say when ready.</p>
+</div>
+
+<h3>Scan Phases</h3>
+<p>The scanner advances through a strict one-way phase machine:</p>
+<table>
+    <tr><th>Phase</th><th>Constant</th><th>Entered by</th><th>What happens</th></tr>
+    <tr><td>Init</td><td><code>PHASE_INIT</code></td><td><code>FullLobeScannerState(...)</code></td><td>Scanner constructed, no query yet</td></tr>
+    <tr><td>Gather</td><td><code>PHASE_GATHER</code></td><td><code>set_query!(scanner, vec)</code></td><td>Query vector stored</td></tr>
+    <tr><td>Activate</td><td><code>PHASE_ACTIVATE</code></td><td><code>gather_candidates!(scanner, dict)</code></td><td>Cosine similarity scored for all features</td></tr>
+    <tr><td>Continue</td><td><code>PHASE_CONTINUE</code></td><td><code>activate_candidates!(scanner)</code></td><td>Candidates ranked, jitter applied</td></tr>
+    <tr><td>Done</td><td><code>PHASE_DONE</code></td><td><code>spread_activation!(scanner, dict)</code></td><td>AIML gate unlocked</td></tr>
+</table>
+
+<h3>Match Types</h3>
+<p>Two distinct match types provide clear provenance for downstream consumers:</p>
+
+<table>
+    <tr><th>Type</th><th>Fields</th><th>Description</th></tr>
+    <tr>
+        <td><code>PatternMatch</code></td>
+        <td><code>node_id, confidence, matched_pattern, source_lobe</code></td>
+        <td>Direct cosine similarity hit between query and a stored feature vector</td>
+    </tr>
+    <tr>
+        <td><code>SemanticMatch</code></td>
+        <td><code>node_id, confidence, seed_node_id, semantic_distance, source_lobe</code></td>
+        <td>Secondary hit found via spreading activation — similar to a PatternMatch winner</td>
+    </tr>
+</table>
+
+<h3>Key Constants</h3>
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>MAX_ACTIVE_NODES</code></td><td>1000</td><td>Hard cap on candidates entering the active set</td></tr>
+    <tr><td><code>SCANNER_CONFIDENCE_THRESHOLD</code></td><td>0.65</td><td>Minimum cosine similarity to include a candidate</td></tr>
+    <tr><td><code>SCANNER_MAX_HOPS</code></td><td>3</td><td>Maximum spreading-activation depth</td></tr>
+    <tr><td><code>SCANNER_THREADS</code></td><td>4</td><td>Worker threads for parallel candidate gathering</td></tr>
+    <tr><td><code>SEMANTIC_DISTANCE_THRESHOLD</code></td><td>0.70</td><td>Cosine distance cutoff for semantic neighbor inclusion</td></tr>
+</table>
+
+<h3>AIML Gating</h3>
+<p>Results are <strong>blocked from AIML until <code>PHASE_DONE</code></strong> is reached and
+<code>emit_done_signal!</code> is called. Always check <code>is_aiml_gated(scanner)</code> before
+handing results to the orchestrator:</p>
+
+<pre><code>scanner = FullLobeScannerState("science"; threshold=0.7)
+set_query!(scanner, query_vec)
+gather_candidates!(scanner, feature_dict)
+activate_candidates!(scanner)
+spread_activation!(scanner, feature_dict)
+emit_done_signal!(scanner)
+
+if !is_aiml_gated(scanner)
+    matches = get_pattern_matches(scanner)
+    # hand matches to orchestrator
+end</code></pre>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> Phase gating eliminates entire classes of race conditions.
+    The scanner cannot be queried for results until explicitly finished. The AIML gate prevents
+    premature consumption of partial results. Bounded activation (1000 nodes max) guarantees
+    predictable memory usage regardless of lobe size.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="immune-thread-pool">15.6 ImmuneThreadPool: Hardened Task Execution <span class="new-badge">v7.5</span></h2>
+
+<p>
+The <strong>ImmuneThreadPool</strong> is a priority-lane thread pool with per-source rate limiting,
+cost-weighted load balancing, and a tripwire state machine. It provides hardened task execution
+for scan workloads that must not overwhelm the system under adversarial or runaway conditions.
+</p>
+
+<div class="grug-box">
+    <p>Grug have WORKERS. Eight of them! But not all work same. <strong>Priority lanes</strong> — critical work
+    first, junk work last. Grug also have <strong>rate limit</strong> — no flood allowed! Token bucket.
+    Tokens run out? Wait. And <strong>tripwire</strong> — too many rejected? System get HARDENED.
+    Rate limit get TIGHTER. Self-defense! Very smart cave brain.</p>
+</div>
+
+<h3>Priority Lanes</h3>
+<p>Tasks are submitted with a priority level. Each priority has its own waiting list:</p>
+<table>
+    <tr><th>Priority</th><th>Constant</th><th>Use case</th></tr>
+    <tr><td>Critical</td><td><code>PRIORITY_CRITICAL</code></td><td>Immune system responses, hard deadlines</td></tr>
+    <tr><td>Normal</td><td><code>PRIORITY_NORMAL</code></td><td>Standard scan tasks</td></tr>
+    <tr><td>Low</td><td><code>PRIORITY_LOW</code></td><td>Background maintenance</td></tr>
+    <tr><td>Junk</td><td><code>PRIORITY_JUNK</code></td><td>Throwaway / test tasks</td></tr>
+</table>
+
+<h3>Rate Limiting (TokenBucket)</h3>
+<p>Each source has its own <code>TokenBucket</code>. Internal sources bypass rate limiting.
+External sources are subject to standard limits; limits tighten when the tripwire escalates:</p>
+
+<table>
+    <tr><th>Constant</th><th>Description</th></tr>
+    <tr><td><code>RATE_LIMIT_TOKENS_PER_SEC</code></td><td>Normal-state token refill rates per source</td></tr>
+    <tr><td><code>RATE_LIMIT_BURST</code></td><td>Normal-state burst capacity per source</td></tr>
+    <tr><td><code>RATE_LIMIT_TOKENS_PER_SEC_HARDENED</code></td><td>Hardened-state refill rates (reduced)</td></tr>
+    <tr><td><code>RATE_LIMIT_BURST_HARDENED</code></td><td>Hardened-state burst capacity (reduced)</td></tr>
+</table>
+
+<h3>Tripwire State Machine</h3>
+<p>The <code>TripwireMonitor</code> watches the rejection rate over a sliding window and escalates the
+system's defense posture:</p>
+
+<pre>
+NORMAL ──(rejection rate > TRIPWIRE_ELEVATED_THRESHOLD)──► ELEVATED
+ELEVATED ──(rate > TRIPWIRE_HARDENED_THRESHOLD)──► HARDENED
+HARDENED ──(rate > TRIPWIRE_CRITICAL_THRESHOLD)──► CRITICAL
+CRITICAL / any ──(rate drops below ELEVATED threshold)──► NORMAL
+</pre>
+
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Description</th></tr>
+    <tr><td><code>TRIPWIRE_WINDOW_S</code></td><td>60.0</td><td>Sliding window for rejection rate calculation</td></tr>
+    <tr><td><code>TRIPWIRE_ELEVATED_THRESHOLD</code></td><td>0.10</td><td>10% rejection rate triggers ELEVATED</td></tr>
+    <tr><td><code>TRIPWIRE_HARDENED_THRESHOLD</code></td><td>0.25</td><td>25% triggers HARDENED (rate limits tighten)</td></tr>
+    <tr><td><code>TRIPWIRE_CRITICAL_THRESHOLD</code></td><td>0.50</td><td>50% triggers CRITICAL</td></tr>
+</table>
+
+<h3>Cost-Weighted Load Balancing</h3>
+<p>Tasks carry an estimated cost in milliseconds. Expensive tasks are weighted more heavily when
+dispatching to workers, preventing the pool from being clogged by expensive work:</p>
+
+<table>
+    <tr><th>Cost</th><th>Constant</th><th>Weight</th></tr>
+    <tr><td>Cheap</td><td><code>COST_CHEAP</code></td><td>1</td></tr>
+    <tr><td>Moderate</td><td><code>COST_MODERATE</code></td><td>3</td></tr>
+    <tr><td>Expensive</td><td><code>COST_EXPENSIVE</code></td><td>8</td></tr>
+</table>
+
+<h3>Core API</h3>
+<table>
+    <tr><th>Function</th><th>Description</th></tr>
+    <tr><td><code>create_immune_thread_pool(n_workers)</code></td><td>Create a pool with n workers (default 8)</td></tr>
+    <tr><td><code>submit_immune_work!(pool, task_id, cost_ms; priority, source)</code></td><td>Submit a task with cost estimate</td></tr>
+    <tr><td><code>shutdown_immune_pool!(pool)</code></td><td>Graceful shutdown: drain queues, stop workers</td></tr>
+    <tr><td><code>get_tripwire_state(monitor)</code></td><td>Returns current state symbol (:normal, :elevated, etc.)</td></tr>
+    <tr><td><code>get_rejection_rate(monitor)</td><td>Returns rejection rate in the sliding window</td></tr>
+    <tr><td><code>try_consume!(bucket, n)</code></td><td>Attempt to consume tokens from a TokenBucket</td></tr>
+</table>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> The ImmuneThreadPool is designed for adversarial conditions.
+    Priority lanes ensure critical work is never blocked by background noise. Token buckets prevent
+    any single source from monopolizing the pool. The tripwire state machine provides automatic
+    escalation when under pressure — the system self-hardens. Cost-weighted load balancing ensures
+    expensive tasks don't starve cheap ones.
+</div>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -1297,7 +1465,7 @@ The signal is not in the wire. Only the computation is. And the computation was 
 <!-- ================================================================ -->
 <h2 id="files">19. File Reference</h2>
 
-<h3>Core Modules (15 files, ~9,631 lines)</h3>
+<h3>Core Modules (17 files, ~11,200 lines)</h3>
 <table>
     <tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
     <tr><td><code>stochastichelper.jl</code></td><td>168</td><td>@coinflip macro, Categorical distribution DSL</td></tr>
@@ -1315,9 +1483,12 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>Thesaurus.jl</code></td><td>698</td><td>Dimensional similarity, synonym bridging, gate filter, runtime seed injection</td></tr>
     <tr><td><code>PhagyMode.jl</code></td><td>611</td><td>6 maintenance automata, self-pruning cycles</td></tr>
     <tr><td><code>Main.jl</code></td><td>2,390</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence</td></tr>
+    <tr><td><code>ImmuneSystem.jl</code></td><td>850</td><td>Specimen immune system: AST scanning, Hopfield immune memory, quarantine→patch→delete pipeline</td></tr>
+    <tr><td><code>ImmuneThreadPool.jl</code></td><td>520</td><td>Hardened task executor: 8-worker priority-lane pool, TokenBucket rate limiting, TripwireMonitor</td></tr>
+    <tr><td><code>FullLobeScanner.jl</code></td><td>1,050</td><td>Phase-gated full-lobe associative scanner: bounded activation, spreading activation, AIML gating</td></tr>
 </table>
 
-<h3>Test Files (11 files)</h3>
+<h3>Test Files (13 files)</h3>
 <table>
     <tr><th>File</th><th>Groups</th><th>Assertions</th><th>Coverage</th></tr>
     <tr><td><code>test_smoke.jl</code></td><td>16</td><td>~80</td><td>All modules integration: ImageSDF, EyeSystem, Engine, ChatterMode, SemanticVerbs, ActionTone</td></tr>
@@ -1331,6 +1502,9 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>test_load_specimen.jl</code></td><td>14</td><td>102</td><td>Specimen persistence: gzip round-trip, node/lobe/verb/hopfield/brainstem serialization, full save+load cycle</td></tr>
     <tr><td><code>test_phagy.jl</code></td><td>—</td><td>—</td><td>Phagy automaton cycle (placeholder)</td></tr>
     <tr><td><code>live_training_test.jl</code></td><td>22</td><td>—</td><td>Multi-lobe training: 7 lobes, 21 nodes, cascade, cross-domain</td></tr>
+    <tr><td><code>test_immune.jl</code></td><td>20</td><td>~300</td><td>Immune system: Hopfield memory, quarantine/patch/delete pipeline, familiarity tracking</td></tr>
+    <tr><td><code>test_immune_thread_pool.jl</code></td><td>15</td><td>~150</td><td>ImmuneThreadPool: priority lanes, TokenBucket, TripwireMonitor, cost-weighted balancing</td></tr>
+    <tr><td><code>test_full_lobe_scanner.jl</code></td><td>18</td><td>~200</td><td>FullLobeScanner: phase machine, PatternMatch/SemanticMatch, AIML gating, bounded activation</td></tr>
 </table>
 
 <!-- ================================================================ -->
@@ -1375,6 +1549,16 @@ julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.5 — Full-Lobe Scanning & Hardened Execution</h3>
+    <ul>
+        <li><strong>FullLobeScanner</strong>: Phase-gated associative memory scanner for entire lobe sweeps — bounded activation (1000 nodes max), cosine similarity matching, spreading activation, AIML gating until DONE signal</li>
+        <li><strong>ImmuneThreadPool</strong>: Hardened 8-worker task pool with priority lanes (CRITICAL/NORMAL/LOW/JUNK), per-source TokenBucket rate limiting, cost-weighted load balancing, TripwireMonitor state machine (NORMAL→ELEVATED→HARDENED→CRITICAL)</li>
+        <li>Two new match types: <code>PatternMatch</code> (direct cosine hit) and <code>SemanticMatch</code> (spreading activation neighbor)</li>
+        <li>Full export surface for ImmuneThreadPool: 18 previously missing symbols now public API</li>
+        <li>Test suite expanded from 12 to 14 files: <code>test_immune_thread_pool.jl</code>, <code>test_full_lobe_scanner.jl</code></li>
+        <li>Documentation: API reference, architecture diagram, wiki pages, README all updated</li>
+        <li>CI deploydocs URL corrected (marshalldavidson61-arch → grug-group420)</li>
+    </ul>
     <h3>v7.4 — Persistence Completeness</h3>
     <ul>
         <li>Fixed StochasticRule field name bug in <code>/saveSpecimen</code> (r.rule_text → r.text, r.fire_prob → r.fire_probability)</li>
@@ -1438,7 +1622,7 @@ julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code
 </div>
 
 <div class="signature">
-    <p>GrugBot Neuromorphic Engine v7.2 &mdash; Technical Whitepaper</p>
+    <p>GrugBot Neuromorphic Engine v7.5 &mdash; Technical Whitepaper</p>
     <p>🦴 "Cave brain think different. That is why cave brain strong." &mdash; Grug</p>
 </div>
 
