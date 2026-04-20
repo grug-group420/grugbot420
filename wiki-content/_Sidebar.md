@@ -21,6 +21,7 @@
 - [[Thesaurus System]]
 - [[Relational Fire]]
 - [[EyeSystem & Image SDF]]
+- [[Full Lobe Scanner]]
 
 **Guides**
 - [[Seeding a New Specimen]]

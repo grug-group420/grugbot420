@@ -1,5 +1,8 @@
 using Documenter
-using GrugBot420
+# GRUG: GrugBot420 uses __precompile__(false) and dynamic submodule includes,
+# so Documenter cannot auto-extract @doc docstrings via the module reference.
+# Documentation is maintained manually in docs/src/*.md files.
+# modules = Module[] is intentional — do not change to [GrugBot420].
 
 makedocs(
     sitename = "GrugBot420.jl",
@@ -18,6 +21,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/marshalldavidson61-arch/grugbot420.git",
+    repo = "github.com/grug-group420/grugbot420.git",
     devbranch = "main",
 )

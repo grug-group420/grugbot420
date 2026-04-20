@@ -85,6 +85,8 @@ Winner-take-all dispatcher with cross-lobe signal propagation and fire-count dec
 | [[EyeSystem & Image SDF]] | `EyeSystem.jl`, `ImageSDF.jl` | Visual attention and GPU SDF conversion |
 | [[Relational Fire]] | `engine.jl` | JIT confidence-baked node attachment chains |
 | ActionTonePredictor | `ActionTonePredictor.jl` | Pre-vote action/tone classification |
+| [[Full Lobe Scanner]] | `FullLobeScanner.jl` | Phase-gated full-lobe associative scan with spreading activation; AIML gated until DONE |
+| ImmuneThreadPool | `ImmuneThreadPool.jl` | Hardened 8-worker pool with priority lanes, rate limiting, and tripwire escalation |
 
 ## Runtime Pipeline
 
@@ -106,6 +108,6 @@ When no input arrives for ~120 seconds:
 
 ## Current vs Planned Scope
 
-**Implemented:** Node cognition, lobe partitioning, quorum voting, brainstem dispatch, specimen persistence, immune system, chatter, phagy, thesaurus, inhibition, relational fire, image SDF.
+**Implemented:** Node cognition, lobe partitioning, quorum voting, brainstem dispatch, specimen persistence, immune system, chatter, phagy, thesaurus, inhibition, relational fire, image SDF, full-lobe associative scanning (FullLobeScanner), hardened immune thread pool (ImmuneThreadPool).
 
 **Planned:** HTNN-style transcriptional layers, advanced image-to-symbol bridging, JIT fuzzy art generation, deeper nonlinear SDF visual organs, hormone-style modulation systems.

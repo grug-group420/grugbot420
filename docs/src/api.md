@@ -211,6 +211,149 @@ immune_gate(cmd_name, input_text; is_critical=true) → Bool
 
 Shared helper in `Main.jl` used by all structure-storing commands. Returns `true` if input passed, `false` if rejected. Logs all decisions. Non-immune errors warn but do not block (immune system crash ≠ command block).
 
+## Full-Lobe Scanner (`FullLobeScanner`)
+
+Phase-gated associative memory scanner that sweeps an entire lobe's feature-vector space. Unlike `scan_specimens` (which works on the flat `NODE_MAP`), `FullLobeScanner` operates on a `Dict{String, Vector{Float64}}` feature dictionary and produces typed matches with spreading-activation semantics. All activations are bounded to prevent runaway expansion.
+
+### Scan Phases
+
+The scanner advances through a strict one-way phase machine:
+
+| Phase | Constant | Description |
+|-------|----------|-------------|
+| Init | `PHASE_INIT` | Scanner created, no query set yet |
+| Gather | `PHASE_GATHER` | Query set; ready to collect candidates |
+| Activate | `PHASE_ACTIVATE` | Candidates scored and ranked |
+| Continue | `PHASE_CONTINUE` | Spreading activation propagating |
+| Done | `PHASE_DONE` | DONE signal emitted; AIML may fire |
+
+### Match Types
+
+- `PatternMatch` — direct cosine similarity hit between input query and a stored feature vector. Fields: `node_id::String`, `confidence::Float64`, `matched_pattern::String`, `source_lobe::String`.
+- `SemanticMatch` — spreading-activation secondary hit: a node that is similar to a `PatternMatch` winner. Fields: `node_id::String`, `confidence::Float64`, `seed_node_id::String`, `semantic_distance::Float64`, `source_lobe::String`.
+
+### Core Functions
+
+- `FullLobeScannerState(lobe_id; threshold, max_hops)` — Construct a scanner for a given lobe. Optional kwargs: `threshold::Float64` (minimum confidence to include a candidate, default `SCANNER_CONFIDENCE_THRESHOLD = 0.65`) and `max_hops::Int` (spreading-activation depth, default `SCANNER_MAX_HOPS = 3`).
+- `set_query!(scanner, query_vector)` — Set the query signal and advance phase to `PHASE_GATHER`. Throws `FullLobeScannerError` if query is empty or scanner is past `PHASE_INIT`.
+- `gather_candidates!(scanner, feature_dict)` — Score all features against the query via cosine similarity. Advances phase to `PHASE_ACTIVATE`. Thread-safe: spawns up to `SCANNER_THREADS` (default 4) parallel tasks. Bounded by `MAX_ACTIVE_NODES = 1000`.
+- `activate_candidates!(scanner)` — Rank candidates, apply `slight_jitter` for vote diversity, advance to `PHASE_CONTINUE`. Returns sorted `Vector{PatternMatch}`.
+- `spread_activation!(scanner, feature_dict)` — Walk the ranked candidates and find semantically similar neighbors via cosine distance. Adds `SemanticMatch` results. Advances to `PHASE_DONE`.
+- `emit_done_signal!(scanner)` — Emits the DONE marker and locks AIML gating open. Must be called after `PHASE_DONE` is reached. Throws if called out of sequence.
+- `get_pattern_matches(scanner)` — Returns `Vector{PatternMatch}` (available after `PHASE_ACTIVATE`).
+- `get_semantic_matches(scanner)` — Returns `Vector{SemanticMatch}` (available after `PHASE_DONE`).
+- `is_aiml_gated(scanner)` — Returns `true` until `emit_done_signal!` is called. AIML layer must check this before using results.
+- `reset_scanner!(scanner)` — Reset to `PHASE_INIT` and clear all results. Reuse the same scanner object for the next query.
+
+### Key Constants
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `MAX_ACTIVE_NODES` | `1000` | Hard cap on candidates entering the active set |
+| `SCANNER_CONFIDENCE_THRESHOLD` | `0.65` | Minimum cosine similarity to include a candidate |
+| `SCANNER_MAX_HOPS` | `3` | Maximum spreading-activation depth |
+| `SCANNER_THREADS` | `4` | Worker threads for parallel candidate gathering |
+| `SEMANTIC_DISTANCE_THRESHOLD` | `0.70` | Cosine distance cutoff for semantic neighbor inclusion |
+
+### AIML Gating
+
+Results are **blocked from AIML until `PHASE_DONE`** is reached and `emit_done_signal!` is called. Always check `is_aiml_gated(scanner)` before handing results to the orchestrator:
+
+```julia
+scanner = FullLobeScannerState("science"; threshold=0.7)
+set_query!(scanner, query_vec)
+gather_candidates!(scanner, feature_dict)
+activate_candidates!(scanner)
+spread_activation!(scanner, feature_dict)
+emit_done_signal!(scanner)
+
+if !is_aiml_gated(scanner)
+    matches = get_pattern_matches(scanner)
+    # hand matches to orchestrator
+end
+```
+
+### Error Types
+
+- `FullLobeScannerError` — thrown on out-of-sequence phase transitions, empty queries, or structural violations. Never silently swallowed (GRUG style).
+
+---
+
+## Immune Thread Pool (`ImmuneThreadPool`)
+
+Priority-lane thread pool with per-source rate limiting, cost-weighted load balancing, and a tripwire state machine. Provides hardened task execution for scan workloads that must not overwhelm the system under adversarial or runaway conditions.
+
+### Priority Lanes
+
+Tasks are submitted with a priority level. Each priority has its own waiting list bounded by `MAX_WAITING_LIST_SIZE_PER_PRIORITY`:
+
+| Priority | Constant | Use case |
+|----------|----------|---------|
+| Critical | `PRIORITY_CRITICAL` | Immune system responses, hard deadlines |
+| Normal | `PRIORITY_NORMAL` | Standard scan tasks |
+| Low | `PRIORITY_LOW` | Background maintenance |
+| Junk | `PRIORITY_JUNK` | Throwaway / test tasks |
+
+### Rate Limiting
+
+Each source (`SOURCE_EXTERNAL`, `SOURCE_INTERNAL`, `SOURCE_SCANNER`) has its own `TokenBucket`. Internal sources bypass rate limiting. External sources are subject to standard limits; limits tighten when the tripwire is hardened.
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `RATE_LIMIT_TOKENS_PER_SEC` | Dict per source | Normal-state token refill rates |
+| `RATE_LIMIT_BURST` | Dict per source | Normal-state burst capacity |
+| `RATE_LIMIT_TOKENS_PER_SEC_HARDENED` | Dict per source | Hardened-state refill rates (reduced) |
+| `RATE_LIMIT_BURST_HARDENED` | Dict per source | Hardened-state burst capacity (reduced) |
+
+### Tripwire State Machine
+
+The `TripwireMonitor` watches the rejection rate over a sliding window (`TRIPWIRE_WINDOW_S` seconds) and escalates the system's defense posture:
+
+```
+NORMAL ──(rejection rate > TRIPWIRE_ELEVATED_THRESHOLD)──► ELEVATED
+ELEVATED ──(rate > TRIPWIRE_HARDENED_THRESHOLD)──► HARDENED
+HARDENED ──(rate > TRIPWIRE_CRITICAL_THRESHOLD)──► CRITICAL
+CRITICAL / any ──(rate drops below ELEVATED threshold)──► NORMAL
+```
+
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `TRIPWIRE_WINDOW_S` | `60.0` | Sliding window for rejection rate calculation |
+| `TRIPWIRE_ELEVATED_THRESHOLD` | `0.10` | 10% rejection rate triggers ELEVATED |
+| `TRIPWIRE_HARDENED_THRESHOLD` | `0.25` | 25% triggers HARDENED (rate limits tighten) |
+| `TRIPWIRE_CRITICAL_THRESHOLD` | `0.50` | 50% triggers CRITICAL |
+
+### Core Functions
+
+- `create_immune_thread_pool(n_workers)` — Create a pool with `n_workers` worker threads (default 8). Returns `ImmuneThreadPool`.
+- `submit_immune_work!(pool, task_id, cost_ms; priority, source)` — Submit a task. `cost_ms` is estimated work duration in milliseconds. `priority` defaults to `PRIORITY_NORMAL`, `source` defaults to `SOURCE_EXTERNAL`. Throws `ImmuneRateLimitExhaustedError` if the rate limit is hit, `ImmuneWaitingListFullError` if the lane's waiting list is full.
+- `shutdown_immune_pool!(pool)` — Graceful shutdown: drain queues, stop workers.
+- `get_tripwire_state(monitor)` — Returns the current tripwire state symbol (`:normal`, `:elevated`, `:hardened`, `:critical`).
+- `get_rejection_rate(monitor)` — Returns the current rejection rate in the sliding window as a `Float64`.
+- `get_lane_size(pool, priority)` — Returns the number of tasks currently waiting in a priority lane.
+- `try_consume!(bucket, n)` — Attempt to consume `n` tokens from a `TokenBucket`. Returns `true` on success, `false` on exhaustion. Auto-refills based on elapsed time.
+- `refill!(bucket)` — Force a time-based refill of a `TokenBucket` without consuming.
+- `record_processed!(monitor)` — Record a successfully processed task in the tripwire window.
+- `update_tripwire_state!(monitor)` — Recompute tripwire state from current rejection rate and advance state machine.
+- `estimate_scan_cost(node_count, complexity) → ScanCost` — Estimate the scan cost category from node count and complexity score. Returns `COST_CHEAP`, `COST_MODERATE`, or `COST_EXPENSIVE`.
+
+### Cost Weights
+
+`COST_WEIGHTS::Dict{ScanCost, Int}` maps each cost category to a relative weight used for load balancing across workers:
+
+| Cost | Constant | Weight |
+|------|----------|--------|
+| Cheap | `COST_CHEAP` | 1 |
+| Moderate | `COST_MODERATE` | 3 |
+| Expensive | `COST_EXPENSIVE` | 8 |
+
+### Error Types
+
+- `ImmuneRateLimitExhaustedError` — thrown when a source's token bucket is empty.
+- `ImmuneWaitingListFullError` — thrown when a priority lane's waiting list has reached `MAX_WAITING_LIST_SIZE_PER_PRIORITY`.
+
+---
+
 ## Vote Orchestrator (`ephemeral_aiml_orchestrator`)
 
 Main response generation entry point in `Main.jl`. Handles vote bucketing, tie-breaking, and AIML payload construction.

@@ -17,6 +17,7 @@ grugbot420 is a **specimen-based cognitive runtime** built around distributed no
 | 🏗️ **[[Architecture Overview]]** | How the engine works |
 | 💾 **[[Specimen Persistence]]** | Save/load your specimen |
 | 🛡️ **[[Immune System]]** | How the immune system protects specimens |
+| 🔬 **[[Full Lobe Scanner]]** | Phase-gated full-lobe associative memory scanning |
 | 🗣️ **[[CLI Command Reference]]** | Full command reference |
 
 ## Core Concepts

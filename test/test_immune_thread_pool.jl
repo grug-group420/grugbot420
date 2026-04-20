@@ -143,10 +143,12 @@ end
 # ==============================================================================
 
 @testset "Token Bucket — GRUG: Rate limiting bucket works" begin
-    bucket = TokenBucket(10.0, 5)  # 10 tokens/sec, max 5 burst
+    # GRUG: Use very slow rate (0.001 tokens/sec) so time-based refill
+    # between rapid test steps is negligible (< 0.001 tokens per ms).
+    bucket = TokenBucket(0.001, 5)  # 0.001 tokens/sec, max 5 burst
     
     @test bucket.tokens == 5.0  # Starts full
-    @test bucket.rate == 10.0
+    @test bucket.rate == 0.001
     @test bucket.burst == 5
     
     # Consume tokens
@@ -310,8 +312,11 @@ end
         initial_loads = get_cost_weighted_load(pool)
         
         # Submit some expensive scans
+        # GRUG: Use SOURCE_INTERNAL to bypass rate limiter in this smoke test.
+        # Rate limiting is tested separately (Group 8). Here we only care about
+        # cost-weighted load tracking, not per-source token buckets.
         for i in 1:5
-            submit_immune_work!(pool, "expensive $i", 500; priority=PRIORITY_NORMAL)
+            submit_immune_work!(pool, "expensive $i", 500; priority=PRIORITY_NORMAL, source=SOURCE_INTERNAL)
         end
         
         # Wait for processing

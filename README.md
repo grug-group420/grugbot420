@@ -403,6 +403,83 @@ Full specification: [`docs/immune_system.html`](./docs/immune_system.html)
 
 ---
 
+## Full-Lobe Scanning System (`FullLobeScanner`)
+
+The full-lobe scanner runs an associative memory scan over an entire lobe. Unlike `scan_specimens` which works on the flat NODE_MAP, `FullLobeScanner` operates on a feature-vector dictionary and produces typed matches with spreading activation semantics.
+
+### How It Works
+
+1. **Set Query** (`set_query!`) — Load the feature vector you're looking for. Must be called in INIT phase. Transitions scanner to GATHER phase.
+
+2. **Gather Candidates** (`gather_candidates!`) — Multithreaded scan of all nodes using cosine similarity. Static chunking divides nodes evenly across threads (4–8 default). Nodes above the candidate threshold (default 0.3) are collected and sorted by score.
+
+3. **Activate Candidates** (`activate_candidates!`) — Top candidates are activated into the `ActiveNodeSet` (max 1,000 active nodes, FIFO eviction at capacity). Nodes above the confident threshold (default 0.75) become `PatternMatch` results.
+
+4. **Continue Scan** (`continue_scan!`) — Spreading activation through node connections. Each active node's activation decays (default 0.9×) as it spreads to neighbors. Neighbors that meet both activation and similarity thresholds become `SemanticMatch` results. Scan terminates when activation is exhausted or max cycles (default 10) reached.
+
+5. **DONE Signal** — When the scan completes, a DONE signal is emitted. Only after DONE is `can_aiml_respond()` true. **AIML must not respond until DONE.**
+
+### Quick Example
+
+```julia
+using GrugBot420
+
+scanner = LobeScanner("language_lobe", 4)  # 4 threads
+
+node_features = Dict(
+    "node_1" => [0.9, 0.1, 0.2],
+    "node_2" => [0.8, 0.15, 0.3],
+    "node_3" => [0.1, 0.9, 0.2],
+)
+node_connections = Dict(
+    "node_1" => ["node_2"],
+    "node_2" => ["node_1", "node_3"],
+    "node_3" => ["node_2"],
+)
+
+set_query!(scanner, [0.85, 0.12, 0.25])
+result = full_scan!(scanner, node_features, node_connections)
+
+if result.done_signal
+    println("Confident matches: ", result.confident_matches)
+    println("Pattern matches: ", result.pattern_matches)
+    println("Semantic matches: ", result.semantic_matches)
+end
+```
+
+### Key Constants
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `MAX_ACTIVE_NODES` | 1000 | Hard cap on simultaneously active nodes |
+| `DEFAULT_THREADS` | 4 | Default thread count for candidate gathering |
+| `MAX_THREADS` | 8 | Maximum allowed threads |
+| `CONFIDENT_THRESHOLD` | 0.75 | Cosine similarity required for a confident match |
+| `DEFAULT_CANDIDATE_THRESHOLD` | 0.3 | Minimum similarity to be considered a candidate |
+| `MAX_CONTINUE_CYCLES` | 10 | Maximum spreading activation cycles |
+
+### Phase Lifecycle
+
+```
+INIT → GATHER → ACTIVATE → CONTINUE → DONE
+```
+
+Each phase has strict entry requirements. Calling a phase function out of order throws `FullLobeScanError`. The `full_scan!` convenience function runs all phases in one call.
+
+### AIML Gating
+
+```julia
+if can_aiml_respond(scanner)
+    # safe to use scan results
+else
+    require_aiml_ready!(scanner)  # throws FullLobeScanError if not ready
+end
+```
+
+The DONE gate is enforced at the API level — you cannot accidentally read results from an in-progress scan.
+
+---
+
 ## File Reference
 
 | File | Role |
@@ -423,6 +500,8 @@ Full specification: [`docs/immune_system.html`](./docs/immune_system.html)
 | `src/SemanticVerbs.jl` | Live mutable verb registry: causal, spatial, temporal classes + runtime synonyms. |
 | `src/ActionTonePredictor.jl` | Pre-vote input classifier: predicts action type and tone, nudges arousal and confidence weights. |
 | `src/ImmuneSystem.jl` | Specimen immune system: automata-based anomaly handling for growth/ledger commands. AST scanning, Hopfield immune memory, quarantine-patch-delete pipeline. |
+| `src/ImmuneThreadPool.jl` | 8-worker immune thread pool with priority lanes (CRITICAL/NORMAL/LOW/JUNK), per-source rate limiting, cost-weighted load balancing, and tripwire state machine (NORMAL→ELEVATED→HARDENED→CRITICAL). |
+| `src/FullLobeScanner.jl` | Full-lobe scanning system: bounded activation (max 1,000 active nodes), phase-gated scan pipeline (INIT→GATHER→ACTIVATE→CONTINUE→DONE), pattern + semantic matches, multithreaded candidate gathering. AIML gated until DONE signal. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---

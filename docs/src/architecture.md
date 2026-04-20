@@ -5,27 +5,33 @@ GrugBot420 is organized as a layered neuromorphic engine. This page describes th
 ## System Overview
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   CLI (Main.jl)                 │
-├──────────┬──────────┬──────────┬────────────────┤
-│ InputQueue│Thesaurus │BrainStem │  ChatterMode   │
-│ (FIFO +  │(Dim.Sim) │(WTA     │  (Idle Gossip) │
-│  NegThes)│          │Dispatch)│                │
-├──────────┴──────────┴──────────┴────────────────┤
-│          Lobe System (Subject Partitions)       │
-│          LobeTable (Chunked Hash Storage)       │
-├─────────────────────────────────────────────────┤
-│           Engine (Node Voting Core)             │
-│  ActionTonePredictor │ SemanticVerbs            │
-│  AttachmentRelay (Relational Fire System)       │
-├──────────────────────┴──────────────────────────┤
-│  PatternScanner │ ImageSDF │ EyeSystem          │
-├─────────────────┴──────────┴────────────────────┤
-│         StochasticHelper (@coinflip)            │
-├─────────────────────────────────────────────────┤
-│  PhagyMode (7 Idle Maintenance Automata)        │
-│  MemoryForensics (Coinflip: Fuzzy │ Metric)     │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                     CLI (Main.jl)                        │
+├───────────┬───────────┬───────────┬──────────────────────┤
+│ InputQueue│ Thesaurus │ BrainStem │    ChatterMode        │
+│ (FIFO +   │ (Dim.Sim) │ (WTA      │    (Idle Gossip)      │
+│  NegThes) │           │ Dispatch) │                       │
+├───────────┴───────────┴───────────┴──────────────────────┤
+│           Lobe System (Subject Partitions)                │
+│           LobeTable (Chunked Hash Storage)                │
+├──────────────────────────────────────────────────────────┤
+│            Engine (Node Voting Core)                      │
+│  ActionTonePredictor │ SemanticVerbs                      │
+│  AttachmentRelay (Relational Fire System)                 │
+├──────────────────────────┬───────────────────────────────┤
+│  PatternScanner          │  FullLobeScanner               │
+│  ImageSDF │ EyeSystem    │  (Phase-gated lobe sweep,      │
+│                          │   cosine sim + spreading       │
+│                          │   activation, AIML gated)      │
+├──────────────────────────┴───────────────────────────────┤
+│  ImmuneThreadPool (8 workers, priority lanes,             │
+│  TokenBucket rate limiting, TripwireMonitor)              │
+├──────────────────────────────────────────────────────────┤
+│          StochasticHelper (@coinflip)                     │
+├──────────────────────────────────────────────────────────┤
+│  PhagyMode (7 Idle Maintenance Automata)                  │
+│  MemoryForensics (Coinflip: Fuzzy │ Metric)               │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ## Node Lifecycle
@@ -37,6 +43,21 @@ GrugBot420 is organized as a layered neuromorphic engine. This page describes th
 5. **Selection** — The orchestrator picks a winner. If multiple nodes tie at the same confidence, the tie is broken randomly via `shuffle!`. The result is classified as SURE (clear winner) or UNSURE (tie broken). Tied alternatives and strong runner-ups are reported.
 6. **Decay** — Unused nodes lose strength over time; grave nodes may be recycled by PhagyMode
 7. **Forensics** — During idle cycles, PhagyMode may roll Automaton 7 (Memory Forensics) to audit message history and node population health. This is read-only observation, never mutation.
+
+## Subsystems
+
+| Subsystem | File | Purpose |
+|-----------|------|---------|
+| Immune System | `ImmuneSystem.jl` | Protects mature specimens from funky inputs |
+| ChatterMode | `ChatterMode.jl` | Idle gossip — weak nodes drift toward strong |
+| PhagyMode | `PhagyMode.jl` | Idle maintenance — pruning, decay, recycling |
+| Thesaurus System | `Thesaurus.jl` | Semantic similarity and synonym expansion |
+| EyeSystem & Image SDF | `EyeSystem.jl`, `ImageSDF.jl` | Visual attention and GPU SDF conversion |
+| Relational Fire | `engine.jl` | JIT confidence-baked node attachment chains |
+| ActionTonePredictor | `ActionTonePredictor.jl` | Pre-vote action/tone classification |
+| Full Lobe Scanner | `FullLobeScanner.jl` | Phase-gated full-lobe associative scan with spreading activation; AIML gated until DONE |
+| ImmuneThreadPool | `ImmuneThreadPool.jl` | Hardened 8-worker pool with priority lanes, rate limiting, and tripwire escalation |
+
 
 ## Attachment Relay (Relational Fire)
 
@@ -176,4 +197,6 @@ Key properties:
 | `src/ChatterMode.jl` | Idle gossip system |
 | `src/PhagyMode.jl` | 7 maintenance automata including memory forensics |
 | `src/ImmuneSystem.jl` | Specimen immune system: AST scanning, Hopfield immune memory, quarantine→patch→delete pipeline. Gates all structure-storing commands. |
+| `src/ImmuneThreadPool.jl` | Hardened task executor: 8-worker priority-lane pool, per-source TokenBucket rate limiting, cost-weighted load balancing, TripwireMonitor state machine (NORMAL→ELEVATED→HARDENED→CRITICAL). |
+| `src/FullLobeScanner.jl` | Phase-gated full-lobe associative memory scanner: bounded activation (max 1,000 active nodes), cosine-similarity candidate gathering, spreading activation, AIML gating until DONE signal. |
 | `src/Main.jl` | CLI loop, memory cave, specimen persistence, `immune_gate()` helper |

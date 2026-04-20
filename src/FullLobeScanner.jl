@@ -368,11 +368,14 @@ end
 # 11. JITTER - Same pattern as PatternScanner
 # ==============================================================================
 # GRUG: Perfect bullseye is fake! Nature always shakes.
+# GRUG: Unlike PatternScanner which allows [-1, 1] for signed similarity,
+#       FullLobeScanner confidences are always [0, 1] (probability-style).
+#       Clamp to [0, 1] here so downstream code never sees negative confidence.
 
 function slight_jitter(confidence::Float64)::Float64
     jitter_magnitude = 0.005 + (0.01 * (1.0 - abs(confidence)))
     jitter = (rand() * 2.0 - 1.0) * jitter_magnitude
-    return clamp(confidence + jitter, -1.0, 1.0)
+    return clamp(confidence + jitter, 0.0, 1.0)
 end
 
 # ==============================================================================
@@ -787,8 +790,6 @@ export is_active, active_count, at_capacity
 export activate_node!, deactivate_node!, clear_active!
 export phase_name
 
-end # module FullLobeScanner
-
 # ==============================================================================
 # ARCHITECTURAL SPECIFICATION: FULL-LOBE SCANNING SYSTEM
 #
@@ -817,7 +818,9 @@ end # module FullLobeScanner
 #    - Context included in all error messages
 #
 # 6. NATURAL JITTER:
-#    - Same bounded uniform jitter as PatternScanner
+#    - Bounded uniform jitter clamped to [0, 1] (confidence-safe)
 #    - Models hardware/sensor variance
 #    - Prevents artificial "perfect" matches
 # ==============================================================================
+
+end # module FullLobeScanner

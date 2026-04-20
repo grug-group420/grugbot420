@@ -95,10 +95,17 @@ export ImmuneRateLimitExhaustedError, ImmuneTripwireTriggeredError, ImmunePriori
 export fetch_result, is_ready
 # GRUG: Hardcore feature exports
 export PriorityLevel, PRIORITY_CRITICAL, PRIORITY_NORMAL, PRIORITY_LOW, PRIORITY_JUNK
-export ScanCost, COST_CHEAP, COST_MODERATE, COST_EXPENSIVE, estimate_scan_cost
+export ScanCost, COST_CHEAP, COST_MODERATE, COST_EXPENSIVE, COST_WEIGHTS, estimate_scan_cost
 export SourceID, SOURCE_INTERNAL, SOURCE_ANONYMOUS
 export TripwireState, TRIPWIRE_NORMAL, TRIPWIRE_ELEVATED, TRIPWIRE_HARDENED, TRIPWIRE_CRITICAL
 export TokenBucket, TripwireMonitor, ImmuneRateLimiter
+export try_consume!, refill!, get_tripwire_state
+export record_processed!, get_rejection_rate, get_lane_size, update_tripwire_state!
+export TRIPWIRE_WINDOW_S
+export RATE_LIMIT_TOKENS_PER_SEC, RATE_LIMIT_BURST
+export RATE_LIMIT_TOKENS_PER_SEC_HARDENED, RATE_LIMIT_BURST_HARDENED
+export TRIPWIRE_ELEVATED_THRESHOLD, TRIPWIRE_HARDENED_THRESHOLD, TRIPWIRE_CRITICAL_THRESHOLD
+export MAX_WAITING_LIST_SIZE_PER_PRIORITY
 
 # GRUG: Full-lobe scanner exports
 export FullLobeScanner, ScanResult, ActiveNodeSet
