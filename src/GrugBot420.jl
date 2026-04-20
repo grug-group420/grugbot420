@@ -68,6 +68,10 @@ using .ImmuneSystem
 include("ImmuneThreadPool.jl")
 using .ImmuneThreadPool
 
+# GRUG: Full-lobe scanner - bounded activation scanning for associative memory
+include("FullLobeScanner.jl")
+using .FullLobeScanner
+
 include("engine.jl")
 include("Main.jl")
 
@@ -95,5 +99,15 @@ export ScanCost, COST_CHEAP, COST_MODERATE, COST_EXPENSIVE, estimate_scan_cost
 export SourceID, SOURCE_INTERNAL, SOURCE_ANONYMOUS
 export TripwireState, TRIPWIRE_NORMAL, TRIPWIRE_ELEVATED, TRIPWIRE_HARDENED, TRIPWIRE_CRITICAL
 export TokenBucket, TripwireMonitor, ImmuneRateLimiter
+
+# GRUG: Full-lobe scanner exports
+export FullLobeScanner, ScanResult, ActiveNodeSet
+export PatternMatch, SemanticMatch
+export FullLobeScanError, NoMatchFoundError
+export set_query!, gather_candidates!, activate_candidates!
+export continue_scan!, full_scan!, reset!
+export can_aiml_respond, require_aiml_ready!
+export scanner_status, print_status
+export MAX_ACTIVE_NODES, MAX_THREADS, CONFIDENT_THRESHOLD
 
 end # module GrugBot420
