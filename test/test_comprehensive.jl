@@ -33,10 +33,9 @@ println("  ✓ Engine (full chain including ImmuneSystem)")
 # GRUG: COMMANDS dict is populated in Main.jl action families. Engine tests don't
 # include Main.jl. Register minimal handlers for all action names used in test nodes.
 # IMPORTANT: Register BEFORE any nodes are created, so Hopfield cache hits can execute.
+# GRUG FIX: Always register test handlers (remove haskey guard to ensure registration).
 for _act in ["reason", "analyze", "greet", "flee", "ponder"]
-    if !haskey(COMMANDS, _act)
-        COMMANDS[_act] = (mission, node, pv, sv, uv, av) -> "test_$(string(_act))_output"
-    end
+    COMMANDS[_act] = (mission, node, pv, sv, uv, av) -> "test_$(string(_act))_output"
 end
 
 # ==============================================================================
