@@ -215,6 +215,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#lobe-tables">6. LobeTable: Per-Lobe Hash Storage</a></li>
         <li><a href="#brainstem">7. BrainStem: Winner-Take-All Dispatch</a></li>
         <li><a href="#prefrontal">8. Prefrontal Cortex: AIML Orchestration</a> <span class="new-badge">v7</span></li>
+        <li><a href="#aiml-node-system">8.5 AIML Node System: Per-Lobe Tribes</a> <span class="new-badge">v7.6</span></li>
         <li><a href="#input-queue">9. InputQueue & NegativeThesaurus</a> <span class="new-badge">v7</span></li>
         <li><a href="#thesaurus">10. Thesaurus: Dimensional Similarity Engine</a></li>
         <li><a href="#phagy">11. Phagy Mode: Self-Maintenance</a></li>
@@ -638,6 +639,71 @@ Lobe Context: [philosophy (2/4 active: truth knowledge logic | ethical moral)]
 /addRule "Focus on {PRIMARY_ACTION} with {CONFIDENCE} certainty"
 /addRule "Consider alternative angles from {UNSURE_ACTIONS} [prob=0.5]"
 /addRule "Draw from {LOBE_CONTEXT} for cross-domain insight [prob=0.7]"</code></pre>
+
+<!-- ================================================================ -->
+<h2 id="aiml-node-system">8.5 AIML Node System: Per-Lobe Tribes <span class="new-badge">v7.6</span></h2>
+
+<p>The AIML Node System provides <strong>per-lobe "tribes"</strong> of AIML nodes with isolated populations
+and independent population caps. Each lobe can host its own AIML tribe, separate from other lobes.</p>
+
+<h3>Per-Lobe Tribes</h3>
+
+<p>When a lobe is registered for AIML via <code>register_lobe!(lobe_id, node_cap)</code>, the system:</p>
+
+<ul>
+    <li>Creates an entry in <code>AIML_REGISTRY</code> keyed by <code>lobe_id</code></li>
+    <li>Sets the AIML population cap to <code>node_cap ÷ 3</code> (one-third of the lobe's node cap)</li>
+    <li>Initializes an empty tribe (Dict mapping node_id → AIMLNode)</li>
+</ul>
+
+<h3>Population Cap with Grave Exclusion</h3>
+
+<p>The key innovation is that <strong>graves don't count towards caps</strong>. When checking if a tribe can
+accept new nodes:</p>
+
+<pre><code>alive_count = count(n -> !n.is_grave, values(tribe))
+if alive_count >= cap
+    throw AIMLNodeError("population cap exceeded")</code></pre>
+
+<p>This design prevents <strong>"cap lock"</strong> — a scenario where accumulated dead nodes block all new growth.
+When an AIML node dies (marked <code>is_grave = true</code>), it immediately frees cap space. The principle:
+<em>"graves are memory, not bloat"</em> — dead nodes preserve history without eating resources.</p>
+
+<h3>AIMLNode Structure</h3>
+
+<pre><code>mutable struct AIMLNode
+    node_id::String
+    template_id::String
+    is_grave::Bool
+    reinforcement_count::Int
+    last_cycle_id::Union{String, Nothing}
+end</code></pre>
+
+<table>
+    <tr><th>Field</th><th>Purpose</th></tr>
+    <tr><td><code>node_id</code></td><td>Unique identifier within the tribe</td></tr>
+    <tr><td><code>template_id</code></td><td>Template reference for AIML generation</td></tr>
+    <tr><td><code>is_grave</code></td><td>Death flag; when true, excluded from cap count</td></tr>
+    <tr><td><code>reinforcement_count</code></td><td>Number of times node has been reinforced</td></tr>
+    <tr><td><code>last_cycle_id</code></td><td>Optional cycle identifier for cycle-aware logic</td></tr>
+</table>
+
+<h3>API Reference</h3>
+
+<table>
+    <tr><th>Function</th><th>Description</th></tr>
+    <tr><td><code>register_lobe!(lobe_id, node_cap)</code></td><td>Register lobe for AIML; cap = node_cap ÷ 3</td></tr>
+    <tr><td><code>add_aiml_node!(lobe_id, node_id, template_id)</code></td><td>Add AIML node to tribe (cap check uses alive count)</td></tr>
+    <tr><td><code>get_aiml_node(lobe_id, node_id)</code></td><td>Retrieve AIML node by ID</td></tr>
+    <tr><td><code>get_population_size(lobe_id)</code></td><td>Total AIML count (includes graves)</td></tr>
+    <tr><td><code>get_alive_population_size(lobe_id)</code></td><td>Alive AIML count only (for cap enforcement)</td></tr>
+    <tr><td><code>remove_aiml_node!(lobe_id, node_id)</code></td><td>Remove AIML node from tribe</td></tr>
+</table>
+
+<h3>Thread Safety</h3>
+
+<p>All AIML operations are protected by <code>AIML_LOCK::ReentrantLock</code>. The lock is held for the duration
+of each registry operation to ensure thread-safe access.</p>
 
 <!-- ================================================================ -->
 <h2 id="input-queue">9. InputQueue & NegativeThesaurus <span class="new-badge">v7</span></h2>
