@@ -354,6 +354,58 @@ CRITICAL / any ──(rate drops below ELEVATED threshold)──► NORMAL
 
 ---
 
+## AIML Node System (`AIMLNodeSystem`)
+
+Per-lobe AIML node tribes with isolated populations and independent population caps. Each lobe maintains its own AIML registry (a "tribe") with configurable caps.
+
+### Core Functions
+
+- `register_lobe!(lobe_id::String, node_cap::Int)` — Register a lobe for AIML nodes. Creates a tribe entry with population cap = `node_cap ÷ 3`. Throws `AIMLNodeError` if lobe_id is empty or already registered.
+- `add_aiml_node!(lobe_id::String, node_id::String, template_id::String)` — Add an AIML node to a lobe's tribe. Checks population cap against **alive nodes only** (graves don't count). Throws `AIMLNodeError` on: empty ids, unregistered lobe, duplicate node_id, or cap exceeded.
+- `get_aiml_node(lobe_id::String, node_id::String)` — Retrieve an AIML node by ID. Returns the `AIMLNode` struct or throws `AIMLNodeError` if not found.
+- `get_population_size(lobe_id::String)::Int` — Total AIML node count in a lobe's tribe (includes graves).
+- `get_alive_population_size(lobe_id::String)::Int` — Number of **alive** AIML nodes (excludes graves). This is the number used for population cap enforcement.
+- `remove_aiml_node!(lobe_id::String, node_id::String)` — Remove an AIML node from a tribe. Throws `AIMLNodeError` if lobe or node not found.
+
+### AIMLNode Struct
+
+```julia
+mutable struct AIMLNode
+    node_id::String
+    template_id::String
+    is_grave::Bool
+    reinforcement_count::Int
+    last_cycle_id::Union{String, Nothing}
+end
+```
+
+- `node_id` — Unique identifier within the tribe
+- `template_id` — Template reference for AIML generation
+- `is_grave` — Death flag; when `true`, node doesn't count towards cap
+- `reinforcement_count` — Number of times node has been reinforced
+- `last_cycle_id` — Optional cycle identifier for cycle-aware reinforcement
+
+### Population Cap Enforcement
+
+Caps are enforced against **alive population only**. Graves are memory, not bloat — dead nodes don't eat cap space.
+
+```
+ALIVE nodes = tribe nodes where is_grave == false
+CAP_CHECK: alive_count < cap
+```
+
+This design prevents "cap lock" scenarios where accumulated graves block new node creation. When an AIML node dies (marked as grave), it immediately frees cap space for new nodes.
+
+### Thread Safety
+
+All AIML operations are protected by `AIML_LOCK::ReentrantLock`. The lock is held for the duration of each operation to ensure thread-safe access to `AIML_REGISTRY`.
+
+### Error Type
+
+- `AIMLNodeError` — thrown on all validation failures with descriptive messages including the offending lobe_id, node_id, and operation name.
+
+---
+
 ## Vote Orchestrator (`ephemeral_aiml_orchestrator`)
 
 Main response generation entry point in `Main.jl`. Handles vote bucketing, tie-breaking, and AIML payload construction.

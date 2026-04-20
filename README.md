@@ -506,6 +506,59 @@ The DONE gate is enforced at the API level — you cannot accidentally read resu
 
 ---
 
+## AIML Node System
+
+GrugBot420 supports per-lobe AIML node tribes — isolated populations of AIML nodes within each lobe with their own population caps.
+
+### Key Concepts
+
+- **Per-Lobe Tribes**: Each lobe maintains its own AIML node registry, independent of other lobes
+- **Population Caps**: Each lobe has a configurable AIML population cap (default: 1/3 of lobe's node cap)
+- **Grave Exclusion**: Dead nodes (graves) don't count towards population caps — they're memory, not bloat
+- **Cycle-Aware Reinforcement**: AIML nodes can be reinforced based on cycle detection
+
+### API Functions
+
+| Function | Description |
+|---|---|
+| `register_lobe!(lobe_id, node_cap)` | Register a lobe for AIML with population cap = node_cap ÷ 3 |
+| `add_aiml_node!(lobe_id, node_id, template_id)` | Add an AIML node to a lobe's tribe |
+| `get_aiml_node(lobe_id, node_id)` | Retrieve a specific AIML node |
+| `get_population_size(lobe_id)` | Get total AIML node count (including graves) |
+| `get_alive_population_size(lobe_id)` | Get alive AIML node count (excludes graves) |
+| `remove_aiml_node!(lobe_id, node_id)` | Remove an AIML node from a tribe |
+
+### Population Cap Enforcement
+
+When adding an AIML node, the system checks the **alive** population count (excluding graves). This means:
+
+- A lobe with cap=3 can have 3 alive nodes + any number of grave nodes
+- When an AIML node dies (becomes a grave), it frees up cap space for new nodes
+- This prevents "cap lock" where dead nodes prevent new growth
+
+Example:
+```julia
+# Register lobe with 9 node cap → AIML cap = 3
+register_lobe!("my_lobe", 9)
+
+# Add 3 alive nodes (fills cap)
+add_aiml_node!("my_lobe", "node1", "tmpl1")
+add_aiml_node!("my_lobe", "node2", "tmpl2")
+add_aiml_node!("my_lobe", "node3", "tmpl3")
+
+# Mark one as grave
+node = get_aiml_node("my_lobe", "node3")
+node.is_grave = true
+
+# Now we can add another! (2 alive + 1 grave = 3 total, but alive cap has room)
+add_aiml_node!("my_lobe", "node4", "tmpl4")  # ✓ Works!
+
+# But 4th alive would fail
+add_aiml_node!("my_lobe", "node5", "tmpl5")  # ✗ Throws AIMLNodeError
+```
+
+---
+
 ## Documentation
 
 Open `grugbot_whitepaper.html` in a browser for the full technical whitepaper covering architecture, formal mathematics, all subsystems, and design rationale.

@@ -56,6 +56,7 @@ GrugBot420 is organized as a layered neuromorphic engine. This page describes th
 | Relational Fire | `engine.jl` | JIT confidence-baked node attachment chains |
 | ActionTonePredictor | `ActionTonePredictor.jl` | Pre-vote action/tone classification |
 | Full Lobe Scanner | `FullLobeScanner.jl` | Phase-gated full-lobe associative scan with spreading activation; AIML gated until DONE |
+| AIML Node System | `AIMLNodeSystem.jl` | Per-lobe AIML tribes with population caps; graves excluded from caps |
 | ImmuneThreadPool | `ImmuneThreadPool.jl` | Hardened 8-worker pool with priority lanes, rate limiting, and tripwire escalation |
 
 
@@ -178,6 +179,45 @@ Key properties:
 | `damping_strength` | 0.25 | How much mass to redistribute when damping fires |
 | `softmax_temperature` | 1.5 | Softmax temperature (lower = sharper, higher = flatter) |
 
+## AIML Node System
+
+The AIML Node System provides per-lobe "tribes" of AIML nodes with isolated populations and independent population caps. Each lobe can host its own AIML tribe, separate from other lobes.
+
+### Per-Lobe Tribes
+
+When a lobe is registered for AIML via `register_lobe!(lobe_id, node_cap)`, the system:
+
+1. Creates an entry in `AIML_REGISTRY` keyed by `lobe_id`
+2. Sets the AIML population cap to `node_cap ÷ 3` (one-third of the lobe's node cap)
+3. Initializes an empty tribe (Dict mapping node_id → AIMLNode)
+
+### Population Cap with Grave Exclusion
+
+The key innovation is that **graves don't count towards caps**. When checking if a tribe can accept new nodes:
+
+```
+alive_count = count(n -> !n.is_grave, values(tribe))
+if alive_count >= cap
+    throw AIMLNodeError("population cap exceeded")
+```
+
+This design prevents "cap lock" — a scenario where accumulated dead nodes block all new growth. When an AIML node dies (marked `is_grave = true`), it immediately frees cap space.
+
+### Cycle-Aware Reinforcement
+
+AIML nodes track their participation in processing cycles:
+
+- `reinforcement_count` — How many times the node has been reinforced
+- `last_cycle_id` — Optional identifier for cycle-aware logic
+
+This enables patterns like "only reinforce once per cycle" or "track reinforcement velocity over time."
+
+### Thread Safety
+
+All AIML operations are protected by `AIML_LOCK::ReentrantLock`. The lock is held for the duration of each registry operation.
+
+---
+
 ## File Reference
 
 | File | Description |
@@ -199,4 +239,5 @@ Key properties:
 | `src/ImmuneSystem.jl` | Specimen immune system: AST scanning, Hopfield immune memory, quarantine→patch→delete pipeline. Gates all structure-storing commands. |
 | `src/ImmuneThreadPool.jl` | Hardened task executor: 8-worker priority-lane pool, per-source TokenBucket rate limiting, cost-weighted load balancing, TripwireMonitor state machine (NORMAL→ELEVATED→HARDENED→CRITICAL). |
 | `src/FullLobeScanner.jl` | Phase-gated full-lobe associative memory scanner: bounded activation (max 1,000 active nodes), cosine-similarity candidate gathering, spreading activation, AIML gating until DONE signal. |
+| `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes with population caps, grave exclusion from caps, cycle-aware reinforcement. |
 | `src/Main.jl` | CLI loop, memory cave, specimen persistence, `immune_gate()` helper |
