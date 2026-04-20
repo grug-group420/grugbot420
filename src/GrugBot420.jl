@@ -72,6 +72,13 @@ using .ImmuneThreadPool
 include("FullLobeScanner.jl")
 using .FullLobeScanner
 
+# GRUG: AIML node tribes - lobe-specific executive node populations.
+# Must load BEFORE Main.jl so command handlers can reach the API. Ordering
+# matters: Lobe must already exist so AIML knows what parent cap to read
+# when registering a lobe's AIML tribe.
+include("AIMLNodeSystem.jl")
+using .AIMLNodeSystem
+
 include("engine.jl")
 include("Main.jl")
 
@@ -116,5 +123,17 @@ export continue_scan!, full_scan!, reset!
 export can_aiml_respond, require_aiml_ready!
 export scanner_status, print_status
 export MAX_ACTIVE_NODES, MAX_THREADS, CONFIDENT_THRESHOLD
+
+# GRUG: AIML node tribes exports - lobe-specific executive node populations
+export AIMLNode, AIMLNodeError
+export AIML_STRENGTH_CAP, AIML_STRENGTH_FLOOR, AIML_POPULATION_CAP_RATIO
+export register_lobe!, unregister_lobe!, is_lobe_registered
+export get_population_cap, get_population_size
+export add_aiml_node!, get_aiml_node, has_aiml_node, remove_aiml_node!
+export list_aiml_nodes, get_registered_lobes
+export begin_cycle!, current_cycle
+export record_fire!, record_vote!
+export apply_aiml_right!, apply_aiml_wrong!
+export aiml_phagy_sweep!, get_aiml_status_summary
 
 end # module GrugBot420

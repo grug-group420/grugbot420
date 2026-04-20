@@ -749,6 +749,8 @@ const HELP_MSG = """
 ║  CORE                                                        ║
 ║  /mission <text>            Send input to the AI engine      ║
 ║  /wrong                     Penalize last response voters    ║
+║  /aimlRight                 Reward AIML nodes that voted     ║
+║  /aimlWrong                 Penalize AIML nodes that voted   ║
 ║  /explicit <cmd> [<id>] <t> Force a specific command+node    ║
 ║  /grow <json>               Plant nodes from JSON packet     ║
 ║  /addRule <rule>            Add stochastic orchestration rule║
@@ -832,6 +834,11 @@ function process_mission(mission_text::String)
     if strip(mission_text) == ""
         error("!!! FATAL: process_mission got empty mission text! !!!")
     end
+
+    # GRUG: Start a new AIML cycle. Resets all per-cycle bookkeeping flags on every
+    # AIML node so /aimlRight and /aimlWrong know exactly what fired THIS cycle.
+    # Must run BEFORE any AIML voting/firing so cycle memory is clean at the start.
+    AIMLNodeSystem.begin_cycle!()
 
     add_message_to_history!("User", mission_text, false)
     
@@ -1498,6 +1505,10 @@ function load_specimen_from_file!(filepath::String)::String
 
     # Wipe AIML rules
     empty!(AIML_DROP_TABLE)
+
+    # GRUG: Wipe AIML node tribes. All lobe registrations, populations, cycle state.
+    # A brain transplant must clear executive memory too, not just cave nodes.
+    AIMLNodeSystem.reset_all!()
 
     # Wipe message history
     empty!(MESSAGE_HISTORY)
@@ -2313,6 +2324,9 @@ function run_cli()
             # GRUG: Parse all known commands via regex
             m_mission     = match(r"^/mission\s+(.+)"s,  line)
             m_wrong       = match(r"^/wrong\s*$",         line)
+            # GRUG: AIML node tribe feedback commands
+            m_aimlright   = match(r"^/aimlRight\s*$",     line)
+            m_aimlwrong   = match(r"^/aimlWrong\s*$",     line)
             m_explicit    = match(r"^/explicit\s+([a-zA-Z0-9_]+)\s+\[(.+?)\]\s+(.+)", line)
             m_grow        = match(r"^/grow\s+(.+)"s,      line)
             m_rule        = match(r"^/addRule\s+(.+)"s,   line)
@@ -2373,6 +2387,30 @@ function run_cli()
                 else
                     apply_wrong_feedback!(voter_ids)
                     println("❌  /wrong applied. $(length(voter_ids)) voter(s) penalized via coinflip.")
+                end
+
+            elseif !isnothing(m_aimlright)
+                # GRUG: /aimlRight - user says AIML executive layer did good this cycle.
+                # Rewards AIML nodes that voted, BUT skips any that already gained
+                # strength from use in the same cycle (no double snack rule).
+                result = AIMLNodeSystem.apply_aiml_right!()
+                if result["total_voters"] == 0
+                    println("⚠  /aimlRight: No AIML nodes voted this cycle. Did you run /mission first?")
+                else
+                    println("✅  /aimlRight applied. $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained this cycle).")
+                end
+
+            elseif !isnothing(m_aimlwrong)
+                # GRUG: /aimlWrong - user says AIML executive layer did bad this cycle.
+                # Penalizes voted AIML nodes via 50/50 coinflip. Nodes that already gained
+                # strength this cycle get EXTRA penalty so they end up net-negative — not
+                # just back at baseline. Fake punishment is not punishment. Grug rules.
+                result = AIMLNodeSystem.apply_aiml_wrong!()
+                if result["total_voters"] == 0
+                    println("⚠  /aimlWrong: No AIML nodes voted this cycle. Did you run /mission first?")
+                else
+                    newly_graved = length(result["newly_graved"])
+                    println("❌  /aimlWrong applied. $(length(result["penalized"])) penalized, $(length(result["spared"])) spared by coinflip, $newly_graved newly graved.")
                 end
 
             elseif !isnothing(m_explicit)
@@ -2501,6 +2539,8 @@ function run_cli()
                 println("  Chatter running : $(cs.is_running)")
                 println("  Input queue     : $(cs.queue_depth) pending")
                 println("  Sessions run    : $(cs.sessions_run)")
+                println("║  AIML NODE TRIBES                                ║")
+                println(AIMLNodeSystem.get_aiml_status_summary())
                 println("╚══════════════════════════════════════════════════╝")
 
             elseif !isnothing(m_arousal)
@@ -2582,7 +2622,12 @@ function run_cli()
                     println("⛔ /newLobe blocked by immune system.")
                 else
                     Lobe.create_lobe!(lobe_id_new, lobe_subject)
-                    println("\U0001f9e0 Lobe '$(lobe_id_new)' created for subject: '$(lobe_subject)'. Cap: $(Lobe.LOBE_NODE_CAP) nodes.")
+                    # GRUG: Every new lobe automatically gets an AIML tribe registered.
+                    # Cap = floor(LOBE_NODE_CAP / 3) — executive layer bounded to 1/3 parent.
+                    # This is NOT optional: lobe without AIML registration means /aimlRight
+                    # and /aimlWrong will silently skip it. Register now, always, loudly.
+                    aiml_cap = AIMLNodeSystem.register_lobe!(lobe_id_new, Lobe.LOBE_NODE_CAP)
+                    println("\U0001f9e0 Lobe '$(lobe_id_new)' created for subject: '$(lobe_subject)'. Cap: $(Lobe.LOBE_NODE_CAP) nodes. AIML tribe registered (cap=$aiml_cap).")
                 end
 
             elseif !isnothing(m_connectlobes)
