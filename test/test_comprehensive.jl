@@ -47,13 +47,13 @@ println("\n[2] NODE LIFECYCLE")
 ids = grow_nodes_from_packet(JSON.json(Dict(
     "nodes" => [
         Dict("pattern" => "fire makes grug warm",
-             "action_packet" => "{\"actions\": [{\"name\": \"reason\", \"weight\": 1.0}]}",
+             "action_packet" => "reason^1.0",
              "json_data" => Dict("system_prompt" => "grug logic cave")),
         Dict("pattern" => "water puts out fire",
-             "action_packet" => "{\"actions\": [{\"name\": \"analyze\", \"weight\": 1.0}]}",
+             "action_packet" => "analyze^1.0",
              "json_data" => Dict("system_prompt" => "grug logic cave")),
         Dict("pattern" => "grug like shiny rocks",
-             "action_packet" => "{\"actions\": [{\"name\": \"greet\", \"weight\": 1.0}]}",
+             "action_packet" => "greet^1.0",
              "json_data" => Dict("system_prompt" => "grug happy cave")),
     ]
 )))
@@ -447,10 +447,10 @@ println("\n[20] NODE ATTACHMENT SYSTEM")
 attach_ids = grow_nodes_from_packet(JSON.json(Dict(
     "nodes" => [
         Dict("pattern" => "grug strong rock",
-             "action_packet" => "{\"actions\": [{\"name\": \"reason\", \"weight\": 1.0}]}",
+             "action_packet" => "reason^1.0",
              "json_data" => Dict("system_prompt" => "cave")),
         Dict("pattern" => "rock falls down fast",
-             "action_packet" => "{\"actions\": [{\"name\": \"analyze\", \"weight\": 1.0}]}",
+             "action_packet" => "analyze^1.0",
              "json_data" => Dict("system_prompt" => "cave")),
     ]
 )))
