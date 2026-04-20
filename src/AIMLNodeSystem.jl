@@ -215,7 +215,8 @@ end
 """
 get_population_size(lobe_id::String)::Int
 
-GRUG: Current number of AIML nodes in this lobe (alive + grave).
+GRUG: Total number of AIML nodes in this lobe (alive + grave).
+For cap enforcement, use get_alive_population_size() instead.
 """
 function get_population_size(lobe_id::String)::Int
     if isempty(strip(lobe_id))
@@ -226,6 +227,26 @@ function get_population_size(lobe_id::String)::Int
             throw_aiml_error("Lobe '$lobe_id' not registered for AIML", "get_population_size")
         end
         return length(AIML_REGISTRY[lobe_id])
+    end
+end
+
+"""
+get_alive_population_size(lobe_id::String)::Int
+
+GRUG: Number of ALIVE AIML nodes in this lobe (excludes graves).
+This is the number used for population cap enforcement.
+GRUG say: graves are memory, not bloat. Dead nodes don't eat cap space.
+"""
+function get_alive_population_size(lobe_id::String)::Int
+    if isempty(strip(lobe_id))
+        throw_aiml_error("lobe_id cannot be empty", "get_alive_population_size")
+    end
+    lock(AIML_LOCK) do
+        if !haskey(AIML_REGISTRY, lobe_id)
+            throw_aiml_error("Lobe '$lobe_id' not registered for AIML", "get_alive_population_size")
+        end
+        tribe = AIML_REGISTRY[lobe_id]
+        return count(n -> !n.is_grave, values(tribe))
     end
 end
 
@@ -258,10 +279,12 @@ function add_aiml_node!(lobe_id::String, node_id::String, template::String;
         tribe = AIML_REGISTRY[lobe_id]
         cap = AIML_POPULATION_CAP[lobe_id]
 
-        # GRUG: Hard cap check — no silent overflow, ever.
-        if length(tribe) >= cap
+        # GRUG: Hard cap check — ALIVE nodes only, graves don't count!
+        # GRUG say: dead executive is memory, not bloat. Cap is for living.
+        alive_count = count(n -> !n.is_grave, values(tribe))
+        if alive_count >= cap
             throw_aiml_error(
-                "AIML population cap exceeded for lobe '$lobe_id' (size=$(length(tribe)), cap=$cap). Top brain not allowed to become big bloated demon.",
+                "AIML population cap exceeded for lobe '$lobe_id' (alive=$alive_count, grave=$(length(tribe)-alive_count), cap=$cap). Top brain not allowed to become big bloated demon.",
                 "add_aiml_node!"
             )
         end
@@ -681,7 +704,7 @@ export AIMLNode, AIMLNodeError
 export AIML_STRENGTH_CAP, AIML_STRENGTH_FLOOR, AIML_POPULATION_CAP_RATIO, AIML_STRENGTH_DELTA
 export AIML_GRAVE_REASON_STRENGTH_ZERO
 export register_lobe!, unregister_lobe!, is_lobe_registered
-export get_population_cap, get_population_size
+export get_population_cap, get_population_size, get_alive_population_size
 export add_aiml_node!, get_aiml_node, has_aiml_node, remove_aiml_node!
 export list_aiml_nodes, get_registered_lobes
 export begin_cycle!, current_cycle

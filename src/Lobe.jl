@@ -106,7 +106,16 @@ end
 # GRUG: Now uses O(1) reverse index for exclusive membership check!
 # ============================================================================
 
-function add_node_to_lobe!(lobe_id::String, node_id::String)
+"""
+    add_node_to_lobe!(lobe_id::String, node_id::String; alive_count::Union{Int, Nothing}=nothing)
+
+GRUG: Put a node into a lobe. Updates node_ids set and reverse index.
+Throws LobeError on: empty ids, missing lobe, cap exceeded, duplicate cross-lobe.
+
+GRUG: If alive_count provided, use it for cap check instead of total count.
+GRUG say: graves are memory, not bloat. Dead nodes don't eat cap space.
+"""
+function add_node_to_lobe!(lobe_id::String, node_id::String; alive_count::Union{Int, Nothing}=nothing)
     if isempty(strip(lobe_id))
         throw_lobe_error("Lobe id cannot be empty", "add_node_to_lobe!")
     end
@@ -119,9 +128,11 @@ function add_node_to_lobe!(lobe_id::String, node_id::String)
         end
         rec = LOBE_REGISTRY[lobe_id]
 
-        # GRUG: Capacity check BEFORE membership check - fail fast on full cave
-        if length(rec.node_ids) >= rec.node_cap
-            throw_lobe_error("Lobe '$lobe_id' is full (cap=$(rec.node_cap)). Cannot add node '$node_id'.", "add_node_to_lobe!")
+        # GRUG: If alive_count provided, use it (graves don't count towards cap!)
+        # GRUG say: dead node is memory of failure, not bloat. Cap is for living.
+        effective_count = isnothing(alive_count) ? length(rec.node_ids) : alive_count
+        if effective_count >= rec.node_cap
+            throw_lobe_error("Lobe '$lobe_id' is full (alive=$effective_count, cap=$(rec.node_cap)). Cannot add node '$node_id'.", "add_node_to_lobe!")
         end
 
         # GRUG: O(1) exclusive membership check via reverse index!

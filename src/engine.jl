@@ -2237,3 +2237,34 @@ end
 # causal chain detection emits a non-fatal @warn when the input ends on a verb with
 # no object, helping surface ambiguous or truncated inputs.
 # ==============================================================================
+
+# ==============================================================================
+# LOBE POPULATION HELPERS
+# ==============================================================================
+
+"""
+    count_alive_nodes_in_lobe(lobe_id::String)::Int
+
+GRUG: Count how many ALIVE (non-grave) nodes belong to a lobe.
+Graves are memory, not bloat — dead nodes don't eat cap space.
+Returns 0 if lobe doesn't exist or Lobe module not loaded.
+"""
+function count_alive_nodes_in_lobe(lobe_id::String)::Int
+    if !isdefined(@__MODULE__, :Lobe)
+        return 0
+    end
+    lobe_rec = Main.Lobe.get_lobe(lobe_id)
+    if isnothing(lobe_rec)
+        return 0
+    end
+    alive_count = 0
+    lock(NODE_LOCK) do
+        for node_id in lobe_rec.node_ids
+            node = get(NODE_MAP, node_id, nothing)
+            if !isnothing(node) && !node.is_grave
+                alive_count += 1
+            end
+        end
+    end
+    return alive_count
+end

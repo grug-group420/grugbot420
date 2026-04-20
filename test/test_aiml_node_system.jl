@@ -199,6 +199,32 @@ end
 @test_throws AIMLNodeError AIMLNodeSystem.add_aiml_node!("medium", "overflow", "x")
 println("  ✓ cap=7 (parent=21): add 7 succeeds, 8th throws")
 
+# GRUG: NEW TEST - Graves don't count towards population cap!
+println("\n[4b] GRAVE EXCLUSION FROM CAP")
+fresh_slate!()
+AIMLNodeSystem.register_lobe!("grave_cap_test", 9)  # cap = 3
+
+# Add 3 nodes (fills cap)
+AIMLNodeSystem.add_aiml_node!("grave_cap_test", "alive1", "tmpl1")
+AIMLNodeSystem.add_aiml_node!("grave_cap_test", "alive2", "tmpl2")
+AIMLNodeSystem.add_aiml_node!("grave_cap_test", "grave1", "tmpl3")
+@test AIMLNodeSystem.get_population_size("grave_cap_test") == 3
+@test AIMLNodeSystem.get_alive_population_size("grave_cap_test") == 3
+
+# Mark one as grave
+node = AIMLNodeSystem.get_aiml_node("grave_cap_test", "grave1")
+node.is_grave = true
+@test AIMLNodeSystem.get_alive_population_size("grave_cap_test") == 2
+
+# GRUG: Now cap should have room! 2 alive + 1 grave = 3 total, but cap=3 for alive.
+# We should be able to add one more alive node.
+AIMLNodeSystem.add_aiml_node!("grave_cap_test", "alive3", "tmpl4")
+println("  ✓ Grave nodes excluded from cap: 1 grave + 3 alive in cap=3 lobe")
+
+# But 4th alive should fail
+@test_throws AIMLNodeError AIMLNodeSystem.add_aiml_node!("grave_cap_test", "overflow", "x")
+println("  ✓ 4th alive node correctly rejected (cap=3 for alive nodes)")
+
 # ==============================================================================
 # [5] LOBE ISOLATION
 # ==============================================================================

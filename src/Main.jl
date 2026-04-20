@@ -2675,7 +2675,10 @@ function run_cli()
                                 json_data,
                                 drop_table
                             )
-                            Lobe.add_node_to_lobe!(target_lobe_id, new_id)
+                            # GRUG: Pass alive_count to exclude graves from cap check!
+                            # GRUG say: dead nodes are memory, not bloat. Cap is for living.
+                            alive_in_lobe = count_alive_nodes_in_lobe(target_lobe_id)
+                            Lobe.add_node_to_lobe!(target_lobe_id, new_id; alive_count=alive_in_lobe)
                             # GRUG: Convert JSON data and drop table into lobe's hash table chunks.
                             # Flat dict and flat vector become O(1) pattern-activated storage.
                             json_count = LobeTable.json_to_table_chunk!(target_lobe_id, new_id, json_data)
