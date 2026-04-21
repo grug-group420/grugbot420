@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.5</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.7</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.7</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -225,7 +225,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#action-tone">15. ActionTonePredictor: Input Classification</a></li>
         <li><a href="#full-lobe-scanner">15.5 FullLobeScanner: Phase-Gated Lobe Sweep</a> <span class="new-badge">v7.5</span></li>
         <li><a href="#immune-thread-pool">15.6 ImmuneThreadPool: Hardened Task Execution</a> <span class="new-badge">v7.5</span></li>
-        <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7</span></li>
+        <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
         <li><a href="#cli">18. CLI Command Reference</a></li>
@@ -1105,7 +1105,7 @@ time, share it with others, or restore it later on a different machine.</p>
     <tr><td><code>/loadSpecimen <filepath></code></td><td>Restore entire cave state from a specimen file (<strong>destructive</strong> — wipes current state)</td></tr>
 </table>
 
-<h3>State Categories (13 total)</h3>
+<h3>State Categories (21 total, v2.4) <span class="new-badge">v7.7</span></h3>
 <table>
     <tr><th>#</th><th>Category</th><th>Description</th></tr>
     <tr><td>1</td><td><strong>nodes</strong></td><td>Full Node structs — id, pattern, signal, action_packet, strength, neighbors, graves, drop_table, response_times, hopfield_key, relational_patterns, throttle, json_data</td></tr>
@@ -1119,8 +1119,16 @@ time, share it with others, or restore it later on a different machine.</p>
     <tr><td>9</td><td><strong>thesaurus_seeds</strong></td><td>Thesaurus SYNONYM_SEED_MAP (hardcoded defaults + runtime additions)</td></tr>
     <tr><td>10</td><td><strong>inhibitions</strong></td><td>InputQueue NegativeThesaurus entries (word, reason, timestamp)</td></tr>
     <tr><td>11</td><td><strong>arousal</strong></td><td>EyeSystem arousal state (level, decay_rate, baseline)</td></tr>
+    <tr><td>11.5</td><td><strong>eye_state</strong></td><td>EyeSystem tracking — attention_enabled, blur_enabled, last centroid, last_arousal</td></tr>
     <tr><td>12</td><td><strong>id_counters</strong></td><td>NODE ID_COUNTER and MSG_ID_COUNTER atomic values</td></tr>
+    <tr><td>12.5</td><td><strong>last_voters</strong></td><td>LAST_VOTER_IDS — node IDs that voted in last cycle (for /wrong feedback)</td></tr>
     <tr><td>13</td><td><strong>brainstem</strong></td><td>BrainStem dispatch count and propagation history</td></tr>
+    <tr><td>14</td><td><strong>attachments</strong></td><td>ATTACHMENT_MAP — target&rarr;attached node mappings with patterns and signals</td></tr>
+    <tr><td>15</td><td><strong>trajectory</strong></td><td>ActionTonePredictor ring buffer + config — behavioral inertia</td></tr>
+    <tr><td>16</td><td><strong>temporal_coherence</strong></td><td>ImageSDF timing patterns and coherence scores</td></tr>
+    <tr><td>17</td><td><strong>morph_cooldowns</strong></td><td>ChatterMode 24h morph cooldown timestamps</td></tr>
+    <tr><td>18</td><td><strong>immune_system</strong></td><td>ImmuneSystem Hopfield memory + ledger — safe/funky signatures</td></tr>
+    <tr><td>19</td><td><strong>aiml_system</strong></td><td>AIMLNodeSystem per-lobe tribes — AIML nodes, templates, strength</td></tr>
 </table>
 
 <h3>Usage Example</h3>
@@ -1135,7 +1143,7 @@ time, share it with others, or restore it later on a different machine.</p>
 <h3>Processing Details</h3>
 
 <div class="academic-box">
-    <p><strong>Save process:</strong> Serializes all 17 state categories into a single JSON object, then
+    <p><strong>Save process:</strong> Serializes all 21 state categories into a single JSON object, then
     gzip-compresses via system <code>gzip</code> pipeline (no extra Julia packages). Pretty-printed JSON
     with indent=2 for human readability when decompressed.</p>
 
@@ -1143,8 +1151,8 @@ time, share it with others, or restore it later on a different machine.</p>
     <ol>
         <li><strong>Read + Decompress + Parse:</strong> Read gzip file, decompress via <code>gunzip</code>, parse JSON</li>
         <li><strong>Validate Structure:</strong> Check all top-level keys and types. Spot-check node entries. If anything is wrong, reject the entire file — zero changes made.</li>
-        <li><strong>Wipe Current State:</strong> Lock and clear all 17 mutable state categories</li>
-        <li><strong>Restore All State:</strong> Rebuild in dependency order: counters &rarr; verbs &rarr; thesaurus &rarr; lobes &rarr; lobe_tables &rarr; nodes &rarr; node_to_lobe_idx &rarr; hopfield &rarr; rules &rarr; inhibitions &rarr; messages &rarr; arousal &rarr; brainstem &rarr; attachments &rarr; trajectory &rarr; temporal_coherence &rarr; morph_cooldowns</li>
+        <li><strong>Wipe Current State:</strong> Lock and clear all 21 mutable state categories</li>
+        <li><strong>Restore All State:</strong> Rebuild in dependency order: counters &rarr; last_voters &rarr; verbs &rarr; thesaurus &rarr; lobes &rarr; lobe_tables &rarr; nodes &rarr; node_to_lobe_idx &rarr; hopfield &rarr; rules &rarr; inhibitions &rarr; messages &rarr; arousal &rarr; eye_state &rarr; brainstem &rarr; attachments &rarr; trajectory &rarr; temporal_coherence &rarr; morph_cooldowns &rarr; immune_system &rarr; aiml_system</li>
         <li><strong>Build Summary:</strong> Print formatted summary table with per-category counts</li>
     </ol>
 </div>
@@ -1524,9 +1532,18 @@ The signal is not in the wire. Only the computation is. And the computation was 
 <h3>Specimen Persistence <span class="new-badge">v7</span></h3>
 <table>
     <tr><th>Command</th><th>Description</th></tr>
-    <tr><td><code>/saveSpecimen <filepath></code></td><td>Save full cave state to gzip-compressed JSON file. Captures all 17 state categories (including attachments).</td></tr>
+    <tr><td><code>/saveSpecimen <filepath></code></td><td>Save full cave state to gzip-compressed JSON file. Captures all 21 state categories (v2.4).</td></tr>
     <tr><td><code>/loadSpecimen <filepath></code></td><td>Restore full cave state from specimen file. Destructive: wipes current state first. Validates before wiping.</td></tr>
 </table>
+
+<h3>Admin Commands <span class="new-badge">v7.7</span></h3>
+<table>
+    <tr><th>Command</th><th>Description</th></tr>
+    <tr><td><code>/login <password></code></td><td>Authenticate as admin. Session expires after 1 hour of inactivity. Required for /writeSave.</td></tr>
+    <tr><td><code>/logout</code></td><td>End admin session.</td></tr>
+    <tr><td><code>/writeSave <filepath> <json></code></td><td>Append validated JSON to an existing save file. <strong>Requires admin login.</strong> Validates JSON before writing.</td></tr>
+</table>
+<p><strong>Default admin password:</strong> <code>grug_cave_master_420</code> (change <code>ADMIN_PASSWORD_HASH</code> before deployment!)</p>
 
 <!-- ================================================================ -->
 <h2 id="files">19. File Reference</h2>
@@ -1615,6 +1632,22 @@ julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.7 — Persistence Completeness v2.4</h3>
+    <ul>
+        <li><strong>LAST_VOTER_IDS persistence</strong>: Node IDs that voted in the last cycle now saved/restored so <code>/wrong</code> feedback works after reload</li>
+        <li><strong>EYE_STATE persistence</strong>: EyeSystem tracking state (attention_enabled, blur_enabled, last centroid, last_arousal) survives save/load</li>
+        <li>Specimen format bumped to v2.4 (backward-compatible with v2.0+ on load)</li>
+        <li>Validation whitelist updated to include <code>eye_state</code> and <code>last_voters</code> keys</li>
+        <li>Documentation: README.md, wiki, whitepaper all updated to reflect 21 state categories</li>
+    </ul>
+    <h3>v7.6 — AIML Immune Support</h3>
+    <ul>
+        <li><strong>AIML immune system</strong>: AIML nodes now protected by immune system at 1000+ node threshold</li>
+        <li><strong>Admin command system</strong>: <code>/login</code>, <code>/logout</code>, <code>/writeSave</code> for secure save file modifications</li>
+        <li><strong>aiml_system persistence</strong>: AIMLNodeSystem per-lobe tribes saved/restored with specimens</li>
+        <li>Session-based auth with 1-hour inactivity timeout</li>
+        <li>Password hashing (SHA256) with configurable default</li>
+    </ul>
     <h3>v7.5 — Full-Lobe Scanning & Hardened Execution</h3>
     <ul>
         <li><strong>FullLobeScanner</strong>: Phase-gated associative memory scanner for entire lobe sweeps — bounded activation (1000 nodes max), cosine similarity matching, spreading activation, AIML gating until DONE signal</li>
@@ -1688,7 +1721,7 @@ julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code
 </div>
 
 <div class="signature">
-    <p>GrugBot Neuromorphic Engine v7.5 &mdash; Technical Whitepaper</p>
+    <p>GrugBot Neuromorphic Engine v7.7 &mdash; Technical Whitepaper</p>
     <p>🦴 "Cave brain think different. That is why cave brain strong." &mdash; Grug</p>
 </div>
 

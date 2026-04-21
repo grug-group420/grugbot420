@@ -78,6 +78,16 @@ Complete reference for all grugbot420 CLI commands.
 
 See [[Specimen Persistence]] for full details on what gets saved.
 
+## Admin Commands
+
+| Command | Description |
+|---------|-------------|
+| `/login <password>` | Authenticate as admin. Session expires after 1 hour of inactivity. |
+| `/logout` | End admin session. |
+| `/writeSave <filepath> <json>` | Append validated JSON to an existing save file. **Requires admin login.** |
+
+**Default admin password:** `grug_cave_master_420` (change `ADMIN_PASSWORD_HASH` before deployment!)
+
 ## Template Tags (for `/addRule`)
 
 | Tag | Expands To |

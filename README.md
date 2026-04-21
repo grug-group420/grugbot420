@@ -106,6 +106,16 @@ Requires [Julia 1.9+](https://julialang.org/downloads/) on your PATH. First run 
 
 Prints the full command reference inside the CLI.
 
+### Admin Commands
+
+| Command | What it does |
+|---|---|
+| `/login <password>` | Authenticate as admin. Session expires after 1 hour of inactivity. Required for `/writeSave`. |
+| `/logout` | End admin session. |
+| `/writeSave <filepath> <json>` | Append validated JSON to an existing save file. **Requires admin login.** Validates JSON before writing — no silent failures. |
+
+**Default admin password:** `grug_cave_master_420` (change `ADMIN_PASSWORD_HASH` before deployment!)
+
 ---
 
 ## Growing Nodes (`/grow`)
@@ -167,7 +177,7 @@ This freezes the entire cave state into `mycave.specimen.gz`. The file contains 
 
 The file is validated before any state is wiped. If validation fails, zero changes are made.
 
-### What gets saved/restored
+### What gets saved/restored (v2.4 — 21 categories)
 
 | # | State Category | Description |
 |---|---|---|
@@ -182,16 +192,20 @@ The file is validated before any state is wiped. If validation fails, zero chang
 | 9 | **thesaurus_seeds** | Thesaurus SYNONYM_SEED_MAP (hardcoded defaults + runtime additions) |
 | 10 | **inhibitions** | InputQueue NegativeThesaurus entries (word, reason, timestamp) |
 | 11 | **arousal** | EyeSystem arousal state (level, decay_rate, baseline) |
+| 11.5 | **eye_state** | EyeSystem tracking state — attention_enabled, blur_enabled, last centroid, last_arousal |
 | 12 | **id_counters** | NODE ID_COUNTER and MSG_ID_COUNTER atomic values |
+| 12.5 | **last_voters** | LAST_VOTER_IDS — node IDs that voted in last cycle (for /wrong feedback) |
 | 13 | **brainstem** | BrainStem dispatch count and propagation history |
 | 14 | **attachments** | ATTACHMENT_MAP — target→attached node mappings with patterns and pre-baked signal vectors |
 | 15 | **trajectory** | ActionTonePredictor ring buffer + config — behavioral inertia through action-tone space (Lorenz damping) |
 | 16 | **temporal_coherence** | ImageSDF TEMPORAL_COHERENCE_LEDGER — SDF timing patterns and coherence scores |
 | 17 | **morph_cooldowns** | ChatterMode MORPH_COOLDOWN_MAP — 24h morph cooldown timestamps per node |
+| 18 | **immune_system** | ImmuneSystem Hopfield memory + ledger — what was safe/funky, automata state |
+| 19 | **aiml_system** | AIMLNodeSystem per-lobe tribes — AIML nodes, templates, strength, cycle state |
 
 ### Restore order
 
-`id_counters` → `verb_registry` → `thesaurus_seeds` → `lobes` → `lobe_tables` → `nodes` → `node_to_lobe_idx` → `hopfield_cache` → `rules` → `inhibitions` → `message_history` → `arousal` → `brainstem` → `attachments` → `trajectory` → `temporal_coherence` → `morph_cooldowns`
+`id_counters` → `last_voters` → `verb_registry` → `thesaurus_seeds` → `lobes` → `lobe_tables` → `nodes` → `node_to_lobe_idx` → `hopfield_cache` → `rules` → `inhibitions` → `message_history` → `arousal` → `eye_state` → `brainstem` → `attachments` → `trajectory` → `temporal_coherence` → `morph_cooldowns` → `immune_system` → `aiml_system`
 
 This ensures upstream entities exist before downstream references (e.g., lobes exist before nodes reference them).
 

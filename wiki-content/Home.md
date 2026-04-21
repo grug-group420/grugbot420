@@ -27,6 +27,8 @@ grugbot420 is a **specimen-based cognitive runtime** built around distributed no
 - **Specimens** — Persistent snapshots of the entire cognitive state. Save, share, restore.
 - **Quorum Voting** — Output is resolved through weighted competition, not a single deterministic path.
 - **Stochastic Coinflip** — Randomness is a feature. Weak nodes can get lucky. Strong nodes can lose.
+- **AIML Tribes** — Per-lobe AIML node populations with independent strength and cycle tracking.
+- **Immune System** — Automata-based protection for mature specimens (1000+ nodes).
 
 ## Ecosystem
 

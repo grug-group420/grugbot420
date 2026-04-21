@@ -16,7 +16,7 @@ grugbot420 supports full long-term persistence via specimen files — gzip-compr
 
 ⚠️ **Destructive operation** — current state is completely wiped and replaced. File is validated before any state is wiped. If validation fails, zero changes are made.
 
-## What Gets Saved
+## What Gets Saved (v2.4 — 21 categories)
 
 | # | Category | Description |
 |---|----------|-------------|
@@ -31,19 +31,24 @@ grugbot420 supports full long-term persistence via specimen files — gzip-compr
 | 9 | **thesaurus_seeds** | Synonym seed map (defaults + runtime additions) |
 | 10 | **inhibitions** | NegativeThesaurus entries (word, reason, timestamp) |
 | 11 | **arousal** | EyeSystem state (level, decay_rate, baseline) |
+| 11.5 | **eye_state** | EyeSystem tracking — attention_enabled, blur_enabled, last centroid, last_arousal |
 | 12 | **id_counters** | NODE ID_COUNTER and MSG_ID_COUNTER |
+| 12.5 | **last_voters** | LAST_VOTER_IDS — node IDs that voted in last cycle (for /wrong feedback) |
 | 13 | **brainstem** | Dispatch count and propagation history |
 | 14 | **attachments** | Target → attached node mappings with patterns and signals |
 | 15 | **trajectory** | ActionTonePredictor ring buffer + config |
 | 16 | **temporal_coherence** | ImageSDF timing patterns and coherence scores |
 | 17 | **morph_cooldowns** | ChatterMode 24h morph cooldown timestamps |
+| 18 | **immune_system** | ImmuneSystem Hopfield memory + ledger — safe/funky signatures, automata state |
+| 19 | **aiml_system** | AIMLNodeSystem per-lobe tribes — AIML nodes, templates, strength, cycle state |
 
 ## Restore Order
 
 ```
-id_counters → verb_registry → thesaurus_seeds → lobes → lobe_tables → nodes →
+id_counters → last_voters → verb_registry → thesaurus_seeds → lobes → lobe_tables → nodes →
 node_to_lobe_idx → hopfield_cache → rules → inhibitions → message_history →
-arousal → brainstem → attachments → trajectory → temporal_coherence → morph_cooldowns
+arousal → eye_state → brainstem → attachments → trajectory → temporal_coherence →
+morph_cooldowns → immune_system → aiml_system
 ```
 
 Upstream entities are restored before downstream references (e.g., lobes exist before nodes reference them).
