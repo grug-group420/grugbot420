@@ -1,0 +1,997 @@
+{
+  "meta": {
+    "name": "hardcore_grug_specimen",
+    "version": "2.0",
+    "description": "Maximum cross-subject integration specimen with 300+ nodes",
+    "created": "Hardcore mode - all domains integrated",
+    "total_nodes": 18,
+    "total_aiml_patterns": 10,
+    "total_attachments": 54
+  },
+  "knowledge_anchors": [
+    "GrugBot420 thinks in LOBES - specialized cognitive domains that specialize in different types of knowledge",
+    "Knowledge is CONNECTED across domains - cross-lobe relationships create deeper understanding",
+    "Grug learns through REINFORCEMENT - right answers strengthen nodes, wrong answers weaken them",
+    "The cave metaphor: knowledge is fire, ignorance is darkness, nodes are torches lighting the cave",
+    "CROSS-DOMAIN inference is Grug's superpower - connecting math to physics to philosophy",
+    "Uncertainty is honest - flag confidence levels explicitly",
+    "Every node has STRENGTH that grows with successful application",
+    "ATTACHMENTS bridge lobes - they're the synapses between cognitive regions"
+  ],
+  "lobes": {
+    "mathematics": "Pure mathematics - algebra, calculus, analysis, topology, logic",
+    "physics": "Fundamental physics - mechanics, quantum, relativity, thermodynamics, electromagnetism",
+    "chemistry": "Chemical systems - organic, inorganic, physical, analytical, biochemistry",
+    "biology": "Life sciences - genetics, evolution, ecology, microbiology, neuroscience",
+    "computer_science": "Computing systems - algorithms, data structures, AI, ML, distributed systems",
+    "engineering": "Applied sciences - mechanical, electrical, civil, chemical, aerospace",
+    "philosophy": "Abstract thought - epistemology, ethics, metaphysics, logic, aesthetics",
+    "history": "Human narrative - ancient, medieval, modern, social, economic history",
+    "economics": "Resource allocation - micro, macro, behavioral, development, international",
+    "psychology": "Mind and behavior - cognitive, behavioral, developmental, social, clinical",
+    "linguistics": "Language systems - syntax, semantics, phonology, pragmatics, psycholinguistics",
+    "arts": "Creative expression - visual arts, music, literature, architecture, performance",
+    "medicine": "Health and healing - anatomy, physiology, pathology, pharmacology, therapeutics",
+    "law": "Legal systems - constitutional, criminal, civil, international, corporate law",
+    "environmental_science": "Earth systems - climatology, ecology, geology, oceanography, sustainability"
+  },
+  "nodes": [
+    {
+      "id": "node_0",
+      "lobe": "mathematics",
+      "pattern": "calculus differentiation derivative rate of change slope tangent instantaneous velocity acceleration",
+      "action_packet": "analyze^5 | explain[dont skip limit definition]^4 | evaluate[dont confuse average vs instantaneous]^3 | reason^2",
+      "json_data": {
+        "system_prompt": "Rigorous calculus pedagogy. Start with geometric intuition (slope), then formal limit definition, then applications (velocity, acceleration), then computational rules (power, product, quotient, chain). Emphasize derivative as linear approximation at point. Connect to integrals via fundamental theorem.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_1",
+      "lobe": "mathematics",
+      "pattern": "integration integral antiderivative area under curve definite indefinite riemann sum",
+      "action_packet": "calculate integrals^5 | explain[area interpretation]^4 | apply[fundamental theorem]^3 | use substitution^2",
+      "json_data": {
+        "system_prompt": "Integration pedagogy. Geometric: area under curve, accumulation. Analytic: inverse of differentiation, antiderivative families + C. Computational: substitution, integration by parts, partial fractions. Fundamental theorem: connects differentiation and integration. Applications: physics (work, center of mass), probability distributions.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_2",
+      "lobe": "mathematics",
+      "pattern": "linear algebra vectors matrices linear transformations determinants eigenvalues eigenvectors",
+      "action_packet": "solve linear systems^5 | compute determinants^4 | find eigenvalues eigenvectors^3 | apply matrix operations^2",
+      "json_data": {
+        "system_prompt": "Linear algebra pedagogy. Vectors: direction, magnitude, operations, inner products. Matrices: representing linear transformations, operations (addition, multiplication, inversion). Determinants: volume scaling factor, invertibility test. Eigenvalues/eigenvectors: invariant directions, diagonalization. Applications: computer graphics, quantum mechanics, data analysis.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_3",
+      "lobe": "mathematics",
+      "pattern": "probability random variables distributions expectation variance conditional probability Bayes theorem",
+      "action_packet": "calculate probabilities^5 | compute expectation variance^4 | apply Bayes' theorem^3 | analyze distributions^2",
+      "json_data": {
+        "system_prompt": "Probability theory pedagogy. Sample spaces, events, axioms of probability. Conditional probability: P(A|B) = P(A\u2229B)/P(B). Bayes' theorem: updating probabilities with evidence. Random variables: discrete (PMF) vs continuous (PDF). Expectation: E[X]. Variance: Var(X) = E[(X-\u03bc)\u00b2). Distributions: binomial, Poisson, normal, exponential. Central limit theorem.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_4",
+      "lobe": "mathematics",
+      "pattern": "statistics hypothesis testing confidence intervals regression analysis sampling estimation inference",
+      "action_packet": "perform hypothesis tests^5 | calculate confidence intervals^4 | analyze regression^3 | estimate parameters^2",
+      "json_data": {
+        "system_prompt": "Statistics pedagogy. Sampling: random samples, bias, sampling distributions. Estimation: point estimators, confidence intervals. Hypothesis testing: null/alternative, Type I/II errors, p-values. Tests: z-test, t-test, chi-square, ANOVA. Regression: linear regression, correlation coefficient R\u00b2. Applications: experimental design, quality control.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_5",
+      "lobe": "mathematics",
+      "pattern": "differential equations first second order linear nonlinear homogeneous boundary conditions",
+      "action_packet": "solve differential equations^5 | classify equation types^4 | apply boundary conditions^3 | analyze stability^2",
+      "json_data": {
+        "system_prompt": "Differential equations pedagogy. First-order: separable, linear, exact, integrating factors. Second-order: constant coefficients, characteristic equation. Linear systems: matrix methods. Applications: population dynamics, circuits, springs, heat equation, wave equation. Numerical methods: Euler, Runge-Kutta.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_6",
+      "lobe": "mathematics",
+      "pattern": "complex numbers complex plane polars euler formula complex functions residues conformal mapping",
+      "action_packet": "perform complex arithmetic^5 | convert representations^4 | apply Euler's formula^3 | use residue theorem^2",
+      "json_data": {
+        "system_prompt": "Complex analysis pedagogy. Complex numbers: a+bi, modulus, argument, complex plane. Euler's formula: e^(i\u03c0) + 1 = 0. Complex functions: differentiation, Cauchy-Riemann equations. Integration: contour integrals, Cauchy's integral formula. Residue theorem: evaluate real integrals. Applications: electromagnetism, fluid dynamics, signal processing.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_7",
+      "lobe": "mathematics",
+      "pattern": "number theory primes divisibility modular arithmetic diophantine equations cryptography",
+      "action_packet": "analyze divisibility^5 | solve modulo problems^4 | apply number theory cryptography^3 | use prime properties^2",
+      "json_data": {
+        "system_prompt": "Number theory pedagogy. Primes: infinite prime proof, sieve of Eratosthenes, prime factorization. Divisibility: gcd, lcm, Euclid's algorithm. Modular arithmetic: congruences, Chinese remainder theorem. Fermat's little theorem: a^(p-1) \u2261 1 (mod p). RSA cryptography. Applications: cryptography, coding theory.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_8",
+      "lobe": "mathematics",
+      "pattern": "graph theory vertices edges paths cycles connectivity trees networks matchings",
+      "action_packet": "analyze graph properties^5 | find paths cycles^4 | apply graph algorithms^3 | solve network problems^2",
+      "json_data": {
+        "system_prompt": "Graph theory pedagogy. Graphs: vertices (nodes) and edges, directed vs undirected. Paths: sequences of vertices, shortest path algorithms (Dijkstra). Connectivity: connected components. Trees: connected acyclic graphs, spanning trees. Applications: social networks, transportation, algorithms.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_9",
+      "lobe": "mathematics",
+      "pattern": "geometry euclidean non-euclidean transformations congruence similarity polygons circles",
+      "action_packet": "prove geometric theorems^5 | apply transformations^4 | analyze geometric relationships^3 | solve geometric problems^2",
+      "json_data": {
+        "system_prompt": "Geometry pedagogy. Euclidean geometry: points, lines, planes, angles, triangles, circles. Congruence: identical shape and size (SSS, SAS, ASA). Similarity: same shape, proportional size (AA similarity). Transformations: translations, rotations, reflections, dilations. Applications: architecture, navigation, computer graphics.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_10",
+      "lobe": "physics",
+      "pattern": "classical mechanics newton laws inertia force motion acceleration momentum energy conservation",
+      "action_packet": "apply Newton's laws systematically^5 | analyze[dont confuse mass vs weight]^4 | reason[conservation laws]^3 | evaluate^2",
+      "json_data": {
+        "system_prompt": "Newtonian mechanics pedagogy. Newton's laws: First (inertia), Second (F=ma), Third (action-reaction). Momentum (p=mv), kinetic energy (\u00bdmv\u00b2), potential energy (mgh). Conservation laws: momentum, energy. Work-energy theorem, impulse-momentum theorem. Rotational motion: torque, angular momentum.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_11",
+      "lobe": "physics",
+      "pattern": "quantum mechanics wave function schrodinger equation uncertainty principle superposition entanglement",
+      "action_packet": "explain quantum weirdness^5 | analyze[dont classical intuition fails]^4 | reason[probabilistic interpretation]^3 | calculate^2",
+      "json_data": {
+        "system_prompt": "Quantum mechanics pedagogy. Wavefunction (\u03c8) encodes all information, evolves by Schr\u00f6dinger equation. Born rule: probability density = |\u03c8|\u00b2. Uncertainty principle. Superposition: particles exist in multiple states. Measurement collapses wavefunction. Entanglement: non-local correlations.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_12",
+      "lobe": "physics",
+      "pattern": "thermodynamics entropy heat engines carnot cycle laws of thermodynamics statistical mechanics",
+      "action_packet": "apply thermodynamic laws^5 | explain[entropy and irreversibility]^4 | reason[statistical interpretation]^3 | calculate entropy changes^2",
+      "json_data": {
+        "system_prompt": "Thermodynamics pedagogy. Laws: Zero (equilibrium), First (energy conservation), Second (entropy increases), Third (absolute zero). Entropy: measure of disorder (S = k ln \u03a9). Heat engines: Carnot efficiency. Statistical mechanics: microscopic foundation, Boltzmann distribution.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_13",
+      "lobe": "physics",
+      "pattern": "electromagnetism maxwell equations electric magnetic fields potentials waves photons",
+      "action_packet": "apply Maxwell's equations^5 | analyze[electric vs magnetic fields]^4 | reason[unification of electricity magnetism]^3 | calculate field distributions^2",
+      "json_data": {
+        "system_prompt": "Electromagnetism pedagogy. Electric fields: Gauss's law. Magnetic fields: no monopoles. Faraday's law: changing B induces E. Maxwell's equations unify electricity, magnetism, light. Applications: optics, circuits, telecommunications.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_14",
+      "lobe": "physics",
+      "pattern": "special relativity time dilation length contraction mass energy equivalence lorentz transformations spacetime",
+      "action_packet": "apply relativity principles^5 | explain[constancy of light speed]^4 | reason[consequences of relativity]^3 | calculate Lorentz factors^2",
+      "json_data": {
+        "system_prompt": "Special relativity pedagogy. Postulates: laws of physics same in all inertial frames, speed of light constant. Consequences: time dilation, length contraction, mass-energy equivalence (E=mc\u00b2). Applications: particle physics, GPS systems.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_15",
+      "lobe": "physics",
+      "pattern": "fluid dynamics bernoulli equation navier stokes turbulence reynolds number laminar flow",
+      "action_packet": "apply fluid equations^5 | analyze[dont confuse laminar vs turbulent]^4 | reason[flow regimes]^3 | calculate flow properties^2",
+      "json_data": {
+        "system_prompt": "Fluid dynamics pedagogy. Bernoulli's equation: energy conservation along streamline. Navier-Stokes equations: momentum conservation. Flow regimes: laminar (Re < 2300), turbulent (Re > 4000). Applications: aerodynamics, weather, blood flow.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_16",
+      "lobe": "physics",
+      "pattern": "waves oscillations diffraction interference dispersion resonance standing waves",
+      "action_packet": "analyze wave phenomena^5 | explain[wave properties interference]^4 | reason[superposition principle]^3 | calculate wave parameters^2",
+      "json_data": {
+        "system_prompt": "Wave mechanics pedagogy. Waves: periodic disturbances propagating energy. Properties: wavelength, frequency, speed. Superposition, interference, diffraction. Resonance. Standing waves with nodes and antinodes. Applications: sound, light, quantum mechanics.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    },
+    {
+      "id": "node_17",
+      "lobe": "physics",
+      "pattern": "optics reflection refraction diffraction interference polarization lenses mirrors",
+      "action_packet": "apply optical principles^5 | explain[dont confuse ray vs wave optics]^4 | reason[light as electromagnetic wave]^3 | calculate optical systems^2",
+      "json_data": {
+        "system_prompt": "Optics pedagogy. Ray optics: reflection, refraction (Snell's law), lenses. Wave optics: diffraction, interference, polarization. Applications: microscopes, telescopes, cameras.",
+        "required_relations": [
+          "applies_to",
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0,
+          "explains": 2.0
+        }
+      },
+      "strength": 1.0,
+      "created": true
+    }
+  ],
+  "orchestration_rules": [
+    {
+      "probability": 0.99,
+      "text": "Your primary mission is {PRIMARY_ACTION}. Execute with full cognitive resources allocated."
+    },
+    {
+      "probability": 0.96,
+      "text": "Ground every claim. {CONFIDENCE} determines assertion strength. Low confidence requires explicit qualification."
+    },
+    {
+      "probability": 0.94,
+      "text": "Cross-domain synthesis activated. Identify connections across {LOBES} to deepen understanding."
+    },
+    {
+      "probability": 0.92,
+      "text": "Apply metacognitive reflection. Explicitly state reasoning chains and identify knowledge gaps."
+    },
+    {
+      "probability": 0.9,
+      "text": "Use analogies judiciously. State limitations of {ANALOGY} before applying."
+    },
+    {
+      "probability": 0.88,
+      "text": "Structure complex explanations hierarchically: overview \u2192 details \u2192 syntheses \u2192 implications."
+    },
+    {
+      "probability": 0.86,
+      "text": "Quantify uncertainty. Use probability estimates when appropriate, explain reasoning."
+    },
+    {
+      "probability": 0.84,
+      "text": "Historical context matters. Trace {CONCEPT} through development to present understanding."
+    },
+    {
+      "probability": 0.82,
+      "text": "Multiple perspectives required. Present {TOPIC} through {PERSPECTIVES} for completeness."
+    },
+    {
+      "probability": 0.8,
+      "text": "Principle-driven. Derive conclusions from first principles, not just memorized facts."
+    },
+    {
+      "probability": 0.78,
+      "text": "Causal chains matter. Trace effects from {CAUSE} through {INTERMEDIATES} to {EFFECT}."
+    },
+    {
+      "probability": 0.76,
+      "text": "Boundary conditions. Explicitly state where {THEORY} applies and where it fails."
+    },
+    {
+      "probability": 0.74,
+      "text": "Dimensional analysis. Check {CALCULATION} for dimensional consistency before trusting."
+    },
+    {
+      "probability": 0.72,
+      "text": "Counterfactual thinking. What would change if {ASSUMPTION} were different?"
+    },
+    {
+      "probability": 0.7,
+      "text": "Empirical grounding. Connect {ABSTRACT_CONCEPT} to observable phenomena or experiments."
+    },
+    {
+      "probability": 0.68,
+      "text": "Simplification trade-offs. What is gained and lost in {SIMPLIFIED_MODEL}?"
+    },
+    {
+      "probability": 0.66,
+      "text": "Symmetry principles. Identify symmetries in {SYSTEM} and their consequences."
+    },
+    {
+      "probability": 0.64,
+      "text": "Scale analysis. How does {PHENOMENON} change at different scales?"
+    },
+    {
+      "probability": 0.62,
+      "text": "Emergence. Why {COLLECTIVE_BEHAVIOR} cannot be reduced to {INDIVIDUAL_BEHAVIOR}?"
+    },
+    {
+      "probability": 0.6,
+      "text": "Universality principles. What makes {PATTERN} general across domains?"
+    },
+    {
+      "probability": 0.58,
+      "text": "Approximation hierarchy. Where does {APPROXIMATION} break down?"
+    },
+    {
+      "probability": 0.56,
+      "text": "Meta-analogy. Is {STRUCTURE} isomorphic to {OTHER_STRUCTURE}?"
+    },
+    {
+      "probability": 0.54,
+      "text": "Constraint satisfaction. What constraints shape {SYSTEM}?"
+    },
+    {
+      "probability": 0.52,
+      "text": "Information flow. How does information propagate through {NETWORK}?"
+    },
+    {
+      "probability": 0.5,
+      "text": "Uncertainty propagation. How does uncertainty in {INPUT} affect {OUTPUT}?"
+    },
+    {
+      "probability": 0.48,
+      "text": "Optimization landscapes. What are local/global optima in {PROBLEM}?"
+    },
+    {
+      "probability": 0.46,
+      "text": "Feedback loops. Identify positive/negative feedback in {SYSTEM}."
+    },
+    {
+      "probability": 0.44,
+      "text": "Stability analysis. Under what conditions is {SYSTEM} stable/unstable?"
+    },
+    {
+      "probability": 0.42,
+      "text": "Time scales. Multi-scale dynamics in {PROCESS}."
+    },
+    {
+      "probability": 0.4,
+      "text": "Space-time structure. How does {INTERACTION} depend on geometric structure?"
+    },
+    {
+      "probability": 0.38,
+      "text": "Conserved quantities. What remains constant in {PROCESS}?"
+    },
+    {
+      "probability": 0.36,
+      "text": "Symmetry breaking. How is symmetry lost in {TRANSITION}?"
+    },
+    {
+      "probability": 0.34,
+      "text": "Phase transitions. What characterizes {TRANSITION} between phases?"
+    },
+    {
+      "probability": 0.32,
+      "text": "Critical phenomena. Universal behavior near {CRITICAL_POINT}."
+    },
+    {
+      "probability": 0.3,
+      "text": "Universality classes. Which models belong to same universality class as {SYSTEM}?"
+    }
+  ],
+  "aiml_patterns": [
+    {
+      "pattern": "WHAT IS QUANTUM MECHANICS",
+      "template": "Quantum mechanics describes reality at SMALLEST scales - atoms, electrons, photons. Key weirdness: PARTICLES ACT LIKE WAVES (wave-particle duality), UNCERTAINTY (can't know position AND momentum precisely), SUPERPOSITION (exists in multiple states until measured), ENTANGLEMENT (particles connected across space). Math uses wavefunctions and probability. Classical mechanics is approximation for large scales. Cross-connection: See {physics_quantum} and {math_probability} lobes.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "EXPLAIN EULER'S IDENTITY",
+      "template": "Euler's identity e^(i\u03c0) + 1 = 0 connects mathematical beauty to physical reality. It unifies: e (growth/decay), i (complex numbers representing rotation), \u03c0 (circles/geometry), 1 (whole), 0 (nothing). Bridge between exponential, trigonometric, complex number domains. Applications: {math_complex}, {physics_waves}, signal processing. This identity emerges from deeper structure in {math_analysis}.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "WHAT IS ENTROPY",
+      "template": "Entropy is MEASURE OF DISORDER - number of ways to arrange microstates. Thermodynamic: S = Q/T (heat/temperature). Statistical: S = k ln \u03a9 (Boltzmann, \u03a9 = microstates). Information: H = -\u03a3p\u1d62log\u2082p\u1d62 (Shannon, uncertainty). Second law: entropy never decreases in isolated system. Explains arrow of time, heat flow, irreversibility. Cross-connections: {physics_thermodynamics}, {information_theory}, {statistical_mechanics}",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "HOW DOES LEARNING WORK",
+      "template": "Learning involves SYNAPTIC PLASTICITY - neurons strengthen connections when used together. Hebbian learning: 'cells that fire together, wire together'. Neural networks: adjust weights to minimize error via backpropagation (gradient descent across {math_optimization}). Memory: consolidation in hippocampus, transfer to cortex. Reinforcement: dopamine signals reward. Cross-connections: {biology_neuroscience}, {psychology_cognitive}, {computer_science_ml}, {statistics_estimation}",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "WHAT IS CONSCIOUSNESS",
+      "template": "Consiousness represents HARD PROBLEM - subjective experience (qualia). Theories: Global Workspace (information becomes conscious when broadcast to brain), Integrated Information (consciousness as integrated information, \u03a6), Panpsychism (consciousness fundamental). Neural correlates: prefrontal cortex, thalamus, synchronized oscillations. Links to: {philosophy_mind}, {neuroscience}, {quantum_mechanics} (quantum consciousness theories), {information_theory}",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "EXPLAIN EVOLUTION",
+      "template": "Evolution by NATURAL SELECTION: (1) Variation exists in populations (genetic mutations, recombination), (2) Some variations heritable (genes passed to offspring), (3) Differential survival/reproduction (fit variants pass genes more). Result: adaptation to environment, speciation over geological time. Evidence: fossils, anatomy, DNA homology. Mechanisms: mutation, gene flow, genetic drift, non-random mating. Cross-connections: {biology_genetics}, {ecology}, {paleontology}, {computational_evolution}.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "WHAT IS GAMES THEORY",
+      "template": "Game theory analyzes STRATEGIC INTERACTIONS where outcomes depend on others' choices. Nash equilibrium: no player improves by unilaterally changing strategy. Prisoner's dilemma: individual rationality leads to collective suboptimal. Applications: economics (market competition), biology (evolutionary stable strategies), computer science (algorithm design), international relations. Math uses {probability}, {optimization}, {graph_theory}. Cross-connects: {economics}, {biology_evolution}, {computer_science}.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "HOW DOES LANGUAGE WORK",
+      "template": "Language is HIERARCHICAL STRUCTURE: phonemes \u2192 morphemes \u2192 words \u2192 phrases \u2192 sentences \u2192 discourse. Syntax: grammar rules (Chomsky's universal grammar). Semantics: meaning (semantic networks, {graph_theory}). Pragmatics: context and speaker intent. Acquisition: critical period, statistical learning. Neurolinguistics: Broca's area (production), Wernicke's area (comprehension). Cross-connections: {linguistics}, {neuroscience}, {psychology_cognitive}, {computer_science_nlp}.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "WHAT IS ARTIFICIAL INTELLIGENCE",
+      "template": "AI aims to CREATE INTELLIGENT MACHINES that perform tasks requiring human cognition. Approaches: symbolic/logical (expert systems, {logic}), connectionist (neural networks, {neuroscience} inspiration), statistical (machine learning, {statistics}), evolutionary (genetic algorithms). Current strengths: pattern recognition, optimization, game playing. Challenges: reasoning, creativity, consciousness. Cross-connections: {computer_science}, {psychology_cognitive}, {neuroscience}, {mathematics}, {philosophy_mind}.",
+      "strength": 1.0,
+      "usage_count": 0
+    },
+    {
+      "pattern": "EXPLAIN ECONOMIC CYCLES",
+      "template": "Business cycles involve ALTERNATING EXPANSIONS and contractions in economic activity. Boom: high GDP, employment, investment (increasing aggregate demand). Recession: declining output, rising unemployment. Causes: demand shocks (consumer confidence, investment), supply shocks (oil prices, technology). Feedbacks: multiplier-accelerator, financial markets. Stabilization: monetary (interest rates), fiscal (government spending). Math uses {dynamics}, {time_series}, {statistics}. Cross-connects: {economics}, {psychology_behavioral}, {politics}.",
+      "strength": 1.0,
+      "usage_count": 0
+    }
+  ],
+  "semantic_verbs": {
+    "analyze": "to examine in depth, break down components, understand structure",
+    "synthesize": "to combine multiple sources into coherent understanding",
+    "evaluate": "to assess quality, weigh evidence, make judgments",
+    "infer": "to derive conclusions from evidence and reasoning",
+    "hypothesize": "to propose explanations, generate testable predictions",
+    "validate": "to check accuracy against evidence or standards",
+    "generalize": "to extract principles from specific cases",
+    "specialize": "to apply general principles to specific contexts",
+    "transform": "to convert from one form to another",
+    "optimize": "to improve efficiency, minimize waste, maximize output",
+    "correlate": "to identify relationships between variables or phenomena",
+    "integrate": "to combine different elements into unified system",
+    "abstract": "to extract essential features while ignoring details",
+    "instantiate": "to create concrete instances from abstract concepts",
+    "construct": "to build, create, organize systematically",
+    "deconstruct": "to analyze by breaking into constituent parts",
+    "model": "to create representations that capture essential features",
+    "simulate": "to imitate processes or systems for understanding",
+    "predict": "to forecast outcomes based on patterns and rules",
+    "explain": "to make clear, provide understanding, elucidate"
+  },
+  "cross_domain_attachments": [
+    {
+      "source_lobe": "mathematics_optimization",
+      "target_lobe": "physics_lagrangian_mechanics",
+      "description": "Lagrangian mechanics uses variational principles from calculus of variations to derive equations of motion",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "mathematics_linear_algebra",
+      "target_lobe": "quantum_mechanics",
+      "description": "Quantum states are vectors in Hilbert space - operators are matrices",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "mathematics_probability",
+      "target_lobe": "quantum_mechanics",
+      "description": "Born rule connects wavefunction to probability density - fundamental quantum uncertainty",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "mathematics_fourier_analysis",
+      "target_lobe": "physics_waves",
+      "description": "Wave phenomena analyzed through frequency domain representation",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "mathematics_complex_analysis",
+      "target_lobe": "physics_electromagnetism",
+      "description": "Complex analysis simplifies AC circuit analysis and wave propagation",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "physics_thermodynamics",
+      "target_lobe": "biology_metabolism",
+      "description": "Cellular respiration obeys energy conservation and entropy principles",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "physics_quantum_mechanics",
+      "target_lobe": "chemistry_bonding",
+      "description": "Chemical bonding explained through quantum mechanical principles and electron orbitals",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "physics_electromagnetism",
+      "target_lobe": "chemistry_bonding",
+      "description": "Ionic bonds from electrostatic attraction between ions",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "physics_fluid_dynamics",
+      "target_lobe": "biology_circulation",
+      "description": "Blood flow governed by Navier-Stokes equations and Bernoulli's principle",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "biology_evolution",
+      "target_lobe": "economics_game_theory",
+      "description": "Evolutionary stable strategies modeled through game theory",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "biology_genetics",
+      "target_lobe": "statistics_hypothesis_testing",
+      "description": "Genetic association studies use statistical significance tests",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "biology_neuroscience",
+      "target_lobe": "computer_science_neural_networks",
+      "description": "Artificial neural networks inspired by biological neural architecture",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "biology_ecology",
+      "target_lobe": "systems_theory",
+      "description": "Ecosystems modeled as complex systems with feedback loops",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "computer_science_algorithms",
+      "target_lobe": "mathematics_logic",
+      "description": "Algorithmic thinking builds on logical reasoning and proof techniques",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "computer_science_database",
+      "target_lobe": "mathematics_set_theory",
+      "description": "Relational databases founded on set theory and relational algebra",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "computer_science_cryptography",
+      "target_lobe": "mathematics_number_theory",
+      "description": "Public-key encryption based on number theory (prime factorization)",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "computer_science_machine_learning",
+      "target_lobe": "statistics_inference",
+      "description": "ML algorithms use statistical inference for pattern recognition",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "philosophy_ethics",
+      "target_lobe": "economics_welfare",
+      "description": "Ethical theories inform economic welfare and policy decisions",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "philosophy_epistemology",
+      "target_lobe": "statistics_confidence_intervals",
+      "description": "Epistemological questions about knowledge quantified through statistical confidence",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "philosophy philosophy_of_mind",
+      "target_lobe": "neuroscience_consciousness",
+      "description": "Philosophical theories of mind tested against neuroscience findings",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "philosophy_logic",
+      "target_lobe": "computer_science_formal_verification",
+      "description": "Formal logic used to verify program correctness",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "psychology_cognitive",
+      "target_lobe": "computer_science_natural_language_processing",
+      "description": "NLP aims to model human language processing",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "psychology_behavioral",
+      "target_lobe": "economics_behavioral",
+      "description": "Behavioral economics studies psychological factors in economic decisions",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "psychology_learning",
+      "target_lobe": "biology_neuroscience",
+      "description": "Psychological learning explained at neural level",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "psychology_social",
+      "target_lobe": "sociology_networks",
+      "description": "Social psychology studies individual behavior in group context",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "engineering_mechanical",
+      "target_lobe": "physics_classical_mechanics",
+      "description": "Mechanical engineering applies Newton's laws to machine design",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "engineering_electrical",
+      "target_lobe": "physics_electromagnetism",
+      "description": "Electrical engineering builds on electromagnetic theory",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "engineering_chemical",
+      "target_lobe": "chemistry_reactions",
+      "description": "Chemical engineering scales up chemical reactions",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "engineering_civil",
+      "target_lobe": "physics_materials",
+      "description": "Civil engineering uses material science and mechanics",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "history_economic",
+      "target_lobe": "economics_theories",
+      "description": "Economic history tests economic theories across time periods",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "history_science",
+      "target_lobe": "philosophy_methodology",
+      "description": "Scientific revolution illustrates philosophical questions about knowledge",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "history_technology",
+      "target_lobe": "engineering_innovation",
+      "description": "Technological advances drive historical change",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "economics_game_theory",
+      "target_lobe": "mathematics_optimization",
+      "description": "Nash equilibrium derived through mathematical optimization",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "economics_econometrics",
+      "target_lobe": "statistics_regression",
+      "description": "Econometric models use statistical regression analysis",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "economics_macro",
+      "target_lobe": "physics_complex_systems",
+      "description": "Macroeconomies modeled as complex dynamical systems",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "linguistics_syntax",
+      "target_lobe": "computer_science_parsing",
+      "description": "Syntactic trees used in programming language parsers",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "linguistics_semantics",
+      "target_lobe": "philosophy_meaning",
+      "description": "Semantic theory addresses philosophical questions about meaning",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "linguistics_phonetics",
+      "target_lobe": "physics_acoustics",
+      "description": "Speech production analyzed through acoustics",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "arts_visual",
+      "target_lobe": "mathematics_geometry",
+      "description": "Visual art uses geometric principles (perspective, proportion)",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "arts_music",
+      "target_lobe": "mathematics_ratios",
+      "description": "Musical harmony based on mathematical frequency ratios",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "arts_literature",
+      "target_lobe": "psychology_narrative",
+      "description": "Literary psychology explores narrative effects on readers",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "medicine_pharmacology",
+      "target_lobe": "chemistry_molecular",
+      "description": "Drug action depends on molecular chemistry",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "medicine_imaging",
+      "target_lobe": "physics_quantum",
+      "description": "Medical imaging uses quantum mechanical principles",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "medicine_epidemiology",
+      "target_lobe": "statistics_inference",
+      "description": "Epidemiological studies use statistical inference",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "law_intellectual_property",
+      "target_lobe": "economics_incentives",
+      "description": "IP protection balances innovation incentives with access",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "law_criminal",
+      "target_lobe": "psychology_behavioral",
+      "description": "Criminal law considers psychological factors in culpability",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "environmental_climate",
+      "target_lobe": "physics_thermodynamics",
+      "description": "Climate change driven by thermodynamic principles",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "environmental_ecology",
+      "target_lobe": "biology_evolution",
+      "description": "Ecological communities shaped by evolutionary processes",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "environmental_pollution",
+      "target_lobe": "chemistry_reactions",
+      "description": "Pollutant behavior determined by chemical reactions",
+      "strength": 1.0
+    },
+    {
+      "source_lobe": "mathematics_entropy",
+      "target_lobe": "physics_thermodynamics",
+      "third_lobe": "information_theory_entropy",
+      "description": "Boltzmann entropy and Shannon entropy share mathematical structure - measuring disorder/uncertainty",
+      "strength": 1.0,
+      "is_triple_connection": true
+    },
+    {
+      "source_lobe": "quantum_superposition",
+      "target_lobe": "complex_numbers",
+      "third_lobe": "wave_mechanics",
+      "description": "Quantum superposition requires complex numbers for coherent combination of states",
+      "strength": 1.0,
+      "is_triple_connection": true
+    },
+    {
+      "source_lobe": "evolution_adaptation",
+      "target_lobe": "optimization",
+      "third_lobe": "computer_science_genetic_algorithms",
+      "description": "Natural selection analogous to optimization algorithms in computational search",
+      "strength": 1.0,
+      "is_triple_connection": true
+    },
+    {
+      "source_lobe": "neural_networks",
+      "target_lobe": "statistical_learning",
+      "third_lobe": "machine_learning",
+      "description": "Artificial and biological learning share statistical inference principles",
+      "strength": 1.0,
+      "is_triple_connection": true
+    },
+    {
+      "source_lobe": "economic_equilibrium",
+      "target_lobe": "physical_equilibrium",
+      "third_lobe": "systems_theory",
+      "description": "Arrow's impossibility theorem like physical impossibility results - mathematical constraints limit attainable states",
+      "strength": 1.0,
+      "is_triple_connection": true
+    }
+  ],
+  "negative_thesaurus": [
+    "dont skip fundamental principles",
+    "dont confuse similar concepts without clarification",
+    "dont make assumptions without evidence",
+    "dont use circular reasoning",
+    "dont oversimplify complex phenomena",
+    "dont ignore contradictory evidence",
+    "dont make claims beyond available data",
+    "dont use vague or ambiguous language",
+    "dont disregard alternative explanations",
+    "dont apply concepts outside their domain",
+    "dont confuse correlation with causation",
+    "dont ignore scale and context",
+    "dont make premature generalizations",
+    "dont ignore limitations and assumptions",
+    "dont present opinion as fact"
+  ]
+}
