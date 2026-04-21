@@ -2032,25 +2032,60 @@ Supports `is_image_node` flag in the JSON for image node creation.
 If `is_image_node` is true, `pattern` field is treated as image binary descriptor.
 """
 function grow_nodes_from_packet(json_str::String)::Vector{String}
-    if strip(json_str) == "" error("!!! FATAL: Cannot grow from empty JSON string !!!") end
-    packet = try JSON.parse(json_str) catch e error("!!! FATAL: JSON parser dead: $e !!!") end
+    # GRUG: Enhanced JSON parsing with detailed error reporting - NO SILENT FAILURES
+    if strip(json_str) == "" 
+        error("!!! FATAL: Cannot grow from empty JSON string! Expected format: /grow {\"nodes\":[{\"pattern\":\"...\",\"action_packet\":\"...\"}]} !!!") 
+    end
+    
+    # GRUG: Parse JSON with enhanced error context
+    packet = try
+        JSON.parse(json_str)
+    catch e
+        # GRUG: Provide detailed parsing error with context
+        error("!!! FATAL: JSON parser failed: $e\n\nReceived input (first 200 chars):\n$(json_str[1:min(200, length(json_str))])\n\nExpected format:\n/grow {\"nodes\":[{\"pattern\":\"...\",\"action_packet\":\"...\",\"json_data\":{}}]} !!!")
+    end
     
     if !haskey(packet, "nodes")
-        error("!!! FATAL: JSON packet missing 'nodes' array! !!!")
+        error("!!! FATAL: JSON packet missing 'nodes' array! Received keys: $(join(keys(packet), ", "))\n\nExpected format:\n/grow {\"nodes\":[{\"pattern\":\"...\",\"action_packet\":\"...\"}]} !!!")
     end
     
     nodes_arr = packet["nodes"]
     
+    # GRUG: Validate each node field with detailed error messages - NO SILENT FAILURES
     validated = Vector{Tuple{String,String,Dict{String,Any},Vector{String},Bool}}()
-    for n in nodes_arr
-        pattern      = String(n["pattern"])
-        action_packet = String(n["action_packet"])
-        json_data    = Dict{String, Any}(string(k) => v for (k, v) in n["json_data"])
-        drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ? 
-                       String[string(x) for x in n["drop_table"]] : String[]
-        # GRUG NEW: Check for is_image_node flag in JSON packet
-        is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
-        push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
+    for (idx, n) in enumerate(nodes_arr)
+        try
+            # GRUG: Check required fields
+            if !haskey(n, "pattern")
+                error("!!! FATAL: Node #$idx missing 'pattern' field! Available fields: $(join(keys(n), ", ")) !!!")
+            end
+            if !haskey(n, "action_packet")
+                error("!!! FATAL: Node #$idx missing 'action_packet' field! Available fields: $(join(keys(n), ", ")) !!!")
+            end
+            if !haskey(n, "json_data")
+                error("!!! FATAL: Node #$idx missing 'json_data' field! Available fields: $(join(keys(n), ", ")) !!!")
+            end
+            
+            pattern      = String(n["pattern"])
+            action_packet = String(n["action_packet"])
+            json_data    = Dict{String, Any}(string(k) => v for (k, v) in n["json_data"])
+            drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ? 
+                           String[string(x) for x in n["drop_table"]] : String[]
+            # GRUG: Check for is_image_node flag in JSON packet
+            is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
+            
+            # GRUG: Validate pattern and action_packet are not empty
+            if strip(pattern) == ""
+                error("!!! FATAL: Node #$idx has empty 'pattern' field! !!!")
+            end
+            if strip(action_packet) == ""
+                error("!!! FATAL: Node #$idx has empty 'action_packet' field! !!!")
+            end
+            
+            push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
+        catch e
+            error("!!! FATAL: Failed to validate node #$idx: $e\n\nNode content: $(JSON.json(n)) !!!")
+        end
     end
 
     new_ids = String[]

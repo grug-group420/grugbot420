@@ -91,6 +91,31 @@ const MESSAGE_HISTORY_LOCK = ReentrantLock()  # GRUG: Lock for phagy forensics r
 
 # GRUG FIX 3.1: Strict Role Validation!
 # Grug no let random strangers paint on memory wall.
+const ALLOWED_ROLES = ["system", "user", "assistant", "User_Pinned"]
+
+# GRUG NEW: Stop-on-error mode for command execution
+# When true, commands stop executing after first error. When false, continue despite errors.
+const STOP_ON_ERROR = true
+
+# GRUG NEW: Track command execution statistics
+const COMMAND_STATS = Dict{String, Int}(
+    "success" => 0,
+    "failure" => 0
+)
+
+# GRUG NEW: Command execution wrapper with error tracking
+# Wraps command execution with try-catch to track failures and provide detailed error context
+function execute_with_tracking(command_name::String, command_func::Function)
+    try
+        command_func()
+        COMMAND_STATS["success"] += 1
+        nothing  # Success: return nothing
+    catch e
+        COMMAND_STATS["failure"] += 1
+        # GRUG: Provide detailed error context with command name
+        error("!!! FATAL: Command [$command_name] failed:\n$e\n\nTotal failures: $(COMMAND_STATS["failure"]) success: $(COMMAND_STATS["success"]) !!!")
+    end
+end
 # ==============================================================================
 # ADMIN COMMAND SYSTEM
 # ==============================================================================
@@ -330,10 +355,12 @@ GRUG: Write new words on memory cave wall. If wall full, wash away old words.
 Pinned messages survive eviction. Throws on empty input — NO SILENT FAILURES.
 """
 function add_message_to_history!(role::String, text::String, pinned::Bool=false)
+    # GRUG: Validate inputs - NO SILENT FAILURES
     if strip(text) == "" || strip(role) == ""
-        error("!!! FATAL: Grug cannot paint empty air on memory cave wall! !!!")
+        error("!!! FATAL: Grug cannot paint empty air on memory cave wall! role='$role', text_length=$(length(text)) !!!")
     end
 
+    # GRUG: Validate role against ALLOWED_ROLES constant
     if !(role in ALLOWED_ROLES)
         error("!!! FATAL: Grug does not know role '$role'. Allowed roles: $(join(ALLOWED_ROLES, ", ")) !!!")
     end
