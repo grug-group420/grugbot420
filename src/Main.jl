@@ -1264,14 +1264,16 @@ Captures ALL mutable state across all modules:
   - thesaurus   (SYNONYM_SEED_MAP runtime additions from Thesaurus)
   - inhibitions (NegativeThesaurus entries from InputQueue)
   - arousal     (EyeSystem arousal state: level, decay, baseline)
+  - eye_state   (EyeSystem tracking: attention, centroid, last_arousal)
   - counters    (NODE ID_COUNTER + MSG_ID_COUNTER)
+  - last_voters (LAST_VOTER_IDS for /wrong feedback)
   - brainstem   (dispatch count, propagation history)
   - attachments (ATTACHMENT_MAP relational fire system)
   - trajectory  (ActionTonePredictor ring buffer + config)
   - temporal    (ImageSDF TEMPORAL_COHERENCE_LEDGER timing patterns)
   - cooldowns   (ChatterMode MORPH_COOLDOWN_MAP 24h morph timestamps)
 
-Format: v2.1 (backward-compatible with v2.0 on load).
+Format: v2.4 (backward-compatible with v2.0+ on load).
 Returns a formatted summary string.
 """
 function save_specimen_to_file!(filepath::String)::String
@@ -1453,11 +1455,33 @@ function save_specimen_to_file!(filepath::String)::String
     end
     specimen["arousal"] = arousal_data
 
+    # ─── 11.5 EYE STATE ────────────────────────────────────────────────────────
+    # GRUG: Save eye tracking state for continuity across reloads.
+    # Includes last detected centroid position and arousal at last processing.
+    eye_state_data = Dict{String, Any}()
+    lock(EyeSystem.EYE_STATE_LOCK) do
+        es = EyeSystem.DEFAULT_EYE_STATE
+        eye_state_data["attention_enabled"] = es.attention_enabled
+        eye_state_data["blur_enabled"] = es.blur_enabled
+        eye_state_data["last_centroid_x"] = es.last_centroid_x
+        eye_state_data["last_centroid_y"] = es.last_centroid_y
+        eye_state_data["last_arousal"] = es.last_arousal
+    end
+    specimen["eye_state"] = eye_state_data
+
     # ── 12. ID COUNTERS ──────────────────────────────────────────────────
     specimen["id_counters"] = Dict{String, Any}(
         "node_id_counter" => ID_COUNTER[],
         "msg_id_counter"  => MSG_ID_COUNTER[]
     )
+    # ─── 12.5 LAST VOTER IDS ────────────────────────────────────────────────────────
+    # GRUG: Save last voter IDs so /wrong works after save/load.
+    # Without this, /wrong has no idea who voted after a reload!
+    last_voters = lock(LAST_VOTER_LOCK) do
+        copy(LAST_VOTER_IDS)
+    end
+    specimen["last_voters"] = last_voters
+
 
     # ── 13. BRAINSTEM STATE ──────────────────────────────────────────────
     brainstem_data = Dict{String, Any}()
@@ -1571,9 +1595,9 @@ function save_specimen_to_file!(filepath::String)::String
     specimen["aiml_system"] = AIMLNodeSystem.serialize_aiml_state()
 
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.3",
+        "version"    => "2.4",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.3"
+        "format"     => "grugbot420-specimen-v2.4"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -1704,8 +1728,8 @@ function load_specimen_from_file!(filepath::String)::String
     allowed_keys = Set(["nodes", "hopfield_cache", "rules", "message_history",
                         "lobes", "node_to_lobe_idx", "lobe_tables",
                         "verb_registry", "thesaurus_seeds", "inhibitions",
-                        "arousal", "id_counters", "brainstem", "attachments",
-                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "_meta"])
+                        "arousal", "eye_state", "id_counters", "last_voters", "brainstem", "attachments",
+                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system", "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
             push!(validation_errors, "Unknown top-level key '$key'")
@@ -1720,8 +1744,8 @@ function load_specimen_from_file!(filepath::String)::String
     end
 
     # GRUG: Type checks for critical dict sections
-    for k in ["node_to_lobe_idx", "verb_registry", "thesaurus_seeds", "arousal", "id_counters", "brainstem",
-             "trajectory", "morph_cooldowns", "immune_system", "_meta"]
+    for k in ["node_to_lobe_idx", "verb_registry", "thesaurus_seeds", "arousal", "eye_state", "id_counters", "brainstem",
+             "trajectory", "morph_cooldowns", "immune_system", "aiml_system", "_meta"]
         if haskey(specimen, k) && !isa(specimen[k], Dict)
             push!(validation_errors, "'$k' must be an object")
         end
@@ -1867,6 +1891,42 @@ function load_specimen_from_file!(filepath::String)::String
             MSG_ID_COUNTER[] = Int(idc["msg_id_counter"])
         end
         println("  🔢 ID counters restored (node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[]))")
+    end
+
+    # ─── 4.1.5 LAST VOTER IDS ──────────────────────────────────────────────────
+    # GRUG: Restore last voter IDs so /wrong works after reload.
+    if haskey(specimen, "last_voters") && isa(specimen["last_voters"], AbstractVector)
+        lock(LAST_VOTER_LOCK) do
+            empty!(LAST_VOTER_IDS)
+            for vid in specimen["last_voters"]
+                push!(LAST_VOTER_IDS, String(vid))
+            end
+        end
+        println("  🗳  Last voters restored ($(length(LAST_VOTER_IDS)) IDs)")
+    end
+
+    # ─── 4.1.6 EYE STATE ────────────────────────────────────────────────────────
+    # GRUG: Restore eye tracking state for continuity.
+    if haskey(specimen, "eye_state") && isa(specimen["eye_state"], Dict)
+        es = specimen["eye_state"]
+        lock(EyeSystem.EYE_STATE_LOCK) do
+            if haskey(es, "attention_enabled")
+                EyeSystem.DEFAULT_EYE_STATE.attention_enabled = Bool(es["attention_enabled"])
+            end
+            if haskey(es, "blur_enabled")
+                EyeSystem.DEFAULT_EYE_STATE.blur_enabled = Bool(es["blur_enabled"])
+            end
+            if haskey(es, "last_centroid_x")
+                EyeSystem.DEFAULT_EYE_STATE.last_centroid_x = Float64(es["last_centroid_x"])
+            end
+            if haskey(es, "last_centroid_y")
+                EyeSystem.DEFAULT_EYE_STATE.last_centroid_y = Float64(es["last_centroid_y"])
+            end
+            if haskey(es, "last_arousal")
+                EyeSystem.DEFAULT_EYE_STATE.last_arousal = Float64(es["last_arousal"])
+            end
+        end
+        println("  👁  Eye state restored")
     end
 
     # ── 4.2 VERB REGISTRY ────────────────────────────────────────────────
