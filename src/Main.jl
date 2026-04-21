@@ -68,6 +68,8 @@ if !isdefined(@__MODULE__, :ImmuneSystem)
 end
 
 using Base64: base64decode
+using SHA: sha256
+using JSON
 
 # ==============================================================================
 # MEMORY CAVE (PIN AWARENESS LAYER)
@@ -89,7 +91,237 @@ const MESSAGE_HISTORY_LOCK = ReentrantLock()  # GRUG: Lock for phagy forensics r
 
 # GRUG FIX 3.1: Strict Role Validation!
 # Grug no let random strangers paint on memory wall.
-const ALLOWED_ROLES = Set(["User", "System", "User_Pinned", "Engine_Voice"])
+# ==============================================================================
+# ADMIN COMMAND SYSTEM
+# ==============================================================================
+# GRUG: Some commands too dangerous for regular cave dwellers.
+# /writeSave can inject arbitrary JSON into save files - MUST be admin-only.
+# /login establishes admin session. Session expires after ADMIN_SESSION_TIMEOUT seconds.
+# Password is stored hashed (SHA256) - never store plaintext!
+# NO SILENT FAILURES: All admin operations log and validate loudly.
+
+# GRUG: Default admin password. CHANGE THIS BEFORE DEPLOYMENT!
+# To set custom password: set ADMIN_PASSWORD_HASH = bytes2hex(sha256("your_password"))
+const ADMIN_PASSWORD_DEFAULT = "grug_cave_master_420"
+
+# GRUG: SHA256 hash of default password. Computed at module load.
+const ADMIN_PASSWORD_HASH = bytes2hex(sha256(ADMIN_PASSWORD_DEFAULT))
+
+# GRUG: Session timeout in seconds (default: 1 hour)
+const ADMIN_SESSION_TIMEOUT = 3600
+
+# GRUG: Admin session state
+mutable struct AdminSession
+    is_logged_in::Bool
+    login_time::Float64
+    last_activity::Float64
+end
+
+const ADMIN_SESSION = Ref{AdminSession}(AdminSession(false, 0.0, 0.0))
+const ADMIN_LOCK = ReentrantLock()
+
+"""
+    is_admin_logged_in()::Bool
+
+GRUG: Check if admin session is active and not expired.
+Returns true if logged in and within timeout, false otherwise.
+Thread-safe: uses ADMIN_LOCK.
+"""
+function is_admin_logged_in()::Bool
+    return lock(ADMIN_LOCK) do
+        if !ADMIN_SESSION[].is_logged_in
+            return false
+        end
+        # GRUG: Check session timeout
+        elapsed = time() - ADMIN_SESSION[].last_activity
+        if elapsed > ADMIN_SESSION_TIMEOUT
+            # GRUG: Session expired - reset it
+            ADMIN_SESSION[] = AdminSession(false, 0.0, 0.0)
+            return false
+        end
+        # GRUG: Update last activity time
+        ADMIN_SESSION[] = AdminSession(true, ADMIN_SESSION[].login_time, time())
+        return true
+    end
+end
+
+"""
+    admin_login(password::String)::Tuple{Bool, String}
+
+GRUG: Attempt admin login with provided password.
+Returns (success, message) tuple. On success, establishes session.
+On failure, returns false with error message. NO SILENT FAILURES.
+"""
+function admin_login(password::String)::Tuple{Bool, String}
+    if strip(password) == ""
+        return (false, "⛔ Password cannot be empty!")
+    end
+    
+    # GRUG: Hash the provided password and compare
+    provided_hash = bytes2hex(sha256(password))
+    
+    return lock(ADMIN_LOCK) do
+        if provided_hash == ADMIN_PASSWORD_HASH
+            now = time()
+            ADMIN_SESSION[] = AdminSession(true, now, now)
+            return (true, "✅ Admin login successful. Session active for $(ADMIN_SESSION_TIMEOUT) seconds of inactivity.")
+        else
+            # GRUG: Log failed attempt (but don't expose password hash)
+            @warn "[ADMIN] Failed login attempt at $(time())"
+            return (false, "⛔ Invalid password. Access denied.")
+        end
+    end
+end
+
+"""
+    admin_logout()::String
+
+GRUG: Terminate admin session. Returns confirmation message.
+"""
+function admin_logout()::String
+    return lock(ADMIN_LOCK) do
+        if ADMIN_SESSION[].is_logged_in
+            ADMIN_SESSION[] = AdminSession(false, 0.0, 0.0)
+            return "✅ Admin session terminated."
+        else
+            return "ℹ️ No active admin session to terminate."
+        end
+    end
+end
+
+"""
+    validate_json(json_str::String)::Tuple{Bool, String}
+
+GRUG: Validate that a string is valid JSON.
+Returns (is_valid, error_message) tuple.
+If valid, error_message is empty string.
+"""
+function validate_json(json_str::String)::Tuple{Bool, String}
+    if strip(json_str) == ""
+        return (false, "JSON string is empty!")
+    end
+    
+    try
+        # GRUG: Try to parse the JSON
+        parsed = JSON.parse(json_str)
+        return (true, "")
+    catch e
+        return (false, "JSON parse error: $(e)")
+    end
+end
+
+"""
+    append_to_save_file(json_str::String, save_filepath::String)::String
+
+GRUG: Append validated JSON to the specimen save file.
+Reads existing save file, merges/appends JSON, writes back.
+Requires admin login. NO SILENT FAILURES.
+Uses system gzip like save_specimen_to_file! - no extra packages needed.
+
+Returns summary string on success, throws on failure.
+"""
+function append_to_save_file(json_str::String, save_filepath::String)::String
+    # GRUG: Pre-flight checks
+    if !is_admin_logged_in()
+        error("!!! FATAL: /writeSave requires admin login! Use /login first! !!!")
+    end
+    
+    if strip(json_str) == ""
+        error("!!! FATAL: /writeSave got empty JSON! Grug cannot write nothing! !!!")
+    end
+    
+    if strip(save_filepath) == ""
+        error("!!! FATAL: /writeSave got empty filepath! Grug cannot write to invisible air! !!!")
+    end
+    
+    # GRUG: Validate JSON
+    is_valid, json_err = validate_json(json_str)
+    if !is_valid
+        error("!!! FATAL: /writeSave JSON validation failed: $json_err !!!")
+    end
+    
+    # GRUG: Parse the new JSON
+    new_data = JSON.parse(json_str)
+    
+    # GRUG: Check if save file exists
+    if !isfile(save_filepath)
+        # GRUG: File doesn't exist - create new file with the JSON
+        # Wrap in specimen structure if not already
+        specimen = Dict{String, Any}(
+            "format_version" => "2.1",
+            "created_at" => time(),
+            "custom_append" => new_data
+        )
+        
+        json_out = JSON.json(specimen)
+        
+        # GRUG: Use system gzip like save_specimen_to_file! - no extra packages needed
+        try
+            open(save_filepath, "w") do io
+                proc = open(`gzip -c`, "r+")
+                write(proc, json_out)
+                close(proc.in)
+                compressed = read(proc)
+                write(io, compressed)
+            end
+        catch e
+            error("!!! FATAL: /writeSave failed to write compressed file '$save_filepath': $e !!!")
+        end
+        
+        return "✅ Created new save file: $save_filepath with appended JSON."
+    end
+    
+    # GRUG: File exists - read, merge, write back
+    try
+        # GRUG: Decompress existing file using system gunzip
+        json_str_existing = read(`gunzip -c $save_filepath`, String)
+        existing = JSON.parse(json_str_existing)
+        
+        # GRUG: Merge/append the new data
+        # If new_data is a dict, merge into existing
+        # If new_data is a list, append to appropriate array
+        if isa(new_data, Dict)
+            for (key, value) in new_data
+                if haskey(existing, key)
+                    # GRUG: Key exists - merge or replace based on type
+                    if isa(existing[key], Dict) && isa(value, Dict)
+                        # GRUG: Both dicts - deep merge
+                        for (k, v) in value
+                            existing[key][k] = v
+                        end
+                    elseif isa(existing[key], Vector) && isa(value, Vector)
+                        # GRUG: Both arrays - concatenate
+                        append!(existing[key], value)
+                    else
+                        # GRUG: Different types - replace
+                        existing[key] = value
+                    end
+                else
+                    # GRUG: New key - just add
+                    existing[key] = value
+                end
+            end
+        else
+            # GRUG: New data is not a dict - put it in a wrapper
+            existing["custom_append_$(round(Int, time()))"] = new_data
+        end
+        
+        # GRUG: Write back using system gzip
+        json_out = JSON.json(existing)
+        open(save_filepath, "w") do io
+            proc = open(`gzip -c`, "r+")
+            write(proc, json_out)
+            close(proc.in)
+            compressed = read(proc)
+            write(io, compressed)
+        end
+        
+        return "✅ Appended JSON to save file: $save_filepath"
+        
+    catch e
+        error("!!! FATAL: /writeSave failed to process save file '$save_filepath': $e !!!")
+    end
+end
 
 """
 add_message_to_history!(role::String, text::String, pinned::Bool=false)
@@ -804,6 +1036,13 @@ const HELP_MSG = """
 ║    Saves/restores: nodes, lobes, lobe tables, Hopfield,     ║
 ║    rules, messages+pins, verbs, thesaurus, inhibitions,     ║
 ║    arousal, ID counters, brainstem state, attachments        ║
+║                                                              ║
+║  ADMIN COMMANDS (password protected)                         ║
+║  /login <password>           Authenticate as admin           ║
+║  /logout                     End admin session               ║
+║  /writeSave <filepath> <json> Append JSON to save file       ║
+║    Requires admin login. Validates JSON before writing.     ║
+║    Use for runtime modifications to saved specimen data.    ║
 ║                                                              ║
 ║  /help                      Show this scroll                ║
 ╠══════════════════════════════════════════════════════════════╣
@@ -2357,6 +2596,10 @@ function run_cli()
             # GRUG: Help command — show all commands
             m_loadspecimen = match(r"^/loadSpecimen\s+(\S+)\s*$",                          line)
             m_savespecimen = match(r"^/saveSpecimen\s+(\S+)\s*$",                          line)
+            # GRUG: Admin commands (password protected)
+            m_login        = match(r"^/login\s+(.+)$",                                     line)
+            m_logout       = match(r"^/logout\s*$",                                        line)
+            m_writesave    = match(r"^/writeSave\s+(\S+)\s+(.+)$"s,                        line)
             # GRUG: Relational fire system commands (node attachment)
             m_nodeattach   = match(r"^/nodeAttach\s+(.+)"s,                              line)
             m_nodedetach   = match(r"^/nodeDetach\s+(\S+)\s+(\S+)\s*$",                  line)
@@ -2895,6 +3138,41 @@ function run_cli()
                     result_summary = load_specimen_from_file!(spec_path)
                     println("\n$result_summary")
                     add_message_to_history!("System", result_summary, false)
+                end
+
+            elseif !isnothing(m_login)
+                # GRUG: /login <password> — authenticate as admin
+                # Password is hashed and compared. Session established on success.
+                password = String(strip(m_login.captures[1]))
+                add_message_to_history!("System", "/login [REDACTED]", false)
+
+                success, message = admin_login(password)
+                println(message)
+                add_message_to_history!("System", message, false)
+
+            elseif !isnothing(m_logout)
+                # GRUG: /logout — terminate admin session
+                add_message_to_history!("System", "/logout", false)
+                message = admin_logout()
+                println(message)
+                add_message_to_history!("System", message, false)
+
+            elseif !isnothing(m_writesave)
+                # GRUG: /writeSave <filepath> <json> — append JSON to save file
+                # Requires admin login. Validates JSON before writing.
+                # This is DANGEROUS - can inject arbitrary data into save files!
+                filepath = String(strip(m_writesave.captures[1]))
+                json_str = String(strip(m_writesave.captures[2]))
+                add_message_to_history!("System", "/writeSave $filepath [JSON]", false)
+
+                try
+                    result = append_to_save_file(json_str, filepath)
+                    println(result)
+                    add_message_to_history!("System", result, false)
+                catch e
+                    error_msg = "⛔ /writeSave failed: $e"
+                    println(error_msg)
+                    add_message_to_history!("System", error_msg, false)
                 end
 
             elseif !isnothing(m_nodeattach)

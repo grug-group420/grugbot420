@@ -1,7 +1,7 @@
 name = "GrugBot420"
 uuid = "cca5d872-df54-4153-9d0d-2ea4c0eb00c4"
-authors = ["marshalldavidson61-arch"]
 version = "0.1.0"
+authors = ["marshalldavidson61-arch"]
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -9,11 +9,13 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+SHA = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
 [compat]
 Distributions = "0.25"
 JSON = "0.21"
 KernelAbstractions = "0.9"
+SHA = "0.7.0"
 julia = "1.9"
 
 [extras]
