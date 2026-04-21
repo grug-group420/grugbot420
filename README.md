@@ -565,6 +565,8 @@ Open `grugbot_whitepaper.html` in a browser for the full technical whitepaper co
 
 See [`docs/immune_system.html`](./docs/immune_system.html) for the immune system specification (grug analogy, academic details, math/lambda, flowchart).
 
+See [`docs/AIML_COMMANDS.md`](./docs/AIML_COMMANDS.md) for the complete AIML Node System command reference, including user commands, API functions, and immune system integration.
+
 ---
 
 ## Notes on Seeding

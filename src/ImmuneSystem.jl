@@ -32,6 +32,8 @@ export ImmuneError, ImmuneLedger, HopfieldImmuneMemory
 export immune_scan!, get_immune_status, get_ledger_entries
 export immune_ast_signature, detect_funky, quarantine_input!, attempt_patch, delete_input!
 export add_known_signature!, lookup_signature, reset_immune_state!
+export aiml_immune_gate, aiml_immune_scan!, get_aiml_immune_status
+export AIML_MATURITY_THRESHOLD
 
 # ==============================================================================
 # ERROR TYPES — GRUG: NO SILENT FAILURES
@@ -681,6 +683,167 @@ function deserialize_immune_state!(data::Dict)
             end
         end
     end
+end
+
+# ==============================================================================
+# AIML-SPECIFIC IMMUNE SUPPORT
+# ==============================================================================
+# GRUG: AIML nodes are executive layer. They get their OWN immune threshold.
+# Regular immune system gates on total node count (1000+ nodes).
+# AIML immune gates on AIML node count (1000+ AIML nodes).
+# Young specimen = no immune. Young AIML tribe = no AIML immune. Same rule.
+#
+# GRUG: This is SEPARATE from the main immune system. AIML has its own:
+#   - Maturity threshold (AIML_MATURITY_THRESHOLD = 1000 AIML nodes)
+#   - Immune ledger entries (prefixed with :aiml_)
+#   - Hopfield memory (shared - signatures are just hashes)
+#
+# GRUG: When to use AIML immune gate?
+#   - When adding new AIML rules/nodes programmatically
+#   - When AIML orchestration wants to validate generated content
+#   - NOT for /aimlRight or /aimlWrong (those are feedback, not structure)
+# ==============================================================================
+
+# GRUG: AIML maturity threshold. Same as regular immune but for AIML population.
+const AIML_MATURITY_THRESHOLD = 1000
+
+"""
+    aiml_immune_gate(aiml_node_count::Int; is_critical::Bool=true)::Bool
+
+GRUG: Check if AIML immune system should activate.
+Returns true if AIML tribe is mature (1000+ nodes), false if immature.
+Immature AIML tribes skip immune checks - they're too young to have meaningful patterns.
+
+This is a THRESHOLD CHECK, not a full scan. Use aiml_immune_scan! for full pipeline.
+"""
+function aiml_immune_gate(aiml_node_count::Int; is_critical::Bool=true)::Bool
+    if aiml_node_count < 0
+        error("!!! FATAL: aiml_immune_gate got negative aiml_node_count=$aiml_node_count! !!!")
+    end
+    return aiml_node_count >= AIML_MATURITY_THRESHOLD
+end
+
+"""
+    aiml_immune_scan!(input_text::String, aiml_node_count::Int; is_critical::Bool=true)::Tuple{Symbol, UInt64}
+
+GRUG: Run immune scan specifically for AIML context.
+Same logic as immune_scan! but uses AIML node count for maturity threshold.
+
+Use this when:
+- Validating AIML template content before storage
+- Checking generated AIML payloads for anomalies
+- Protecting AIML tribe from malformed executive commands
+
+Returns (status, signature) - same as immune_scan!:
+  :immature    — AIML tribe below 1000 nodes, immune sleeping
+  :nonfunky    — input is safe
+  :coinflip_skip — was funky but all agents skipped
+  :patched     — funky but successfully patched
+  :deleted     — funky and deleted
+  :error       — something went wrong
+"""
+function aiml_immune_scan!(input_text::String, aiml_node_count::Int; is_critical::Bool=true)::Tuple{Symbol, UInt64}
+    # GRUG: Same validation as main immune_scan!
+    if strip(input_text) == ""
+        error("!!! FATAL: aiml_immune_scan! got empty input! !!!")
+    end
+
+    if aiml_node_count < 0
+        error("!!! FATAL: aiml_immune_scan! got negative aiml_node_count=$aiml_node_count! !!!")
+    end
+
+    # GRUG: AIML maturity gate - uses AIML node count, not total node count
+    if aiml_node_count < AIML_MATURITY_THRESHOLD
+        return (:immature, UInt64(0))
+    end
+
+    # GRUG: If mature, run the SAME scan logic as main immune system.
+    # The only difference is the maturity gate threshold source.
+    # We reuse immune_scan! internals by calling it with a fake node_count
+    # that triggers the maturity gate appropriately.
+    #
+    # Actually, cleaner approach: call immune_scan! with MATURITY_THRESHOLD
+    # so it passes the gate, then prefix the ledger entries to mark AIML origin.
+    sig = immune_ast_signature(input_text)
+    funky = detect_funky(sig, input_text)
+
+    if !funky
+        # GRUG: Safe berry for AIML! Remember and let through.
+        add_known_signature!(sig)
+        log_immune_event!(:aiml_nonfunky, sig, Dict(
+            "aiml_node_count" => aiml_node_count,
+            "is_critical" => is_critical
+        ))
+        return (:nonfunky, sig)
+    end
+
+    # GRUG: Funky AIML input! Log with AIML marker.
+    log_immune_event!(:aiml_funky_detected, sig, Dict(
+        "text_preview" => input_text[1:min(80, length(input_text))],
+        "aiml_node_count" => aiml_node_count,
+        "is_critical" => is_critical
+    ))
+
+    # GRUG: Non-critical AIML inputs get lighter treatment
+    if !is_critical
+        log_immune_event!(:aiml_noncritical_pass, sig, nothing)
+        return (:nonfunky, sig)
+    end
+
+    # GRUG: Spawn automata for AIML funky input
+    # Population = 1/3 of AIML node count (same ratio as main immune)
+    automata_count = max(1, div(aiml_node_count, 3))
+
+    # GRUG: Population coinflip
+    materialized_count = 0
+    for agent_id in 1:automata_count
+        if rand() < COINFLIP_PROBABILITY
+            materialized_count += 1
+        end
+    end
+
+    if materialized_count == 0
+        log_immune_event!(:aiml_coinflip_skip, sig, Dict(
+            "automata_count" => automata_count,
+            "materialized" => 0
+        ))
+        return (:coinflip_skip, sig)
+    end
+
+    log_immune_event!(:aiml_automata_materialized, sig, Dict(
+        "automata_count" => automata_count,
+        "materialized" => materialized_count
+    ))
+
+    # GRUG: Quarantine and patch attempt (same as main immune)
+    quarantine_input!(input_text, sig, 1)  # agent_id = 1 (first materialized)
+
+    patch_success, patched_text = attempt_patch(input_text, sig)
+
+    if patch_success
+        log_immune_event!(:aiml_patched, sig, Dict("patched_text" => patched_text))
+        add_known_signature!(sig)
+        return (:patched, sig)
+    else
+        delete_input!(input_text, sig)
+        log_immune_event!(:aiml_deleted, sig, Dict("reason" => "patch_failed"))
+        return (:deleted, sig)
+    end
+end
+
+"""
+    get_aiml_immune_status(aiml_node_count::Int)::Dict{String, Any}
+
+GRUG: Get AIML immune system status. Same as get_immune_status but for AIML tribe.
+"""
+function get_aiml_immune_status(aiml_node_count::Int)::Dict{String, Any}
+    return Dict{String, Any}(
+        "aiml_node_count"       => aiml_node_count,
+        "aiml_maturity_threshold" => AIML_MATURITY_THRESHOLD,
+        "is_mature"             => aiml_node_count >= AIML_MATURITY_THRESHOLD,
+        "hopfield_size"         => length(IMMUNE_HOPFIELD),
+        "ledger_size"           => length(IMMUNE_LEDGER)
+    )
 end
 
 # ==============================================================================

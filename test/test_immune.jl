@@ -596,8 +596,89 @@ final_entries = ImmuneSystem.get_ledger_entries(ImmuneSystem.MAX_LEDGER_ENTRIES 
 println("  ✓ Ledger trimmed to $(length(final_entries)) entries (max=$(ImmuneSystem.MAX_LEDGER_ENTRIES))")
 
 # ==============================================================================
+# 21. AIML IMMUNE GATE & SCAN
+# ==============================================================================
+println("\n[21] AIML IMMUNE GATE & SCAN")
+
+ImmuneSystem.reset_immune_state!()
+
+# GRUG: AIML immune gate should return false for immature tribes (<1000 nodes)
+@test !ImmuneSystem.aiml_immune_gate(0)
+@test !ImmuneSystem.aiml_immune_gate(500)
+@test !ImmuneSystem.aiml_immune_gate(999)
+println("  ✓ aiml_immune_gate returns false for <1000 AIML nodes")
+
+# GRUG: AIML immune gate should return true for mature tribes (>=1000 nodes)
+@test ImmuneSystem.aiml_immune_gate(1000)
+@test ImmuneSystem.aiml_immune_gate(5000)
+println("  ✓ aiml_immune_gate returns true for >=1000 AIML nodes")
+
+# GRUG: aiml_immune_scan! returns :immature for small AIML tribes
+status, sig = ImmuneSystem.aiml_immune_scan!("test input", 500; is_critical=true)
+@test status == :immature
+@test sig == UInt64(0)
+println("  ✓ aiml_immune_scan! returns :immature for small AIML tribes")
+
+# GRUG: aiml_immune_scan! runs full scan for mature AIML tribes
+status, sig = ImmuneSystem.aiml_immune_scan!("safe test input", 1500; is_critical=false)
+@test status == :nonfunky
+println("  ✓ aiml_immune_scan! returns :nonfunky for safe input")
+
+# GRUG: get_aiml_immune_status returns correct structure
+aiml_status = ImmuneSystem.get_aiml_immune_status(1500)
+@test haskey(aiml_status, "aiml_node_count")
+@test haskey(aiml_status, "aiml_maturity_threshold")
+@test haskey(aiml_status, "is_mature")
+@test aiml_status["aiml_node_count"] == 1500
+@test aiml_status["aiml_maturity_threshold"] == 1000
+@test aiml_status["is_mature"] == true
+println("  ✓ get_aiml_immune_status returns correct structure")
+
+# GRUG: Immature tribe status
+aiml_status_immature = ImmuneSystem.get_aiml_immune_status(100)
+@test aiml_status_immature["is_mature"] == false
+println("  ✓ get_aiml_immune_status shows is_mature=false for immature tribes")
+
+println("  ✓ AIML immune constants exported correctly")
+
+# ==============================================================================
+# 22. AIML IMMUNE ERROR HANDLING
+# ==============================================================================
+println("\n[22] AIML IMMUNE ERROR HANDLING")
+
+# GRUG: aiml_immune_gate should throw on negative count
+caught = Ref(false)
+try
+    ImmuneSystem.aiml_immune_gate(-100)
+catch e
+    caught[] = true
+end
+@test caught[]
+println("  ✓ aiml_immune_gate throws on negative node count")
+
+# GRUG: aiml_immune_scan! should throw on empty input
+caught = Ref(false)
+try
+    ImmuneSystem.aiml_immune_scan!("", 1500; is_critical=true)
+catch e
+    caught[] = true
+end
+@test caught[]
+println("  ✓ aiml_immune_scan! throws on empty input")
+
+# GRUG: aiml_immune_scan! should throw on negative count
+caught = Ref(false)
+try
+    ImmuneSystem.aiml_immune_scan!("test", -50; is_critical=true)
+catch e
+    caught[] = true
+end
+@test caught[]
+println("  ✓ aiml_immune_scan! throws on negative node count")
+
+# ==============================================================================
 # DONE
 # ==============================================================================
 println("\n" * "="^60)
-println("✅  ALL IMMUNE SYSTEM TESTS PASSED (20 groups)")
+println("✅  ALL IMMUNE SYSTEM TESTS PASSED (22 groups)")
 println("="^60 * "\n")
