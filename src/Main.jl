@@ -1007,6 +1007,16 @@ const HELP_MSG = """
 ║  /tableStatus <lobe_id>     Show hash table chunk sizes      ║
 ║  /tableMatch <l> <c> <pat>  Pattern-activate table entries   ║
 ║                                                              ║
+║  AIML NODE SYSTEM                                            ║
+║  /aimlStatus                 Show AIML tribe status          ║
+║  /aimlList <lobe_id>         List AIML nodes in lobe         ║
+║  /aimlAdd <l> <id> <tmpl>    Add AIML node to lobe           ║
+║  /aimlRemove <l> <id>        Remove AIML node from lobe      ║
+║  /aimlRight                  Reward AIML nodes that voted    ║
+║  /aimlWrong                  Penalize AIML nodes that voted  ║
+║  /aimlCycle                  Show current cycle info         ║
+║  /aimlPhagy                  Run phagy sweep on AIML graves  ║
+║                                                              ║
 ║  THESAURUS                                                   ║
 ║  /thesaurus <w1> | <w2>     Dimensional similarity compare   ║
 ║                                                              ║
@@ -1554,10 +1564,16 @@ function save_specimen_to_file!(filepath::String)::String
     # losing all learned safe signatures and audit history.
     specimen["immune_system"] = ImmuneSystem.serialize_immune_state()
 
+    # ─── 19. AIML NODE SYSTEM STATE ─────────────────────────────────────────────────────
+    # GRUG: Save AIML registry + population caps + cycle counter.
+    # Academic: Without this, all AIML executive nodes are lost on reload —
+    # the specimen forgets its learned AIML patterns and tribal structure.
+    specimen["aiml_system"] = AIMLNodeSystem.serialize_aiml_state()
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.2",
+        "version"    => "2.3",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.2"
+        "format"     => "grugbot420-specimen-v2.3"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -1606,6 +1622,11 @@ function save_specimen_to_file!(filepath::String)::String
     push!(lines, "  🔮  Trajectory entries : $(length(_traj_buf))")
     push!(lines, "  🕐  Temporal coherence : $(length(tcl_list))")
     push!(lines, "  ⏳  Morph cooldowns    : $(length(cooldown_data))")
+    # GRUG: Show AIML stats if aiml_system was saved
+    _aiml_data = get(specimen, "aiml_system", Dict())
+    _aiml_registry = get(_aiml_data, "registry", Dict())
+    _aiml_total_nodes = sum(length(get(v, "nodes", [])) for v in values(_aiml_registry))
+    push!(lines, "  🤖  AIML nodes       : $(_aiml_total_nodes)")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
     return join(lines, "\n")
@@ -2332,6 +2353,18 @@ function load_specimen_from_file!(filepath::String)::String
         println("  🛡 Immune system restored ($n_immune_sigs signatures, $n_immune_log ledger entries)")
     end
 
+    # ─── 4.19 AIML NODE SYSTEM STATE ─────────────────────────────────────────────────
+    # GRUG: Restore AIML registry + population caps + cycle counter.
+    # Academic: Without this, all AIML executive nodes are lost on reload.
+    if haskey(specimen, "aiml_system") && isa(specimen["aiml_system"], Dict)
+        AIMLNodeSystem.deserialize_aiml_state!(specimen["aiml_system"])
+        n_aiml_lobes = length(AIMLNodeSystem.get_registered_lobes())
+        n_aiml_nodes = sum(AIMLNodeSystem.get_population_size(lid) for lid in AIMLNodeSystem.get_registered_lobes())
+        counts["aiml_lobes"] = n_aiml_lobes
+        counts["aiml_nodes"] = n_aiml_nodes
+        println("  🤖 AIML system restored ($n_aiml_nodes nodes across $n_aiml_lobes lobes)")
+    end
+
 
     # ══════════════════════════════════════════════════════════════════════
     # PHASE 5: BUILD SUMMARY SCROLL
@@ -2360,6 +2393,7 @@ function load_specimen_from_file!(filepath::String)::String
     push!(lines, "  🔤  Thesaurus words  : $(get(counts, "thesaurus_words", 0))")
     push!(lines, "  🚫  Inhibitions      : $(get(counts, "inhibitions", 0))")
     push!(lines, "  🔗  Attachments      : $(get(counts, "attachments", 0))")
+    push!(lines, "  🤖  AIML nodes       : $(get(counts, "aiml_nodes", 0)) ($(get(counts, "aiml_lobes", 0)) lobes)")
     push!(lines, "  👁   Arousal          : $(EyeSystem.get_arousal())")
     push!(lines, "  🔢  ID counters      : node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[])")
     push!(lines, "  ─────────────────────────────────────────────")
@@ -2566,6 +2600,13 @@ function run_cli()
             # GRUG: AIML node tribe feedback commands
             m_aimlright   = match(r"^/aimlRight\s*$",     line)
             m_aimlwrong   = match(r"^/aimlWrong\s*$",     line)
+            # GRUG: AIML management commands (status, list, add, remove, cycle, phagy)
+            m_aimlstatus  = match(r"^/aimlStatus\s*$",    line)
+            m_aimllist    = match(r"^/aimlList\s+(\S+)\s*$", line)
+            m_aimladd     = match(r"^/aimlAdd\s+(\S+)\s+(\S+)\s+(.+)$", line)
+            m_aimlremove  = match(r"^/aimlRemove\s+(\S+)\s+(\S+)\s*$", line)
+            m_aimlcycle   = match(r"^/aimlCycle\s*$",     line)
+            m_aimlphagy   = match(r"^/aimlPhagy\s*$",     line)
             m_explicit    = match(r"^/explicit\s+([a-zA-Z0-9_]+)\s+\[(.+?)\]\s+(.+)", line)
             m_grow        = match(r"^/grow\s+(.+)"s,      line)
             m_rule        = match(r"^/addRule\s+(.+)"s,   line)
@@ -2654,6 +2695,107 @@ function run_cli()
                 else
                     newly_graved = length(result["newly_graved"])
                     println("❌  /aimlWrong applied. $(length(result["penalized"])) penalized, $(length(result["spared"])) spared by coinflip, $newly_graved newly graved.")
+                end
+
+            elseif !isnothing(m_aimlstatus)
+                # GRUG: /aimlStatus - show AIML tribe status across all lobes.
+                # GRUG: Gives overview of population, caps, and grave count.
+                summary = AIMLNodeSystem.get_aiml_status_summary()
+                println("\n╔══════════════════════════════════════════════════════════════╗")
+                println("║                    🤖 AIML TRIBE STATUS                      ║")
+                println("╠══════════════════════════════════════════════════════════════╣")
+                println("  Total Lobes      : $(summary["total_lobes"])")
+                println("  Total Nodes      : $(summary["total_nodes"])")
+                println("  Alive Nodes      : $(summary["alive_nodes"])")
+                println("  Grave Nodes      : $(summary["grave_nodes"])")
+                println("  Current Cycle    : $(summary["current_cycle"])")
+                println("  ─────────────────────────────────────────────────────────────")
+                for (lobe_id, lobe_info) in summary["lobes"]
+                    println("  📍 $lobe_id:")
+                    println("     Nodes: $(lobe_info["population"])/$(lobe_info["cap"]) (cap)")
+                    println("     Alive: $(lobe_info["alive"]), Graves: $(lobe_info["graves"])")
+                end
+                println("╚══════════════════════════════════════════════════════════════╝")
+
+            elseif !isnothing(m_aimllist)
+                # GRUG: /aimlList <lobe_id> - list all AIML nodes in a specific lobe.
+                # GRUG: Shows node IDs, strengths, and grave status.
+                lobe_id = m_aimllist.captures[1]
+                nodes = AIMLNodeSystem.list_aiml_nodes(String(lobe_id))
+                if isempty(nodes)
+                    println("⚠  /aimlList: No AIML nodes found in lobe '$lobe_id'. Is it registered?")
+                else
+                    println("\n╔══════════════════════════════════════════════════════════════╗")
+                    println("║           🤖 AIML NODES IN LOBE: $lobe_id")
+                    println("╠══════════════════════════════════════════════════════════════╣")
+                    for node in nodes
+                        grave_marker = node.is_grave ? "💀 GRAVE" : "✅ ALIVE"
+                        println("  📍 $(node.id)")
+                        println("     Strength: $(round(node.strength, digits=2)) $grave_marker")
+                        if node.is_grave
+                            println("     Reason: $(node.grave_reason)")
+                        end
+                        println("     Template: $(node.template[1:min(50, length(node.template))])...")
+                    end
+                    println("╚══════════════════════════════════════════════════════════════╝")
+                end
+
+            elseif !isnothing(m_aimladd)
+                # GRUG: /aimlAdd <lobe_id> <node_id> <template> - add new AIML node.
+                # GRUG: Creates a new AIML executive node in the specified lobe.
+                # GRUG: Will error if lobe not registered or population cap exceeded.
+                lobe_id = String(m_aimladd.captures[1])
+                node_id = String(m_aimladd.captures[2])
+                template = String(m_aimladd.captures[3])
+                try
+                    node = AIMLNodeSystem.add_aiml_node!(lobe_id, node_id, template)
+                    println("✅  /aimlAdd: Created AIML node '$node_id' in lobe '$lobe_id' with strength $(node.strength)")
+                catch e
+                    if e isa AIMLNodeSystem.AIMLNodeError
+                        println("❌  /aimlAdd failed: $(e.message) [$(e.context)]")
+                    else
+                        println("❌  /aimlAdd failed: $e")
+                    end
+                end
+
+            elseif !isnothing(m_aimlremove)
+                # GRUG: /aimlRemove <lobe_id> <node_id> - remove AIML node from lobe.
+                # GRUG: Permanently deletes the node. No recovery. Grug not joke.
+                lobe_id = String(m_aimlremove.captures[1])
+                node_id = String(m_aimlremove.captures[2])
+                if AIMLNodeSystem.has_aiml_node(lobe_id, node_id)
+                    AIMLNodeSystem.remove_aiml_node!(lobe_id, node_id)
+                    println("✅  /aimlRemove: Removed AIML node '$node_id' from lobe '$lobe_id'")
+                else
+                    println("⚠  /aimlRemove: Node '$node_id' not found in lobe '$lobe_id'")
+                end
+
+            elseif !isnothing(m_aimlcycle)
+                # GRUG: /aimlCycle - show current cycle info for AIML system.
+                # GRUG: Displays cycle counter and explains cycle-based mechanics.
+                cycle = AIMLNodeSystem.current_cycle()
+                println("\n╔══════════════════════════════════════════════════════════════╗")
+                println("║                    🔄 AIML CYCLE INFO                         ║")
+                println("╠══════════════════════════════════════════════════════════════╣")
+                println("  Current Cycle    : $cycle")
+                println("  ─────────────────────────────────────────────────────────────")
+                println("  Cycle Mechanics:")
+                println("  • /aimlRight rewards nodes that voted this cycle")
+                println("  • /aimlWrong penalizes nodes that voted this cycle")
+                println("  • Nodes that gained strength are skipped from double reward")
+                println("  • Nodes that gained get EXTRA penalty on /aimlWrong")
+                println("  • Cycle counter increments with /mission calls")
+                println("╚══════════════════════════════════════════════════════════════╝")
+
+            elseif !isnothing(m_aimlphagy)
+                # GRUG: /aimlPhagy - run phagy sweep on AIML graves.
+                # GRUG: Removes grave nodes from registry (cleanup operation).
+                # GRUG: Returns count of removed graves. Grug like clean cave.
+                removed_count = AIMLNodeSystem.aiml_phagy_sweep!()
+                if removed_count > 0
+                    println("🧹  /aimlPhagy: Cleaned up $removed_count grave node(s) from AIML registry")
+                else
+                    println("✨  /aimlPhagy: No graves to clean. AIML registry already pristine!")
                 end
 
             elseif !isnothing(m_explicit)

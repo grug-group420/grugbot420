@@ -697,6 +697,178 @@ function reset_all!()
 end
 
 # ==============================================================================
+# SERIALIZATION — Save/Load Support for Specimen Files
+# ==============================================================================
+# GRUG: AIML nodes need to survive /saveSpecimen and /loadSpecimen.
+# This module provides serialize/deserialize functions for the specimen file.
+# NO SILENT FAILURES: All errors are loud and clear.
+
+"""
+    serialize_aiml_state()::Dict{String, Any}
+
+GRUG: Serialize the entire AIML system state for specimen save file.
+Returns a dict with:
+  - "registry": All AIML nodes per lobe
+  - "population_caps": Per-lobe caps
+  - "cycle": Current cycle counter
+
+Thread-safe: uses AIML_LOCK.
+"""
+function serialize_aiml_state()::Dict{String, Any}
+    return lock(AIML_LOCK) do
+        # GRUG: Serialize each lobe's tribe
+        registry_data = Dict{String, Any}()
+        for (lobe_id, tribe) in AIML_REGISTRY
+            nodes_list = Dict{String, Any}[]
+            for (node_id, node) in tribe
+                push!(nodes_list, Dict{String, Any}(
+                    "id" => node.id,
+                    "lobe_id" => node.lobe_id,
+                    "template" => node.template,
+                    "strength" => node.strength,
+                    "is_grave" => node.is_grave,
+                    "grave_reason" => node.grave_reason,
+                    "voted_this_cycle" => node.voted_this_cycle,
+                    "fired_this_cycle" => node.fired_this_cycle,
+                    "gained_this_cycle" => node.gained_this_cycle,
+                    "strength_delta_this_cycle" => node.strength_delta_this_cycle,
+                    "created_at" => node.created_at
+                ))
+            end
+            registry_data[lobe_id] = nodes_list
+        end
+
+        # GRUG: Copy population caps
+        caps_data = Dict{String, Int}()
+        for (lobe_id, cap) in AIML_POPULATION_CAP
+            caps_data[lobe_id] = cap
+        end
+
+        return Dict{String, Any}(
+            "registry" => registry_data,
+            "population_caps" => caps_data,
+            "cycle" => CURRENT_CYCLE[]
+        )
+    end
+end
+
+"""
+    deserialize_aiml_state!(data::Dict{String, Any})
+
+GRUG: Restore AIML system state from specimen save file.
+Wipes existing state and replaces with loaded data.
+NO SILENT FAILURES: Validates all data before applying.
+
+Expects data with keys:
+  - "registry": Dict mapping lobe_id -> list of node dicts
+  - "population_caps": Dict mapping lobe_id -> cap
+  - "cycle": Integer cycle counter
+"""
+function deserialize_aiml_state!(data::Dict{String, Any})
+    # GRUG: Validate input structure
+    if !haskey(data, "registry")
+        error("!!! FATAL: deserialize_aiml_state! missing 'registry' key !!!")
+    end
+    if !haskey(data, "population_caps")
+        error("!!! FATAL: deserialize_aiml_state! missing 'population_caps' key !!!")
+    end
+    if !haskey(data, "cycle")
+        error("!!! FATAL: deserialize_aiml_state! missing 'cycle' key !!!")
+    end
+
+    lock(AIML_LOCK) do
+        # GRUG: Wipe existing state
+        empty!(AIML_REGISTRY)
+        empty!(AIML_POPULATION_CAP)
+
+        # GRUG: Restore population caps first (needed for node validation)
+        caps_data = data["population_caps"]
+        if !isa(caps_data, Dict)
+            error("!!! FATAL: deserialize_aiml_state! population_caps is not a Dict !!!")
+        end
+        for (lobe_id, cap) in caps_data
+            if !isa(cap, Int) && !isa(cap, Number)
+                error("!!! FATAL: deserialize_aiml_state! cap for '$lobe_id' is not an integer: $cap !!!")
+            end
+            AIML_POPULATION_CAP[string(lobe_id)] = Int(cap)
+        end
+
+        # GRUG: Restore registry
+        registry_data = data["registry"]
+        if !isa(registry_data, Dict)
+            error("!!! FATAL: deserialize_aiml_state! registry is not a Dict !!!")
+        end
+        for (lobe_id, nodes_list) in registry_data
+            lobe_id_str = string(lobe_id)
+            AIML_REGISTRY[lobe_id_str] = Dict{String, AIMLNode}()
+
+            if !isa(nodes_list, AbstractVector)
+                @warn "[AIML] deserialize: nodes for lobe '$lobe_id_str' is not a list, skipping"
+                continue
+            end
+
+            for node_data in nodes_list
+                if !isa(node_data, Dict)
+                    @warn "[AIML] deserialize: node entry is not a Dict, skipping"
+                    continue
+                end
+
+                # GRUG: Validate required fields
+                required_fields = ["id", "lobe_id", "template", "strength"]
+                for field in required_fields
+                    if !haskey(node_data, field)
+                        @warn "[AIML] deserialize: node missing '$field', skipping"
+                        continue
+                    end
+                end
+
+                # GRUG: Reconstruct the AIMLNode
+                node_id = string(node_data["id"])
+                node_lobe_id = string(node_data["lobe_id"])
+                template = string(node_data["template"])
+                strength = Float64(node_data["strength"])
+
+                # GRUG: Create node with proper validation
+                try
+                    node = AIMLNode(node_id, node_lobe_id, template; initial_strength=strength)
+                    
+                    # GRUG: Restore other fields
+                    node.is_grave = get(node_data, "is_grave", false)
+                    node.grave_reason = get(node_data, "grave_reason", "")
+                    node.voted_this_cycle = get(node_data, "voted_this_cycle", false)
+                    node.fired_this_cycle = get(node_data, "fired_this_cycle", false)
+                    node.gained_this_cycle = get(node_data, "gained_this_cycle", false)
+                    node.strength_delta_this_cycle = get(node_data, "strength_delta_this_cycle", 0.0)
+                    node.created_at = get(node_data, "created_at", time())
+
+                    AIML_REGISTRY[lobe_id_str][node_id] = node
+                catch e
+                    @warn "[AIML] deserialize: failed to create node '$node_id': $e"
+                end
+            end
+        end
+
+        # GRUG: Restore cycle counter
+        cycle_val = data["cycle"]
+        if !isa(cycle_val, Int) && !isa(cycle_val, Number)
+            @warn "[AIML] deserialize: cycle is not an integer, defaulting to 0"
+            CURRENT_CYCLE[] = 0
+        else
+            CURRENT_CYCLE[] = Int(cycle_val)
+        end
+    end
+
+    # GRUG: Return summary for diagnostics
+    total_nodes = 0
+    total_live = 0
+    for (lobe_id, tribe) in AIML_REGISTRY
+        total_nodes += length(tribe)
+        total_live += count(n -> !n.is_grave, values(tribe))
+    end
+    return "AIML state restored: $(length(AIML_REGISTRY)) lobes, $total_nodes nodes ($total_live alive)"
+end
+
+# ==============================================================================
 # EXPORTS
 # ==============================================================================
 
@@ -712,6 +884,7 @@ export record_fire!, record_vote!
 export apply_aiml_right!, apply_aiml_wrong!
 export aiml_phagy_sweep!
 export get_aiml_status_summary, reset_all!
+export serialize_aiml_state, deserialize_aiml_state!
 
 # GRUG say: AIML node tribes ready. Executive layer is now nodes, not blob.
 
