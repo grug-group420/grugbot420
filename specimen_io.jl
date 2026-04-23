@@ -16,6 +16,7 @@ Features:
 
 using JSON3
 using GZip
+using Printf
 
 # ═════════════════════════════════════════════════════════════════════
 # ERROR HANDLING
