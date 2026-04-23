@@ -8,6 +8,7 @@ which works on Windows, Linux, and macOS without external dependencies.
 Features:
 - Cross-platform gzip compression (GZip.jl built-in)
 - Multi-line JSON editing support
+- Quick append mode with hotkey-based JSON appending
 - Robust error handling with no silent failures
 - Consistent comment conventions
 - Validation before save
@@ -81,6 +82,32 @@ function validate_specimen(specimen::Dict)
     lobes = specimen["lobes"]
     if !isa(lobes, Dict)
         throw(SpecimenError("lobes must be a dict"))
+    end
+    
+    return true
+end
+
+"""
+Validate individual JSON object before appending
+
+# Arguments
+- `json_obj::Dict`: The JSON object to validate
+
+# Returns
+- `Bool`: true if valid
+
+# Throws
+- `SpecimenError`: if validation fails
+"""
+function validate_json_object(json_obj::Dict)
+    # Check it's a dict
+    if !isa(json_obj, Dict)
+        throw(SpecimenError("JSON must be a dict/object"))
+    end
+    
+    # Basic structure check - must have at least some content
+    if isempty(json_obj)
+        throw(SpecimenError("JSON object cannot be empty"))
     end
     
     return true
@@ -254,6 +281,162 @@ function edit_specimen_interactive(specimen::Dict)
 end
 
 # ═════════════════════════════════════════════════════════════════════
+# QUICK APPEND MODE
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Quick append mode editor for rapid JSON appending
+
+Opens a dedicated editor where you can paste JSON and use a hotkey to append.
+
+# Arguments
+- `target_file::String`: The specimen file to append to
+
+# Returns
+- Nothing
+
+# Throws
+- `SpecimenError`: if append operation fails
+"""
+function quick_append_mode(target_file::String)
+    try
+        # Check target file exists
+        if !isfile(target_file)
+            throw(SpecimenError("Target file not found: $target_file"))
+        end
+        
+        # Determine editor to use
+        editor = get(ENV, "EDITOR", "")
+        editor = isempty(editor) ? (Sys.iswindows() ? "notepad" : "vim") : editor
+        
+        # Create append editor file with instructions
+        append_file = tempname() * "_append.txt"
+        
+        instructions = """
+════════════════════════════════════════════════════════════════════
+QUICK APPEND MODE - GRUGBOT420 SPECIMEN
+════════════════════════════════════════════════════════════════════
+
+TARGET FILE: $target_file
+
+INSTRUCTIONS:
+1. Paste your JSON below this line
+2. Save and close editor when done
+3. System will automatically validate and append
+
+HOTKEYS (in editor):
+- Ctrl+S & Ctrl+Q: Save and append (vim: :wq)
+- Esc: Cancel and exit without saving
+
+WHAT CAN I APPEND?
+- Individual nodes: {"id": "N-XXXX", "pattern": "...", ...}
+- Node arrays: [{"id": "N-001", ...}, {"id": "N-002", ...}]
+- Lobe definitions: {"mathematics": "Pure mathematics..."}
+- Any valid JSON object that fits specimen structure
+
+════════════════════════════════════════════════════════════════════
+APPEND YOUR JSON BELOW THIS LINE:
+════════════════════════════════════════════════════════════════════
+
+
+"""
+        
+        # Write instructions to append file
+        write(append_file, instructions)
+        
+        println("📝 QUICK APPEND MODE")
+        println("📝 Target file: $target_file")
+        println("📝 Append file: $append_file")
+        println("📝 Opening editor: $editor")
+        println("📝 Paste your JSON, then save and close to append")
+        println("─" * 70)
+        
+        # Launch editor
+        try
+            run(`$editor $append_file`)
+        catch
+            println("⚠️  Editor launch failed. Please edit manually: $append_file")
+            println("⚠️  Press Enter when done...")
+            readline()
+        end
+        
+        # Read appended content
+        append_content = read(append_file, String)
+        
+        # Find JSON after instructions
+        json_start = findfirst("APPEND YOUR JSON BELOW THIS LINE:", append_content)
+        if json_start === nothing
+            rm(append_file)
+            throw(SpecimenError("Could not find JSON section. Did you modify the instructions?"))
+        end
+        
+        json_section = append_content[last(json_start)+length("APPEND YOUR JSON BELOW THIS LINE:"):end]
+        
+        # Strip whitespace and check if empty
+        json_section = strip(json_section)
+        if isempty(json_section)
+            println("⚠️  No JSON found. Nothing to append.")
+            rm(append_file)
+            return
+        end
+        
+        # Try to parse JSON
+        try
+            json_obj = JSON3.read(json_section, Dict)
+            validate_json_object(json_obj)
+        catch e
+            rm(append_file)
+            throw(SpecimenError("Invalid JSON: $(e.msg)"))
+        end
+        
+        # Load current specimen
+        specimen = load_specimen(target_file)
+        
+        # Determine what to append based on structure
+        appended_count = 0
+        if haskey(json_obj, "id") && haskey(json_obj, "pattern")
+            # Single node
+            push!(specimen["nodes"], json_obj)
+            appended_count = 1
+            println("✓ Appended 1 node")
+        elseif isa(json_obj, Array) && !isempty(json_obj) && haskey(json_obj[1], "id")
+            # Array of nodes
+            for node in json_obj
+                push!(specimen["nodes"], node)
+            end
+            appended_count = length(json_obj)
+            println("✓ Appended $appended_count nodes")
+        elseif !isempty(json_obj) && !any(haskey.(Ref(json_obj), ["id", "signal"]))
+            # Likely lobes or other metadata
+            for (key, value) in json_obj
+                specimen[key] = value
+            end
+            appended_count = length(json_obj)
+            println("✓ Appended $appended_count metadata fields")
+        else
+            rm(append_file)
+            throw(SpecimenError("Unrecognized JSON structure. Cannot determine where to append."))
+        end
+        
+        # Save updated specimen
+        result = save_specimen(specimen, target_file)
+        println(result)
+        
+        # Clean up temp file
+        rm(append_file)
+        
+        println("✓ Quick append completed successfully!")
+        
+    catch e
+        if isa(e, SpecimenError)
+            rethrow(e)
+        else
+            throw(SpecimenError("Failed to append to specimen: $(e.msg)"))
+        end
+    end
+end
+
+# ═════════════════════════════════════════════════════════════════════
 # CLI INTERFACE
 # ═════════════════════════════════════════════════════════════════════
 
@@ -268,6 +451,7 @@ function main()
         println("  save <input.json> <output.gz>   - Save specimen to compressed file")
         println("  load <input.gz> <output.json>   - Load specimen from compressed file")
         println("  edit <specimen.gz>               - Interactive multi-line JSON editing")
+        println("  append <specimen.gz>             - Quick append mode with hotkey")
         println("  validate <file>                  - Validate specimen file")
         exit(1)
     end
@@ -335,6 +519,17 @@ function main()
             # Save back
             result = save_specimen(edited_specimen, input_file)
             println(result)
+            
+        elseif command == "append"
+            if length(ARGS) != 2
+                println("Error: append requires specimen.gz")
+                exit(1)
+            end
+            
+            input_file = ARGS[2]
+            
+            # Quick append mode
+            quick_append_mode(input_file)
             
         elseif command == "validate"
             if length(ARGS) != 2
