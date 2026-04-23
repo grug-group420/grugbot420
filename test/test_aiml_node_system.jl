@@ -381,7 +381,9 @@ AIMLNodeSystem.add_aiml_node!("right_lobe", "pre_gained", "tmpl"; initial_streng
 pg_node = AIMLNodeSystem.get_aiml_node("right_lobe", "pre_gained")
 AIMLNodeSystem.begin_cycle!()
 # Manually simulate that the node already gained this cycle (bypass coinflip)
+# CRITICAL: Must set fired_this_cycle for node to be considered a contributor
 pg_node.voted_this_cycle  = true
+pg_node.fired_this_cycle  = true  # Node contributed to output
 pg_node.gained_this_cycle = true
 pg_node.strength_delta_this_cycle = 1.0
 pg_node.strength = 6.0  # Simulate strength after use-gain
@@ -405,6 +407,7 @@ let
         ng_node = AIMLNodeSystem.get_aiml_node("right_lobe", "no_gain")
         AIMLNodeSystem.begin_cycle!()
         ng_node.voted_this_cycle  = true
+        ng_node.fired_this_cycle  = true  # Node contributed to output
         ng_node.gained_this_cycle = false
         result_b = AIMLNodeSystem.apply_aiml_right!()
         if ng_node.id in result_b["rewarded"]
@@ -422,8 +425,8 @@ fresh_slate!()
 AIMLNodeSystem.register_lobe!("right_lobe", 30)
 AIMLNodeSystem.begin_cycle!()
 result_no_voters = AIMLNodeSystem.apply_aiml_right!()
-@test result_no_voters["total_voters"] == 0
-println("  ✓ /aimlRight with no voters reports total_voters=0")
+@test result_no_voters["total_contributors"] == 0
+println("  ✓ /aimlRight with no contributors reports total_contributors=0")
 
 # ==============================================================================
 # [9] /aimlWrong — COMPENSATING NET LOSS
@@ -449,6 +452,7 @@ let
 
         # GRUG: Simulate use-gain: strength 5.0 -> 6.0, delta=1.0
         gb_node.voted_this_cycle           = true
+        gb_node.fired_this_cycle           = true  # Node contributed to output
         gb_node.gained_this_cycle          = true
         gb_node.strength_delta_this_cycle  = 1.0
         gb_node.strength                   = 6.0
@@ -477,6 +481,7 @@ let
         np_node = AIMLNodeSystem.get_aiml_node("wrong_lobe", "no_prior_gain")
         AIMLNodeSystem.begin_cycle!()
         np_node.voted_this_cycle           = true
+        np_node.fired_this_cycle           = true  # Node contributed to output
         np_node.gained_this_cycle          = false
         np_node.strength_delta_this_cycle  = 0.0
 
@@ -502,6 +507,7 @@ let
         fn = AIMLNodeSystem.get_aiml_node("wrong_lobe", "flip_node")
         AIMLNodeSystem.begin_cycle!()
         fn.voted_this_cycle = true
+        fn.fired_this_cycle = true  # Node contributed to output
         result_c = AIMLNodeSystem.apply_aiml_wrong!()
         if fn.id in result_c["spared"]     spared_seen     = true end
         if fn.id in result_c["penalized"]  penalized_seen  = true end
@@ -517,8 +523,8 @@ fresh_slate!()
 AIMLNodeSystem.register_lobe!("wrong_lobe", 30)
 AIMLNodeSystem.begin_cycle!()
 result_nv = AIMLNodeSystem.apply_aiml_wrong!()
-@test result_nv["total_voters"] == 0
-println("  ✓ /aimlWrong with no voters reports total_voters=0")
+@test result_nv["total_contributors"] == 0
+println("  ✓ /aimlWrong with no contributors reports total_contributors=0")
 
 # ==============================================================================
 # [10] AIML_GRAVE TRANSITION
@@ -540,6 +546,7 @@ let
         dn = AIMLNodeSystem.get_aiml_node("grave_lobe", "dying_node")
         AIMLNodeSystem.begin_cycle!()
         dn.voted_this_cycle           = true
+        dn.fired_this_cycle           = true  # Node contributed to output
         dn.gained_this_cycle          = false
         dn.strength_delta_this_cycle  = 0.0
 
@@ -572,18 +579,21 @@ gp_node.grave_reason = AIMLNodeSystem.AIML_GRAVE_REASON_STRENGTH_ZERO
 println("  ✓ AIML_GRAVE node remains in tribe (negative reinforcement memory, not wiped)")
 
 # GRUG: Grave node is skipped by /aimlRight.
+# CRITICAL: Must mark as fired to be collected as contributor, then should be skipped
 AIMLNodeSystem.begin_cycle!()
 gp_node.voted_this_cycle = true
+gp_node.fired_this_cycle = true  # Node fired, but is grave - should be skipped
 result_right_grave = AIMLNodeSystem.apply_aiml_right!()
 @test gp_node.id in result_right_grave["grave_skipped"]
-println("  ✓ /aimlRight skips grave nodes")
+println("  ✓ /aimlRight skips grave nodes even if they fired")
 
 # GRUG: Grave node is skipped by /aimlWrong.
 AIMLNodeSystem.begin_cycle!()
 gp_node.voted_this_cycle = true
+gp_node.fired_this_cycle = true  # Node fired, but is grave - should be skipped
 result_wrong_grave = AIMLNodeSystem.apply_aiml_wrong!()
 @test gp_node.id in result_wrong_grave["grave_skipped"]
-println("  ✓ /aimlWrong skips grave nodes")
+println("  ✓ /aimlWrong skips grave nodes even if they fired")
 
 # GRUG: Grave node does not gain from record_fire!.
 strength_at_grave = gp_node.strength
@@ -711,23 +721,27 @@ phil_2 = AIMLNodeSystem.get_aiml_node("philosophy", "philosophy_node_2")
 cmd_1  = AIMLNodeSystem.get_aiml_node("command",    "command_node_1")
 
 AIMLNodeSystem.record_vote!(sci_1)
+AIMLNodeSystem.record_fire!(sci_1)  # Node actually contributed to output
 AIMLNodeSystem.record_vote!(phil_2)
+AIMLNodeSystem.record_fire!(phil_2)  # Node actually contributed to output
 # GRUG: Do NOT vote cmd_1 — verify it is untouched by /aimlRight.
 
 strength_cmd_before = cmd_1.strength
 result_right_multi = AIMLNodeSystem.apply_aiml_right!()
-@test result_right_multi["total_voters"] == 2
+@test result_right_multi["total_contributors"] == 2
 @test cmd_1.strength == strength_cmd_before  # Command lobe untouched
 println("  ✓ Multi-lobe /aimlRight: only 2 voted nodes eligible, command lobe untouched")
 
 # GRUG: Now /aimlWrong with fresh cycle.
 AIMLNodeSystem.begin_cycle!()
 AIMLNodeSystem.record_vote!(sci_1)
+AIMLNodeSystem.record_fire!(sci_1)  # Node actually contributed to output
 AIMLNodeSystem.record_vote!(phil_2)
+AIMLNodeSystem.record_fire!(phil_2)  # Node actually contributed to output
 strength_cmd_before2 = cmd_1.strength
 
 result_wrong_multi = AIMLNodeSystem.apply_aiml_wrong!()
-@test result_wrong_multi["total_voters"] == 2
+@test result_wrong_multi["total_contributors"] == 2
 @test cmd_1.strength == strength_cmd_before2
 println("  ✓ Multi-lobe /aimlWrong: only 2 voted nodes eligible, command lobe untouched")
 

@@ -490,8 +490,9 @@ end
 # ==============================================================================
 
 # GRUG: Shared helper to collect all voted-this-cycle AIML nodes across registered
-# lobes. Used by both feedback commands. Caller does NOT hold the lock — this
-# function takes it internally and returns a plain vector for iteration outside.
+# lobes. Used by legacy systems. New feedback uses _collect_contributors().
+# Caller does NOT hold the lock — this function takes it internally and returns
+# a plain vector for iteration outside.
 function _collect_voters()::Vector{AIMLNode}
     voters = AIMLNode[]
     lock(AIML_LOCK) do
@@ -506,34 +507,68 @@ function _collect_voters()::Vector{AIMLNode}
     return voters
 end
 
+# GRUG: Shared helper to collect all FIRED-this-cycle AIML nodes across registered
+# lobes. ONLY nodes that actually contributed to generating output (fired)
+# are eligible for strength modifications from /aimlRight and /aimlWrong.
+# Voters who didn't fire are NOT reinforced or penalized.
+# Caller does NOT hold the lock — this function takes it internally and returns
+# a plain vector for iteration outside.
+function _collect_contributors()::Vector{AIMLNode}
+    contributors = AIMLNode[]
+    lock(AIML_LOCK) do
+        for (_lobe_id, tribe) in AIML_REGISTRY
+            for (_nid, node) in tribe
+                if node.fired_this_cycle
+                    push!(contributors, node)
+                end
+            end
+        end
+    end
+    return contributors
+end
+
 """
 apply_aiml_right!()::Dict{String, Any}
 
-GRUG: /aimlRight feedback. For each AIML node that voted this cycle:
-  - If node already GAINED strength this cycle from use -> skip (no double snack).
-  - Else coinflip; on success, node gains strength.
+GRUG: /aimlRight feedback - SECONDARY REINFORCEMENT FOR CONTRIBUTORS ONLY.
+
+CRITICAL RULE: ONLY nodes that FIRED this cycle (actually contributed to output)
+are eligible for reinforcement. Voters who didn't fire are ignored.
+
+For each contributing AIML node (fired_this_cycle == true):
+  - If node already GAINED strength this cycle from use (coinflip in record_fire!)
+    -> skip (no double snack - secondary reinforcement only).
+  - Else coinflip; on success, node gains strength. This gives contributors who
+    missed the initial coinflip a second chance.
+
+Rationale: Output generation is a hard contribution test. Only nodes that actually
+helped produce output should be reinforced. The secondary /right reinforcement
+rewards contributors who were "worthy but unlucky" in the initial coinflip.
 
 Returns a diagnostic dict for logging / test assertions.
 """
 function apply_aiml_right!()::Dict{String, Any}
-    voters = _collect_voters()
+    contributors = _collect_contributors()
     rewarded = String[]
     skipped_double_reward = String[]
     coinflip_missed = String[]
     grave_skipped = String[]
 
     lock(AIML_LOCK) do
-        for node in voters
+        for node in contributors
             if node.is_grave
+                # GRUG: Grave nodes don't get rewards, even if they fired.
                 push!(grave_skipped, node.id)
                 continue
             end
             if node.gained_this_cycle
-                # GRUG: Node already snacked this cycle. No double reward.
+                # GRUG: Node already snacked this cycle via record_fire! coinflip.
+                # Secondary reinforcement only for contributors who missed.
                 push!(skipped_double_reward, node.id)
                 continue
             end
             if rand() < 0.5
+                # GRUG: Secondary reinforcement - contributor gets a second chance.
                 _apply_strength_delta!(node, AIML_STRENGTH_DELTA)
                 push!(rewarded, node.id)
             else
@@ -543,20 +578,25 @@ function apply_aiml_right!()::Dict{String, Any}
     end
 
     result = Dict{String, Any}(
-        "total_voters"          => length(voters),
-        "rewarded"              => rewarded,
+        "total_contributors"   => length(contributors),
+        "rewarded"             => rewarded,
         "skipped_double_reward" => skipped_double_reward,
-        "coinflip_missed"       => coinflip_missed,
-        "grave_skipped"         => grave_skipped,
+        "coinflip_missed"      => coinflip_missed,
+        "grave_skipped"        => grave_skipped,
     )
-    println("[AIML] ✅ /aimlRight: voters=$(length(voters)) rewarded=$(length(rewarded)) double_skip=$(length(skipped_double_reward)) coinflip_miss=$(length(coinflip_missed)) grave_skip=$(length(grave_skipped))")
+    println("[AIML] ✅ /aimlRight: contributors=$(length(contributors)) rewarded=$(length(rewarded)) double_skip=$(length(skipped_double_reward)) coinflip_miss=$(length(coinflip_missed)) grave_skip=$(length(grave_skipped))")
     return result
 end
 
 """
 apply_aiml_wrong!()::Dict{String, Any}
 
-GRUG: /aimlWrong feedback. For each AIML node that voted this cycle:
+GRUG: /aimlWrong feedback - PENALIZE CONTRIBUTORS ONLY.
+
+CRITICAL RULE: ONLY nodes that FIRED this cycle (actually contributed to output)
+are eligible for penalty. Voters who didn't fire are ignored.
+
+For each contributing AIML node (fired_this_cycle == true):
   - 50/50 coinflip decides whether this node is penalized at all.
   - If coinflip says penalize:
       * If node GAINED strength this cycle from use, penalty must be
@@ -567,19 +607,23 @@ GRUG: /aimlWrong feedback. For each AIML node that voted this cycle:
 Returns a diagnostic dict. If strength reaches 0.0, the node is transitioned
 to AIML_GRAVE by _apply_strength_delta! — no special casing here.
 
+Rationale: Only nodes that actually contributed to the "wrong" output should
+be penalized. Voters who participated but didn't fire shouldn't be punished
+for output they didn't help produce.
+
 Hard rule: /aimlWrong must produce a REAL net loss for any node penalized.
 If node had already gained in-cycle, we over-compensate. This is the honest
 punishment rule from the spec.
 """
 function apply_aiml_wrong!()::Dict{String, Any}
-    voters = _collect_voters()
+    contributors = _collect_contributors()
     penalized = String[]
     spared = String[]
     graved = String[]
     grave_skipped = String[]
 
     lock(AIML_LOCK) do
-        for node in voters
+        for node in contributors
             if node.is_grave
                 # GRUG: Already dead. Cannot penalize the already-dead.
                 push!(grave_skipped, node.id)
@@ -606,13 +650,13 @@ function apply_aiml_wrong!()::Dict{String, Any}
     end
 
     result = Dict{String, Any}(
-        "total_voters"  => length(voters),
-        "penalized"     => penalized,
-        "spared"        => spared,
-        "newly_graved"  => graved,
-        "grave_skipped" => grave_skipped,
+        "total_contributors" => length(contributors),
+        "penalized"         => penalized,
+        "spared"            => spared,
+        "newly_graved"      => graved,
+        "grave_skipped"     => grave_skipped,
     )
-    println("[AIML] ❌ /aimlWrong: voters=$(length(voters)) penalized=$(length(penalized)) spared=$(length(spared)) newly_graved=$(length(graved)) grave_skip=$(length(grave_skipped))")
+    println("[AIML] ❌ /aimlWrong: contributors=$(length(contributors)) penalized=$(length(penalized)) spared=$(length(spared)) newly_graved=$(length(graved)) grave_skip=$(length(grave_skipped))")
     return result
 end
 
