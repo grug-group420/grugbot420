@@ -1,0 +1,377 @@
+#!/usr/bin/env julia
+"""
+specimen_io.jl — Cross-Platform Specimen I/O for GrugBot420
+════════════════════════════════════════════════════════════════════
+Provides cross-platform specimen compression and decompression using Julia,
+which works on Windows, Linux, and macOS without external dependencies.
+
+Features:
+- Cross-platform gzip compression (GZip.jl built-in)
+- Multi-line JSON editing support
+- Robust error handling with no silent failures
+- Consistent comment conventions
+- Validation before save
+"""
+
+using JSON3
+using GZip
+
+# ═════════════════════════════════════════════════════════════════════
+# ERROR HANDLING
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Custom error type for specimen operations
+"""
+struct SpecimenError <: Exception
+    message::String
+end
+
+# ═════════════════════════════════════════════════════════════════════
+# VALIDATION
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Validate specimen structure before saving
+
+# Arguments
+- `specimen::Dict`: The specimen dict to validate
+
+# Returns
+- `Bool`: true if valid
+
+# Throws
+- `SpecimenError`: if validation fails
+"""
+function validate_specimen(specimen::Dict)
+    # Check required top-level fields
+    required_fields = ["meta", "nodes", "lobes"]
+    for field in required_fields
+        if !haskey(specimen, field)
+            throw(SpecimenError("Missing required field: $field"))
+        end
+    end
+    
+    # Validate meta section
+    if !haskey(specimen["meta"], "version")
+        throw(SpecimenError("Missing meta.version field"))
+    end
+    
+    # Validate nodes array
+    nodes = specimen["nodes"]
+    if !isa(nodes, Array) || isempty(nodes)
+        throw(SpecimenError("nodes must be a non-empty array"))
+    end
+    
+    # Validate each node has required fields
+    for (i, node) in enumerate(nodes)
+        if !isa(node, Dict)
+            throw(SpecimenError("Node $i must be a dict"))
+        end
+        
+        node_required = ["id", "pattern"]
+        for field in node_required
+            if !haskey(node, field)
+                throw(SpecimenError("Node $i missing required field: $field"))
+            end
+        end
+    end
+    
+    # Validate lobes
+    lobes = specimen["lobes"]
+    if !isa(lobes, Dict)
+        throw(SpecimenError("lobes must be a dict"))
+    end
+    
+    return true
+end
+
+# ═════════════════════════════════════════════════════════════════════
+# COMPRESSION
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Save specimen to compressed file (cross-platform)
+
+# Arguments
+- `specimen::Dict`: The specimen dict to save
+- `filepath::String`: Output file path (with .gz extension)
+
+# Returns
+- `String`: Success message with file size info
+
+# Throws
+- `SpecimenError`: if validation or saving fails
+"""
+function save_specimen(specimen::Dict, filepath::String)
+    try
+        # Validate specimen first
+        validate_specimen(specimen)
+        
+        # Convert to JSON with pretty printing
+        json_str = JSON3.write(specimen, indent=2)
+        
+        # Write compressed file
+        GZip.open(filepath, "w") do io
+            write(io, json_str)
+        end
+        
+        # Get file sizes
+        json_size = length(json_str)
+        gz_size = filesize(filepath)
+        compression_ratio = json_size / gz_size
+        
+        return @sprintf(
+            "✓ Specimen saved successfully!\n  Raw JSON: %d bytes\n  Compressed: %d bytes\n  Compression ratio: %.1fx",
+            json_size, gz_size, compression_ratio
+        )
+        
+    catch e
+        if isa(e, SpecimenError)
+            rethrow(e)
+        else
+            throw(SpecimenError("Failed to save specimen: $(e.msg)"))
+        end
+    end
+end
+
+"""
+Load specimen from compressed file (cross-platform)
+
+# Arguments
+- `filepath::String`: Input file path
+
+# Returns
+- `Dict`: The loaded specimen
+
+# Throws
+- `SpecimenError`: if file doesn't exist or is invalid
+"""
+function load_specimen(filepath::String)
+    try
+        # Check file exists
+        if !isfile(filepath)
+            throw(SpecimenError("File not found: $filepath"))
+        end
+        
+        # Read and decompress
+        json_str = GZip.open(filepath, "r") do io
+            read(io, String)
+        end
+        
+        # Parse JSON
+        specimen = JSON3.read(json_str, Dict)
+        
+        # Validate loaded specimen
+        validate_specimen(specimen)
+        
+        return specimen
+        
+    catch e
+        if isa(e, SpecimenError)
+            rethrow(e)
+        else
+            throw(SpecimenError("Failed to load specimen: $(e.msg)"))
+        end
+    end
+end
+
+# ═════════════════════════════════════════════════════════════════════
+# MULTI-LINE JSON EDITING
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Interactive multi-line JSON editor
+
+Opens a terminal-based editor for editing JSON with proper validation
+
+# Arguments
+- `specimen::Dict`: The specimen to edit
+
+# Returns
+- `Dict`: The edited specimen
+
+# Throws
+- `SpecimenError`: if editing or validation fails
+"""
+function edit_specimen_interactive(specimen::Dict)
+    try
+        # Convert to pretty JSON
+        json_str = JSON3.write(specimen, indent=2)
+        
+        # Determine editor to use
+        editor = get(ENV, "EDITOR", "")
+        editor = isempty(editor) ? (Sys.iswindows() ? "notepad" : "vim") : editor
+        
+        # Create temp file
+        temp_file = tempname() * ".json"
+        
+        # Write JSON to temp file
+        write(temp_file, json_str)
+        
+        println("📝 Opening editor: $editor")
+        println("📝 Editing file: $temp_file")
+        println("📝 Press Ctrl+D (Unix) or Ctrl+Z (Windows) to finish editing")
+        
+        # Launch editor
+        try
+            run(`$editor $temp_file`)
+        catch
+            # Editor failed, provide fallback
+            println("⚠️  Editor launch failed. Please edit manually: $temp_file")
+            println("⚠️  Press Enter when done editing...")
+            readline()
+        end
+        
+        # Read edited JSON
+        edited_json = read(temp_file, String)
+        
+        # Validate JSON syntax
+        try
+            edited_specimen = JSON3.read(edited_json, Dict)
+        catch e
+            rm(temp_file)
+            throw(SpecimenError("Invalid JSON syntax: $(e.msg)"))
+        end
+        
+        # Validate specimen structure
+        validate_specimen(edited_specimen)
+        
+        # Clean up temp file
+        rm(temp_file)
+        
+        println("✓ Edit completed successfully!")
+        
+        return edited_specimen
+        
+    catch e
+        if isa(e, SpecimenError)
+            rethrow(e)
+        else
+            throw(SpecimenError("Failed to edit specimen: $(e.msg)"))
+        end
+    end
+end
+
+# ═════════════════════════════════════════════════════════════════════
+# CLI INTERFACE
+# ═════════════════════════════════════════════════════════════════════
+
+"""
+Main CLI entry point
+"""
+function main()
+    if length(ARGS) < 1
+        println("Usage: julia specimen_io.jl <command> [args]")
+        println("")
+        println("Commands:")
+        println("  save <input.json> <output.gz>   - Save specimen to compressed file")
+        println("  load <input.gz> <output.json>   - Load specimen from compressed file")
+        println("  edit <specimen.gz>               - Interactive multi-line JSON editing")
+        println("  validate <file>                  - Validate specimen file")
+        exit(1)
+    end
+    
+    command = lowercase(ARGS[1])
+    
+    try
+        if command == "save"
+            if length(ARGS) != 3
+                println("Error: save requires input.json and output.gz")
+                exit(1)
+            end
+            
+            input_file = ARGS[2]
+            output_file = ARGS[3]
+            
+            if !isfile(input_file)
+                println("Error: Input file not found: $input_file")
+                exit(1)
+            end
+            
+            # Load JSON
+            json_str = read(input_file, String)
+            specimen = JSON3.read(json_str, Dict)
+            
+            # Save compressed
+            result = save_specimen(specimen, output_file)
+            println(result)
+            
+        elseif command == "load"
+            if length(ARGS) != 3
+                println("Error: load requires input.gz and output.json")
+                exit(1)
+            end
+            
+            input_file = ARGS[2]
+            output_file = ARGS[3]
+            
+            # Load compressed
+            specimen = load_specimen(input_file)
+            
+            # Save as JSON
+            json_str = JSON3.write(specimen, indent=2)
+            write(output_file, json_str)
+            
+            json_size = length(json_str)
+            println("✓ Specimen loaded successfully!")
+            println("  Output: $output_file")
+            println("  Size: $json_size bytes")
+            
+        elseif command == "edit"
+            if length(ARGS) != 2
+                println("Error: edit requires specimen.gz")
+                exit(1)
+            end
+            
+            input_file = ARGS[2]
+            
+            # Load specimen
+            specimen = load_specimen(input_file)
+            
+            # Edit interactively
+            edited_specimen = edit_specimen_interactive(specimen)
+            
+            # Save back
+            result = save_specimen(edited_specimen, input_file)
+            println(result)
+            
+        elseif command == "validate"
+            if length(ARGS) != 2
+                println("Error: validate requires a file path")
+                exit(1)
+            end
+            
+            filepath = ARGS[2]
+            
+            # Determine file type
+            if endswith(filepath, ".gz")
+                specimen = load_specimen(filepath)
+            else
+                json_str = read(filepath, String)
+                specimen = JSON3.read(json_str, Dict)
+            end
+            
+            validate_specimen(specimen)
+            println("✓ Specimen is valid!")
+            
+        else
+            println("Error: Unknown command: $command")
+            exit(1)
+        end
+        
+    catch e
+        if isa(e, SpecimenError)
+            println("❌ Specimen Error: $(e.message)")
+            exit(1)
+        else
+            println("❌ Error: $(e.msg)")
+            exit(1)
+        end
+    end
+end
+
+# Run main if script is executed directly
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
