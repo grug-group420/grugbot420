@@ -285,9 +285,10 @@ end
 # ═════════════════════════════════════════════════════════════════════
 
 """
-Quick append mode editor for rapid JSON appending
+Continuous append mode editor for rapid JSON appending
 
-Opens a dedicated editor where you can paste JSON and use a hotkey to append.
+Opens a dedicated editor where you can paste JSON repeatedly. Each save automatically
+appends the JSON to the specimen file. The editor stays open for continuous appending.
 
 # Arguments
 - `target_file::String`: The specimen file to append to
@@ -312,126 +313,195 @@ function quick_append_mode(target_file::String)
         # Create append editor file with instructions
         append_file = tempname() * "_append.txt"
         
-        instructions = """
+        # Append counter for this session
+        append_count = 0
+        session_start = time()
+        failed_count = 0
+        
+        # Initial instructions
+        initial_content = """
 ════════════════════════════════════════════════════════════════════
-QUICK APPEND MODE - GRUGBOT420 SPECIMEN
+CONTINUOUS APPEND MODE - GRUGBOT420 SPECIMEN
 ════════════════════════════════════════════════════════════════════
 
 TARGET FILE: $target_file
-
-INSTRUCTIONS:
-1. Paste your JSON below this line
-2. Save and close editor when done
-3. System will automatically validate and append
-
-HOTKEYS (in editor):
-- Ctrl+S & Ctrl+Q: Save and append (vim: :wq)
-- Esc: Cancel and exit without saving
-
-WHAT CAN I APPEND?
-- Individual nodes: {"id": "N-XXXX", "pattern": "...", ...}
-- Node arrays: [{"id": "N-001", ...}, {"id": "N-002", ...}]
-- Lobe definitions: {"mathematics": "Pure mathematics..."}
-- Any valid JSON object that fits specimen structure
+SESSION STARTED: $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))
 
 ════════════════════════════════════════════════════════════════════
-APPEND YOUR JSON BELOW THIS LINE:
+HOW TO USE:
+════════════════════════════════════════════════════════════════════
+
+1. PASTE YOUR JSON below the marker line
+2. SAVE THE FILE (Ctrl+S or :w) → JSON automatically appended!
+3. CLEAR the JSON area (leave marker intact)
+4. PASTE ANOTHER JSON
+5. SAVE again → appended again!
+6. REPEAT steps 3-5 as many times as you want
+7. When DONE, close the editor
+
+HOTKEYS (SAVE = APPEND):
+• Vim:          :w      (save/append, keep editor open)
+• Vim:          :q      (quit when done)
+• Notepad:      Ctrl+S  (save/append)
+• Notepad:      Alt+F4  (quit when done)
+• VS Code:      Ctrl+S  (save/append)
+• VS Code:      Ctrl+Q  (quit when done)
+
+WHAT CAN I APPEND?
+• Single node:   {"id": "N-0001", "pattern": "...", ...}
+• Multiple:      [{"id": "N-001", ...}, {"id": "N-002", ...}]
+• Lobes:         {"mathematics": "Pure mathematics..."}
+• Any JSON:      (will be auto-formatted to fit)
+
+════════════════════════════════════════════════════════════════════
+SESSION LOG:
+════════════════════════════════════════════════════════════════════
+Appended successfully: 0
+Failed attempts:        0
+════════════════════════════════════════════════════════════════════
+
+════════════════════════════════════════════════════════════════════
+PASTE JSON BELOW THIS LINE:
 ════════════════════════════════════════════════════════════════════
 
 
 """
         
-        # Write instructions to append file
-        write(append_file, instructions)
+        # Write initial content
+        write(append_file, initial_content)
         
-        println("📝 QUICK APPEND MODE")
-        println("📝 Target file: $target_file")
-        println("📝 Append file: $append_file")
-        println("📝 Opening editor: $editor")
-        println("📝 Paste your JSON, then save and close to append")
+        println("📝 CONTINUOUS APPEND MODE STARTED")
         println("─" * 70)
+        println("📁 Target file: $target_file")
+        println("📝 Edit file:   $append_file")
+        println("🔧 Editor:      $editor")
+        println("─" * 70)
+        println("📌 PASTE JSON → SAVE → AUTO-APPENDED → REPEAT")
+        println("─" * 70)
+        println()
         
-        # Launch editor
+        # Store last processed content to detect changes
+        last_processed_content = initial_content
+        
+        # Start monitoring in background
+        monitor_task = @async begin
+            monitor_interval = 0.5  # Check every 500ms
+            
+            while true
+                sleep(monitor_interval)
+                
+                try
+                    if !isfile(append_file)
+                        # Editor closed file, stop monitoring
+                        break
+                    end
+                    
+                    # Read current content
+                    current_content = read(append_file, String)
+                    
+                    # Check if content changed
+                    if current_content != last_processed_content
+                        # Extract new JSON and append
+                        json_start = findfirst("PASTE JSON BELOW THIS LINE:", current_content)
+                        
+                        if json_start !== nothing
+                            json_section = current_content[last(json_start)+length("PASTE JSON BELOW THIS LINE:"):end]
+                            json_section = strip(json_section)
+                            
+                            # Only process if there's JSON and it's different from last time
+                            if !isempty(json_section)
+                                try
+                                    # Try to parse JSON
+                                    json_obj = JSON3.read(json_section)
+                                    validate_json_object(json_obj)
+                                    
+                                    # Load specimen
+                                    specimen = load_specimen(target_file)
+                                    
+                                    # Determine append type
+                                    appended = 0
+                                    if isa(json_obj, Dict)
+                                        if haskey(json_obj, "id") && haskey(json_obj, "pattern")
+                                            push!(specimen["nodes"], json_obj)
+                                            appended = 1
+                                            println("✓ [$(Dates.format(Dates.now(), "HH:MM:SS"))] Appended 1 node")
+                                        else
+                                            for (k, v) in json_obj
+                                                specimen[k] = v
+                                            end
+                                            appended = 1
+                                            println("✓ [$(Dates.format(Dates.now(), "HH:MM:SS"))] Appended metadata")
+                                        end
+                                    elseif isa(json_obj, Array) && !isempty(json_obj)
+                                        if haskey(json_obj[1], "id")
+                                            for node in json_obj
+                                                push!(specimen["nodes"], node)
+                                            end
+                                            appended = length(json_obj)
+                                            println("✓ [$(Dates.format(Dates.now(), "HH:MM:SS"))] Appended $appended nodes")
+                                        end
+                                    end
+                                    
+                                    if appended > 0
+                                        # Save specimen
+                                        save_specimen(specimen, target_file)
+                                        append_count += appended
+                                        
+                                        # Update log in editor file
+                                        updated_content = replace(current_content,
+                                            r"Appended successfully: \d+.*"m => "Appended successfully: $append_count\nFailed attempts:        $failed_count"
+                                        )
+                                        write(append_file, updated_content)
+                                        last_processed_content = updated_content
+                                    end
+                                    
+                                catch e
+                                    # JSON parsing failed, don't update
+                                    # Will be retried on next save
+                                    failed_count += 1
+                                    println("❌ [$(Dates.format(Dates.now(), "HH:MM:SS"))] Failed: $(isa(e, SpecimenError) ? e.message : e.msg)")
+                                end
+                            end
+                        end
+                    end
+                catch e
+                    # File might be locked by editor, ignore and retry
+                    # println("⚠️  Monitor error: $(e.msg)")
+                end
+            end
+        end
+        
+        # Launch editor (will block until closed)
         try
             run(`$editor $append_file`)
         catch
             println("⚠️  Editor launch failed. Please edit manually: $append_file")
-            println("⚠️  Press Enter when done...")
+            println("⚠️  Press Enter when done appending...")
             readline()
         end
         
-        # Read appended content
-        append_content = read(append_file, String)
+        # Wait a bit for final processing
+        sleep(1)
         
-        # Find JSON after instructions
-        json_start = findfirst("APPEND YOUR JSON BELOW THIS LINE:", append_content)
-        if json_start === nothing
-            rm(append_file)
-            throw(SpecimenError("Could not find JSON section. Did you modify the instructions?"))
-        end
-        
-        json_section = append_content[last(json_start)+length("APPEND YOUR JSON BELOW THIS LINE:"):end]
-        
-        # Strip whitespace and check if empty
-        json_section = strip(json_section)
-        if isempty(json_section)
-            println("⚠️  No JSON found. Nothing to append.")
-            rm(append_file)
-            return
-        end
-        
-        # Try to parse JSON
-        try
-            json_obj = JSON3.read(json_section, Dict)
-            validate_json_object(json_obj)
-        catch e
-            rm(append_file)
-            throw(SpecimenError("Invalid JSON: $(e.msg)"))
-        end
-        
-        # Load current specimen
-        specimen = load_specimen(target_file)
-        
-        # Determine what to append based on structure
-        appended_count = 0
-        if haskey(json_obj, "id") && haskey(json_obj, "pattern")
-            # Single node
-            push!(specimen["nodes"], json_obj)
-            appended_count = 1
-            println("✓ Appended 1 node")
-        elseif isa(json_obj, Array) && !isempty(json_obj) && haskey(json_obj[1], "id")
-            # Array of nodes
-            for node in json_obj
-                push!(specimen["nodes"], node)
-            end
-            appended_count = length(json_obj)
-            println("✓ Appended $appended_count nodes")
-        elseif !isempty(json_obj) && !any(haskey.(Ref(json_obj), ["id", "signal"]))
-            # Likely lobes or other metadata
-            for (key, value) in json_obj
-                specimen[key] = value
-            end
-            appended_count = length(json_obj)
-            println("✓ Appended $appended_count metadata fields")
-        else
-            rm(append_file)
-            throw(SpecimenError("Unrecognized JSON structure. Cannot determine where to append."))
-        end
-        
-        # Save updated specimen
-        result = save_specimen(specimen, target_file)
-        println(result)
-        
-        # Clean up temp file
+        # Clean up
         rm(append_file)
         
-        println("✓ Quick append completed successfully!")
+        # Print session summary
+        session_time = time() - session_start
+        println("─" * 70)
+        println("📊 SESSION COMPLETED")
+        println("─" * 70)
+        println("Items appended: $append_count")
+        println("Failed attempts: $failed_count")
+        println("Session time:   $(round(session_time, digits=2))s")
+        println("─" * 70)
+        println("✓ Continuous append session finished!")
         
     catch e
         if isa(e, SpecimenError)
             rethrow(e)
         else
-            throw(SpecimenError("Failed to append to specimen: $(e.msg)"))
+            throw(SpecimenError("Failed to run continuous append: $(e.msg)"))
         end
     end
 end
