@@ -420,8 +420,10 @@ end</code></pre>
 <table>
     <tr><th>Event</th><th>Effect</th></tr>
     <tr><td>Creation</td><td>Strength = 1.0, hopfield key computed, auto-latch neighbors (if >1000 nodes)</td></tr>
-    <tr><td>Vote cast</td><td><code>bump_strength!</code> on coinflip → strength increases toward cap</td></tr>
-    <tr><td><code>/wrong</code></td><td><code>penalize_strength!</code> on coinflip → strength decreases</td></tr>
+    <tr><td>Vote cast</td><td><code>bump_strength!</code> on coinflip → strength increases toward cap (voting alone does not enable reinforcement)</td></tr>
+    <tr><td>Node fires (contributes)</td><td>Marks <code>fired_this_cycle = true</code>, allowing strength feedback (required for /right and /wrong)</td></tr>
+    <tr><td><code>/right</code></td><td>Secondary reinforcement: contributors only, 50% chance to bump strength (no double reward)</td></tr>
+    <tr><td><code>/wrong</code></td><td>Penalize contributors only on coinflip → strength decreases with over-compensation if gained</td></tr>
     <tr><td>Strength → 0</td><td>Marked <code>is_grave = true</code>, becomes negative anchor</td></tr>
     <tr><td>Slow response</td><td>Avg time > 5s → GRAVED-SLOW</td></tr>
     <tr><td>4 neighbors</td><td><code>is_unlinkable = true</code>, rejects further links</td></tr>

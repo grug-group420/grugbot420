@@ -12,6 +12,7 @@ The AIML (Artificial Intelligence Markup Language) Node System provides an execu
 - **Grave Nodes**: Nodes with strength = 0.0 are marked as grave (dead)
 - **Cycle Memory**: Each node tracks per-cycle activity for honest feedback
 - **Maturity Threshold**: AIML immune system activates at 1000+ AIML nodes
+- **Contributors vs Voters**: Only nodes that **fired** (actually contributed to output) are eligible for reinforcement/penalty. Voters who didn't fire are ignored.
 
 ---
 
@@ -19,49 +20,58 @@ The AIML (Artificial Intelligence Markup Language) Node System provides an execu
 
 ### `/aimlRight`
 
-**Purpose**: Reward AIML nodes that voted in the current cycle.
+**Purpose**: Apply secondary reinforcement to AIML nodes that actually contributed to output generation.
 
 **Usage**: `/aimlRight`
 
 **Behavior**:
-- Increases strength by `AIML_STRENGTH_DELTA` (1.0) for all AIML nodes that voted this cycle
-- Skips nodes that already gained strength this cycle (no double reward)
+- **CRITICAL**: Only processes nodes that **fired** this cycle (contributors), not all voters
+- Increases strength by `AIML_STRENGTH_DELTA` (1.0) for contributing nodes that didn't already gain strength
+- Skips nodes that already gained strength this cycle from initial coinflip (no double reward)
+- Uses 50/50 coinflip for eligible contributors (secondary reinforcement chance)
 - Clamps strength to `AIML_STRENGTH_CAP` (10.0)
-- Returns summary of rewarded and skipped nodes
+- Returns summary of rewarded, skipped, and missed contributors
 
 **Example**:
 ```
 /aimlRight
-✅  /aimlRight applied. 15 rewarded, 3 skipped (already gained this cycle).
+✅  /aimlRight applied. 15 contributors processed, 8 rewarded, 5 double-skip, 2 missed coinflip.
 ```
 
+**Key Concept**: Contributors who were "worthy but unlucky" in the initial coinflip get a second chance via secondary reinforcement.
+
 **Error Handling**:
-- Warns if no AIML nodes voted this cycle
+- Warns if no AIML nodes contributed this cycle
 - No silent failures - all errors are logged
 
 ---
 
 ### `/aimlWrong`
 
-**Purpose**: Penalize AIML nodes that voted in the current cycle.
+**Purpose**: Penalize AIML nodes that actually contributed to a wrong output.
 
 **Usage**: `/aimlWrong`
 
 **Behavior**:
-- Decreases strength by `AIML_STRENGTH_DELTA` (1.0) for voted AIML nodes
-- Uses 50/50 coinflip to determine which nodes get penalized
-- Nodes that already gained strength this cycle get EXTRA penalty (net-negative)
-- Nodes that hit strength = 0.0 become grave
-- Returns summary of penalized, spared, and newly graved nodes
+- **CRITICAL**: Only processes nodes that **fired** this cycle (contributors), not all voters
+- Uses 50/50 coinflip to determine which contributors get penalized
+- Contributors that already gained strength this cycle get EXTRA penalty (net-negative):
+  - Penalty magnitude = strength gained this cycle + AIML_STRENGTH_DELTA
+  - Ensures net loss even if node gained during cycle
+- Contributors that didn't gain strength get standard penalty
+- Contributors that hit strength = 0.0 become grave
+- Returns summary of penalized, spared, and newly graved contributors
 
 **Example**:
 ```
 /aimlWrong
-❌  /aimlWrong applied. 12 penalized, 6 spared by coinflip, 2 newly graved.
+❌  /aimlWrong applied. 10 contributors processed, 5 penalized, 5 spared by coinflip, 1 newly graved.
 ```
 
+**Key Concept**: Only nodes that actually contributed to the "wrong" output should be penalized. Voters who didn't fire are innocent bystanders.
+
 **Error Handling**:
-- Warns if no AIML nodes voted this cycle
+- Warns if no AIML nodes contributed this cycle
 - No silent failures - all errors are logged
 
 ---
@@ -290,14 +300,16 @@ Get the current cycle number.
 
 #### `record_fire!(node::AIMLNode)`
 
-Record that a node fired in the current cycle.
+Record that a node fired in the current cycle (actually contributed to output).
 
 **Behavior**:
-- Sets `fired_this_cycle = true`
-- Applies strength gain (+1.0)
-- Sets `gained_this_cycle = true`
+- Sets `fired_this_cycle = true` (marks node as contributor)
+- Applies strength gain (+1.0) via 50/50 coinflip
+- Sets `gained_this_cycle = true` if strength increased
 - Clamps strength to `AIML_STRENGTH_CAP`
 - Updates `strength_delta_this_cycle`
+
+**Important**: Only nodes with `fired_this_cycle == true` are eligible for `/aimlRight` and `/aimlWrong` feedback.
 
 **Throws**: `AIMLNodeError` if strength update fails
 
@@ -310,40 +322,50 @@ Record that a node voted in the current cycle.
 **Behavior**:
 - Sets `voted_this_cycle = true`
 
+**Important**: Voting alone does NOT make a node eligible for feedback. The node must also fire (call `record_fire!()`) to be considered a contributor for `/aimlRight` and `/aimlWrong`.
+
 ---
 
 ### Feedback Application
 
 #### `apply_aiml_right!()::Dict{String, Any}`
 
-Apply positive feedback to all voted AIML nodes.
+Apply secondary reinforcement to AIML nodes that contributed to output.
 
 **Returns**: Dictionary with keys:
-- `"total_voters"`: Total number of nodes that voted
+- `"total_contributors"`: Total number of nodes that fired (contributed)
 - `"rewarded"`: List of node IDs that received reward
-- `"skipped_double_reward"`: List of node IDs skipped (already gained)
+- `"skipped_double_reward"`: List of node IDs skipped (already gained this cycle)
+- `"coinflip_missed"`: List of node IDs that missed the coinflip
+- `"grave_skipped"`: List of grave node IDs skipped
 
 **Behavior**:
-- Rewards nodes that voted but didn't already gain strength
-- Skips nodes that already gained (no double reward)
+- **Only processes nodes that fired** (fired_this_cycle == true), not all voters
+- Rewards contributing nodes that didn't already gain strength via coinflip
+- Skips contributors that already gained (no double reward - secondary reinforcement only)
+- Uses 50/50 coinflip for eligible contributors
 - Clamps strength to `AIML_STRENGTH_CAP`
 
 ---
 
 #### `apply_aiml_wrong!()::Dict{String, Any}`
 
-Apply negative feedback to all voted AIML nodes.
+Apply negative feedback to AIML nodes that contributed to output.
 
 **Returns**: Dictionary with keys:
-- `"total_voters"`: Total number of nodes that voted
+- `"total_contributors"`: Total number of nodes that fired (contributed)
 - `"penalized"`: List of node IDs that were penalized
 - `"spared"`: List of node IDs spared by coinflip
 - `"newly_graved"`: List of node IDs that hit strength = 0.0
+- `"grave_skipped"`: List of grave node IDs skipped
 
 **Behavior**:
-- Uses 50/50 coinflip to determine which nodes get penalized
-- Nodes that already gained strength get EXTRA penalty
-- Nodes hitting strength = 0.0 become grave
+- **Only processes nodes that fired** (fired_this_cycle == true), not all voters
+- Uses 50/50 coinflip to determine which contributors get penalized
+- Contributors that already gained strength get EXTRA penalty:
+  - Penalty = strength_delta_this_cycle + AIML_STRENGTH_DELTA
+  - Ensures net loss even if node gained during cycle
+- Contributors hitting strength = 0.0 become grave
 
 ---
 
@@ -531,11 +553,13 @@ AIMLNodeSystem.add_aiml_node!(lobe_id, node_id, template)
 
 1. **Per-Lobe Isolation**: Each lobe's AIML tribe is independent
 2. **Population Control**: AIML nodes capped at 1/3 of parent lobe size
-3. **Honest Feedback**: Cycle memory prevents double rewards and ensures real penalties
-4. **No Silent Failures**: All errors are logged and propagated
-5. **Immune Protection**: AIML immune system activates at 1000+ nodes
-6. **Grave Tracking**: Dead nodes are remembered, not silently deleted
-7. **Thread Safety**: All operations protected by ReentrantLock
+3. **Contributor-Only Feedback**: Only nodes that actually fired (contributed to output) are reinforced or penalized. Voters who didn't fire are ignored.
+4. **Secondary Reinforcement**: `/aimlRight` gives contributors who missed initial coinflip a second chance
+5. **Honest Feedback**: Cycle memory prevents double rewards and ensures real penalties with over-compensation
+6. **No Silent Failures**: All errors are logged and propagated
+7. **Immune Protection**: AIML immune system activates at 1000+ nodes
+8. **Grave Tracking**: Dead nodes are remembered, not silently deleted
+9. **Thread Safety**: All operations protected by ReentrantLock
 
 ---
 

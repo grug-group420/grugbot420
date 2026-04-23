@@ -7,7 +7,8 @@ Launch GrugBot420 with `julia Main.jl` (standalone) or `GrugBot420.main()` (from
 | Command | Description |
 |---------|-------------|
 | `/mission <text>` | Send input to the engine (main command) — exempt from immune gates |
-| `/wrong` | Penalize nodes that voted on the last response |
+| `/wrong` | Penalize only contributing nodes (fired) from the last response |
+| `/right` | Secondary reinforcement: contributors get another coinflip chance to gain strength |
 | `/explicit <cmd> [<node_id>] <text>` | Force a specific command+node, bypassing votes |
 | `/grow <json>` | Plant new nodes from a JSON packet — immune gated (critical) |
 | `/addRule <rule> [prob=X]` | Add a stochastic orchestration rule — immune gated |

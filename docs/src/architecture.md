@@ -56,7 +56,7 @@ GrugBot420 is organized as a layered neuromorphic engine. This page describes th
 | Relational Fire | `engine.jl` | JIT confidence-baked node attachment chains |
 | ActionTonePredictor | `ActionTonePredictor.jl` | Pre-vote action/tone classification |
 | Full Lobe Scanner | `FullLobeScanner.jl` | Phase-gated full-lobe associative scan with spreading activation; AIML gated until DONE |
-| AIML Node System | `AIMLNodeSystem.jl` | Per-lobe AIML tribes with population caps; graves excluded from caps |
+| AIML Node System | `AIMLNodeSystem.jl` | Per-lobe AIML tribes with population caps; graves excluded from caps; contributor-only reinforcement |
 | ImmuneThreadPool | `ImmuneThreadPool.jl` | Hardened 8-worker pool with priority lanes, rate limiting, and tripwire escalation |
 
 
@@ -211,6 +211,20 @@ AIML nodes track their participation in processing cycles:
 - `last_cycle_id` — Optional identifier for cycle-aware logic
 
 This enables patterns like "only reinforce once per cycle" or "track reinforcement velocity over time."
+
+### Contributor-Only Feedback
+
+**CRITICAL DESIGN PRINCIPLE:** AIML nodes can only gain or lose strength if they actually **fired** and contributed to generating output (marked with `fired_this_cycle = true`). 
+
+This distinction separates:
+- **Voters:** Nodes that voted but may or may not have contributed
+- **Contributors:** Nodes that fired and generated actual output content
+
+**Reinforcement behavior:**
+- `/aimlRight` (secondary reinforcement): Only contributors get a 50% coinflip chance to gain additional strength, minus those who already gained from initial coinflip (no double reward)
+- `/aimlWrong` (penalty): Only contributors are penalized on a 50% coinflip, with over-compensation penalty if they gained strength during the cycle
+
+This ensures that only nodes that meaningfully contributed to outputs are eligible for strength modification.
 
 ### Thread Safety
 

@@ -32,7 +32,8 @@ Requires [Julia 1.9+](https://julialang.org/downloads/) on your PATH. First run 
 | Command | What it does |
 |---|---|
 | `/mission <text>` | Send input to the engine. This is the main command. Also accepts image binary (Base64 or hex). |
-| `/wrong` | Tell GrugBot its last response was bad. Penalizes every node that voted via coinflip strength decay. Nodes that reach 0 become graves. |
+| `/wrong` | Tell GrugBot its last response was bad. Penalizes only contributing nodes (that actually fired) via coinflip strength decay. Nodes that reach 0 become graves. |
+| `/right` | Tell GrugBot its last response was good. Secondary reinforcement for contributing nodes: 50% coinflip chance to gain strength (no double reward). |
 | `/explicit <cmd> [<node_id>] <text>` | Force a specific command+node combination, bypassing the vote system. |
 | `/grow <json>` | Plant one or more new nodes from a JSON packet (see format below). |
 | `/addRule <rule text> [prob=0.0-1.0]` | Add a stochastic orchestration rule. Fires with given probability on every response. Supports template tags. |
@@ -194,7 +195,7 @@ The file is validated before any state is wiped. If validation fails, zero chang
 | 11 | **arousal** | EyeSystem arousal state (level, decay_rate, baseline) |
 | 11.5 | **eye_state** | EyeSystem tracking state — attention_enabled, blur_enabled, last centroid, last_arousal |
 | 12 | **id_counters** | NODE ID_COUNTER and MSG_ID_COUNTER atomic values |
-| 12.5 | **last_voters** | LAST_VOTER_IDS — node IDs that voted in last cycle (for /wrong feedback) |
+| 12.5 | **last_contributors** | LAST_VOTER_IDS — node IDs that fired and contributed in last cycle (for /right and /wrong feedback) |
 | 13 | **brainstem** | BrainStem dispatch count and propagation history |
 | 14 | **attachments** | ATTACHMENT_MAP — target→attached node mappings with patterns and pre-baked signal vectors |
 | 15 | **trajectory** | ActionTonePredictor ring buffer + config — behavioral inertia through action-tone space (Lorenz damping) |
