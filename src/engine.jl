@@ -276,6 +276,12 @@ mutable struct Node
 
     # GRUG NEW: Hopfield cache key (hash of pattern, used for familiar input lookup)
     hopfield_key::UInt64
+
+    # GRUG NEW: Contributed to output this cycle (for /right and /wrong feedback)
+    fired_this_cycle::Bool           # GRUG: True if node's vote was used by AIML orchestrator
+    voted_this_cycle::Bool           # GRUG: True if node voted (may or may not have contributed)
+    gained_this_cycle::Bool          # GRUG: True if node gained strength this cycle
+    strength_delta_this_cycle::Float64  # GRUG: Strength change this cycle (for over-compensation penalty)
 end
 
 struct Vote
@@ -426,6 +432,36 @@ GRUG: Record a response time for this node in its big-O ledger.
 If average response time exceeds SLOW_NODE_THRESHOLD_SECONDS, mark GRAVED-SLOW.
 Ledger clears every 24 hours (LEDGER_CLEAR_INTERVAL).
 """
+function mark_node_contributor!(node::Node)
+    """
+    Mark a node as having contributed to output this cycle.
+    This enables the node for reinforcement/penalty via /right and /wrong.
+    """
+    node.fired_this_cycle = true
+    node.voted_this_cycle = true  # Contributors also voted
+end
+
+function reset_cycle_flags!(node::Node)
+    """
+    Reset cycle tracking flags at the start of a new cycle.
+    """
+    node.fired_this_cycle = false
+    node.voted_this_cycle = false
+    node.gained_this_cycle = false
+    node.strength_delta_this_cycle = 0.0
+end
+
+function reset_all_cycle_flags!()
+    """
+    Reset cycle flags for all nodes at the start of a new mission.
+    """
+    lock(NODE_LOCK) do
+        for node in values(NODE_MAP)
+            reset_cycle_flags!(node)
+        end
+    end
+end
+
 function record_response_time!(node::Node, elapsed_seconds::Float64)
     if elapsed_seconds < 0.0
         error("!!! FATAL: record_response_time! got negative elapsed time: $elapsed_seconds! !!!")
@@ -1116,7 +1152,11 @@ function create_node(
         "",                 # grave_reason
         Float64[],          # response_times (big-O ledger)
         time(),             # ledger_last_cleared
-        hopfield_key        # hopfield_key
+        hopfield_key,       # hopfield_key
+        false,              # fired_this_cycle
+        false,              # voted_this_cycle
+        false,              # gained_this_cycle
+        0.0                 # strength_delta_this_cycle
     )
 
     lock(NODE_LOCK) do
@@ -1992,19 +2032,89 @@ GRUG: /wrong command! Every node who voted gets a coinflip.
 Losers have their strength lowered. Nodes that hit 0 are marked GRAVE.
 Grave nodes become negative reinforcement anchors during generative phase.
 """
-function apply_wrong_feedback!(voter_ids::Vector{String})
-    if isempty(voter_ids)
-        error("!!! FATAL: apply_wrong_feedback! got empty voter_ids list! !!!")
+function apply_right_feedback!(contributor_ids::Vector{String})::Dict{String, Any}
+    """
+    Apply secondary reinforcement to regular (non-AIML) nodes that contributed to output.
+    
+    CRITICAL: Only processes nodes that fired_this_cycle == true (contributors).
+    - Nodes that already gained strength this cycle are skipped (no double reward)
+    - Grave nodes are skipped (dead nodes don't get feedback)
+    - Uses 50/50 coinflip for eligible contributors (secondary reinforcement chance)
+    
+    Returns statistics dictionary with:
+    - "total_contributors": Total number of contributing nodes
+    - "rewarded": Node IDs that gained strength
+    - "skipped_double_reward": Node IDs that already gained (skipped to avoid double reward)
+    - "coinflip_missed": Node IDs that lost the coinflip
+    - "grave_skipped": Node IDs that are grave and were skipped
+    """
+    if isempty(contributor_ids)
+        error("!!! FATAL: apply_right_feedback! got empty contributor_ids list! !!!")
+    end
+
+    rewarded = String[]
+    skipped_double_reward = String[]
+    coinflip_missed = String[]
+    grave_skipped = String[]
+    STRENGTH_DELTA = 1.0  # Same as AIML_STRENGTH_DELTA
+
+    lock(NODE_LOCK) do
+        for id in contributor_ids
+            node = get(NODE_MAP, id, nothing)
+            if isnothing(node)
+                # GRUG: Node may have already been deleted. Non-fatal, skip.
+                println("[ENGINE] ⚠  /right: Node [$id] not found, skipping.")
+                continue
+            end
+
+            # Skip grave nodes
+            if node.is_grave
+                push!(grave_skipped, node.id)
+                continue
+            end
+
+            # Skip nodes that already gained strength this cycle (no double reward)
+            if node.gained_this_cycle
+                push!(skipped_double_reward, node.id)
+                continue
+            end
+
+            # 50/50 coinflip for secondary reinforcement
+            if rand() < 0.5
+                bump_strength!(node)
+                node.gained_this_cycle = true
+                node.strength_delta_this_cycle += STRENGTH_DELTA
+                push!(rewarded, node.id)
+            else
+                push!(coinflip_missed, node.id)
+            end
+        end
+    end
+
+    result = Dict{String, Any}(
+        "total_contributors"   => length(contributor_ids),
+        "rewarded"             => rewarded,
+        "skipped_double_reward" => skipped_double_reward,
+        "coinflip_missed"      => coinflip_missed,
+        "grave_skipped"        => grave_skipped,
+    )
+    println("[ENGINE] ✅ /right: contributors=$(length(contributor_ids)) rewarded=$(length(rewarded)) double_skip=$(length(skipped_double_reward)) coinflip_miss=$(length(coinflip_missed)) grave_skip=$(length(grave_skipped))")
+    return result
+end
+
+function apply_wrong_feedback!(contributor_ids::Vector{String})
+    if isempty(contributor_ids)
+        error("!!! FATAL: apply_wrong_feedback! got empty contributor_ids list! !!!")
     end
 
     penalized_count = 0
     graved_count    = 0
 
-    for id in voter_ids
+    for id in contributor_ids
         node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
         if isnothing(node)
             # GRUG: Node may have already been graved. Non-fatal, skip.
-            println("[ENGINE] ⚠  /wrong: Node [$id] not found, skipping penalty.")
+            println("[ENGINE] ⚠  /wrong: Node [$id] not found, skipping.")
             continue
         end
 
@@ -2017,7 +2127,7 @@ function apply_wrong_feedback!(voter_ids::Vector{String})
         end
     end
 
-    println("[ENGINE] ❌  /wrong applied to $(length(voter_ids)) voters. Penalized: $penalized_count, Newly graved: $graved_count.")
+    println("[ENGINE] ❌  /wrong applied to $(length(contributor_ids)) contributors. penalized= $penalized_count, newly_graved= $graved_count.")
 end
 
 # ==============================================================================

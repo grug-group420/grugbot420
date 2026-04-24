@@ -629,7 +629,7 @@ end
             Dict{String, Any}(), String[], 1.0,
             RelationalTriple[], String[], Dict{String, Float64}(),
             5.0, true, String[], false, false, "",
-            Float64[], time(), hash("SDF:image:4x4")
+            Float64[], time(), hash("SDF:image:4x4"), false, false, false, 0.0
         )
         NODE_MAP[nid] = node
         return nid
@@ -712,7 +712,7 @@ end
             Dict{String, Any}(), String[], 1.0,
             RelationalTriple[], String[], Dict{String, Float64}(),
             5.0, true, String[], false, false, "",
-            Float64[], time(), hash("SDF:image:4x4")
+            Float64[], time(), hash("SDF:image:4x4"), false, false, false, 0.0
         )
         NODE_MAP[nid] = node
         return nid

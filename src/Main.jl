@@ -520,7 +520,7 @@ GRUG: Superposition orchestrator. Finds heaviest rocks (max confidence) for "Sur
 basket, coinflips smaller rocks into "Unsure" basket. Builds AIML payload and
 fires the generative engine. Throws on empty votes — NO SILENT FAILURES.
 """
-function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
+function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tuple{String, Vector{Vote}, Vector{Vote}}
     if isempty(votes)
         error("!!! FATAL: Orchestrator failed: Cave empty! Received zero votes! Cannot build fire! !!!")
     end
@@ -586,7 +586,11 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
     end
 
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
-    return COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+    output = COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+    
+    # GRUG: Return output along with contributing votes (sure + unsure)
+    # These are the votes that actually contributed to generating output
+    return output, sure_votes, unsure_votes
 end
 
 # ==============================================================================
@@ -980,9 +984,10 @@ const HELP_MSG = """
 ╠══════════════════════════════════════════════════════════════╣
 ║  CORE                                                        ║
 ║  /mission <text>            Send input to the AI engine      ║
-║  /wrong                     Penalize last response voters    ║
-║  /aimlRight                 Reward AIML nodes that voted     ║
-║  /aimlWrong                 Penalize AIML nodes that voted   ║
+║  /wrong                     Penalize last contributors    ║
+║  /aimlRight                 Reward AIML contributors     ║
+ │  /right                     Reward last contributors         │
+║  /aimlWrong                 Penalize AIML contributors   ║
 ║  /explicit <cmd> [<id>] <t> Force a specific command+node    ║
 ║  /grow <json>               Plant nodes from JSON packet     ║
 ║  /addRule <rule>            Add stochastic orchestration rule║
@@ -1012,8 +1017,8 @@ const HELP_MSG = """
 ║  /aimlList <lobe_id>         List AIML nodes in lobe         ║
 ║  /aimlAdd <l> <id> <tmpl>    Add AIML node to lobe           ║
 ║  /aimlRemove <l> <id>        Remove AIML node from lobe      ║
-║  /aimlRight                  Reward AIML nodes that voted    ║
-║  /aimlWrong                  Penalize AIML nodes that voted  ║
+║  /aimlRight                  Reward AIML contributors    ║
+║  /aimlWrong                  Penalize AIML contributors  ║
 ║  /aimlCycle                  Show current cycle info         ║
 ║  /aimlPhagy                  Run phagy sweep on AIML graves  ║
 ║                                                              ║
@@ -1071,6 +1076,7 @@ const HELP_MSG = """
 # GRUG: Track last voter IDs so /wrong knows who to punish
 const LAST_VOTER_IDS = String[]
 const LAST_VOTER_LOCK = ReentrantLock()
+const LAST_CONTRIBUTOR_IDS = String[]  # Node IDs that actually contributed to output (fired)
 
 """
 process_mission(mission_text::String)
@@ -1163,15 +1169,31 @@ function process_mission(mission_text::String)
     end
 
     println("--> $(length(cast_votes)) valid votes passed gate... compiling JIT superposition...")
-    output = ephemeral_aiml_orchestrator(mission_text, cast_votes)
+    output, sure_votes, unsure_votes = ephemeral_aiml_orchestrator(mission_text, cast_votes)
 
     t_elapsed = time() - t_start
 
-    # GRUG: Record response time on all winning node voters for big-O ledger
+    # GRUG: Merge sure and unsure votes - these are the contributors (votes that generated output)
+    contributing_votes = vcat(sure_votes, unsure_votes)
+    
+    # GRUG: Mark contributing nodes and record response time
     for v in cast_votes
         voter_node = lock(() -> get(NODE_MAP, v.node_id, nothing), NODE_LOCK)
         if !isnothing(voter_node)
+            # Mark all voters as voted_this_cycle
+            voter_node.voted_this_cycle = true
+            # Record response time on all winning node voters for big-O ledger
             record_response_time!(voter_node, t_elapsed)
+        end
+    end
+    
+    # GRUG: Mark contributing nodes as fired_this_cycle
+    lock(NODE_LOCK) do
+        for v in contributing_votes
+            node = get(NODE_MAP, v.node_id, nothing)
+            if !isnothing(node)
+                node.fired_this_cycle = true
+            end
         end
     end
 
@@ -1179,6 +1201,13 @@ function process_mission(mission_text::String)
     lock(LAST_VOTER_LOCK) do
         empty!(LAST_VOTER_IDS)
         append!(LAST_VOTER_IDS, [v.node_id for v in cast_votes])
+    end
+    
+    # GRUG: Store contributor IDs for /right and /wrong feedback
+    # Only nodes that actually contributed to output should be reinforced/penalized
+    lock(LAST_VOTER_LOCK) do
+        empty!(LAST_CONTRIBUTOR_IDS)
+        append!(LAST_CONTRIBUTOR_IDS, [v.node_id for v in contributing_votes])
     end
 
     println("\n🤖 AIML Output Scaffold:\n$output")
@@ -2658,6 +2687,7 @@ function run_cli()
             m_mission     = match(r"^/mission\s+(.+)"s,  line)
             m_wrong       = match(r"^/wrong\s*$",         line)
             # GRUG: AIML node tribe feedback commands
+            m_right       = match(r"^/right\s*$",          line)
             m_aimlright   = match(r"^/aimlRight\s*$",     line)
             m_aimlwrong   = match(r"^/aimlWrong\s*$",     line)
             # GRUG: AIML management commands (status, list, add, remove, cycle, phagy)
@@ -2720,25 +2750,38 @@ function run_cli()
 
             elseif !isnothing(m_wrong)
                 # GRUG: /wrong - user says last response was wrong.
-                # Every node that voted gets a coinflip strength penalty.
+                # CRITICAL: Only nodes that actually contributed (fired) get penalized, not all voters.
                 # Nodes that hit 0 become grave (negative reinforcement markers).
-                voter_ids = lock(LAST_VOTER_LOCK) do
-                    copy(LAST_VOTER_IDS)
+                contributor_ids = lock(LAST_VOTER_LOCK) do
+                    copy(LAST_CONTRIBUTOR_IDS)
                 end
 
-                if isempty(voter_ids)
-                    println("⚠  /wrong: No previous voters to penalize. Did you run /mission first?")
+                if isempty(contributor_ids)
+                    println("⚠  /wrong: No previous contributors to penalize. Did you run /mission first?")
                 else
-                    apply_wrong_feedback!(voter_ids)
-                    println("❌  /wrong applied. $(length(voter_ids)) voter(s) penalized via coinflip.")
+                    apply_wrong_feedback!(contributor_ids)
+                    println("❌  /wrong applied. $(length(contributor_ids)) contributor(s) penalized via coinflip.")
                 end
 
-            elseif !isnothing(m_aimlright)
+elseif !isnothing(m_right)
+                # GRUG: /right - user says last response was good.
+                # CRITICAL: Only nodes that actually contributed (fired) get secondary reinforcement.
+                # Contributors that didn't already gain strength get a 50% coinflip chance.
+                contributor_ids = lock(LAST_VOTER_LOCK) do
+                    copy(LAST_CONTRIBUTOR_IDS)
+                end
+
+                if isempty(contributor_ids)
+                    println("⚠  /right: No previous contributors to reward. Did you run /mission first?")
+                else
+                    result = apply_right_feedback!(contributor_ids)
+                    println("✅ /right applied. $(length(contributor_ids)) contributor(s) processed: $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained), $(length(result["coinflip_missed"])) missed coinflip.")
+                end            elseif !isnothing(m_aimlright)
                 # GRUG: /aimlRight - user says AIML executive layer did good this cycle.
-                # Rewards AIML nodes that voted, BUT skips any that already gained
+                # Rewards AIML nodes that contributed (fired), BUT skips any that already gained
                 # strength from use in the same cycle (no double snack rule).
                 result = AIMLNodeSystem.apply_aiml_right!()
-                if result["total_voters"] == 0
+                if result["total_contributors"] == 0
                     println("⚠  /aimlRight: No AIML nodes voted this cycle. Did you run /mission first?")
                 else
                     println("✅  /aimlRight applied. $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained this cycle).")
@@ -2746,11 +2789,11 @@ function run_cli()
 
             elseif !isnothing(m_aimlwrong)
                 # GRUG: /aimlWrong - user says AIML executive layer did bad this cycle.
-                # Penalizes voted AIML nodes via 50/50 coinflip. Nodes that already gained
+                # Penalizes AIML nodes that contributed (fired) via 50/50 coinflip. Nodes that already gained
                 # strength this cycle get EXTRA penalty so they end up net-negative — not
                 # just back at baseline. Fake punishment is not punishment. Grug rules.
                 result = AIMLNodeSystem.apply_aiml_wrong!()
-                if result["total_voters"] == 0
+                if result["total_contributors"] == 0
                     println("⚠  /aimlWrong: No AIML nodes voted this cycle. Did you run /mission first?")
                 else
                     newly_graved = length(result["newly_graved"])

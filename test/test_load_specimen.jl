@@ -269,7 +269,11 @@ let
         String(parsed["grave_reason"]),
         Float64.(parsed["response_times"]),
         Float64(parsed["ledger_last_cleared"]),
-        parse(UInt64, parsed["hopfield_key"])
+        parse(UInt64, parsed["hopfield_key"]),
+        Bool(get(parsed, "fired_this_cycle", false)),
+        Bool(get(parsed, "voted_this_cycle", false)),
+        Bool(get(parsed, "gained_this_cycle", false)),
+        Float64(get(parsed, "strength_delta_this_cycle", 0.0))
     )
     
     test("Restored node id matches", restored_node.id == node.id)

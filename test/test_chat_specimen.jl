@@ -93,7 +93,8 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
     primary_vote = sure_votes[1]
     node = lock(() -> get(NODE_MAP, primary_vote.node_id, nothing), NODE_LOCK)
     isnothing(node) && error("!!! FATAL: winning node vanished !!!")
-    return COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+    output = COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+    return output, sure_votes, unsure_votes
 end
 
 function generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, context)
@@ -209,6 +210,7 @@ end
 
 const LAST_VOTER_IDS  = String[]
 const LAST_VOTER_LOCK = ReentrantLock()
+const LAST_CONTRIBUTOR_IDS = String[]  # Node IDs that actually contributed to output
 
 function process_mission(mission_text::String)
     strip(mission_text) == "" && error("!!! FATAL: empty mission !!!")
@@ -242,17 +244,36 @@ function process_mission(mission_text::String)
         push!(cast_votes, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
     end
 
-    output = ephemeral_aiml_orchestrator(mission_text, cast_votes)
+    output, sure_votes, unsure_votes = ephemeral_aiml_orchestrator(mission_text, cast_votes)
     t_elapsed = time() - t_start
 
+    # Merge sure and unsure votes - these are the contributors
+    contributing_votes = vcat(sure_votes, unsure_votes)
+    
+    # Mark all voters as voted_this_cycle and record response time
     for v in cast_votes
         vn = lock(() -> get(NODE_MAP, v.node_id, nothing), NODE_LOCK)
-        !isnothing(vn) && record_response_time!(vn, t_elapsed)
+        if !isnothing(vn)
+            vn.voted_this_cycle = true
+            record_response_time!(vn, t_elapsed)
+        end
+    end
+    
+    # Mark contributing nodes as fired_this_cycle
+    lock(NODE_LOCK) do
+        for v in contributing_votes
+            node = get(NODE_MAP, v.node_id, nothing)
+            if !isnothing(node)
+                node.fired_this_cycle = true
+            end
+        end
     end
 
     lock(LAST_VOTER_LOCK) do
         empty!(LAST_VOTER_IDS)
         append!(LAST_VOTER_IDS, [v.node_id for v in cast_votes])
+        empty!(LAST_CONTRIBUTOR_IDS)
+        append!(LAST_CONTRIBUTOR_IDS, [v.node_id for v in contributing_votes])
     end
 
     add_message_to_history!("System", output, false)
