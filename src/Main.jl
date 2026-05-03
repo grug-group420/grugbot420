@@ -1684,7 +1684,7 @@ function save_specimen_to_file!(filepath::String)::String
     # GRUG: Show AIML stats if aiml_system was saved
     _aiml_data = get(specimen, "aiml_system", Dict())
     _aiml_registry = get(_aiml_data, "registry", Dict())
-    _aiml_total_nodes = sum(length(get(v, "nodes", [])) for v in values(_aiml_registry))
+    _aiml_total_nodes = isempty(_aiml_registry) ? 0 : sum(length(get(v, "nodes", [])) for v in values(_aiml_registry))
     push!(lines, "  🤖  AIML nodes       : $(_aiml_total_nodes)")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
@@ -2454,7 +2454,8 @@ function load_specimen_from_file!(filepath::String)::String
     if haskey(specimen, "aiml_system") && isa(specimen["aiml_system"], Dict)
         AIMLNodeSystem.deserialize_aiml_state!(specimen["aiml_system"])
         n_aiml_lobes = length(AIMLNodeSystem.get_registered_lobes())
-        n_aiml_nodes = sum(AIMLNodeSystem.get_population_size(lid) for lid in AIMLNodeSystem.get_registered_lobes())
+        registered_lobes = AIMLNodeSystem.get_registered_lobes()
+        n_aiml_nodes = isempty(registered_lobes) ? 0 : sum(AIMLNodeSystem.get_population_size(lid) for lid in registered_lobes)
         counts["aiml_lobes"] = n_aiml_lobes
         counts["aiml_nodes"] = n_aiml_nodes
         println("  🤖 AIML system restored ($n_aiml_nodes nodes across $n_aiml_lobes lobes)")
