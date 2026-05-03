@@ -542,37 +542,48 @@ function recycle_grave_assets!(node_map::Dict, node_lock::ReentrantLock)::PhagyS
 end
 
 # ==============================================================================
+# AUTOMATON 4: HOPFIELD CACHE VALIDATOR - DISABLED
+# ==============================================================================
+# GRUG: Hopfield caching has been DISABLED. Pattern bind phase is blazing fast
+# even without caching, and the Hopfield system introduces unnecessary complexity.
+# Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
+# (50,000+ nodes per lobe) where memory access becomes a bottleneck.
+# Current lobe architecture with 1000 node cap per cycle makes this obsolete.
+# ============================================================================
+
+# OLD CODE (DISABLED):
+# ==============================================================================
 # AUTOMATON 4: HOPFIELD CACHE VALIDATOR
 # ==============================================================================
 
-"""
-validate_hopfield_cache!(hopfield_cache, cache_lock, node_map, node_lock)::PhagyStats
+# """
+# validate_hopfield_cache!(hopfield_cache, cache_lock, node_map, node_lock)::PhagyStats
 
-GRUG: The Hopfield cache stores familiar-input fast-paths: UInt64 hash keys ->
-Vector{String} of node IDs. If those node IDs have since been graved or deleted,
-the cache entry is stale - it routes the fast-path to a dead node.
-This automaton purges stale entries so the cache doesn't route to dead nodes.
+# GRUG: The Hopfield cache stores familiar-input fast-paths: UInt64 hash keys ->
+# Vector{String} of node IDs. If those node IDs have since been graved or deleted,
+# the cache entry is stale - it routes the fast-path to a dead node.
+# This automaton purges stale entries so the cache doesn't route to dead nodes.
 
-Cache key type  : UInt64 (hash of normalized input text, from hopfield_input_hash())
-Cache value type: Vector{String} (list of node IDs that matched that input)
+# Cache key type  : UInt64 (hash of normalized input text, from hopfield_input_hash())
+# Cache value type: Vector{String} (list of node IDs that matched that input)
 
-A cache entry is stale if ANY of its node IDs are missing or graved.
-SAFETY: Only removes entries - never modifies NODE_MAP. Two-pass pattern to avoid
-mutation-during-iteration. Always acquires cache_lock THEN node_lock (deadlock order).
-"""
-function validate_hopfield_cache!(
-    hopfield_cache  ::Dict,          # GRUG: Dict{UInt64, Vector{String}} from engine
-    cache_lock      ::ReentrantLock,
-    node_map        ::Dict,
-    node_lock       ::ReentrantLock
-)::PhagyStats\2
-    const AUTOMATON_NAME = "CACHE_VALIDATOR"
-    const RESOURCE_SCOPE = "hopfield_cache"
+# A cache entry is stale if ANY of its node IDs are missing or graved.
+# SAFETY: Only removes entries - never modifies NODE_MAP. Two-pass pattern to avoid
+# mutation-during-iteration. Always acquires cache_lock THEN node_lock (deadlock order).
+# """
+# function validate_hopfield_cache!(
+#     hopfield_cache  ::Dict,          # GRUG: Dict{UInt64, Vector{String}} from engine
+#     cache_lock      ::ReentrantLock,
+#     node_map        ::Dict,
+#     node_lock       ::ReentrantLock
+# )::PhagyStats\2
+#     const AUTOMATON_NAME = "CACHE_VALIDATOR"
+#     const RESOURCE_SCOPE = "hopfield_cache"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
-    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
-        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
-    end
+#     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+#         throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+#     end
     
     # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
     t_start = time()

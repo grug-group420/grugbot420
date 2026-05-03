@@ -316,54 +316,65 @@ const HOPFIELD_STORE_THRESHOLD   = 1.5
 const HOPFIELD_HIT_COUNT_MIN     = 2
 const HOPFIELD_HIT_COUNTS        = Dict{UInt64, Int}()
 
-"""
-hopfield_input_hash(input_text::String)::UInt64
-
-GRUG: Compute a stable hash for a normalized input string.
-Used as the key for Hopfield cache lookups.
-"""
-function hopfield_input_hash(input_text::String)::UInt64
-    if strip(input_text) == ""
-        error("!!! FATAL: hopfield_input_hash got empty input! !!!")
-    end
-    # GRUG: Normalize before hashing (lowercase, strip, collapse spaces)
-    normalized = join(split(lowercase(strip(input_text))), " ")
-    return hash(normalized)
-end
-
-"""
-hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
-
-GRUG: Check if this input hash is familiar enough for Hopfield fast-path.
-Returns cached node_ids if familiar, Nothing if not cached or not yet familiar.
-"""
-function hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
-    return lock(HOPFIELD_CACHE_LOCK) do
-        hit_count = get(HOPFIELD_HIT_COUNTS, input_hash, 0)
-        if hit_count >= HOPFIELD_HIT_COUNT_MIN && haskey(HOPFIELD_CACHE, input_hash)
-            return HOPFIELD_CACHE[input_hash]
-        end
-        return nothing
-    end
-end
-
-"""
-hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
-
-GRUG: Record that these node_ids fired for this input hash at high confidence.
-Increment hit counter. Once hit count reaches HOPFIELD_HIT_COUNT_MIN, future
-lookups will use the cache instead of doing a full scan.
-"""
-function hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
-    if isempty(node_ids)
-        # GRUG: Nothing to cache. Not a failure, just skip.
-        return
-    end
-    lock(HOPFIELD_CACHE_LOCK) do
-        HOPFIELD_CACHE[input_hash] = node_ids
-        HOPFIELD_HIT_COUNTS[input_hash] = get(HOPFIELD_HIT_COUNTS, input_hash, 0) + 1
-    end
-end
+# ============================================================================
+# HOPFIELD CACHE FUNCTIONS - DISABLED
+# ============================================================================
+# GRUG: Hopfield caching has been DISABLED. Pattern bind phase is blazing fast
+# even without caching, and the Hopfield system introduces unnecessary complexity.
+# Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
+# (50,000+ nodes per lobe) where memory access becomes a bottleneck.
+# Current lobe architecture with 1000 node cap per cycle makes this obsolete.
+# ============================================================================
+#
+# OLD CODE (DISABLED):
+# """
+# hopfield_input_hash(input_text::String)::UInt64
+#
+# GRUG: Compute a stable hash for a normalized input string.
+# Used as the key for Hopfield cache lookups.
+# """
+# function hopfield_input_hash(input_text::String)::UInt64
+#     if strip(input_text) == ""
+#         error("!!! FATAL: hopfield_input_hash got empty input! !!!")
+#     end
+#     # GRUG: Normalize before hashing (lowercase, strip, collapse spaces)
+#     normalized = join(split(lowercase(strip(input_text))), " ")
+#     return hash(normalized)
+# end
+#
+# """
+# hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
+#
+# GRUG: Check if this input hash is familiar enough for Hopfield fast-path.
+# Returns cached node_ids if familiar, Nothing if not cached or not yet familiar.
+# """
+# function hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
+#     return lock(HOPFIELD_CACHE_LOCK) do
+#         hit_count = get(HOPFIELD_HIT_COUNTS, input_hash, 0)
+#         if hit_count >= HOPFIELD_HIT_COUNT_MIN && haskey(HOPFIELD_CACHE, input_hash)
+#             return HOPFIELD_CACHE[input_hash]
+#         end
+#         return nothing
+#     end
+# end
+#
+# """
+# hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
+#
+# GRUG: Record that these node_ids fired for this input hash at high confidence.
+# Increment hit counter. Once hit count reaches HOPFIELD_HIT_COUNT_MIN, future
+# lookups will use the cache instead of doing a full scan.
+# """
+# function hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
+#     if isempty(node_ids)
+#         # GRUG: Nothing to cache. Not a failure, just skip.
+#         return
+#     end
+#     lock(HOPFIELD_CACHE_LOCK) do
+#         HOPFIELD_CACHE[input_hash] = node_ids
+#         HOPFIELD_HIT_COUNTS[input_hash] = get(HOPFIELD_HIT_COUNTS, input_hash, 0) + 1
+#     end
+# end
 
 # ==============================================================================
 # STRENGTH & GRAVE MANAGEMENT
@@ -1663,33 +1674,40 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
     end
 
-    # GRUG: HOPFIELD FAST-PATH CHECK!
-    # If this input is highly familiar (seen multiple times at high confidence),
-    # skip the full scan and use the cached node IDs directly.
-    input_hash    = hopfield_input_hash(input_text)
-    cached_ids    = hopfield_lookup(input_hash)
-
-    if !isnothing(cached_ids)
-        println("[ENGINE] ⚡  Hopfield cache hit for input hash $(input_hash). Firing $(length(cached_ids)) precached nodes.")
-        lock(NODE_LOCK) do
-            for id in cached_ids
-                if haskey(NODE_MAP, id)
-                    node = NODE_MAP[id]
-                    # GRUG: Even cached nodes must not be grave!
-                    if node.is_grave
-                        continue
-                    end
-                    # GRUG: Cached nodes still go through strength biased coinflip
-                    if !strength_biased_scan_coinflip(node)
-                        continue
-                    end
-                    # GRUG: Use stored confidence from cache (represented as HOPFIELD_STORE_THRESHOLD)
-                    push!(all_valid_specimens, (id, HOPFIELD_STORE_THRESHOLD, false, user_triples, node.relational_patterns))
-                end
-            end
-        end
-        return all_valid_specimens
-    end
+    # GRUG: HOPFIELD FAST-PATH CHECK - DISABLED
+    # ==============================================================================
+    # The Hopfield cache has been DISABLED. Pattern bind phase is blazing fast even
+    # without caching, and the Hopfield system introduces unnecessary complexity.
+    # Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
+    # (50,000+ nodes per lobe) where memory access becomes a bottleneck.
+    # Current lobe architecture with 1000 node cap per cycle makes this obsolete.
+    # ============================================================================
+    #
+    # OLD CODE (DISABLED):
+    # input_hash    = hopfield_input_hash(input_text)
+    # cached_ids    = hopfield_lookup(input_hash)
+    #
+    # if !isnothing(cached_ids)
+    #     println("[ENGINE] ⚡  Hopfield cache hit for input hash $(input_hash). Firing $(length(cached_ids)) precached nodes.")
+    #     lock(NODE_LOCK) do
+    #         for id in cached_ids
+    #             if haskey(NODE_MAP, id)
+    #                 node = NODE_MAP[id]
+    #                 # GRUG: Even cached nodes must not be grave!
+    #                 if node.is_grave
+    #                     continue
+    #                 end
+    #                 # GRUG: Cached nodes still go through strength biased coinflip
+    #                 if !strength_biased_scan_coinflip(node)
+    #                     continue
+    #                 end
+    #                 # GRUG: Use stored confidence from cache (represented as HOPFIELD_STORE_THRESHOLD)
+    #                 push!(all_valid_specimens, (id, HOPFIELD_STORE_THRESHOLD, false, user_triples, node.relational_patterns))
+    #             end
+    #         end
+    #     end
+    #     return all_valid_specimens
+    # end
 
     # GRUG: DETERMINISTIC SCAN SELECTION
     # Grug look at how complex input is to choose scanner eye.
@@ -1709,7 +1727,8 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         shuffle!(all_keys) 
         active_keys = all_keys[1:min(length(all_keys), active_cap)]
 
-        hopfield_candidates = String[]  # GRUG: Track high-confidence matches for caching
+        # GRUG: Hopfield candidates tracking DISABLED
+        # hopfield_candidates = String[]  # OLD CODE (DISABLED)
 
         for id in active_keys
             node = NODE_MAP[id]
@@ -1807,17 +1826,20 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             if token_conf > 0 || rel_conf > 0
                 push!(all_valid_specimens, (id, confidence, is_antimatch, user_triples, node.relational_patterns))
 
-                # GRUG: Track high-confidence nodes as Hopfield cache candidates
-                if confidence >= HOPFIELD_STORE_THRESHOLD
-                    push!(hopfield_candidates, id)
-                end
+                # GRUG: Hopfield cache tracking DISABLED - see note at top of scan_specimens
+                # OLD CODE (DISABLED):
+                # if confidence >= HOPFIELD_STORE_THRESHOLD
+                #     push!(hopfield_candidates, id)
+                # end
             end
         end
 
-        # GRUG: Store high-confidence results in Hopfield cache for future fast-path use
-        if !isempty(hopfield_candidates)
-            hopfield_record!(input_hash, hopfield_candidates)
-        end
+        # GRUG: Store high-confidence results in Hopfield cache - DISABLED
+        # See note at top of scan_specimens for explanation
+        # OLD CODE (DISABLED):
+        # if !isempty(hopfield_candidates)
+        #     hopfield_record!(input_hash, hopfield_candidates)
+        # end
     end
 
     if isempty(all_valid_specimens)

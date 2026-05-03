@@ -454,40 +454,50 @@ end
 # GRUG: Replaces global HOPFIELD_CACHE. Each lobe has its own hopfield chunk.
 # Key = string(input_hash::UInt64) -> Vector{String} of node_ids
 # ============================================================================
-
-function hopfield_put!(lobe_id::String, input_hash::UInt64, node_ids::Vector{String})
-    if isempty(strip(lobe_id))
-        throw_table_error("lobe_id cannot be empty", "hopfield_put!")
-    end
-    if isempty(node_ids)
-        throw_table_error("node_ids cannot be empty for hopfield_put!", "hopfield_put!")
-    end
-    key = string(input_hash)
-    table_put!(lobe_id, CHUNK_HOPFIELD, key, node_ids)
-end
-
-function hopfield_get(lobe_id::String, input_hash::UInt64)::Union{Vector{String}, Nothing}
-    if isempty(strip(lobe_id))
-        throw_table_error("lobe_id cannot be empty", "hopfield_get")
-    end
-    key = string(input_hash)
-    val = table_get(lobe_id, CHUNK_HOPFIELD, key)
-    if isnothing(val)
-        return nothing
-    end
-    # GRUG: Sanity check - stored value must be a Vector{String}
-    if !(val isa Vector)
-        throw_table_error("Hopfield chunk entry for key '$key' is not a Vector. Data corruption!", "hopfield_get")
-    end
-    return val
-end
-
-function hopfield_has(lobe_id::String, input_hash::UInt64)::Bool
-    if isempty(strip(lobe_id))
-        throw_table_error("lobe_id cannot be empty", "hopfield_has")
-    end
-    return table_has(lobe_id, CHUNK_HOPFIELD, string(input_hash))
-end
+# GRUG: HOPFIELD CHUNK OPS - DISABLED
+# ==============================================================================
+# Hopfield caching has been DISABLED for per-lobe chunk operations.
+# Pattern bind phase is blazing fast even without caching, and the Hopfield
+# system introduces unnecessary complexity. Hopfield caching should only be used
+# for RIDICULOUSLY LARGE lobe sizes (50,000+ nodes per lobe) where memory access
+# becomes a bottleneck. Current lobe architecture with 1000 node cap per cycle
+# makes this obsolete.
+# ============================================================================
+#
+# OLD CODE (DISABLED):
+# function hopfield_put!(lobe_id::String, input_hash::UInt64, node_ids::Vector{String})
+#     if isempty(strip(lobe_id))
+#         throw_table_error("lobe_id cannot be empty", "hopfield_put!")
+#     end
+#     if isempty(node_ids)
+#         throw_table_error("node_ids cannot be empty for hopfield_put!", "hopfield_put!")
+#     end
+#     key = string(input_hash)
+#     table_put!(lobe_id, CHUNK_HOPFIELD, key, node_ids)
+# end
+#
+# function hopfield_get(lobe_id::String, input_hash::UInt64)::Union{Vector{String}, Nothing}
+#     if isempty(strip(lobe_id))
+#         throw_table_error("lobe_id cannot be empty", "hopfield_get")
+#     end
+#     key = string(input_hash)
+#     val = table_get(lobe_id, CHUNK_HOPFIELD, key)
+#     if isnothing(val)
+#         return nothing
+#     end
+#     # GRUG: Sanity check - stored value must be a Vector{String}
+#     if !(val isa Vector)
+#         throw_table_error("Hopfield chunk entry for key '$key' is not a Vector. Data corruption!", "hopfield_get")
+#     end
+#     return val
+# end
+#
+# function hopfield_has(lobe_id::String, input_hash::UInt64)::Bool
+#     if isempty(strip(lobe_id))
+#         throw_table_error("lobe_id cannot be empty", "hopfield_has")
+#     end
+#     return table_has(lobe_id, CHUNK_HOPFIELD, string(input_hash))
+# end
 
 # ============================================================================
 # NODE CHUNK OPS - Per-lobe node index
