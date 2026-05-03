@@ -585,49 +585,49 @@ end
 #         throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
 #     end
     
-    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
-    t_start = time()
-    try
-    examined   = 0
-    purged     = 0
-    valid      = 0
-
-    stale_keys = UInt64[]
-
-    # GRUG: PASS 1 - collect stale keys under both locks (cache_lock THEN node_lock)
-    # Lock order must always be cache_lock -> node_lock to prevent deadlock.
-    lock(cache_lock) do
-        lock(node_lock) do
-            for (cache_key, node_ids) in hopfield_cache
-                examined += 1
-                # GRUG: Entry is stale if ANY referenced node is missing or graved
-                is_stale = any(node_ids) do nid
-                    !haskey(node_map, nid) || node_map[nid].is_grave
-                end
-                if is_stale
-                    push!(stale_keys, cache_key)
-                else
-                    valid += 1
-                end
-            end
-        end
-    end
-
-    # GRUG: PASS 2 - delete stale entries under cache_lock only (node_map not touched)
-    if !isempty(stale_keys)
-        lock(cache_lock) do
-            for key in stale_keys
-                delete!(hopfield_cache, key)
-                purged += 1
-                @debug "[PHAGY:CACHE] Purged stale cache entry key=$(key)"
-            end
-        end
-    end
-
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Purged=$purged, ValidKept=$valid"
-    println("[PHAGY:CACHE] 🗄️   Cycle complete. $notes")
-    return PhagyStats("CACHE_VALIDATOR", examined, purged, elapsed_ms, notes)
+#     # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+#     t_start = time()
+#     try
+#     examined   = 0
+#     purged     = 0
+#     valid      = 0
+# 
+#     stale_keys = UInt64[]
+# 
+#     # GRUG: PASS 1 - collect stale keys under both locks (cache_lock THEN node_lock)
+#     # Lock order must always be cache_lock -> node_lock to prevent deadlock.
+#     lock(cache_lock) do
+#         lock(node_lock) do
+#             for (cache_key, node_ids) in hopfield_cache
+#                 examined += 1
+#                 # GRUG: Entry is stale if ANY referenced node is missing or graved
+#                 is_stale = any(node_ids) do nid
+#                     !haskey(node_map, nid) || node_map[nid].is_grave
+#                 end
+#                 if is_stale
+#                     push!(stale_keys, cache_key)
+#                 else
+#                     valid += 1
+#                 end
+#             end
+#         end
+#     end
+# 
+#     # GRUG: PASS 2 - delete stale entries under cache_lock only (node_map not touched)
+#     if !isempty(stale_keys)
+#         lock(cache_lock) do
+#             for key in stale_keys
+#                 delete!(hopfield_cache, key)
+#                 purged += 1
+#                 @debug "[PHAGY:CACHE] Purged stale cache entry key=$(key)"
+#             end
+#         end
+#     end
+# 
+#     elapsed_ms = (time() - t_start) * 1000.0
+#     notes = "Examined=$examined, Purged=$purged, ValidKept=$valid"
+#     println("[PHAGY:CACHE] 🗄️   Cycle complete. $notes")
+#     return PhagyStats("CACHE_VALIDATOR", examined, purged, elapsed_ms, notes)
 end
 
 # ==============================================================================

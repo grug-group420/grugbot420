@@ -19,11 +19,17 @@ if !isdefined(@__MODULE__, :ChatterMode)
 end
 
 # GRUG: Bring the Phagy Mode maintenance automata into the cave!
-# GRUG: Guard against double-include if PhagyMode already loaded by caller.
-if !isdefined(@__MODULE__, :PhagyMode)
-    include("PhagyMode.jl")
-    using .PhagyMode
-end
+# GRUG: DISABLED - PhagyMode has been commented out throughout the codebase.
+# Phagy automata should only be used for long-running systems with large-scale
+# memory management needs. For specimen testing and development, the overhead
+# is unnecessary. Uncomment when running long-term production instances.
+#
+# Original functionality:
+# # GRUG: Guard against double-include if PhagyMode already loaded by caller.
+# if !isdefined(@__MODULE__, :PhagyMode)
+#     include("PhagyMode.jl")
+#     using .PhagyMode
+# end
 
 # GRUG: Bring the Thesaurus dimensional similarity engine into the cave!
 # GRUG: Guard against double-include if Thesaurus already loaded by caller.
@@ -2533,11 +2539,17 @@ end
 # GRUG: Track when last user input arrived so idle detector knows when to act.
 const LAST_INPUT_TIME = Ref{Float64}(time())
 
-# GRUG: Rules vector and lock for RULE PRUNER automaton.
+# GRUG: DISABLED - Phagy rules vector and lock for RULE PRUNER automaton.
+# Phagy automata should only be used for long-running systems with large-scale
+# memory management needs. For specimen testing and development, the overhead
+# is unnecessary. Uncomment when running long-term production instances.
+#
+# Original functionality:
+# Rules vector and lock for RULE PRUNER automaton.
 # These are the live orchestration rules registered via /addRule.
 # PhagyMode.prune_dormant_rules! expects: rules with fire_count, dormancy_strikes, is_dormant fields.
-const PHAGY_RULES_REF  = Ref{Vector}(Vector())
-const PHAGY_RULES_LOCK = ReentrantLock()
+# const PHAGY_RULES_REF  = Ref{Vector}(Vector())
+# const PHAGY_RULES_LOCK = ReentrantLock()
 
 """
 maybe_run_idle()
@@ -2613,26 +2625,40 @@ function maybe_run_idle()
         # GRUG: Phagy fires for mature specimens (1000+ nodes, gated above).
         println("[IDLE] 🪙  Coinflip → PHAGY. Running maintenance automaton...")
 
-        # GRUG: Grab the live rules vector for RULE PRUNER
-        rules_snapshot = lock(PHAGY_RULES_LOCK) do
-            PHAGY_RULES_REF[]
-        end
-
-        try
-            PhagyMode.run_phagy!(
-                NODE_MAP,
-                NODE_LOCK,
-                HOPFIELD_CACHE,
-                HOPFIELD_CACHE_LOCK,
-                rules_snapshot,
-                PHAGY_RULES_LOCK;
-                message_history = MESSAGE_HISTORY,
-                history_lock    = MESSAGE_HISTORY_LOCK
-            )
-        catch e
-            println("[IDLE:PHAGY] !!! ERROR during phagy cycle: $e !!!")
-            Base.show_backtrace(stdout, catch_backtrace())
-        end
+        # GRUG: GRAB THE LIVE RULES VECTOR FOR RULE PRUNER
+        # GRUG: DISABLED - Phagy automata system has been commented out throughout the codebase.
+        # Phagy automata should only be used for long-running systems with large-scale
+        # memory management needs. For specimen testing and development, the overhead
+        # is unnecessary. Uncomment when running long-term production instances.
+        #
+        # Original functionality:
+        # Phagy automata handle background memory maintenance including:
+        # - ORPHAN_PRUNER: Removes unused nodes
+        # - STRENGTH_DECAYER: Weakens inactive connections
+        # - GRAVE_RECYCLER: Reuses recycled node IDs
+        # - DROP_TABLE_COMPACT: Optimizes drop tables
+        # - RULE_PRUNER: Removes low-strength rules
+        # - MEMORY_FORENSICS: Validates memory integrity
+        #
+        # rules_snapshot = lock(PHAGY_RULES_LOCK) do
+        #     PHAGY_RULES_REF[]
+        # end
+        #
+        # try
+        #     PhagyMode.run_phagy!(
+        #         NODE_MAP,
+        #         NODE_LOCK,
+        #         HOPFIELD_CACHE,
+        #         HOPFIELD_CACHE_LOCK,
+        #         rules_snapshot,
+        #         PHAGY_RULES_LOCK;
+        #         message_history = MESSAGE_HISTORY,
+        #         history_lock    = MESSAGE_HISTORY_LOCK
+        #     )
+        # catch e
+        #     println("[IDLE:PHAGY] !!! ERROR during phagy cycle: $e !!!")
+        #     Base.show_backtrace(stdout, catch_backtrace())
+        # end
     end
 
     # GRUG: Reset idle timer after EITHER action so the next event waits a full interval.
