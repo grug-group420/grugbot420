@@ -149,7 +149,8 @@ println("  ✓ Created: Ecosystems")
 nature_id_2 = create_node(
     "Evolution shapes species over time",
     "POS_ACTION_PACKET([\"explain\", \"describe\"], [\"ignore\"], 0.05)",
-    Dict("domain" => "biology", "theory" => true);
+    Dict("domain" => "biology", "theory" => true),
+    String[];
     initial_strength=8.0
 )
 Lobe.add_node_to_lobe!("nature", nature_id_2)
