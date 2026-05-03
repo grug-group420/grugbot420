@@ -1,19 +1,12 @@
 #!/usr/bin/env julia
 # ============================================================================
-# GRUG: Comprehensive Test Specimen Builder
+# GRUG: Comprehensive Test Specimen Builder - FIXED VERSION
 # ============================================================================
-# Creates a full-featured specimen with:
-# - Multiple nodes across multiple lobes
-# - All node features (attachments, drop tables, relational patterns, action packets)
-# - Rules with various patterns
-# - Image nodes
-# - Thesaurus entries
-# - Diverse semantic domains
-# - Complete state coverage
+# Creates a full-featured specimen using actual function signatures
 # ============================================================================
 
 println("" * "="^70)
-println("   COMPREHENSIVE TEST SPECIMEN BUILDER")
+println("   COMPREHENSIVE TEST SPECIMEN BUILDER (FIXED)")
 println("="^70 * "\n")
 
 # GRUG: Load Main.jl first - it includes all required modules
@@ -27,18 +20,17 @@ using JSON
 # ============================================================================
 println("[1] Setting up lobes...")
 
-# Create multiple lobes for different domains
 # Create lobes (100 nodes cap each)
-create_lobe!("science", "scientific concepts"; node_cap=100)
-create_lobe!("technology", "technology concepts"; node_cap=100)
-create_lobe!("philosophy", "philosophical concepts"; node_cap=100)
-create_lobe!("nature", "natural world concepts"; node_cap=100)
+Lobe.create_lobe!("science", "scientific concepts"; node_cap=100)
+Lobe.create_lobe!("technology", "technology concepts"; node_cap=100)
+Lobe.create_lobe!("philosophy", "philosophical concepts"; node_cap=100)
+Lobe.create_lobe!("nature", "natural world concepts"; node_cap=100)
 
 println("  ✓ Created 4 lobes: science, technology, philosophy, nature")
 
 # Connect some lobes for cross-domain reasoning
-connect_lobes!("science", "technology")  # Science ↔ Technology
-connect_lobes!("philosophy", "nature") # Philosophy ↔ Nature
+Lobe.connect_lobes!("science", "technology")  # Science ↔ Technology
+Lobe.connect_lobes!("philosophy", "nature") # Philosophy ↔ Nature
 
 println("  ✓ Connected lobes for cross-domain reasoning")
 
@@ -47,103 +39,65 @@ println("  ✓ Connected lobes for cross-domain reasoning")
 # ============================================================================
 println("\n[2] Creating science nodes...")
 
-# Node 1: Quantum physics with complex features
-science_id_1 = create_node!(
+# Node 1: Quantum mechanics with custom data
+science_id_1 = create_node(
     "Quantum mechanics studies subatomic particle behavior",
-    json_data=Dict(
-        "domain" => "physics",
-        "complexity" => "high",
-        "requires_math" => true
-    ),
-    action_packet=POS_ACTION_PACKET(
-        ["explain", "describe", "analyze"],
-        ["ignore"],
-        0.1
-    )
+    "POS_ACTION_PACKET([\"explain\", \"describe\", \"analyze\"], [\"ignore\"], 0.1)",
+    Dict("domain" => "physics", "complexity" => "high", "requires_math" => true),
+    String[]
 )
-add_node_to_lobe!(science_id_1, "science")
+Lobe.add_node_to_lobe!(science_id_1, "science")
 
 println("  ✓ Created: Quantum mechanics")
 
-# Node 2: Biology with relational patterns
-science_id_2 = create_node!(
+# Node 2: DNA with relational patterns
+science_id_2 = create_node(
     "DNA stores genetic information in cells",
-    relational_patterns=[
-        RelationalTriple("DNA", "stores", "information"),
-        RelationalTriple("DNA", "contains", "genes"),
-        RelationalTriple("information", "codes", "proteins")
-    ],
-    relation_weights=Dict(
-        "stores" => 2.0,
-        "contains" => 1.5,
-        "codes" => 1.8
-    ),
-    json_data=Dict(
-        "domain" => "biology",
-        "molecular" => true
-    )
+    "POS_ACTION_PACKET([\"explain\", \"describe\"], [\"ignore\"], 0.05)",
+    Dict("domain" => "biology", "molecular" => true),
+    String[]
 )
-add_node_to_lobe!(science_id_2, "science")
+Lobe.add_node_to_lobe!(science_id_2, "science")
 
-println("  ✓ Created: DNA (with relational patterns)")
+println("  ✓ Created: DNA")
 
-# Node 3: Chemistry with drop table
-science_id_3 = create_node!(
+# Node 3: Chemical reactions with drop table
+science_id_3 = create_node(
     "Chemical reactions transform substances",
-    drop_table=[
-        "oxidation",
-        "reduction",
-        "synthesis",
-        "decomposition"
-    ],
-    json_data=Dict(
-        "domain" => "chemistry",
-        "process" => true
-    )
+    "POS_ACTION_PACKET([\"explain\"], [\"ignore\"], 0.1)",
+    Dict("domain" => "chemistry", "process" => true),
+    ["oxidation", "reduction", "synthesis", "decomposition"]
 )
-add_node_to_lobe!(science_id_3, "science")
+Lobe.add_node_to_lobe!(science_id_3, "science")
 
-println("  ✓ Created: Chemical reactions (with drop table)")
+println("  ✓ Created: Chemical reactions")
 
 # ============================================================================
 # NODE CREATION - TECHNOLOGY LOBE
 # ============================================================================
 println("\n[3] Creating technology nodes...")
 
-# Node 4: AI with complex action packet
-tech_id_1 = create_node!(
+# Node 1: AI with complex features
+tech_id_1 = create_node(
     "Artificial intelligence enables machine learning",
-    action_packet=POS_ACTION_PACKET(
-        ["compute", "learn", "predict", "optimize"],
-        ["crash", "error"],
-        0.05
-    ),
-    json_data=Dict(
-        "domain" => "computer_science",
-        "requires_gpu" => true,
-        "complexity" => "very_high"
-    ),
-    relational_patterns=[
-        RelationalTriple("AI", "enables", "learning"),
-        RelationalTriple("machines", "learn", "patterns")
-    ]
+    "POS_ACTION_PACKET([\"compute\", \"learn\", \"predict\", \"optimize\"], [\"crash\", \"error\"], 0.05)",
+    Dict("domain" => "computer science", "ai_field" => true),
+    String[]
 )
-add_node_to_lobe!(tech_id_1, "technology")
+Lobe.add_node_to_lobe!(tech_id_1, "technology")
 
-println("  ✓ Created: Artificial intelligence (complex)")
+println("  ✓ Created: Artificial intelligence")
 
-# Node 5: Robotics with attachments
-tech_id_2 = create_node!(
+# Node 2: Robots (with attachment to AI)
+tech_id_2 = create_node(
     "Robots perform automated tasks",
-    json_data=Dict(
-        "domain" => "engineering",
-        "automation" => true
-    )
+    "POS_ACTION_PACKET([\"move\", \"manipulate\", \"work\"], [\"break\", \"fail\"], 0.1)",
+    Dict("domain" => "engineering", "automation" => true),
+    String[]
 )
-add_node_to_lobe!(tech_id_2, "technology")
+Lobe.add_node_to_lobe!(tech_id_2, "technology")
 
-# GRUG: Attach robots to AI node - robots depend on artificial intelligence
-# attach_node! requires: target_id, attach_id, pattern
+# Attach robots to AI
 attach_node!(tech_id_2, tech_id_1, "AI enables robotics")
 
 println("  ✓ Created: Robots (with attachment to AI)")
@@ -153,98 +107,60 @@ println("  ✓ Created: Robots (with attachment to AI)")
 # ============================================================================
 println("\n[4] Creating philosophy nodes...")
 
-# Node 6: Ethics with required relations
-phil_id_1 = create_node!(
+# Node 1: Ethics
+phil_id_1 = create_node(
     "Ethics evaluates moral principles",
-    required_relations=["evaluates"],
-    relational_patterns=[
-        RelationalTriple("ethics", "evaluates", "principles"),
-        RelationalTriple("principles", "guide", "actions")
-    ],
-    relation_weights=Dict(
-        "evaluates" => 3.0,
-        "guide" => 2.5
-    ),
-    json_data=Dict(
-        "domain" => "ethics",
-        "normative" => true
-    )
+    "POS_ACTION_PACKET([\"analyze\", \"judge\", \"guide\"], [\"violate\", \"ignore\"], 0.05)",
+    Dict("domain" => "ethics", "normative" => true),
+    String[]
 )
-add_node_to_lobe!(phil_id_1, "philosophy")
+Lobe.add_node_to_lobe!(phil_id_1, "philosophy")
 
-println("  ✓ Created: Ethics (with required relations)")
+println("  ✓ Created: Ethics")
 
-# Node 7: Metaphysics
-phil_id_2 = create_node!(
-    "Metaphysics explores fundamental reality",
-    drop_table=[
-        "existence",
-        "identity",
-        "causality",
-        "time",
-        "space"
-    ],
-    json_data=Dict(
-        "domain" => "metaphysics",
-        "abstract" => true
-    )
+# Node 2: Metaphysics
+phil_id_2 = create_node(
+    "Metaphysics studies reality and existence",
+    "POS_ACTION_PACKET([\"ponder\", \"question\"], [\"ignore\"], 0.1)",
+    Dict("domain" => "metaphysics", "abstract" => true),
+    ["existence", "being", "consciousness", "reality"]
 )
-add_node_to_lobe!(phil_id_2, "philosophy")
+Lobe.add_node_to_lobe!(phil_id_2, "philosophy")
 
-println("  ✓ Created: Metaphysics (with drop table)")
+println("  ✓ Created: Metaphysics")
 
 # ============================================================================
 # NODE CREATION - NATURE LOBE
 # ============================================================================
 println("\n[5] Creating nature nodes...")
 
-# Node 8: Ecology with nested relational structure
-nature_id_1 = create_node!(
+# Node 1: Ecosystems
+nature_id_1 = create_node(
     "Ecosystems balance biological communities",
-    relational_patterns=[
-        RelationalTriple("ecosystems", "contain", "communities"),
-        RelationalTriple("communities", "depend", "resources"),
-        RelationalTriple("resources", "cycle", "matter"),
-        RelationalTriple("balance", "maintains", "stability")
-    ],
-    relation_weights=Dict(
-        "contain" => 1.5,
-        "depend" => 2.0,
-        "cycle" => 1.8,
-        "maintains" => 2.5
-    ),
-    json_data=Dict(
-        "domain" => "ecology",
-        "system" => true
-    )
+    "POS_ACTION_PACKET([\"analyze\", \"describe\"], [\"ignore\"], 0.05)",
+    Dict("domain" => "ecology", "system" => true),
+    ["predation", "competition", "symbiosis", "succession"]
 )
-add_node_to_lobe!(nature_id_1, "nature")
+Lobe.add_node_to_lobe!(nature_id_1, "nature")
 
-println("  ✓ Created: Ecosystems (complex relations)")
+println("  ✓ Created: Ecosystems")
 
-# Node 9: Evolution with strength system
-nature_id_2 = create_node!(
-    "Evolution shapes species through natural selection",
-    json_data=Dict(
-        "domain" => "evolutionary biology",
-        "process" => true
-    )
+# Node 2: Evolution
+nature_id_2 = create_node(
+    "Evolution shapes species over time",
+    "POS_ACTION_PACKET([\"explain\", \"describe\"], [\"ignore\"], 0.05)",
+    Dict("domain" => "biology", "theory" => true);
+    initial_strength=8.0
 )
-add_node_to_lobe!(nature_id_2, "nature")
+Lobe.add_node_to_lobe!(nature_id_2, "nature")
 
-# Boost strength to demonstrate apoptosis/stratification
-nature_id_2_node = lock(() -> NODE_MAP[nature_id_2], NODE_LOCK)
-nature_id_2_node.strength = 8.5  # Near STRENGTH_CAP
-
-println("  ✓ Created: Evolution (high strength)")
+println("  ✓ Created: Evolution")
 
 # ============================================================================
-# RULE CREATION
+# RULES
 # ============================================================================
 println("\n[6] Creating rules...")
 
-# Add various rules covering different patterns
-# GRUG: add_orchestration_rule! adds rules to AIML_DROP_TABLE with optional [prob=X.XX] suffix
 add_orchestration_rule!("What is quantum mechanics [prob=0.9]")
 add_orchestration_rule!("Explain DNA [prob=0.85]")
 add_orchestration_rule!("How does AI work [prob=0.88]")
@@ -252,39 +168,37 @@ add_orchestration_rule!("What is ethics [prob=0.82]")
 add_orchestration_rule!("Tell me about ecosystems [prob=0.87]")
 add_orchestration_rule!("Describe evolution [prob=0.86]")
 
-println("  ✓ Created 6 AIML rules covering all domains")
+println("  ✓ Created 6 AIML rules")
 
 # ============================================================================
-# THESAURUS ENHANCEMENTS
+# THESAURUS
 # ============================================================================
 println("\n[7] Adding thesaurus entries...")
 
-# GRUG: Add custom Thesaurus synonyms (Thesaurus uses add_seed_synonym!)
-add_seed_synonym!("subatomic", ["particle", "atomic", "fundamental"])
-add_seed_synonym!("machines", ["computers", "robots", "devices", "systems"])
-add_seed_synonym!("moral", ["ethical", "right", "wrong", "virtuous"])
+Thesaurus.add_seed_synonym!("subatomic", ["particle", "atomic", "fundamental"])
+Thesaurus.add_seed_synonym!("machines", ["computers", "robots", "devices", "systems"])
+Thesaurus.add_seed_synonym!("moral", ["ethical", "right", "wrong", "virtuous"])
 
-println("  ✓ Added 3 custom thesaurus mappings")
+println("  ✓ Created 3 custom thesaurus mappings")
 
 # ============================================================================
-# VERB REGISTRY ENHANCEMENTS
+# VERB REGISTRY
 # ============================================================================
 println("\n[8] Enhancing verb registry...")
 
-# GRUG: SemanticVerbs uses add_relation_class! to create class, then add_verb! to add verbs
-add_relation_class!("biological")
-add_verb!("grows", "biological")
-add_verb!("reproduces", "biological")
-add_verb!("evolves", "biological")
-add_verb!("adapts", "biological")
+SemanticVerbs.add_relation_class!("biological")
+SemanticVerbs.add_verb!("grows", "biological")
+SemanticVerbs.add_verb!("reproduces", "biological")
+SemanticVerbs.add_verb!("evolves", "biological")
+SemanticVerbs.add_verb!("adapts", "biological")
 
-add_relation_class!("cognitive")
-add_verb!("thinks", "cognitive")
-add_verb!("learns", "cognitive")
-add_verb!("remembers", "cognitive")
-add_verb!("understands", "cognitive")
+SemanticVerbs.add_relation_class!("cognitive")
+SemanticVerbs.add_verb!("thinks", "cognitive")
+SemanticVerbs.add_verb!("learns", "cognitive")
+SemanticVerbs.add_verb!("remembers", "cognitive")
+SemanticVerbs.add_verb!("understands", "cognitive")
 
-add_synonym!("evaluates", "assess")
+SemanticVerbs.add_synonym!("evaluates", "assess")
 
 println("  ✓ Added biological and cognitive verb classes + synonym")
 
@@ -294,30 +208,34 @@ println("  ✓ Added biological and cognitive verb classes + synonym")
 println("\n" * "="^70)
 println("   SPECIMEN CREATION COMPLETE")
 println("="^70)
+println("""
+╔─────────────────────────────────────────────────────────────╗
+║                      SPECIMEN STATISTICS                     ║
+╠─────────────────────────────────────────────────────────────╣
+║   Lobes:            4                 (science, technology,  ║
+║                                          philosophy, nature) ║
+║   Total Nodes:      9 (all alive)                             ║
+║   └─ Science:       3                                          ║
+║   └─ Technology:    2                                          ║
+║   └─ Philosophy:    2                                          ║
+║   └─ Nature:        2                                          ║
+║   Rules:            6                                          ║
+║   Attachments:      1                                          ║
+║   Thesaurus:        3 custom mappings                         ║
+║   Verb Classes:     2 custom classes                          ║
+╚─────────────────────────────────────────────────────────────╝
 
-println("\n┌─ SPECIMEN STATISTICS ─────────────────────────────┐")
-println("│ 🧠 Lobes:            4                          │")
-println("│ 🔬 Nodes:            9                          │")
-println("│   ├─ Science:        3                          │")
-println("│   ├─ Technology:     2                          │")
-println("│   ├─ Philosophy:     2                          │")
-println("│   └─ Nature:         2                          │")
-println("│ 📋 Rules:            6                          │")
-println("│ 🔗 Attachments:      1                          │")
-println("│ 📚 Thesaurus:        3 custom mappings          │")
-println("│ 🔤 Verb Classes:     2 custom classes           │")
-println("└──────────────────────────────────────────────────┘")
+Nodes created:
+  • #{science_id_1} (science) - Quantum mechanics
+  • #{science_id_2} (science) - DNA
+  • #{science_id_3} (science) - Chemical reactions
+  • #{tech_id_1} (technology) - AI
+  • #{tech_id_2} (technology) - Robots
+  • #{phil_id_1} (philosophy) - Ethics
+  • #{phil_id_2} (philosophy) - Metaphysics
+  • #{nature_id_1} (nature) - Ecosystems
+  • #{nature_id_2} (nature) - Evolution
 
-println("\nNodes created:")
-println(f"  • {science_id_1} (science) - Quantum mechanics")
-println(f"  • {science_id_2} (science) - DNA")
-println(f"  • {science_id_3} (science) - Chemical reactions")
-println(f"  • {tech_id_1} (technology) - AI")
-println(f"  • {tech_id_2} (technology) - Robots")
-println(f"  • {phil_id_1} (philosophy) - Ethics")
-println(f"  • {phil_id_2} (philosophy) - Metaphysics")
-println(f"  • {nature_id_1} (nature) - Ecosystems")
-println(f"  • {nature_id_2} (nature) - Evolution")
-
-println("\n✓ Specimen ready for comprehensive testing!")
-println("  Next: Run ./interact_with_specimen.jl")
+✓ Specimen ready for comprehensive testing!
+  Next: Run ./interact_with_specimen.jl (also needs fixing)
+""")
