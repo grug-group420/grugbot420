@@ -15,22 +15,8 @@ println("" * "="^70)
 println("   COMPREHENSIVE SPECIMEN INTERACTION & LOGGING")
 println("="^70 * "\n")
 
-# Include all modules
-include("../src/stochastichelper.jl"); using .CoinFlipHeader
-include("../src/patternscanner.jl"); using .PatternScanner
-include("../src/ImageSDF.jl"); using .ImageSDF
-include("../src/EyeSystem.jl"); using .EyeSystem
-include("../src/SemanticVerbs.jl"); using .SemanticVerbs
-include("../src/ActionTonePredictor.jl"); using .ActionTonePredictor
-include("../src/LobeTable.jl"); using .LobeTable
-include("../src/Lobe.jl"); using .Lobe
-include("../src/BrainStem.jl"); using .BrainStem
-include("../src/Thesaurus.jl"); using .Thesaurus
-include("../src/ChatterMode.jl"); using .ChatterMode
-include("../src/InputQueue.jl"); using .InputQueue
-
-# Load Main.jl for save/load functions and state initialization
-include("../src/Main.jl")
+# GRUG: Load Main.jl first - it includes all required modules
+include("src/Main.jl")
 
 using Base.Threads: Atomic, atomic_add!
 using Dates

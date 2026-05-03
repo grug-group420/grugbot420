@@ -16,20 +16,8 @@ println("" * "="^70)
 println("   COMPREHENSIVE TEST SPECIMEN BUILDER")
 println("="^70 * "\n")
 
-# Include all modules
-include("../src/stochastichelper.jl"); using .CoinFlipHeader
-include("../src/patternscanner.jl"); using .PatternScanner
-include("../src/ImageSDF.jl"); using .ImageSDF
-include("../src/EyeSystem.jl"); using .EyeSystem
-include("../src/SemanticVerbs.jl"); using .SemanticVerbs
-include("../src/ActionTonePredictor.jl"); using .ActionTonePredictor
-include("../src/LobeTable.jl"); using .LobeTable
-include("../src/Lobe.jl"); using .Lobe
-include("../src/BrainStem.jl"); using .BrainStem
-include("../src/Thesaurus.jl"); using .Thesaurus
-include("../src/ChatterMode.jl"); using .ChatterMode
-include("../src/InputQueue.jl"); using .InputQueue
-include("../src/engine.jl")
+# GRUG: Load Main.jl first - it includes all required modules
+include("src/Main.jl")
 
 using Base.Threads: Atomic, atomic_add!
 using JSON
@@ -40,16 +28,17 @@ using JSON
 println("[1] Setting up lobes...")
 
 # Create multiple lobes for different domains
-Lobe.create_lobe!("science", "scientific concepts", 100)
-Lobe.create_lobe!("technology", "technology concepts", 100)
-Lobe.create_lobe!("philosophy", "philosophical concepts", 100)
-Lobe.create_lobe!("nature", "natural world concepts", 100)
+# Create lobes (100 nodes cap each)
+create_lobe!("science", "scientific concepts"; node_cap=100)
+create_lobe!("technology", "technology concepts"; node_cap=100)
+create_lobe!("philosophy", "philosophical concepts"; node_cap=100)
+create_lobe!("nature", "natural world concepts"; node_cap=100)
 
 println("  ✓ Created 4 lobes: science, technology, philosophy, nature")
 
 # Connect some lobes for cross-domain reasoning
-Lobe.connect_lobe!("science", "technology")  # Science ↔ Technology
-Lobe.connect_lobe!("philosophy", "nature") # Philosophy ↔ Nature
+connect_lobes!("science", "technology")  # Science ↔ Technology
+connect_lobes!("philosophy", "nature") # Philosophy ↔ Nature
 
 println("  ✓ Connected lobes for cross-domain reasoning")
 
@@ -72,7 +61,7 @@ science_id_1 = create_node!(
         0.1
     )
 )
-Lobe.register_node_to_lobe!(science_id_1, "science")
+add_node_to_lobe!(science_id_1, "science")
 
 println("  ✓ Created: Quantum mechanics")
 
@@ -94,7 +83,7 @@ science_id_2 = create_node!(
         "molecular" => true
     )
 )
-Lobe.register_node_to_lobe!(science_id_2, "science")
+add_node_to_lobe!(science_id_2, "science")
 
 println("  ✓ Created: DNA (with relational patterns)")
 
@@ -112,7 +101,7 @@ science_id_3 = create_node!(
         "process" => true
     )
 )
-Lobe.register_node_to_lobe!(science_id_3, "science")
+add_node_to_lobe!(science_id_3, "science")
 
 println("  ✓ Created: Chemical reactions (with drop table)")
 
@@ -139,7 +128,7 @@ tech_id_1 = create_node!(
         RelationalTriple("machines", "learn", "patterns")
     ]
 )
-Lobe.register_node_to_lobe!(tech_id_1, "technology")
+add_node_to_lobe!(tech_id_1, "technology")
 
 println("  ✓ Created: Artificial intelligence (complex)")
 
@@ -151,10 +140,11 @@ tech_id_2 = create_node!(
         "automation" => true
     )
 )
-Lobe.register_node_to_lobe!(tech_id_2, "technology")
+add_node_to_lobe!(tech_id_2, "technology")
 
-# Attach AI node to robotics (AI enables robotics)
-attach_node!(tech_id_2, tech_id_1)
+# GRUG: Attach robots to AI node - robots depend on artificial intelligence
+# attach_node! requires: target_id, attach_id, pattern
+attach_node!(tech_id_2, tech_id_1, "AI enables robotics")
 
 println("  ✓ Created: Robots (with attachment to AI)")
 
@@ -180,7 +170,7 @@ phil_id_1 = create_node!(
         "normative" => true
     )
 )
-Lobe.register_node_to_lobe!(phil_id_1, "philosophy")
+add_node_to_lobe!(phil_id_1, "philosophy")
 
 println("  ✓ Created: Ethics (with required relations)")
 
@@ -199,7 +189,7 @@ phil_id_2 = create_node!(
         "abstract" => true
     )
 )
-Lobe.register_node_to_lobe!(phil_id_2, "philosophy")
+add_node_to_lobe!(phil_id_2, "philosophy")
 
 println("  ✓ Created: Metaphysics (with drop table)")
 
@@ -228,7 +218,7 @@ nature_id_1 = create_node!(
         "system" => true
     )
 )
-Lobe.register_node_to_lobe!(nature_id_1, "nature")
+add_node_to_lobe!(nature_id_1, "nature")
 
 println("  ✓ Created: Ecosystems (complex relations)")
 
@@ -240,7 +230,7 @@ nature_id_2 = create_node!(
         "process" => true
     )
 )
-Lobe.register_node_to_lobe!(nature_id_2, "nature")
+add_node_to_lobe!(nature_id_2, "nature")
 
 # Boost strength to demonstrate apoptosis/stratification
 nature_id_2_node = lock(() -> NODE_MAP[nature_id_2], NODE_LOCK)
@@ -254,12 +244,13 @@ println("  ✓ Created: Evolution (high strength)")
 println("\n[6] Creating rules...")
 
 # Add various rules covering different patterns
-add_rule_to_aiml!("What is quantum mechanics", "Quantum mechanics studies subatomic particle behavior and quantum states.", 0.9)
-add_rule_to_aiml!("Explain DNA", "DNA stores genetic information in cells and contains genes that code for proteins.", 0.85)
-add_rule_to_aiml!("How does AI work", "Artificial intelligence enables machine learning through neural networks that learn patterns.", 0.88)
-add_rule_to_aiml!("What is ethics", "Ethics evaluates moral principles that guide human actions and decisions.", 0.82)
-add_rule_to_aiml!("Tell me about ecosystems", "Ecosystems balance biological communities through resource cycling and stability maintenance.", 0.87)
-add_rule_to_aiml!("Describe evolution", "Evolution shapes species through natural selection acting on genetic variation over time.", 0.86)
+# GRUG: add_orchestration_rule! adds rules to AIML_DROP_TABLE with optional [prob=X.XX] suffix
+add_orchestration_rule!("What is quantum mechanics [prob=0.9]")
+add_orchestration_rule!("Explain DNA [prob=0.85]")
+add_orchestration_rule!("How does AI work [prob=0.88]")
+add_orchestration_rule!("What is ethics [prob=0.82]")
+add_orchestration_rule!("Tell me about ecosystems [prob=0.87]")
+add_orchestration_rule!("Describe evolution [prob=0.86]")
 
 println("  ✓ Created 6 AIML rules covering all domains")
 
@@ -268,21 +259,32 @@ println("  ✓ Created 6 AIML rules covering all domains")
 # ============================================================================
 println("\n[7] Adding thesaurus entries...")
 
-# Add custom synonyms for better pattern matching
-Thesaurus.add_synonym!("subatomic", ["particle", "atomic", "fundamental"])
-Thesaurus.add_synonym!("machines", ["computers", "robots", "devices", "systems"])
-Thesaurus.add_synonym!("moral", ["ethical", "right", "wrong", "virtuous"])
+# GRUG: Add custom Thesaurus synonyms (Thesaurus uses add_seed_synonym!)
+add_seed_synonym!("subatomic", ["particle", "atomic", "fundamental"])
+add_seed_synonym!("machines", ["computers", "robots", "devices", "systems"])
+add_seed_synonym!("moral", ["ethical", "right", "wrong", "virtuous"])
 
-println("  ✓ Added 3 custom synonym mappings")
+println("  ✓ Added 3 custom thesaurus mappings")
 
 # ============================================================================
 # VERB REGISTRY ENHANCEMENTS
 # ============================================================================
 println("\n[8] Enhancing verb registry...")
 
-SemanticVerbs.add_relation_class("biological", ["grows", "reproduces", "evolves", "adapts"])
-SemanticVerbs.add_relation_class("cognitive", ["thinks", "learns", "remembers", "understands"])
-SemanticVerbs.add_synonym!("evaluates", "assess")
+# GRUG: SemanticVerbs uses add_relation_class! to create class, then add_verb! to add verbs
+add_relation_class!("biological")
+add_verb!("grows", "biological")
+add_verb!("reproduces", "biological")
+add_verb!("evolves", "biological")
+add_verb!("adapts", "biological")
+
+add_relation_class!("cognitive")
+add_verb!("thinks", "cognitive")
+add_verb!("learns", "cognitive")
+add_verb!("remembers", "cognitive")
+add_verb!("understands", "cognitive")
+
+add_synonym!("evaluates", "assess")
 
 println("  ✓ Added biological and cognitive verb classes + synonym")
 
