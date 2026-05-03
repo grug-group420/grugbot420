@@ -208,7 +208,9 @@ println("  ✓ Added biological and cognitive verb classes + synonym")
 # SAVE SPECIMEN
 # ============================================================================
 println("\n[9] Saving specimen...")
-process_mission("/saveSpecimen comprehensive_test_specimen.json")
+specimen_path = "comprehensive_test_specimen.json"
+result = save_specimen_to_file!(specimen_path)
+println("\n$result")
 
 # ============================================================================
 # SUMMARY
