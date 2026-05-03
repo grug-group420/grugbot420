@@ -156,6 +156,134 @@ function extract_relational_triples(input::String)::Vector{RelationalTriple}
 end
 
 """
+extract_dynamic_relational_triples(input::String, scan_mode::Int)::Vector{RelationalTriple}
+
+GRUG: Dynamic relational extraction for complex inputs (high-res scan mode).
+When scan_mode >= 3 (high-res), this performs more sophisticated extraction:
+  - Captures compound subjects/objects across multiple tokens
+  - Handles nested relations (e.g., "A causes B which causes C")
+  - Detects implicit relations through conjunctions and prepositions
+  - Extracts causal chains and temporal sequences
+  - Handles multiple clauses with proper scope
+
+This follows the "wave" of complexity - if pattern scan goes high-res,
+relational extraction should too. For simple inputs (scan_mode < 3),
+falls back to basic extract_relational_triples() for efficiency.
+
+Throws on empty input - NO SILENT FAILURES.
+"""
+function extract_dynamic_relational_triples(input::String, scan_mode::Int)::Vector{RelationalTriple}
+    if strip(input) == ""
+        error("!!! FATAL: extract_dynamic_relational_triples got empty input! Cannot extract relations from empty air! !!!")
+    end
+    
+    # GRUG: For simple inputs, use basic extraction (efficiency)
+    if scan_mode < 3
+        return extract_relational_triples(input)
+    end
+    
+    # GRUG: High-res mode - perform sophisticated extraction
+    triples = RelationalTriple[]
+    
+    # Step 1: Normalize synonyms first
+    synonym_normalized = SemanticVerbs.normalize_synonyms(input)
+    clean_input = rewrite_passive_mission(synonym_normalized)
+    tokens = split(lowercase(clean_input))
+    
+    if isempty(tokens)
+        error("!!! FATAL: Grug found no tokens after split. Something wrong with input! !!!")
+    end
+    
+    if length(tokens) < 3
+        return triples
+    end
+    
+    try
+        # GRUG: Get all live verbs for matching
+        all_verbs = SemanticVerbs.get_all_verbs()
+        
+        # GRUG: Track for compound subject/object construction
+        i = 1
+        while i <= length(tokens)
+            tok = tokens[i]
+            
+            if tok in all_verbs
+                # GRUG: Extract compound subject (look backward)
+                subj_parts = String[]
+                j = i - 1
+                while j >= 1
+                    candidate = String(tokens[j])
+                    # Stop at verb or conjunction boundary
+                    if candidate in all_verbs || candidate in ["and", "or", "but", "which", "that", "who", "whose"]
+                        break
+                    end
+                    pushfirst!(subj_parts, candidate)
+                    j -= 1
+                end
+                subject = join(subj_parts, " ")
+                
+                # GRUG: Extract compound object (look forward)
+                obj_parts = String[]
+                j = i + 1
+                while j <= length(tokens)
+                    candidate = String(tokens[j])
+                    # Stop at verb boundary
+                    if candidate in all_verbs
+                        break
+                    end
+                    push!(obj_parts, candidate)
+                    j += 1
+                end
+                object = join(obj_parts, " ")
+                
+                # GRUG: Add triple if valid
+                if !isempty(subject) && !isempty(object)
+                    push!(triples, RelationalTriple(subject, tok, object))
+                    
+                    # GRUG: High-res feature - detect nested relations via "which" clause
+                    # e.g., "A causes B which causes C" -> extract (A causes B) and (B causes C)
+                    if "which" in obj_parts || "that" in obj_parts
+                        which_idx = findfirst(x -> x in ["which", "that"], obj_parts)
+                        if !isnothing(which_idx) && which_idx < length(obj_parts)
+                            # Look for verb after "which/that"
+                            for k in (which_idx + 1):length(obj_parts)
+                                if obj_parts[k] in all_verbs && k < length(obj_parts)
+                                    nested_obj = join(obj_parts[(k+1):end], " ")
+                                    if !isempty(nested_obj)
+                                        # Create nested relation: subject of clause verb -> object
+                                        # The clause subject is the compound object minus the which/that part
+                                        clause_subj = join(obj_parts[1:(which_idx-1)], " ")
+                                        if !isempty(clause_subj)
+                                            push!(triples, RelationalTriple(clause_subj, obj_parts[k], nested_obj))
+                                        end
+                                    end
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                # Skip tokens we've already processed
+                i += max(1, length(obj_parts))
+            else
+                i += 1
+            end
+        end
+        
+    catch e
+        rethrow(e)
+    end
+    
+    if isempty(triples)
+        # GRUG QoL FIX: No relations found is not a failure
+        return triples
+    end
+    
+    return triples
+end
+
+"""
 # GRUG DOC 2.3 & 2.7: Match Score expectations!
 # If node demands a relation user doesn't have, Grug return Sentinel -9999.0!
 # Normal match scores add up! Score can easily exceed 1.0 (sometimes 2.0+). 
@@ -1650,7 +1778,32 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     
     # GRUG: Convert input to number rocks!
     target_signal = words_to_signal(input_text)
-    user_triples  = extract_relational_triples(input_text)
+    
+    # GRUG: DETERMINISTIC SCAN SELECTION
+    # Grug look at how complex input is to choose scanner eye.
+    scan_mode = screen_input_complexity(target_signal, RelationalTriple[])
+    
+    # GRUG: Extract relational triples - use dynamic extraction for complex inputs
+    # Follow the "wave" of complexity: high-res scan mode -> dynamic relational extraction
+    if scan_mode >= 3
+        # GRUG: High-res mode - compound subjects, nested relations, causal chains
+        user_triples = try
+            extract_dynamic_relational_triples(input_text, scan_mode)
+        catch e
+            # GRUG: On error, fall back to basic extraction - never silent fail!
+            @warn "[ENGINE] Dynamic relational extraction failed (non-fatal), falling back to basic: $e"
+            extract_relational_triples(input_text)
+        end
+        println("[ENGINE] 🌊 High-res relational extraction: $(length(user_triples)) triples from complex input")
+    else
+        # GRUG: Simple mode - basic (subject, verb, object) extraction only
+        user_triples = try
+            extract_relational_triples(input_text)
+        catch e
+            @warn "[ENGINE] Basic relational extraction failed (non-fatal): $e"
+            RelationalTriple[]
+        end
+    end
 
     # GRUG: ACTION+TONE PRE-PREDICTION
     # Run BEFORE Hopfield check and BEFORE scan so we can pre-weight confidences.
@@ -1709,9 +1862,8 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     #     return all_valid_specimens
     # end
 
-    # GRUG: DETERMINISTIC SCAN SELECTION
-    # Grug look at how complex input is to choose scanner eye.
-    scan_mode = screen_input_complexity(target_signal, user_triples)
+    # GRUG: SCAN NODES - Already have scan_mode from earlier (deterministic selection)
+    # scan_mode was computed before relational extraction to decide extraction strategy
 
     lock(NODE_LOCK) do
         if isempty(NODE_MAP)

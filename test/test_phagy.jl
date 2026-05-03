@@ -180,33 +180,41 @@ end
 end
 
 # ==============================================================================
-# 5. HOPFIELD CACHE VALIDATOR — purges stale entries
+# 5. HOPFIELD CACHE VALIDATOR — purges stale entries - DISABLED
 # ==============================================================================
-@testset "Phagy - Cache Validator" begin
-    reset_engine!()
+# GRUG: Hopfield caching has been DISABLED. The CACHE_VALIDATOR automaton is no
+# longer active. Tests are disabled but preserved for reference.
+# Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
+# (50,000+ nodes per lobe) where memory access becomes a bottleneck.
+#
+# OLD TEST (DISABLED):
+# @testset "Phagy - Cache Validator" begin
+#     reset_engine!()
+#
+#     alive_node = make_node!("alive cache node")
+#     dead_node = make_node!("dead cache node"; is_grave=true, grave_reason="TEST")
+#
+#     # Plant cache entries
+#     lock(HOPFIELD_CACHE_LOCK) do
+#         HOPFIELD_CACHE[UInt64(1001)] = [alive_node]         # Valid
+#         HOPFIELD_CACHE[UInt64(1002)] = [dead_node]           # Stale (graved)
+#         HOPFIELD_CACHE[UInt64(1003)] = ["nonexistent_node"]  # Stale (missing)
+#     end
+#
+#     stats = PhagyMode.validate_hopfield_cache!(HOPFIELD_CACHE, HOPFIELD_CACHE_LOCK, NODE_MAP, NODE_LOCK)
+#     @test stats.automaton == "CACHE_VALIDATOR"
+#     @test stats.items_changed == 2  # Two stale entries purged
+#
+#     lock(HOPFIELD_CACHE_LOCK) do
+#         @test haskey(HOPFIELD_CACHE, UInt64(1001))   # Valid kept
+#         @test !haskey(HOPFIELD_CACHE, UInt64(1002))  # Stale purged
+#         @test !haskey(HOPFIELD_CACHE, UInt64(1003))  # Stale purged
+#     end
+#
+#     println("  ✓ [5] Cache Validator: purged 2 stale entries, kept 1 valid")
+# end
 
-    alive_node = make_node!("alive cache node")
-    dead_node = make_node!("dead cache node"; is_grave=true, grave_reason="TEST")
-
-    # Plant cache entries
-    lock(HOPFIELD_CACHE_LOCK) do
-        HOPFIELD_CACHE[UInt64(1001)] = [alive_node]         # Valid
-        HOPFIELD_CACHE[UInt64(1002)] = [dead_node]           # Stale (graved)
-        HOPFIELD_CACHE[UInt64(1003)] = ["nonexistent_node"]  # Stale (missing)
-    end
-
-    stats = PhagyMode.validate_hopfield_cache!(HOPFIELD_CACHE, HOPFIELD_CACHE_LOCK, NODE_MAP, NODE_LOCK)
-    @test stats.automaton == "CACHE_VALIDATOR"
-    @test stats.items_changed == 2  # Two stale entries purged
-
-    lock(HOPFIELD_CACHE_LOCK) do
-        @test haskey(HOPFIELD_CACHE, UInt64(1001))   # Valid kept
-        @test !haskey(HOPFIELD_CACHE, UInt64(1002))  # Stale purged
-        @test !haskey(HOPFIELD_CACHE, UInt64(1003))  # Stale purged
-    end
-
-    println("  ✓ [5] Cache Validator: purged 2 stale entries, kept 1 valid")
-end
+println("  ⊝ [5] Cache Validator: DISABLED (Hopfield caching removed)")
 
 # ==============================================================================
 # 6. RULE PRUNER — flags dormant rules
@@ -681,10 +689,11 @@ end
         push!(automata_seen, stats.automaton)
     end
 
-    # Should have seen all 7 automaton types (or at least most — probabilistic)
-    # ORPHAN_PRUNER, STRENGTH_DECAYER, GRAVE_RECYCLER, CACHE_VALIDATOR,
-    # DROP_TABLE_COMPACT, RULE_PRUNER, MEMORY_FORENSICS_FUZZY or MEMORY_FORENSICS_METRIC
-    @test length(automata_seen) >= 5  # Conservative: at least 5 of 7+variants seen
+    # Should have seen all 6 active automaton types (or at least most — probabilistic)
+    # ORPHAN_PRUNER, STRENGTH_DECAYER, GRAVE_RECYCLER, DROP_TABLE_COMPACT,
+    # RULE_PRUNER, MEMORY_FORENSICS_FUZZY or MEMORY_FORENSICS_METRIC
+    # NOTE: CACHE_VALIDATOR is DISABLED (Hopfield caching removed)
+    @test length(automata_seen) >= 4  # Conservative: at least 4 of 6+variants seen
 
     println("  ✓ [28] Full phagy cycle: $(length(automata_seen)) unique automata seen: $(join(sort(collect(automata_seen)), ", "))")
 end
