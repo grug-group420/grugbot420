@@ -46,7 +46,7 @@ science_id_1 = create_node(
     Dict("domain" => "physics", "complexity" => "high", "requires_math" => true),
     String[]
 )
-Lobe.add_node_to_lobe!(science_id_1, "science")
+Lobe.add_node_to_lobe!("science", science_id_1)
 
 println("  ✓ Created: Quantum mechanics")
 
@@ -57,7 +57,7 @@ science_id_2 = create_node(
     Dict("domain" => "biology", "molecular" => true),
     String[]
 )
-Lobe.add_node_to_lobe!(science_id_2, "science")
+Lobe.add_node_to_lobe!("science", science_id_2)
 
 println("  ✓ Created: DNA")
 
@@ -68,7 +68,7 @@ science_id_3 = create_node(
     Dict("domain" => "chemistry", "process" => true),
     ["oxidation", "reduction", "synthesis", "decomposition"]
 )
-Lobe.add_node_to_lobe!(science_id_3, "science")
+Lobe.add_node_to_lobe!("science", science_id_3)
 
 println("  ✓ Created: Chemical reactions")
 
@@ -84,7 +84,7 @@ tech_id_1 = create_node(
     Dict("domain" => "computer science", "ai_field" => true),
     String[]
 )
-Lobe.add_node_to_lobe!(tech_id_1, "technology")
+Lobe.add_node_to_lobe!("technology", tech_id_1)
 
 println("  ✓ Created: Artificial intelligence")
 
@@ -95,7 +95,7 @@ tech_id_2 = create_node(
     Dict("domain" => "engineering", "automation" => true),
     String[]
 )
-Lobe.add_node_to_lobe!(tech_id_2, "technology")
+Lobe.add_node_to_lobe!("technology", tech_id_2)
 
 # Attach robots to AI
 attach_node!(tech_id_2, tech_id_1, "AI enables robotics")
@@ -114,7 +114,7 @@ phil_id_1 = create_node(
     Dict("domain" => "ethics", "normative" => true),
     String[]
 )
-Lobe.add_node_to_lobe!(phil_id_1, "philosophy")
+Lobe.add_node_to_lobe!("philosophy", phil_id_1)
 
 println("  ✓ Created: Ethics")
 
@@ -125,7 +125,7 @@ phil_id_2 = create_node(
     Dict("domain" => "metaphysics", "abstract" => true),
     ["existence", "being", "consciousness", "reality"]
 )
-Lobe.add_node_to_lobe!(phil_id_2, "philosophy")
+Lobe.add_node_to_lobe!("philosophy", phil_id_2)
 
 println("  ✓ Created: Metaphysics")
 
@@ -141,7 +141,7 @@ nature_id_1 = create_node(
     Dict("domain" => "ecology", "system" => true),
     ["predation", "competition", "symbiosis", "succession"]
 )
-Lobe.add_node_to_lobe!(nature_id_1, "nature")
+Lobe.add_node_to_lobe!("nature", nature_id_1)
 
 println("  ✓ Created: Ecosystems")
 
@@ -152,7 +152,7 @@ nature_id_2 = create_node(
     Dict("domain" => "biology", "theory" => true);
     initial_strength=8.0
 )
-Lobe.add_node_to_lobe!(nature_id_2, "nature")
+Lobe.add_node_to_lobe!("nature", nature_id_2)
 
 println("  ✓ Created: Evolution")
 
