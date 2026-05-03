@@ -1703,7 +1703,7 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         # GRUG DOC 2.6: Biological Attention Bottleneck!
         # Grug cannot look at 1,000,000 rocks at once. Cave will catch fire!
         # Grug roll rand(600:1800) to limit how many nodes Grug scan. 
-        active_cap  = rand(600:1800)
+        active_cap  = 1000  # GRUG: HARD CAP - 1000 nodes max per cycle
         
         all_keys    = collect(keys(NODE_MAP))
         shuffle!(all_keys) 
@@ -1945,7 +1945,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     # The connector pattern also surfaces as a RelationalTriple in the node's
     # context so the generative pipeline knows WHY this node was co-activated.
     # Triple format: (target_id, "relay_attached", connector_pattern)
-    relay_cap = rand(600:1800)  # GRUG: Independent cap for relay pass
+    relay_cap = 1000  # GRUG: HARD CAP - 1000 nodes max per cycle
     relay_count = length(expanded)
     relay_additions = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
 

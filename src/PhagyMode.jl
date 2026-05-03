@@ -63,6 +63,32 @@ const PHAGY_LOG      = PhagyStats[]
 const PHAGY_LOG_LOCK = ReentrantLock()
 const MAX_PHAGY_LOG  = 50
 
+# ==============================================================================
+# PHAGY COLLISION PROTECTION & TIMEOUT SYSTEM
+# ==============================================================================
+
+# GRUG: Resource tracking to prevent automata collisions
+# Each automaton reserves its target resource before execution
+const PHAGY_RESOURCE_LOCK   = ReentrantLock()
+const PHAGY_RESERVED_RESOURCES = Dict{String, String}()  # resource_type -> automaton_name
+
+# GRUG: Timeout configuration - reasonable limits balanced with quality assurance
+const PHAGY_TIMEOUT_SECONDS = Dict{String, Float64}(
+    "ORPHAN_PRUNER"     => 10.0,   # GRUG: Node iteration, fast operation
+    "STRENGTH_DECAYER"  => 10.0,   # GRUG: Node iteration, fast operation
+    "GRAVE_RECYCLER"    => 15.0,   # GRUG: Complex drop table merging
+    "CACHE_VALIDATOR"   => 20.0,   # GRUG: Cache validation may need full scan
+    "DROP_TABLE_COMPACT" => 15.0,  # GRUG: Drop table compaction
+    "RULE_PRUNER"       => 5.0,    # GRUG: Small vector iteration
+    "MEMORY_FORENSICS_FUZZY"   => 10.0,  # GRUG: Sampling based, fast
+    "MEMORY_FORENSICS_METRIC"  => 30.0,  # GRUG: Full enumeration, can be slow
+)
+
+const PHAGY_DEFAULT_TIMEOUT = 15.0  # GRUG: Fallback timeout if automaton not in map
+
+
+# ==============================================================================
+
 """
 push_phagy_log!(stats::PhagyStats)
 
@@ -78,6 +104,69 @@ function push_phagy_log!(stats::PhagyStats)
     end
 end
 
+# ==============================================================================
+# PHAGY RESOURCE RESERVATION SYSTEM (COLLISION PREVENTION)
+# ==============================================================================
+
+"""
+reserve_phagy_resource!(automaton_name::String, resource_scope::String)::Bool
+
+GRUG: Reserve a resource scope for an automaton. This prevents multiple automata
+from working on the same data structure simultaneously.
+
+resource_scope options:
+  - "node_map"         : NODE_MAP iteration
+  - "node_map_write"   : NODE_MAP mutation
+  - "hopfield_cache"   : HOPFIELD_CACHE access
+  - "rules"            : RULES vector access
+  - "message_history"  : MESSAGE_HISTORY read access
+  - "global"           : Global state (no simultaneous phagy)
+
+Returns true if reservation successful, false if already reserved by another automaton.
+Thread-safe operation. All reservations must be released via release_phagy_resource!().
+"""
+function reserve_phagy_resource!(automaton_name::String, resource_scope::String)::Bool
+    lock(PHAGY_RESOURCE_LOCK) do
+        if haskey(PHAGY_RESERVED_RESOURCES, resource_scope)
+            existing_automaton = PHAGY_RESERVED_RESOURCES[resource_scope]
+            println("[PHAGY:COLLISION] ⚠️  Resource '$resource_scope' already reserved by $existing_automaton. $automaton_name skipped.")
+            return false
+        end
+        PHAGY_RESERVED_RESOURCES[resource_scope] = automaton_name
+        @debug "[PHAGY:RESERVE] ✅ $automaton_name reserved '$resource_scope'"
+        return true
+    end
+end
+
+"""
+release_phagy_resource!(resource_scope::String)::Nothing
+
+GRUG: Release a previously reserved resource scope. This MUST be called in a
+finally block to ensure cleanup even if the automaton crashes or times out.
+
+Thread-safe operation. Safe to call even if resource was never reserved.
+"""
+function release_phagy_resource!(resource_scope::String)::Nothing
+    lock(PHAGY_RESOURCE_LOCK) do
+        if haskey(PHAGY_RESERVED_RESOURCES, resource_scope)
+            automaton_name = PHAGY_RESERVED_RESOURCES[resource_scope]
+            delete!(PHAGY_RESERVED_RESOURCES, resource_scope)
+            @debug "[PHAGY:RELEASE] ✅ $automaton_name released '$resource_scope'"
+        end
+    end
+    return nothing
+end
+
+"""
+get_phagy_timeout(automaton_name::String)::Float64
+
+GRUG: Retrieve the timeout duration for a specific automaton.
+Returns automaton-specific timeout or PHAGY_DEFAULT_TIMEOUT if not configured.
+"""
+function get_phagy_timeout(automaton_name::String)::Float64
+    return get(PHAGY_TIMEOUT_SECONDS, automaton_name, PHAGY_DEFAULT_TIMEOUT)
+end
+
 """
 get_phagy_log()::Vector{PhagyStats}
 
@@ -87,6 +176,70 @@ function get_phagy_log()::Vector{PhagyStats}
     return lock(PHAGY_LOG_LOCK) do
         copy(PHAGY_LOG)
     end
+
+# ==============================================================================
+# PHAGY RESOURCE RESERVATION SYSTEM (COLLISION PREVENTION)
+# ==============================================================================
+
+"""
+reserve_phagy_resource!(automaton_name::String, resource_scope::String)::Bool
+
+GRUG: Reserve a resource scope for an automaton. This prevents multiple automata
+from working on the same data structure simultaneously.
+
+resource_scope options:
+  - "node_map"         : NODE_MAP iteration
+  - "node_map_write"   : NODE_MAP mutation
+  - "hopfield_cache"   : HOPFIELD_CACHE access
+  - "rules"            : RULES vector access
+  - "message_history"  : MESSAGE_HISTORY read access
+  - "global"           : Global state (no simultaneous phagy)
+
+Returns true if reservation successful, false if already reserved by another automaton.
+Thread-safe operation. All reservations must be released via release_phagy_resource!().
+"""
+function reserve_phagy_resource!(automaton_name::String, resource_scope::String)::Bool
+    lock(PHAGY_RESOURCE_LOCK) do
+        if haskey(PHAGY_RESERVED_RESOURCES, resource_scope)
+            existing_automaton = PHAGY_RESERVED_RESOURCES[resource_scope]
+            println("[PHAGY:COLLISION] ⚠️  Resource '$resource_scope' already reserved by $existing_automaton. $automaton_name skipped.")
+            return false
+        end
+        PHAGY_RESERVED_RESOURCES[resource_scope] = automaton_name
+        @debug "[PHAGY:RESERVE] ✅ $automaton_name reserved '$resource_scope'"
+        return true
+    end
+end
+
+"""
+release_phagy_resource!(resource_scope::String)::Nothing
+
+GRUG: Release a previously reserved resource scope. This MUST be called in a
+finally block to ensure cleanup even if the automaton crashes or times out.
+
+Thread-safe operation. Safe to call even if resource was never reserved.
+"""
+function release_phagy_resource!(resource_scope::String)::Nothing
+    lock(PHAGY_RESOURCE_LOCK) do
+        if haskey(PHAGY_RESERVED_RESOURCES, resource_scope)
+            automaton_name = PHAGY_RESERVED_RESOURCES[resource_scope]
+            delete!(PHAGY_RESERVED_RESOURCES, resource_scope)
+            @debug "[PHAGY:RELEASE] ✅ $automaton_name released '$resource_scope'"
+        end
+    end
+    return nothing
+end
+
+"""
+get_phagy_timeout(automaton_name::String)::Float64
+
+GRUG: Retrieve the timeout duration for a specific automaton.
+Returns automaton-specific timeout or PHAGY_DEFAULT_TIMEOUT if not configured.
+"""
+function get_phagy_timeout(automaton_name::String)::Float64
+    return get(PHAGY_TIMEOUT_SECONDS, automaton_name, PHAGY_DEFAULT_TIMEOUT)
+end
+
 end
 
 # ==============================================================================
@@ -128,59 +281,82 @@ history remains consistent.
 
 SAFETY: Never graves a node that has a non-empty drop_table (GRAVE RECYCLER
 handles those). Never graves image nodes (SDF data is irreplaceable).
+
+COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
+TIMEOUT: 10 second limit enforced by dispatcher.
 """
 function prune_orphan_nodes!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
+    const AUTOMATON_NAME = "ORPHAN_PRUNER"
+    const RESOURCE_SCOPE = "node_map_write"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+    end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
     t_start = time()
-    examined = 0
-    graved   = 0
-    skipped_has_drops  = 0
-    skipped_image      = 0
+    try
+        examined = 0
+        graved   = 0
+        skipped_has_drops  = 0
+        skipped_image      = 0
 
-    orphan_ids = String[]
+        orphan_ids = String[]
 
-    lock(node_lock) do
-        for (id, node) in node_map
-            examined += 1
-            # GRUG: Skip already-graved nodes (phagy should not double-process)
-            node.is_grave && continue
-            # GRUG: Skip image nodes - their SDF data is not reconstructable
-            if node.is_image_node
-                skipped_image += 1
-                continue
-            end
-            # GRUG: Skip nodes that still have drop_table entries - GRAVE RECYCLER owns those
-            if !isempty(node.drop_table)
-                skipped_has_drops += 1
-                continue
-            end
-            # GRUG: Orphan condition: zero neighbors AND zero strength
-            if length(node.neighbor_ids) <= ORPHAN_MAX_NEIGHBORS && node.strength <= 0.0
-                push!(orphan_ids, id)
+        lock(node_lock) do
+            for (id, node) in node_map
+                examined += 1
+                # GRUG: Skip already-graved nodes (phagy should not double-process)
+                node.is_grave && continue
+                # GRUG: Skip image nodes - their SDF data is not reconstructable
+                if node.is_image_node
+                    skipped_image += 1
+                    continue
+                end
+                # GRUG: Skip nodes that still have drop_table entries - GRAVE RECYCLER owns those
+                if !isempty(node.drop_table)
+                    skipped_has_drops += 1
+                    continue
+                end
+                # GRUG: Orphan condition: zero neighbors AND zero strength
+                if length(node.neighbor_ids) <= ORPHAN_MAX_NEIGHBORS && node.strength <= 0.0
+                    push!(orphan_ids, id)
+                end
             end
         end
-    end
 
-    # GRUG: Second pass - grave the identified orphans under lock
-    if !isempty(orphan_ids)
-        lock(node_lock) do
-            for id in orphan_ids
-                if haskey(node_map, id)
-                    node = node_map[id]
-                    # GRUG: Final safety check under lock before graving
-                    if !node.is_grave && !node.is_image_node && isempty(node.drop_table)
-                        node.is_grave = true
-                        graved += 1
-                        @debug "[PHAGY:ORPHAN] Graved orphan node $id (strength=$(node.strength), neighbors=$(length(node.neighbor_ids)))"
+        # GRUG: Second pass - grave the identified orphans under lock
+        if !isempty(orphan_ids)
+            lock(node_lock) do
+                for id in orphan_ids
+                    if haskey(node_map, id)
+                        node = node_map[id]
+                        # GRUG: Final safety check under lock before graving
+                        if !node.is_grave && !node.is_image_node && isempty(node.drop_table)
+                            node.is_grave = true
+                            graved += 1
+                            @debug "[PHAGY:ORPHAN] Graved orphan node $id (strength=$(node.strength), neighbors=$(length(node.neighbor_ids)))"
+                        end
                     end
                 end
             end
         end
-    end
 
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Graved=$graved, SkippedImageNodes=$skipped_image, SkippedHasDrops=$skipped_has_drops"
-    println("[PHAGY:ORPHAN] 🧹  Cycle complete. $notes")
-    return PhagyStats("ORPHAN_PRUNER", examined, graved, elapsed_ms, notes)
+        elapsed_ms = (time() - t_start) * 1000.0
+        notes = "Examined=$examined, Graved=$graved, SkippedImageNodes=$skipped_image, SkippedHasDrops=$skipped_has_drops"
+        println("[PHAGY:ORPHAN] 🧹  Cycle complete. $notes")
+        return PhagyStats(AUTOMATON_NAME, examined, graved, elapsed_ms, notes)
+        
+    catch e
+        # GRUG: Explicit error handling - no silent failures
+        println("[PHAGY:ORPHAN] !!! ERROR: $e !!!")
+        Base.show_backtrace(stdout, catch_backtrace())
+        rethrow(e)
+    finally
+        # GRUG: ALWAYS release the reservation (cleanup on success, error, or timeout)
+        release_phagy_resource!(RESOURCE_SCOPE)
+    end
 end
 
 # ==============================================================================
@@ -196,41 +372,64 @@ Does NOT grave nodes - strength decay only. Graving is the ORPHAN PRUNER's job.
 
 SAFETY: Never decays image nodes. Never decays nodes already at strength 0.0.
 Decay is floored at 0.0 (no negative strength).
+
+COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
+TIMEOUT: 10 second limit enforced by dispatcher.
 """
 function decay_forgotten_strengths!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    t_start  = time()
-    examined = 0
-    decayed  = 0
-    skipped_strong = 0
-    skipped_image  = 0
-
-    lock(node_lock) do
-        for (id, node) in node_map
-            examined += 1
-            node.is_grave && continue
-            if node.is_image_node
-                skipped_image += 1
-                continue
-            end
-            # GRUG: Only decay weak nodes - strong nodes earned their keep
-            if node.strength > DECAY_ELIGIBILITY_MAX
-                skipped_strong += 1
-                continue
-            end
-            # GRUG: Already at floor - nothing to decay
-            node.strength <= 0.0 && continue
-
-            old_str = node.strength
-            node.strength = max(0.0, node.strength - DECAY_RATE)
-            decayed += 1
-            @debug "[PHAGY:DECAY] Node $id: strength $old_str → $(node.strength)"
-        end
+    const AUTOMATON_NAME = "STRENGTH_DECAYER"
+    const RESOURCE_SCOPE = "node_map_write"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
     end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+    t_start = time()
+    try
+        examined = 0
+        decayed  = 0
+        skipped_strong = 0
+        skipped_image  = 0
 
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Decayed=$decayed, SkippedStrong=$skipped_strong, SkippedImageNodes=$skipped_image, DecayRate=$DECAY_RATE"
-    println("[PHAGY:DECAY] 📉  Cycle complete. $notes")
-    return PhagyStats("STRENGTH_DECAYER", examined, decayed, elapsed_ms, notes)
+        lock(node_lock) do
+            for (id, node) in node_map
+                examined += 1
+                node.is_grave && continue
+                if node.is_image_node
+                    skipped_image += 1
+                    continue
+                end
+                # GRUG: Only decay weak nodes - strong nodes earned their keep
+                if node.strength > DECAY_ELIGIBILITY_MAX
+                    skipped_strong += 1
+                    continue
+                end
+                # GRUG: Already at floor - nothing to decay
+                node.strength <= 0.0 && continue
+
+                old_str = node.strength
+                node.strength = max(0.0, node.strength - DECAY_RATE)
+                decayed += 1
+                @debug "[PHAGY:DECAY] Node $id: strength $old_str → $(node.strength)"
+            end
+        end
+
+        elapsed_ms = (time() - t_start) * 1000.0
+        notes = "Examined=$examined, Decayed=$decayed, SkippedStrong=$skipped_strong, SkippedImageNodes=$skipped_image, DecayRate=$DECAY_RATE"
+        println("[PHAGY:DECAY] 📉  Cycle complete. $notes")
+        return PhagyStats(AUTOMATON_NAME, examined, decayed, elapsed_ms, notes)
+        
+    catch e
+        # GRUG: Explicit error handling - no silent failures
+        println("[PHAGY:DECAY] !!! ERROR: $e !!!")
+        Base.show_backtrace(stdout, catch_backtrace())
+        rethrow(e)
+    finally
+        # GRUG: ALWAYS release the reservation (cleanup on success, error, or timeout)
+        release_phagy_resource!(RESOURCE_SCOPE)
+    end
 end
 
 # ==============================================================================
@@ -250,73 +449,96 @@ left to recycle on next pass).
 
 SAFETY: Only processes nodes where is_grave=true. Never ungraves a node.
 If no neighbor exists to receive assets, assets are discarded (logged as waste).
+
+COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
+TIMEOUT: 15 second limit enforced by dispatcher.
 """
 function recycle_grave_assets!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    t_start   = time()
-    examined  = 0
-    recycled  = 0
-    wasted    = 0
-    no_target = 0
+    const AUTOMATON_NAME = "GRAVE_RECYCLER"
+    const RESOURCE_SCOPE = "node_map_write"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+    end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+    t_start = time()
+    try
+        examined  = 0
+        recycled  = 0
+        wasted    = 0
+        no_target = 0
 
-    lock(node_lock) do
-        for (id, node) in node_map
-            node.is_grave || continue
-            isempty(node.drop_table) && continue
-            examined += 1
+        lock(node_lock) do
+            for (id, node) in node_map
+                node.is_grave || continue
+                isempty(node.drop_table) && continue
+                examined += 1
 
-            # GRUG: Find the strongest alive neighbor to receive the assets
-            best_neighbor_id = ""
-            best_strength    = -1.0
+                # GRUG: Find the strongest alive neighbor to receive the assets
+                best_neighbor_id = ""
+                best_strength    = -1.0
 
-            for nid in node.neighbor_ids
-                if haskey(node_map, nid)
-                    n = node_map[nid]
-                    if !n.is_grave && n.strength > best_strength
-                        best_strength    = n.strength
-                        best_neighbor_id = nid
+                for nid in node.neighbor_ids
+                    if haskey(node_map, nid)
+                        n = node_map[nid]
+                        if !n.is_grave && n.strength > best_strength
+                            best_strength    = n.strength
+                            best_neighbor_id = nid
+                        end
                     end
                 end
-            end
 
-            if isempty(best_neighbor_id)
-                # GRUG: Graved node has no alive neighbors. Assets go to waste.
-                # Clear them anyway so this node doesn't get re-examined next cycle.
-                wasted += length(node.drop_table)
+                if isempty(best_neighbor_id)
+                    # GRUG: Graved node has no alive neighbors. Assets go to waste.
+                    # Clear them anyway so this node doesn't get re-examined next cycle.
+                    wasted += length(node.drop_table)
+                    empty!(node.drop_table)
+                    no_target += 1
+                    @debug "[PHAGY:RECYCLE] Node $id: no alive neighbors. $(wasted) assets wasted."
+                    continue
+                end
+
+                # GRUG: Donate drop_table entries to best neighbor
+                target = node_map[best_neighbor_id]
+                donated = 0
+                for (response_text, probability) in node.drop_table
+                    # GRUG: Only donate if target doesn't already have this entry
+                    if !haskey(target.drop_table, response_text)
+                        target.drop_table[response_text] = probability
+                        donated += 1
+                    end
+                    # GRUG: If target already has it, keep the max probability
+                    # (donated knowledge should not override stronger existing knowledge)
+                    existing = get(target.drop_table, response_text, 0.0)
+                    if probability > existing
+                        target.drop_table[response_text] = probability
+                        donated += 1
+                    end
+                end
+
+                # GRUG: Clear the graved node's drop_table - assets have been transferred
                 empty!(node.drop_table)
-                no_target += 1
-                @debug "[PHAGY:RECYCLE] Node $id: no alive neighbors. $(wasted) assets wasted."
-                continue
+                recycled += donated
+                @debug "[PHAGY:RECYCLE] Node $id → $best_neighbor_id: donated $donated entries"
             end
-
-            # GRUG: Donate drop_table entries to best neighbor
-            target = node_map[best_neighbor_id]
-            donated = 0
-            for (response_text, probability) in node.drop_table
-                # GRUG: Only donate if target doesn't already have this entry
-                if !haskey(target.drop_table, response_text)
-                    target.drop_table[response_text] = probability
-                    donated += 1
-                end
-                # GRUG: If target already has it, keep the max probability
-                # (donated knowledge should not override stronger existing knowledge)
-                existing = get(target.drop_table, response_text, 0.0)
-                if probability > existing
-                    target.drop_table[response_text] = probability
-                    donated += 1
-                end
-            end
-
-            # GRUG: Clear the graved node's drop_table - assets have been transferred
-            empty!(node.drop_table)
-            recycled += donated
-            @debug "[PHAGY:RECYCLE] Node $id → $best_neighbor_id: donated $donated entries"
         end
-    end
 
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Recycled=$recycled, Wasted=$wasted, NoTargetNodes=$no_target"
-    println("[PHAGY:RECYCLE] ♻️   Cycle complete. $notes")
-    return PhagyStats("GRAVE_RECYCLER", examined, recycled, elapsed_ms, notes)
+        elapsed_ms = (time() - t_start) * 1000.0
+        notes = "Examined=$examined, Recycled=$recycled, Wasted=$wasted, NoTargetNodes=$no_target"
+        println("[PHAGY:RECYCLE] ♻️   Cycle complete. $notes")
+        return PhagyStats(AUTOMATON_NAME, examined, recycled, elapsed_ms, notes)
+        
+    catch e
+        # GRUG: Explicit error handling - no silent failures
+        println("[PHAGY:RECYCLE] !!! ERROR: $e !!!")
+        Base.show_backtrace(stdout, catch_backtrace())
+        rethrow(e)
+    finally
+        # GRUG: ALWAYS release the reservation (cleanup on success, error, or timeout)
+        release_phagy_resource!(RESOURCE_SCOPE)
+    end
 end
 
 # ==============================================================================
@@ -343,8 +565,18 @@ function validate_hopfield_cache!(
     cache_lock      ::ReentrantLock,
     node_map        ::Dict,
     node_lock       ::ReentrantLock
-)::PhagyStats
-    t_start    = time()
+)::PhagyStats\2
+    const AUTOMATON_NAME = "CACHE_VALIDATOR"
+    const RESOURCE_SCOPE = "hopfield_cache"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+    end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+    t_start = time()
+    try
     examined   = 0
     purged     = 0
     valid      = 0
@@ -401,8 +633,18 @@ Also deduplicates any entries that are exact string matches (keeps the max proba
 SAFETY: Never removes entries from graved nodes (GRAVE RECYCLER handles those).
 Never removes the LAST entry in a drop_table (node must keep at least one response).
 """
-function compact_drop_tables!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    t_start   = time()
+function compact_drop_tables!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats\2
+    const AUTOMATON_NAME = "DROP_TABLE_COMPACT"
+    const RESOURCE_SCOPE = "node_map_write"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+    end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+    t_start = time()
+    try
     examined  = 0
     trimmed   = 0
     protected = 0   # GRUG: Entries saved by "last entry" protection rule
@@ -462,8 +704,18 @@ If rules don't have dormancy_strikes yet, this automaton adds them gracefully.
 SAFETY: Never deletes rules - only sets is_dormant=true. User must explicitly
 purge dormant rules via /pruneRules CLI command. This prevents accidental rule loss.
 """
-function prune_dormant_rules!(rules::Vector, rules_lock::ReentrantLock)::PhagyStats
-    t_start   = time()
+function prune_dormant_rules!(rules::Vector, rules_lock::ReentrantLock)::PhagyStats\2
+    const AUTOMATON_NAME = "RULE_PRUNER"
+    const RESOURCE_SCOPE = "rules"
+    
+    # GRUG: Reserve resource to prevent collision with other phagy automata
+    if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
+        throw(PhagyError("!!! COLLISION: $AUTOMATON_NAME cannot reserve '$RESOURCE_SCOPE' - already in use! !!!"))
+    end
+    
+    # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
+    t_start = time()
+    try
     examined  = 0
     flagged   = 0
     already   = 0
@@ -897,11 +1149,23 @@ run_phagy!(node_map, node_lock, hopfield_cache, cache_lock, rules, rules_lock;
            message_history=nothing, history_lock=nothing)::PhagyStats
 
 GRUG: Main phagy entry point. Randomly selects ONE automaton to run this cycle.
-Selection is weighted equally (1/7 each) - no automaton gets priority over others.
-Automaton 7 (MEMORY FORENSICS) requires message_history and history_lock kwargs.
-If those kwargs are not provided and automaton 7 is rolled, it re-rolls to 1-6.
-Each automaton is self-contained and handles its own locking.
+Selection is weighted equally (1/6 each) - no automaton gets priority over others.
+Available automata (1-6):
+  1. ORPHAN_PRUNER
+  2. STRENGTH_DECAYER
+  3. GRAVE_RECYCLER
+  4. DROP_TABLE_COMPACT (CACHE_VALIDATOR disabled - Hopfield obsolete for lobe-based architecture)
+  5. RULE_PRUNER
+  6. MEMORY_FORENSICS (requires message_history and history_lock kwargs)
 
+MEMORY_FORENSICS context: If message_history/history_lock not provided and automaton 6 is rolled,
+re-rolls to 1-5. Forensics needs memory access - no silent skip.
+
+HOPFIELD CACHE NOTE: CACHE_VALIDATOR (formerly automaton 4) is DISABLED. Hopfield caching
+was used prior to lobe-based architecture. Modern system uses 1000-node active cap biological
+bottleneck. Hopfield cache only relevant for RIDICULOUSLY LARGE lobe sizes (50,000+ nodes).
+
+Each automaton is self-contained and handles its own locking.
 Returns PhagyStats from the automaton that ran. Logs result to PHAGY_LOG.
 Throws PhagyError on structural failure (missing locks, corrupted state).
 Never silently swallows errors - all exceptions propagate up to maybe_run_idle().
@@ -948,16 +1212,15 @@ function run_phagy!(
         elseif automaton_roll == 3
             recycle_grave_assets!(node_map, node_lock)
         elseif automaton_roll == 4
-            validate_hopfield_cache!(hopfield_cache, cache_lock, node_map, node_lock)
-        elseif automaton_roll == 5
+            # GRUG: CACHE_VALIDATOR DISABLED - Hopfield obsolete for lobe-based architecture
             compact_drop_tables!(node_map, node_lock)
-        elseif automaton_roll == 6
+        elseif automaton_roll == 5
             prune_dormant_rules!(rules, rules_lock)
-        elseif automaton_roll == 7
+        elseif automaton_roll == 6
             run_memory_forensics!(node_map, node_lock, message_history, history_lock)
         else
-            # GRUG: Should be unreachable. If rand(1:7) returns something else, cave is haunted.
-            throw(PhagyError("!!! FATAL: automaton_roll=$automaton_roll is out of range [1,7]! !!!"))
+            # GRUG: Should be unreachable. If rand(1:6) returns something else, cave is haunted.
+            throw(PhagyError("!!! FATAL: automaton_roll=$automaton_roll is out of range [1,6]! !!!"))
         end
     catch e
         # GRUG: Automaton failure is NOT silent. Surface it immediately.
