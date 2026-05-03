@@ -31,6 +31,13 @@ if !isdefined(@__MODULE__, :SemanticVerbs)
     using .SemanticVerbs
 end
 
+# GRUG: Bring the AIML Node System for pattern-based responses.
+# GRUG: Guard against double-include if AIMLNodeSystem already loaded by caller.
+if !isdefined(@__MODULE__, :AIMLNodeSystem)
+    include("AIMLNodeSystem.jl")
+    using .AIMLNodeSystem
+end
+
 # GRUG: Bring the Action+Tone Predictor (pre-vote arousal tuning and confidence weighting)!
 # GRUG: Guard against double-include if ActionTonePredictor already loaded by caller.
 if !isdefined(@__MODULE__, :ActionTonePredictor)
