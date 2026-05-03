@@ -205,6 +205,12 @@ SemanticVerbs.add_synonym!("evaluates", "assess")
 println("  ✓ Added biological and cognitive verb classes + synonym")
 
 # ============================================================================
+# SAVE SPECIMEN
+# ============================================================================
+println("\n[9] Saving specimen...")
+process_mission("/saveSpecimen comprehensive_test_specimen.json")
+
+# ============================================================================
 # SUMMARY
 # ============================================================================
 println("\n" * "="^70)

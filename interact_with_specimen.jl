@@ -524,8 +524,8 @@ end
 
 # Save updated specimen with learned information
 updated_path = "comprehensive_test_specimen_with_interactions.json"
-result = save_specimen_to_file!(updated_path)
-log_system!("Updated specimen saved with interaction history", result)
+process_mission("/saveSpecimen $updated_path")
+log_system!("Updated specimen saved with interaction history")
 
 # ============================================================================
 # FINAL LOG SAVE
