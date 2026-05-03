@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
 # ============================================================================
-# GRUG: Comprehensive Specimen Interaction & Logging
+# GRUG: Comprehensive Specimen Interaction & Logging - FIXED VERSION
 # ============================================================================
 # Loads the specimen, performs diverse interactions, logs everything to markdown
 # with detailed annotations including:
@@ -11,14 +11,13 @@
 # - All verbose logging
 # ============================================================================
 
-println("" * "="^70)
+println("=" * "="^70)
 println("   COMPREHENSIVE SPECIMEN INTERACTION & LOGGING")
 println("="^70 * "\n")
 
 # GRUG: Load Main.jl first - it includes all required modules
 include("src/Main.jl")
 
-using Base.Threads: Atomic, atomic_add!
 using Dates
 
 # ============================================================================
@@ -54,15 +53,6 @@ function log_analysis!(header::String, content::String)
     for line in split(content, '\n')
         println("   $line")
     end
-end
-
-function log_activations!(nodes::Vector{Tuple{String, Float64}})
-    push!(INTERACTION_LOG, "**Activated Nodes:**\n")
-    for (node_id, conf) in nodes
-        push!(INTERACTION_LOG, "- `$node_id` (confidence: $(round(conf, digits=3)))\n")
-    end
-    push!(INTERACTION_LOG, "\n")
-    println(f"  ✓ Activated {length(nodes)} node(s)")
 end
 
 function log_scan_mode!(mode::Int, explanation::String)
@@ -107,47 +97,54 @@ end
 # ============================================================================
 println("[1] Loading specimen...")
 
-# First create the specimen
-include("create_comprehensive_specimen.jl")
-
-# Save it to file
 specimen_path = "comprehensive_test_specimen.json"
-result = save_specimen_to_file!(specimen_path)
-log_system!("Specimen saved to $specimen_path", result)
 
-# Now reload to test the load function
-log_system!("Reloading specimen to test persistence...")
-load_result = load_specimen_from_file!(specimen_path)
-log_system!("Specimen reloaded", load_result)
+# Check if specimen exists
+if !isfile(specimen_path)
+    println("  ✗ Specimen file not found: $specimen_path")
+    println("  → Please run create_comprehensive_specimen.jl first to create the specimen")
+    exit(1)
+end
+
+log_section!("Specimen Loading")
+
+result = load_specimen_from_file!(specimen_path)
+log_system!("Specimen reloaded", result)
+
+# Count nodes
+node_count = lock(NODE_LOCK) do
+    count(n -> !n.is_grave, values(NODE_MAP))
+end
+
+log_system!("Total alive nodes", "$node_count nodes")
 
 # ============================================================================
 # INTERACTION TESTS
 # ============================================================================
+println("\n[2] Running interaction tests...")
+
 log_section!("Basic Queries - Simple Input")
 
 # Test 1: Simple query in science domain
 log_user!("What is quantum mechanics?")
-println("\n[Processing query...]")
-response = process_user_input("What is quantum mechanics")
-log_system!("- Response", "**$response**")
+println("\n[Processing query...]...")
+process_mission("What is quantum mechanics")
 log_scan_mode!(1, "Short input with simple structure → bidirectional cheap scan")
 
 # Test 2: Simple query in philosophy
 log_user!("Explain ethics")
-println("\n[Processing query...]")
-response = process_user_input("Explain ethics")
-log_system!("- Response", "**$response**")
+println("\n[Processing query...]...")
+process_mission("Explain ethics")
 
 log_section!("Complex Queries - Dynamic Relational Extraction")
 
 # Test 3: Complex nested relation query
 log_user!("How does AI which enables learning affect scientific discovery?")
-println("\n[Processing complex query with nested relations...]")
-response = process_user_input("How does AI which enables learning affect scientific discovery")
-log_system!("- Response", "**$response**")
+println("\n[Processing complex query with nested relations...]...")
+process_mission("How does AI which enables learning affect scientific discovery")
 
 # Analyze what happened with dynamic extraction
-println("\n[Analyzing dynamic extraction...]")
+println("\n[Analyzing dynamic extraction...]...")
 triple_analysis = """
 Dynamic Relational Extraction activated:
 Input complexity: High (complexity_score >= 4.5)
@@ -166,9 +163,8 @@ log_scan_mode!(3, "Complex input with nested relations → high-res scan with dy
 
 # Test 4: Multi-domain query triggering cross-lobe activation
 log_user!("Tell me about ecosystems which contain communities that depend on resources")
-println("\n[Processing multi-clause query...]")
-response = process_user_input("Tell me about ecosystems which contain communities that depend on resources")
-log_system!("- Response", "**$response**")
+println("\n[Processing multi-clause query...]...")
+process_mission("Tell me about ecosystems which contain communities that depend on resources")
 
 relational_analysis = """
 Cross-Domain Relational Matching:
@@ -193,9 +189,8 @@ log_section!("Cross-Lobe Reasoning")
 
 # Test 5: Query spanning science and technology
 log_user!("How do robots which use artificial intelligence advance scientific research?")
-println("\n[Processing cross-lobe query...]")
-response = process_user_input("How do robots which use artificial intelligence advance scientific research")
-log_system!("- Response", "**$response**")
+println("\n[Processing cross-lobe query...]...")
+process_mission("How do robots which use artificial intelligence advance scientific research")
 
 lobe_analysis = """
 Cross-Lobe Activation Pattern:
@@ -222,9 +217,8 @@ log_section!("Attachment Relay System")
 
 # Test 6: Query triggering attachment fire
 log_user!("What does AI enable?")
-println("\n[Testing attachment relay...]")
-response = process_user_input("What does AI enable")
-log_system!("- Response", "**$response**")
+println("\n[Testing attachment relay...]...")
+process_mission("What does AI enable")
 
 attachment_analysis = """
 Attachment Relay Activation:
@@ -257,9 +251,8 @@ log_section!("Drop Table Lookup")
 
 # Test 7: Query triggering drop table responses
 log_user!("What types of chemical reactions exist?")
-println("\n[Testing drop table lookup...]")
-response = process_user_input("What types of chemical reactions exist")
-log_system!("- Response", "**$response**")
+println("\n[Testing drop table lookup...]...")
+process_mission("What types of chemical reactions exist")
 
 droptable_analysis = """
 Drop Table Lookup System:
@@ -290,9 +283,8 @@ log_section!("Action Packet Filtering")
 
 # Test 8: Query demonstrating action packet
 log_user!("Can machines learn patterns?")
-println("\n[Testing action packet filtering...]")
-response = process_user_input("Can machines learn patterns")
-log_system!("- Response", "**$response**")
+println("\n[Testing action packet filtering...]...")
+process_mission("Can machines learn patterns")
 
 action_analysis = """
 Action Packet Analysis:
@@ -328,9 +320,8 @@ log_section!("Strength-Based Bias")
 
 # Test 9: Query favoring high-strength node
 log_user!("How do species change over time?")
-println("\n[Testing strength-based bias...]")
-response = process_user_input("How do species change over time")
-log_system!("- Response", "**$response**")
+println("\n[Testing strength-based bias...]...")
+process_mission("How do species change over time")
 
 strength_analysis = """
 Strength System Analysis:
@@ -367,9 +358,8 @@ log_section!("Thesaurus Normalization")
 
 # Test 10: Query requiring synonym resolution
 log_user!("Tell me about fundamental particles")
-println("\n[Testing thesaurus normalization...]")
-response = process_user_input("Tell me about fundamental particles")
-log_system!("- Response", "**$response**)
+println("\n[Testing thesaurus normalization...]...")
+process_mission("Tell me about fundamental particles")
 
 thesaurus_analysis = """
 Thesaurus Normalization:
@@ -401,9 +391,8 @@ log_section!("Rule-Based Fallback")
 
 # Test 11: Query triggering AIML rule
 log_user!("What is quantum mechanics")  # Exact rule match
-println("\n[Testing AIML rule fallback...]")
-response = process_user_input("What is quantum mechanics")
-log_system!("- Response", "**$response**")
+println("\n[Testing AIML rule fallback...]...")
+process_mission("What is quantum mechanics")
 
 rule_analysis = """
 AIML Rule Fallback System:
@@ -442,9 +431,8 @@ log_section!("Complex Multi-Part Query")
 
 # Test 12: Very complex query
 log_user!("Explain how artificial intelligence which enables machines to learn patterns affects scientific discovery by enabling new approaches to quantum mechanics and DNA research")
-println("\n[Processing very complex multi-part query...]")
-response = process_user_input("Explain how artificial intelligence which enables machines to learn patterns affects scientific discovery by enabling new approaches to quantum mechanics and DNA research")
-log_system!("- Response", "**$response**")
+println("\n[Processing very complex multi-part query...]...")
+process_mission("Explain how artificial intelligence which enables machines to learn patterns affects scientific discovery by enabling new approaches to quantum mechanics and DNA research")
 
 complex_analysis = """
 Ultra-Complex Query Analysis:
@@ -489,7 +477,7 @@ log_analysis!("Complex Query Analysis", complex_analysis)
 log_section!("Summary & Statistics")
 
 # Final specimen state
-println("\n[Compiling final statistics...]")
+println("\n[Compiling final statistics...]...")
 lock(NODE_LOCK) do
     total_nodes = length(NODE_MAP)
     total_strength = sum(node.strength for node in values(NODE_MAP))
@@ -500,6 +488,7 @@ Final Specimen State:
 
 Total nodes: $total_nodes
 Average node strength: $(round(avg_strength, digits=2))
+
 Lobe distribution:
   - Science: 3 nodes
   - Technology: 2 nodes
@@ -541,7 +530,7 @@ log_system!("Updated specimen saved with interaction history", result)
 # ============================================================================
 # FINAL LOG SAVE
 # ============================================================================
-println("\n[Writing complete interaction log...]")
+println("\n[Writing complete interaction log...]...")
 write_log!()
 
 println("\n" * "="^70)
