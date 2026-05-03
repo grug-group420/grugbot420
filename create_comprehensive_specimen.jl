@@ -198,6 +198,7 @@ SemanticVerbs.add_verb!("thinks", "cognitive")
 SemanticVerbs.add_verb!("learns", "cognitive")
 SemanticVerbs.add_verb!("remembers", "cognitive")
 SemanticVerbs.add_verb!("understands", "cognitive")
+SemanticVerbs.add_verb!("evaluates", "cognitive")
 
 SemanticVerbs.add_synonym!("evaluates", "assess")
 
