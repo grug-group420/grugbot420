@@ -28,6 +28,7 @@ const ALL_TESTS = [
     "test_vote_ties.jl",
     "test_comprehensive.jl",
     "test_aiml_node_system.jl",
+    "test_vote_orchestrator.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

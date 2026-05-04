@@ -534,33 +534,65 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         error("!!! FATAL: Orchestrator failed: Mission text is invisible wind! !!!")
     end
 
-    # GRUG FIX: Sort votes by confidence descending BEFORE bucketing.
-    # This guarantees the highest-confidence domain node wins primary slot,
-    # not a boot seed that happened to be inserted first.
+    # GRUG: Sort votes by confidence descending BEFORE bucketing.
     sorted_votes = sort(votes; by = v -> v.confidence, rev = true)
 
-    max_conf = sorted_votes[1].confidence
-
-    sure_votes   = Vote[]
-    unsure_votes = Vote[]
-
-    for v in sorted_votes
-        # GRUG: If rock is within 0.05 of the biggest rock, it is a SURE thing.
-        if v.confidence >= max_conf - 0.05
-            push!(sure_votes, v)
-        else
-            # GRUG: For smaller rocks, loop through and flip a flat 50/50 coin!
-            # Side effects! If Keep wins, push to unsure_votes.
-            @coinflip [
-                bias(:Keep, 50) => () -> push!(unsure_votes, v),
-                bias(:Drop, 50) => () -> nothing
-            ]
+    # GRUG: NEW ARCHITECTURE — threshold-gated vote selection!
+    # AIML only considers votes past AIML_CONFIDENCE_THRESHOLD. Top tier (within
+    # AIML_TOP_TIER_WINDOW of max) goes straight in, no coinflip. Sub-top tier
+    # (below top but above threshold) gets a strength-biased coinflip — strong
+    # neurons more likely kept. Below threshold = dropped.
+    #
+    # This replaces the old "within 0.05 of max = sure, else 50/50 flat coin"
+    # logic with a principled two-stage filter that respects node strength.
+    # --------------------------------------------------------------------------
+    # GRUG: Convert engine votes -> VoteCandidate with node strength pulled
+    # from NODE_MAP. Done under one lock pass for efficiency.
+    vote_candidates = VoteOrchestrator.VoteCandidate[]
+    candidate_to_vote = Dict{String, Vote}()
+    lock(NODE_LOCK) do
+        for v in sorted_votes
+            node = get(NODE_MAP, v.node_id, nothing)
+            # GRUG: If a node vanished between scan and orchestrate, skip it
+            # loudly (warn, not crash). Another thread may have graved it.
+            if isnothing(node)
+                @warn "[ORCHESTRATOR] ⚠ Vote for missing node '$(v.node_id)' dropped."
+                continue
+            end
+            push!(vote_candidates, VoteOrchestrator.VoteCandidate(
+                v.node_id, v.confidence, node.strength; strength_cap = STRENGTH_CAP
+            ))
+            candidate_to_vote[v.node_id] = v
         end
     end
 
+    if isempty(vote_candidates)
+        error("!!! FATAL: Orchestrator failed: All votes referenced vanished nodes! !!!")
+    end
+
+    top_tier, subtop_tier, rejected_tier = VoteOrchestrator.select_aiml_votes(
+        vote_candidates;
+        threshold  = VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD,
+        top_window = VoteOrchestrator.AIML_TOP_TIER_WINDOW
+    )
+
+    # GRUG: If nothing passed the threshold, fall back to the highest-confidence
+    # vote we have. Biology rule: cave should always try to answer, not freeze.
+    # This also preserves backwards compatibility with tests that feed low-confidence votes.
+    if isempty(top_tier) && isempty(subtop_tier)
+        @warn "[ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=$(VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD). Falling back to highest-confidence vote."
+        # GRUG: Pick top of the rejected list as emergency fallback.
+        fallback = rejected_tier[1]
+        push!(top_tier, fallback)
+    end
+
+    # GRUG: Translate selected candidates back to Vote objects for downstream use.
+    sure_votes   = Vote[candidate_to_vote[vc.node_id] for vc in top_tier]
+    unsure_votes = Vote[candidate_to_vote[vc.node_id] for vc in subtop_tier]
+
     if isempty(sure_votes)
-        # GRUG: Should be mathematically impossible, but Grug checks anyway! NO SILENT FAILURES!
-        error("!!! FATAL: Grug math broke! Max confidence produced zero sure votes! !!!")
+        # GRUG: Should be mathematically impossible after fallback, but NO SILENT FAILURES!
+        error("!!! FATAL: Grug math broke! Top tier produced zero sure votes even after fallback! !!!")
     end
 
     # GRUG: TIE-BREAKING! If multiple rocks sit at the same confidence, pick random winner.
@@ -1155,6 +1187,14 @@ function process_mission(mission_text::String)
     println("--> Scanning specimens & looking for dialectical relations...")
     t_start = time()
 
+    # GRUG: Build the DONE channel for this cycle. One slot per "lobe" unit of
+    # fire work. Here we treat the entire scan+expand as one logical lobe
+    # (the cave-wide firing pass). If we later split into per-lobe parallel
+    # fire, each lobe gets its own slot and its own DoneSignal put.
+    # This makes the DONE protocol the official handoff from the fire layer
+    # to the orchestrator layer, per architecture spec.
+    done_channel = VoteOrchestrator.make_done_channel(8)
+
     valid_specimens = if is_image
         # GRUG: Image input! Scan image nodes using SDF signal.
         println("[IMAGE] 🔍  Routing to image node scan path...")
@@ -1162,6 +1202,41 @@ function process_mission(mission_text::String)
     else
         # GRUG: Normal text scan with drop-table expansion
         scan_and_expand(mission_text)
+    end
+
+    # GRUG: LOBE FIRING COMPLETE → emit DONE to the orchestrator layer.
+    # This is the explicit boundary requested by the architecture spec:
+    # "once a lobe is finished firing everything then it sends DONE to the
+    # orchestrator layer". The orchestrator (ephemeral_aiml_orchestrator)
+    # will only run after DONE is received.
+    try
+        scan_fc = Main._LAST_FIRE_COUNTER[]
+        fires_total = isnothing(scan_fc) ? 0 : VoteOrchestrator.current_fire_count(scan_fc)
+        VoteOrchestrator.send_done!(done_channel, VoteOrchestrator.DoneSignal(
+            "scan_pass",
+            fires_total,
+            length(valid_specimens),
+            time() - t_start,
+            nothing
+        ))
+    catch e
+        # GRUG: Sending DONE should never fail (channel is bounded to 8, we put 1).
+        # If it does, log loudly — but don't abort the response pipeline.
+        @warn "[MAIN] Failed to send scan DONE signal: $e"
+    end
+
+    # GRUG: Orchestrator waits for DONE before picking winners. Timeout 5s —
+    # scan should already be done, this is just the formal handoff.
+    try
+        _signals = VoteOrchestrator.wait_for_done(done_channel, 1; timeout_s = 5.0)
+        # GRUG: signals is informational — log if any lobe reported an error.
+        for s in _signals
+            if !isnothing(s.error)
+                @warn "[MAIN] Lobe '$(s.lobe_id)' reported error in DONE: $(s.error)"
+            end
+        end
+    catch e
+        @warn "[MAIN] DONE wait failed (non-fatal, orchestrator will still run): $e"
     end
 
     if isempty(valid_specimens)

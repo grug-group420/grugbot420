@@ -79,6 +79,11 @@ using .FullLobeScanner
 include("AIMLNodeSystem.jl")
 using .AIMLNodeSystem
 
+# GRUG: Vote orchestrator — parallel 1000-cap fire + DONE signalling + threshold vote pick.
+# Must load BEFORE engine.jl so engine can call parallel_fire_batches and FireCounter.
+include("VoteOrchestrator.jl")
+using .VoteOrchestrator
+
 include("engine.jl")
 include("Main.jl")
 

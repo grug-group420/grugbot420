@@ -45,6 +45,13 @@ if !isdefined(@__MODULE__, :ActionTonePredictor)
     using .ActionTonePredictor
 end
 
+# GRUG: Bring the Vote Orchestrator (parallel 1000-cap fire + unique Task dispatch + threshold vote picker).
+# GRUG: Guard against double-include if VoteOrchestrator already loaded by caller.
+if !isdefined(@__MODULE__, :VoteOrchestrator)
+    include("VoteOrchestrator.jl")
+    using .VoteOrchestrator
+end
+
 # ==============================================================================
 # SENSORY CONVERSION (TEXT TO SIGNAL)
 # ==============================================================================
@@ -769,6 +776,13 @@ end
 # GRUG: Map from target_node_id -> Vector of AttachedNode (max MAX_ATTACHMENTS each)
 const ATTACHMENT_MAP  = Dict{String, Vector{AttachedNode}}()
 const ATTACHMENT_LOCK = ReentrantLock()
+
+# GRUG: Handoff slot so scan_and_expand relay pass can reuse the FireCounter
+# built by scan_specimens for this cycle. All fire paths share one counter so
+# the 1000 cap is enforced GLOBALLY — attachments, drop-table, and cascade all
+# count toward the same limit. Protected by NODE_LOCK implicitly (only written
+# by scan_specimens under its own flow).
+const _LAST_FIRE_COUNTER = Ref{Union{Nothing, VoteOrchestrator.FireCounter}}(nothing)
 
 # GRUG: Hard cap on how many nodes can be bolted onto one target. User said 4.
 const MAX_ATTACHMENTS = 4
@@ -1864,134 +1878,161 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     # GRUG: SCAN NODES - Already have scan_mode from earlier (deterministic selection)
     # scan_mode was computed before relational extraction to decide extraction strategy
 
-    lock(NODE_LOCK) do
+    # GRUG: PARALLEL FIRE PIPELINE (new architecture)
+    # --------------------------------------------------------------------------
+    # Old code was a serial for-loop. New code:
+    #   1. Snapshot node map under NODE_LOCK -> release lock.
+    #   2. Build FireCounter (hard cap = 1000, shared across ALL fire types).
+    #   3. Dispatch batched fire Tasks via VoteOrchestrator.parallel_fire_batches.
+    #      Each Task has a unique non-colliding name so there is NO collision.
+    #   4. Results are aggregated flat. Attachment relay later uses SAME counter.
+    # --------------------------------------------------------------------------
+    # GRUG: Snapshot key list under lock, then release so per-node work can run
+    # without blocking other threads. Each node is read-only inside the fire
+    # closure (only bump_strength! mutates, and it takes its own sub-lock).
+    active_keys = lock(NODE_LOCK) do
         if isempty(NODE_MAP)
             error("!!! FATAL: Grug find cave empty! No specimens to scan! !!!")
         end
 
         # GRUG DOC 2.6: Biological Attention Bottleneck!
         # Grug cannot look at 1,000,000 rocks at once. Cave will catch fire!
-        # Grug roll rand(600:1800) to limit how many nodes Grug scan. 
-        active_cap  = 1000  # GRUG: HARD CAP - 1000 nodes max per cycle
-        
+        # active_cap  = 1000  # GRUG: HARD CAP - 1000 nodes max per cycle (now in VoteOrchestrator)
         all_keys    = collect(keys(NODE_MAP))
-        shuffle!(all_keys) 
-        active_keys = all_keys[1:min(length(all_keys), active_cap)]
+        shuffle!(all_keys)
+        # GRUG: Pre-trim to cap so we don't even build Tasks for over-cap ids.
+        all_keys[1:min(length(all_keys), VoteOrchestrator.ACTIVE_FIRE_CAP)]
+    end
 
-        # GRUG: Hopfield candidates tracking DISABLED
-        # hopfield_candidates = String[]  # OLD CODE (DISABLED)
+    # GRUG: Build FireCounter for this cycle. Cap = 1000. All firing shares this.
+    # cycle_id carries the input hash for diagnostic traceability.
+    cycle_id = "scan#$(hash(input_text))"
+    fire_counter = VoteOrchestrator.FireCounter(cycle_id, VoteOrchestrator.ACTIVE_FIRE_CAP)
 
-        for id in active_keys
-            node = NODE_MAP[id]
+    # GRUG: The fire_one closure. One node = one fire attempt. Called from
+    # many Tasks in parallel. Returns a tuple if node voted, nothing if skipped.
+    # Returns shape: (id, confidence, is_antimatch, user_triples, node_triples)
+    fire_one = function(id::String, fc::VoteOrchestrator.FireCounter)
+        # GRUG: Read node under lock, then release for scan work.
+        # Scan work (pattern matching, relational eval) is read-only on the node.
+        node = lock(NODE_LOCK) do
+            get(NODE_MAP, id, nothing)
+        end
+        if isnothing(node)
+            return nothing
+        end
 
-            # GRUG: Skip grave nodes. They are negative reinforcement markers, not voters!
-            if node.is_grave
-                continue
-            end
+        # GRUG: Skip grave nodes. They are negative reinforcement markers, not voters!
+        if node.is_grave
+            return nothing
+        end
 
-            # GRUG NEW: STRENGTH-BIASED COINFLIP before even scanning pattern!
-            # Strong nodes are biased to activate. Weak nodes may be skipped.
-            if !strength_biased_scan_coinflip(node)
-                continue
-            end
+        # GRUG NEW: STRENGTH-BIASED COINFLIP before even scanning pattern!
+        # Strong nodes are biased to activate. Weak nodes may be skipped.
+        if !strength_biased_scan_coinflip(node)
+            return nothing
+        end
 
-            # GRUG: Image nodes use SDF signal, not text signal. Skip size check for them.
-            if !node.is_image_node
-                # Grug check: Is user signal too small to hold node pattern? Skip safely.
-                if length(target_signal) < length(node.signal)
-                    continue
-                end
-            end
-            
-            token_conf = 0.0
-            try
-                if node.is_image_node
-                    # GRUG: Image nodes cannot be scanned with text signals.
-                    # They only respond to image inputs that have been SDF-converted.
-                    # Skip image nodes during text scans (they'll fire in image scan path).
-                    continue
-                end
-
-                # GRUG: SELECTIVE PATTERN SCAN — downgrade scan tier for simple patterns.
-                # The base scan_mode is set by input complexity, but a tiny node pattern
-                # doesn't justify high-res. _effective_scan_mode caps the tier based on
-                # the node's own signal length. Cheap patterns get cheap scans.
-                effective_mode = _effective_scan_mode(scan_mode, node.signal)
-
-                if effective_mode == 1
-                    # GRUG: BIDIRECTIONAL CHEAP SCAN — simple patterns (≤3 signal elements)
-                    # run forward AND reverse. "dog bites man" vs "man bites dog" both align.
-                    # Confidence is smoothed: average of forward and reverse contributions.
-                    # If both miss → PatternNotFoundError propagates normally (skip node).
-                    _, token_conf = _bidirectional_cheap_scan(target_signal, node.signal; threshold=0.3)
-                elseif effective_mode == 2
-                    _, token_conf = medium_scan(target_signal, node.signal; threshold=0.4)
-                else
-                    _, token_conf = high_res_scan(target_signal, node.signal; threshold=0.5)
-                end
-            catch e
-                if e isa PatternNotFoundError
-                    # Normal logic: Scanner says no match in any direction. Skip!
-                    continue
-                elseif e isa PatternScanError
-                    # FATAL LOGIC ERROR. NO SILENT FAILURE! Scream loud!
-                    rethrow(e)
-                else
-                    error("!!! FATAL: Unknown error during complexity-based pattern scan: $e !!!")
-                end
-            end
-            
-            # 2. Relational Matcher (Dialectical)
-            rel_conf, is_antimatch = evaluate_relational_dialectics(
-                user_triples, node.relational_patterns, node.required_relations, node.relation_weights
-            )
-            
-            # 3. Hard Anti-Match / Missing Requirement Penalty
-            # GRUG: -9999.0 means node demanded a gear user did not have!
-            if is_antimatch || rel_conf == -9999.0
-                continue 
-            end
-
-            confidence = token_conf + rel_conf
-
-            # GRUG: ACTION+TONE CONFIDENCE PRE-WEIGHTING
-            # If prediction ran successfully, apply action family weight multiplier.
-            # Nodes whose action_packet aligns with predicted action get boosted.
-            # Nodes that don't align get mild suppression. Low-confidence predictions
-            # apply minimal modulation (multiplier stays near 1.0).
-            if !isnothing(prediction) && confidence > 0.0
-                # GRUG: Peek at the node's likely action from its action_packet.
-                # We use the first positive action name as the node's "declared action".
-                node_action_peek = try
-                    positives, _, _ = parse_action_packet(node.action_packet)
-                    isempty(positives) ? "" : String(positives[1][1])
-                catch ex
-                    # GRUG: Don't crash scan for one bad action packet, but NEVER hide it!
-                    @warn "[ENGINE] ⚠ Failed to peek action_packet for node $(node.id): $ex"
-                    ""
-                end
-                weight = ActionTonePredictor.get_action_weight_multiplier(prediction, node_action_peek)
-                confidence = confidence * weight
-            end
-            
-            if token_conf > 0 || rel_conf > 0
-                push!(all_valid_specimens, (id, confidence, is_antimatch, user_triples, node.relational_patterns))
-
-                # GRUG: Hopfield cache tracking DISABLED - see note at top of scan_specimens
-                # OLD CODE (DISABLED):
-                # if confidence >= HOPFIELD_STORE_THRESHOLD
-                #     push!(hopfield_candidates, id)
-                # end
+        # GRUG: Image nodes use SDF signal, not text signal. Skip size check for them.
+        if !node.is_image_node
+            # Grug check: Is user signal too small to hold node pattern? Skip safely.
+            if length(target_signal) < length(node.signal)
+                return nothing
             end
         end
 
-        # GRUG: Store high-confidence results in Hopfield cache - DISABLED
-        # See note at top of scan_specimens for explanation
-        # OLD CODE (DISABLED):
-        # if !isempty(hopfield_candidates)
-        #     hopfield_record!(input_hash, hopfield_candidates)
-        # end
+        token_conf = 0.0
+        try
+            if node.is_image_node
+                # GRUG: Image nodes cannot be scanned with text signals.
+                # They only respond to image inputs that have been SDF-converted.
+                # Skip image nodes during text scans (they'll fire in image scan path).
+                return nothing
+            end
+
+            # GRUG: SELECTIVE PATTERN SCAN — downgrade scan tier for simple patterns.
+            effective_mode = _effective_scan_mode(scan_mode, node.signal)
+
+            if effective_mode == 1
+                # GRUG: BIDIRECTIONAL CHEAP SCAN — simple patterns (≤3 signal elements)
+                _, token_conf = _bidirectional_cheap_scan(target_signal, node.signal; threshold=0.3)
+            elseif effective_mode == 2
+                _, token_conf = medium_scan(target_signal, node.signal; threshold=0.4)
+            else
+                _, token_conf = high_res_scan(target_signal, node.signal; threshold=0.5)
+            end
+        catch e
+            if e isa PatternNotFoundError
+                # Normal logic: Scanner says no match in any direction. Skip!
+                return nothing
+            elseif e isa PatternScanError
+                # FATAL LOGIC ERROR. NO SILENT FAILURE! Scream loud!
+                rethrow(e)
+            else
+                error("!!! FATAL: Unknown error during complexity-based pattern scan: $e !!!")
+            end
+        end
+
+        # 2. Relational Matcher (Dialectical)
+        rel_conf, is_antimatch = evaluate_relational_dialectics(
+            user_triples, node.relational_patterns, node.required_relations, node.relation_weights
+        )
+
+        # 3. Hard Anti-Match / Missing Requirement Penalty
+        # GRUG: -9999.0 means node demanded a gear user did not have!
+        if is_antimatch || rel_conf == -9999.0
+            return nothing
+        end
+
+        confidence = token_conf + rel_conf
+
+        # GRUG: ACTION+TONE CONFIDENCE PRE-WEIGHTING
+        if !isnothing(prediction) && confidence > 0.0
+            node_action_peek = try
+                positives, _, _ = parse_action_packet(node.action_packet)
+                isempty(positives) ? "" : String(positives[1][1])
+            catch ex
+                @warn "[ENGINE] ⚠ Failed to peek action_packet for node $(node.id): $ex"
+                ""
+            end
+            weight = ActionTonePredictor.get_action_weight_multiplier(prediction, node_action_peek)
+            confidence = confidence * weight
+        end
+
+        if token_conf > 0 || rel_conf > 0
+            # GRUG: Node wants to fire. Claim a slot from the shared FireCounter.
+            # If cap reached, skip — hard cap applies to ALL fire paths.
+            if !VoteOrchestrator.try_claim_fire_slot!(fc)
+                return nothing
+            end
+            return (id, confidence, is_antimatch, user_triples, node.relational_patterns)
+        end
+        return nothing
     end
+
+    # GRUG: Launch parallel fire. Each batch is its own Task with unique name.
+    # Errors from any Task surface here via fetch.
+    fire_results = try
+        VoteOrchestrator.parallel_fire_batches(
+            active_keys, fire_counter, fire_one;
+            batch_size = VoteOrchestrator.FIRE_BATCH_SIZE,
+            task_prefix = "scan_fire"
+        )
+    catch e
+        # GRUG: Parallel fire exploded. Scream, don't hide.
+        @error "[ENGINE] parallel_fire_batches failed during scan_specimens: $e"
+        rethrow(e)
+    end
+
+    # GRUG: Re-type the flat Any[] into our specimen tuple vector.
+    for r in fire_results
+        push!(all_valid_specimens, r)
+    end
+
+    # GRUG: Attach FireCounter to a task-local so scan_and_expand relay pass
+    # can count attachment fires toward the same 1000 cap. We pass it via a
+    # thread-local-ish handoff: store last cycle's counter in a const Ref.
+    _LAST_FIRE_COUNTER[] = fire_counter
 
     if isempty(all_valid_specimens)
         # GRUG QoL FIX: If no valid rocks found, this is not a logic failure!
@@ -2118,14 +2159,36 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     # The connector pattern also surfaces as a RelationalTriple in the node's
     # context so the generative pipeline knows WHY this node was co-activated.
     # Triple format: (target_id, "relay_attached", connector_pattern)
-    relay_cap = 1000  # GRUG: HARD CAP - 1000 nodes max per cycle
-    relay_count = length(expanded)
+    # GRUG: Relay pass uses the SAME FireCounter that scan_specimens built for
+    # this cycle. That means attachment fires COUNT against the global 1000 cap
+    # along with pattern-scan fires, drop-table fires, and cascade fires.
+    # If scan already consumed all 1000 slots, attachments simply won't fire.
+    # If scan_specimens was never called (edge case, e.g. empty NODE_MAP branch),
+    # fall back to a fresh FireCounter so relay still respects the cap.
+    shared_fc = _LAST_FIRE_COUNTER[]
+    if isnothing(shared_fc)
+        shared_fc = VoteOrchestrator.FireCounter("relay_fallback#$(hash(input_text))", VoteOrchestrator.ACTIVE_FIRE_CAP)
+    end
+    relay_cap   = shared_fc.cap
     relay_additions = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
 
     for (id, conf, antimatch, u_trips, n_trips) in expanded
-        fired_pairs = fire_attachments!(id, relay_count, relay_cap)
+        # GRUG: Stop firing attachments if global cap is already hit. Hard cap
+        # applies across ALL fire paths — no bypass for attachments!
+        if VoteOrchestrator.fire_cap_reached(shared_fc)
+            println("[ENGINE] 🧠  Attachment relay halted — global fire cap ($relay_cap) reached.")
+            break
+        end
+        # GRUG: Pass current counter value to fire_attachments! so it can
+        # honor the cap internally. Tracking is per-call; counter persists.
+        fired_pairs = fire_attachments!(id, VoteOrchestrator.current_fire_count(shared_fc), relay_cap)
         for (fired_id, fired_conf, connector_pattern) in fired_pairs
             if !(fired_id in already_included)
+                # GRUG: Claim a fire slot for this attachment. If cap is hit, skip.
+                # This ensures attached-node firings count toward the 1000 limit.
+                if !VoteOrchestrator.try_claim_fire_slot!(shared_fc)
+                    break
+                end
                 fired_node = lock(() -> get(NODE_MAP, fired_id, nothing), NODE_LOCK)
                 isnothing(fired_node) && continue
                 # GRUG: Inject the connector pattern as a relay triple so generative
@@ -2135,7 +2198,6 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                 relay_triples = vcat(fired_node.relational_patterns, [relay_triple])
                 push!(relay_additions, (fired_id, fired_conf, false, user_triples, relay_triples))
                 push!(already_included, fired_id)
-                relay_count += 1
             end
         end
     end
