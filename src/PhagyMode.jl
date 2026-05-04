@@ -286,8 +286,8 @@ COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
 TIMEOUT: 10 second limit enforced by dispatcher.
 """
 function prune_orphan_nodes!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    const AUTOMATON_NAME = "ORPHAN_PRUNER"
-    const RESOURCE_SCOPE = "node_map_write"
+    AUTOMATON_NAME = "ORPHAN_PRUNER"
+    RESOURCE_SCOPE = "node_map_write"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
@@ -377,8 +377,8 @@ COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
 TIMEOUT: 10 second limit enforced by dispatcher.
 """
 function decay_forgotten_strengths!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    const AUTOMATON_NAME = "STRENGTH_DECAYER"
-    const RESOURCE_SCOPE = "node_map_write"
+    AUTOMATON_NAME = "STRENGTH_DECAYER"
+    RESOURCE_SCOPE = "node_map_write"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
@@ -454,8 +454,8 @@ COLLISION PROTECTION: Reserves "node_map_write" resource before execution.
 TIMEOUT: 15 second limit enforced by dispatcher.
 """
 function recycle_grave_assets!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
-    const AUTOMATON_NAME = "GRAVE_RECYCLER"
-    const RESOURCE_SCOPE = "node_map_write"
+    AUTOMATON_NAME = "GRAVE_RECYCLER"
+    RESOURCE_SCOPE = "node_map_write"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
@@ -576,7 +576,7 @@ end
 #     cache_lock      ::ReentrantLock,
 #     node_map        ::Dict,
 #     node_lock       ::ReentrantLock
-# )::PhagyStats\2
+# )::PhagyStats
 #     const AUTOMATON_NAME = "CACHE_VALIDATOR"
 #     const RESOURCE_SCOPE = "hopfield_cache"
     
@@ -628,7 +628,7 @@ end
 #     notes = "Examined=$examined, Purged=$purged, ValidKept=$valid"
 #     println("[PHAGY:CACHE] 🗄️   Cycle complete. $notes")
 #     return PhagyStats("CACHE_VALIDATOR", examined, purged, elapsed_ms, notes)
-end
+# end  # DISABLED: validate_hopfield_cache! is commented out
 
 # ==============================================================================
 # AUTOMATON 5: DROP TABLE COMPACTOR
@@ -644,9 +644,9 @@ Also deduplicates any entries that are exact string matches (keeps the max proba
 SAFETY: Never removes entries from graved nodes (GRAVE RECYCLER handles those).
 Never removes the LAST entry in a drop_table (node must keep at least one response).
 """
-function compact_drop_tables!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats\2
-    const AUTOMATON_NAME = "DROP_TABLE_COMPACT"
-    const RESOURCE_SCOPE = "node_map_write"
+function compact_drop_tables!(node_map::Dict, node_lock::ReentrantLock)::PhagyStats
+    AUTOMATON_NAME = "DROP_TABLE_COMPACT"
+    RESOURCE_SCOPE = "node_map_write"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
@@ -656,46 +656,53 @@ function compact_drop_tables!(node_map::Dict, node_lock::ReentrantLock)::PhagySt
     # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
     t_start = time()
     try
-    examined  = 0
-    trimmed   = 0
-    protected = 0   # GRUG: Entries saved by "last entry" protection rule
+        examined  = 0
+        trimmed   = 0
+        protected = 0   # GRUG: Entries saved by "last entry" protection rule
 
-    lock(node_lock) do
-        for (id, node) in node_map
-            node.is_grave && continue
-            isempty(node.drop_table) && continue
-            examined += 1
+        lock(node_lock) do
+            for (id, node) in node_map
+                node.is_grave && continue
+                isempty(node.drop_table) && continue
+                examined += 1
 
-            # GRUG: Collect keys to trim (below floor probability)
-            trim_candidates = String[]
-            for (response_text, probability) in node.drop_table
-                if probability < DROP_TABLE_TRIM_FLOOR
-                    push!(trim_candidates, response_text)
+                # GRUG: Collect keys to trim (below floor probability)
+                trim_candidates = String[]
+                for (response_text, probability) in node.drop_table
+                    if probability < DROP_TABLE_TRIM_FLOOR
+                        push!(trim_candidates, response_text)
+                    end
+                end
+
+                # GRUG: Apply "last entry" protection - never empty a drop_table
+                if length(trim_candidates) >= length(node.drop_table)
+                    # GRUG: Would empty the table. Protect by keeping the highest-prob entry.
+                    keep_key = argmax(node.drop_table)
+                    filter!(k -> k != keep_key, trim_candidates)
+                    protected += 1
+                    @debug "[PHAGY:COMPACT] Node $id: last-entry protection applied, kept $keep_key"
+                end
+
+                # GRUG: Delete trim candidates
+                for key in trim_candidates
+                    delete!(node.drop_table, key)
+                    trimmed += 1
+                    @debug "[PHAGY:COMPACT] Node $id: trimmed '$key' (below floor $DROP_TABLE_TRIM_FLOOR)"
                 end
             end
-
-            # GRUG: Apply "last entry" protection - never empty a drop_table
-            if length(trim_candidates) >= length(node.drop_table)
-                # GRUG: Would empty the table. Protect by keeping the highest-prob entry.
-                keep_key = argmax(node.drop_table)
-                filter!(k -> k != keep_key, trim_candidates)
-                protected += 1
-                @debug "[PHAGY:COMPACT] Node $id: last-entry protection applied, kept $keep_key"
-            end
-
-            # GRUG: Delete trim candidates
-            for key in trim_candidates
-                delete!(node.drop_table, key)
-                trimmed += 1
-                @debug "[PHAGY:COMPACT] Node $id: trimmed '$key' (below floor $DROP_TABLE_TRIM_FLOOR)"
-            end
         end
-    end
 
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Trimmed=$trimmed, LastEntryProtections=$protected, TrimFloor=$DROP_TABLE_TRIM_FLOOR"
-    println("[PHAGY:COMPACT] 🗜️   Cycle complete. $notes")
-    return PhagyStats("DROP_TABLE_COMPACT", examined, trimmed, elapsed_ms, notes)
+        elapsed_ms = (time() - t_start) * 1000.0
+        notes = "Examined=$examined, Trimmed=$trimmed, LastEntryProtections=$protected, TrimFloor=$DROP_TABLE_TRIM_FLOOR"
+        println("[PHAGY:COMPACT] 🗜️   Cycle complete. $notes")
+        return PhagyStats("DROP_TABLE_COMPACT", examined, trimmed, elapsed_ms, notes)
+    catch e
+        println("[PHAGY:COMPACT] !!! ERROR: $e !!!")
+        Base.show_backtrace(stdout, catch_backtrace())
+        rethrow(e)
+    finally
+        release_phagy_resource!(RESOURCE_SCOPE)
+    end
 end
 
 # ==============================================================================
@@ -715,9 +722,9 @@ If rules don't have dormancy_strikes yet, this automaton adds them gracefully.
 SAFETY: Never deletes rules - only sets is_dormant=true. User must explicitly
 purge dormant rules via /pruneRules CLI command. This prevents accidental rule loss.
 """
-function prune_dormant_rules!(rules::Vector, rules_lock::ReentrantLock)::PhagyStats\2
-    const AUTOMATON_NAME = "RULE_PRUNER"
-    const RESOURCE_SCOPE = "rules"
+function prune_dormant_rules!(rules::Vector, rules_lock::ReentrantLock)::PhagyStats
+    AUTOMATON_NAME = "RULE_PRUNER"
+    RESOURCE_SCOPE = "rules"
     
     # GRUG: Reserve resource to prevent collision with other phagy automata
     if !reserve_phagy_resource!(AUTOMATON_NAME, RESOURCE_SCOPE)
@@ -727,48 +734,55 @@ function prune_dormant_rules!(rules::Vector, rules_lock::ReentrantLock)::PhagySt
     # GRUG: Ensure cleanup happens no matter what (success, error, or timeout)
     t_start = time()
     try
-    examined  = 0
-    flagged   = 0
-    already   = 0
-    active    = 0
+        examined  = 0
+        flagged   = 0
+        already   = 0
+        active    = 0
 
-    lock(rules_lock) do
-        for rule in rules
-            examined += 1
+        lock(rules_lock) do
+            for rule in rules
+                examined += 1
 
-            # GRUG: Skip rules already marked dormant
-            if hasproperty(rule, :is_dormant) && rule.is_dormant
-                already += 1
-                continue
-            end
-
-            # GRUG: Rules with fires are alive - reset their dormancy strike counter
-            if hasproperty(rule, :fire_count) && rule.fire_count > 0
-                if hasproperty(rule, :dormancy_strikes)
-                    rule.dormancy_strikes = 0
+                # GRUG: Skip rules already marked dormant
+                if hasproperty(rule, :is_dormant) && rule.is_dormant
+                    already += 1
+                    continue
                 end
-                active += 1
-                continue
-            end
 
-            # GRUG: Rule has zero fires. Increment dormancy strike.
-            if hasproperty(rule, :dormancy_strikes)
-                rule.dormancy_strikes += 1
-                if rule.dormancy_strikes >= RULE_DORMANCY_CYCLES
-                    if hasproperty(rule, :is_dormant)
-                        rule.is_dormant = true
-                        flagged += 1
-                        @debug "[PHAGY:RULES] Rule flagged dormant after $(rule.dormancy_strikes) strikes: $(hasproperty(rule, :pattern) ? rule.pattern : rule)"
+                # GRUG: Rules with fires are alive - reset their dormancy strike counter
+                if hasproperty(rule, :fire_count) && rule.fire_count > 0
+                    if hasproperty(rule, :dormancy_strikes)
+                        rule.dormancy_strikes = 0
+                    end
+                    active += 1
+                    continue
+                end
+
+                # GRUG: Rule has zero fires. Increment dormancy strike.
+                if hasproperty(rule, :dormancy_strikes)
+                    rule.dormancy_strikes += 1
+                    if rule.dormancy_strikes >= RULE_DORMANCY_CYCLES
+                        if hasproperty(rule, :is_dormant)
+                            rule.is_dormant = true
+                            flagged += 1
+                            @debug "[PHAGY:RULES] Rule flagged dormant after $(rule.dormancy_strikes) strikes: $(hasproperty(rule, :pattern) ? rule.pattern : rule)"
+                        end
                     end
                 end
             end
         end
-    end
 
-    elapsed_ms = (time() - t_start) * 1000.0
-    notes = "Examined=$examined, Flagged=$flagged, AlreadyDormant=$already, ActiveRules=$active, DormancyThreshold=$RULE_DORMANCY_CYCLES"
-    println("[PHAGY:RULES] ✂️   Cycle complete. $notes")
-    return PhagyStats("RULE_PRUNER", examined, flagged, elapsed_ms, notes)
+        elapsed_ms = (time() - t_start) * 1000.0
+        notes = "Examined=$examined, Flagged=$flagged, AlreadyDormant=$already, ActiveRules=$active, DormancyThreshold=$RULE_DORMANCY_CYCLES"
+        println("[PHAGY:RULES] ✂️   Cycle complete. $notes")
+        return PhagyStats("RULE_PRUNER", examined, flagged, elapsed_ms, notes)
+    catch e
+        println("[PHAGY:RULES] !!! ERROR: $e !!!")
+        Base.show_backtrace(stdout, catch_backtrace())
+        rethrow(e)
+    finally
+        release_phagy_resource!(RESOURCE_SCOPE)
+    end
 end
 
 # ==============================================================================
@@ -1203,17 +1217,17 @@ function run_phagy!(
         throw(PhagyError("!!! FATAL: run_phagy! got invalid rules_lock! !!!"))
     end
 
-    # GRUG: Roll the automaton selector (1-7, uniform)
-    automaton_roll = rand(1:7)
+    # GRUG: Roll the automaton selector (1-6, uniform)
+    automaton_roll = rand(1:6)
 
-    # GRUG: If automaton 7 is rolled but message_history/history_lock not provided,
-    # re-roll to 1-6. Forensics needs memory access — no silent skip.
-    if automaton_roll == 7 && (isnothing(message_history) || isnothing(history_lock))
-        println("[PHAGY] 🦠  Rolled MEMORY_FORENSICS but no message_history provided. Re-rolling 1-6.")
-        automaton_roll = rand(1:6)
+    # GRUG: If automaton 6 (MEMORY_FORENSICS) is rolled but message_history/history_lock not provided,
+    # re-roll to 1-5. Forensics needs memory access — no silent skip.
+    if automaton_roll == 6 && (isnothing(message_history) || isnothing(history_lock))
+        println("[PHAGY] 🦠  Rolled MEMORY_FORENSICS but no message_history provided. Re-rolling 1-5.")
+        automaton_roll = rand(1:5)
     end
 
-    println("[PHAGY] 🦠  Phagy cycle starting. Automaton roll: $automaton_roll/7")
+    println("[PHAGY] 🦠  Phagy cycle starting. Automaton roll: $automaton_roll/6")
 
     stats = try
         if automaton_roll == 1

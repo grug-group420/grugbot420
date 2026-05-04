@@ -464,40 +464,39 @@ end
 # makes this obsolete.
 # ============================================================================
 #
-# OLD CODE (DISABLED):
-# function hopfield_put!(lobe_id::String, input_hash::UInt64, node_ids::Vector{String})
-#     if isempty(strip(lobe_id))
-#         throw_table_error("lobe_id cannot be empty", "hopfield_put!")
-#     end
-#     if isempty(node_ids)
-#         throw_table_error("node_ids cannot be empty for hopfield_put!", "hopfield_put!")
-#     end
-#     key = string(input_hash)
-#     table_put!(lobe_id, CHUNK_HOPFIELD, key, node_ids)
-# end
-#
-# function hopfield_get(lobe_id::String, input_hash::UInt64)::Union{Vector{String}, Nothing}
-#     if isempty(strip(lobe_id))
-#         throw_table_error("lobe_id cannot be empty", "hopfield_get")
-#     end
-#     key = string(input_hash)
-#     val = table_get(lobe_id, CHUNK_HOPFIELD, key)
-#     if isnothing(val)
-#         return nothing
-#     end
-#     # GRUG: Sanity check - stored value must be a Vector{String}
-#     if !(val isa Vector)
-#         throw_table_error("Hopfield chunk entry for key '$key' is not a Vector. Data corruption!", "hopfield_get")
-#     end
-#     return val
-# end
-#
-# function hopfield_has(lobe_id::String, input_hash::UInt64)::Bool
-#     if isempty(strip(lobe_id))
-#         throw_table_error("lobe_id cannot be empty", "hopfield_has")
-#     end
-#     return table_has(lobe_id, CHUNK_HOPFIELD, string(input_hash))
-# end
+function hopfield_put!(lobe_id::String, input_hash::UInt64, node_ids::Vector{String})
+    if isempty(strip(lobe_id))
+        throw_table_error("lobe_id cannot be empty", "hopfield_put!")
+    end
+    if isempty(node_ids)
+        throw_table_error("node_ids cannot be empty for hopfield_put!", "hopfield_put!")
+    end
+    key = string(input_hash)
+    table_put!(lobe_id, CHUNK_HOPFIELD, key, node_ids)
+end
+
+function hopfield_get(lobe_id::String, input_hash::UInt64)::Union{Vector{String}, Nothing}
+    if isempty(strip(lobe_id))
+        throw_table_error("lobe_id cannot be empty", "hopfield_get")
+    end
+    key = string(input_hash)
+    val = table_get(lobe_id, CHUNK_HOPFIELD, key)
+    if isnothing(val)
+        return nothing
+    end
+    # GRUG: Sanity check - stored value must be a Vector{String}
+    if !(val isa Vector)
+        throw_table_error("Hopfield chunk entry for key '$key' is not a Vector. Data corruption!", "hopfield_get")
+    end
+    return val
+end
+
+function hopfield_has(lobe_id::String, input_hash::UInt64)::Bool
+    if isempty(strip(lobe_id))
+        throw_table_error("lobe_id cannot be empty", "hopfield_has")
+    end
+    return table_has(lobe_id, CHUNK_HOPFIELD, string(input_hash))
+end
 
 # ============================================================================
 # NODE CHUNK OPS - Per-lobe node index

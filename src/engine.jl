@@ -452,64 +452,56 @@ const HOPFIELD_HIT_COUNT_MIN     = 2
 const HOPFIELD_HIT_COUNTS        = Dict{UInt64, Int}()
 
 # ============================================================================
-# HOPFIELD CACHE FUNCTIONS - DISABLED
+# HOPFIELD CACHE FUNCTIONS - RE-ENABLED for test compatibility
 # ============================================================================
-# GRUG: Hopfield caching has been DISABLED. Pattern bind phase is blazing fast
-# even without caching, and the Hopfield system introduces unnecessary complexity.
-# Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
-# (50,000+ nodes per lobe) where memory access becomes a bottleneck.
-# Current lobe architecture with 1000 node cap per cycle makes this obsolete.
-# ============================================================================
-#
-# OLD CODE (DISABLED):
-# """
-# hopfield_input_hash(input_text::String)::UInt64
-#
-# GRUG: Compute a stable hash for a normalized input string.
-# Used as the key for Hopfield cache lookups.
-# """
-# function hopfield_input_hash(input_text::String)::UInt64
-#     if strip(input_text) == ""
-#         error("!!! FATAL: hopfield_input_hash got empty input! !!!")
-#     end
-#     # GRUG: Normalize before hashing (lowercase, strip, collapse spaces)
-#     normalized = join(split(lowercase(strip(input_text))), " ")
-#     return hash(normalized)
-# end
-#
-# """
-# hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
-#
-# GRUG: Check if this input hash is familiar enough for Hopfield fast-path.
-# Returns cached node_ids if familiar, Nothing if not cached or not yet familiar.
-# """
-# function hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
-#     return lock(HOPFIELD_CACHE_LOCK) do
-#         hit_count = get(HOPFIELD_HIT_COUNTS, input_hash, 0)
-#         if hit_count >= HOPFIELD_HIT_COUNT_MIN && haskey(HOPFIELD_CACHE, input_hash)
-#             return HOPFIELD_CACHE[input_hash]
-#         end
-#         return nothing
-#     end
-# end
-#
-# """
-# hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
-#
-# GRUG: Record that these node_ids fired for this input hash at high confidence.
-# Increment hit counter. Once hit count reaches HOPFIELD_HIT_COUNT_MIN, future
-# lookups will use the cache instead of doing a full scan.
-# """
-# function hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
-#     if isempty(node_ids)
-#         # GRUG: Nothing to cache. Not a failure, just skip.
-#         return
-#     end
-#     lock(HOPFIELD_CACHE_LOCK) do
-#         HOPFIELD_CACHE[input_hash] = node_ids
-#         HOPFIELD_HIT_COUNTS[input_hash] = get(HOPFIELD_HIT_COUNTS, input_hash, 0) + 1
-#     end
-# end
+"""
+hopfield_input_hash(input_text::String)::UInt64
+
+GRUG: Compute a stable hash for a normalized input string.
+Used as the key for Hopfield cache lookups.
+"""
+function hopfield_input_hash(input_text::String)::UInt64
+    if strip(input_text) == ""
+        error("!!! FATAL: hopfield_input_hash got empty input! !!!")
+    end
+    # GRUG: Normalize before hashing (lowercase, strip, collapse spaces)
+    normalized = join(split(lowercase(strip(input_text))), " ")
+    return hash(normalized)
+end
+
+"""
+hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
+
+GRUG: Check if this input hash is familiar enough for Hopfield fast-path.
+Returns cached node_ids if familiar, Nothing if not cached or not yet familiar.
+"""
+function hopfield_lookup(input_hash::UInt64)::Union{Vector{String}, Nothing}
+    return lock(HOPFIELD_CACHE_LOCK) do
+        hit_count = get(HOPFIELD_HIT_COUNTS, input_hash, 0)
+        if hit_count >= HOPFIELD_HIT_COUNT_MIN && haskey(HOPFIELD_CACHE, input_hash)
+            return HOPFIELD_CACHE[input_hash]
+        end
+        return nothing
+    end
+end
+
+"""
+hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
+
+GRUG: Record that these node_ids fired for this input hash at high confidence.
+Increment hit counter. Once hit count reaches HOPFIELD_HIT_COUNT_MIN, future
+lookups will use the cache instead of doing a full scan.
+"""
+function hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
+    if isempty(node_ids)
+        # GRUG: Nothing to cache. Not a failure, just skip.
+        return
+    end
+    lock(HOPFIELD_CACHE_LOCK) do
+        HOPFIELD_CACHE[input_hash] = node_ids
+        HOPFIELD_HIT_COUNTS[input_hash] = get(HOPFIELD_HIT_COUNTS, input_hash, 0) + 1
+    end
+end
 
 # ==============================================================================
 # STRENGTH & GRAVE MANAGEMENT
