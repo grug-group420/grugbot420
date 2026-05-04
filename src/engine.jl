@@ -1795,25 +1795,49 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     # GRUG: DETERMINISTIC SCAN SELECTION
     # Grug look at how complex input is to choose scanner eye.
     scan_mode = screen_input_complexity(target_signal, RelationalTriple[])
-    
-    # GRUG: Extract relational triples - use dynamic extraction for complex inputs
-    # Follow the "wave" of complexity: high-res scan mode -> dynamic relational extraction
-    if scan_mode >= 3
-        # GRUG: High-res mode - compound subjects, nested relations, causal chains
-        user_triples = try
-            extract_dynamic_relational_triples(input_text, scan_mode)
+
+    # GRUG: RELATIONAL EXTRACTION COUPLING (per architecture spec)
+    # --------------------------------------------------------------------------
+    # Rule: "complex pattern scan → dynamic relational extraction, keep basic
+    #        relational triples for simple things, dynamic is needed for complex"
+    #
+    # Therefore:
+    #   mode 1 (cheap_scan)   → basic extract_relational_triples
+    #   mode 2 (medium_scan)  → basic extract_relational_triples
+    #   mode 3 (high_res_scan)→ dynamic extract_dynamic_relational_triples
+    #                            NO SILENT FALLBACK. If dynamic fails on a
+    #                            complex input, we scream loud. Falling back to
+    #                            basic on mode-3 input would defeat the purpose
+    #                            of the complexity coupling — the input earned
+    #                            high-res scanning, so it earns dynamic triples.
+    #
+    # Error handling:
+    #   - mode 3 dynamic failure → rethrow (fatal for this scan cycle, caller
+    #                                       receives real error, NO SILENT FAIL)
+    #   - mode 1/2 basic failure → return empty triples + loud @warn
+    #     (basic extraction on simple input is less critical; an empty triple
+    #      set just means pattern-scan alone drives the decision.)
+    # --------------------------------------------------------------------------
+    user_triples = if scan_mode >= 3
+        # GRUG: High-res mode → DYNAMIC triples REQUIRED. No fallback.
+        try
+            result = extract_dynamic_relational_triples(input_text, scan_mode)
+            println("[ENGINE] 🌊 High-res dynamic relational extraction: $(length(result)) triples from complex input")
+            result
         catch e
-            # GRUG: On error, fall back to basic extraction - never silent fail!
-            @warn "[ENGINE] Dynamic relational extraction failed (non-fatal), falling back to basic: $e"
-            extract_relational_triples(input_text)
+            # GRUG: Complex input failed dynamic extraction. This is serious.
+            # Do NOT quietly degrade to basic — the caller asked for complex
+            # analysis and we must either deliver or fail loudly.
+            @error "[ENGINE] ⚠ Dynamic relational extraction FAILED on complex input (mode=$scan_mode). NO SILENT FAIL — rethrowing: $e"
+            rethrow(e)
         end
-        println("[ENGINE] 🌊 High-res relational extraction: $(length(user_triples)) triples from complex input")
     else
-        # GRUG: Simple mode - basic (subject, verb, object) extraction only
-        user_triples = try
+        # GRUG: Simple mode (1 or 2) → basic extraction. Non-fatal on failure
+        # because basic triples are complementary to pattern scan, not required.
+        try
             extract_relational_triples(input_text)
         catch e
-            @warn "[ENGINE] Basic relational extraction failed (non-fatal): $e"
+            @warn "[ENGINE] Basic relational extraction failed on simple input (mode=$scan_mode), returning empty triples: $e"
             RelationalTriple[]
         end
     end
