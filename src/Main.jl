@@ -1195,13 +1195,38 @@ function process_mission(mission_text::String)
     # to the orchestrator layer, per architecture spec.
     done_channel = VoteOrchestrator.make_done_channel(8)
 
-    valid_specimens = if is_image
-        # GRUG: Image input! Scan image nodes using SDF signal.
-        println("[IMAGE] 🔍  Routing to image node scan path...")
-        _scan_image_specimens(img_signal)
-    else
-        # GRUG: Normal text scan with drop-table expansion
-        scan_and_expand(mission_text)
+    # GRUG: SCAN SUB-PROCESS DISPATCH!
+    # The whole scan+expand is its own Task with a unique non-colliding name
+    # and a hard timeout. If scan deadlocks (e.g. a wedged batch slipped through
+    # the inner batch_timeout), the scan-task timeout catches it at the outer
+    # boundary. TaskTimeoutError surfaces loudly — NO SILENT FAILURES.
+    # Timeout is derived from FIRE_BATCH_TIMEOUT_S * expected-batch-count margin:
+    # 30s is more than enough for any realistic cave, still bounded.
+    scan_task_name, scan_task = VoteOrchestrator.dispatch_task_with_timeout(
+        () -> begin
+            if is_image
+                println("[IMAGE] 🔍  Routing to image node scan path...")
+                return _scan_image_specimens(img_signal)
+            else
+                return scan_and_expand(mission_text)
+            end
+        end,
+        "scan_cycle",
+        30.0;
+        context = "run_mission.scan"
+    )
+
+    valid_specimens = try
+        VoteOrchestrator.fetch_with_timeout(scan_task_name, scan_task)
+    catch e
+        # GRUG: Scan exploded or timed out. Scream, then fail loudly —
+        # cave cannot respond without scan results. NO SILENT FAILURES.
+        if e isa VoteOrchestrator.TaskTimeoutError
+            @error "[MAIN] Scan sub-process TIMEOUT: $e"
+        else
+            @error "[MAIN] Scan sub-process FAILED: $e"
+        end
+        rethrow(e)
     end
 
     # GRUG: LOBE FIRING COMPLETE → emit DONE to the orchestrator layer.
@@ -1226,7 +1251,9 @@ function process_mission(mission_text::String)
     end
 
     # GRUG: Orchestrator waits for DONE before picking winners. Timeout 5s —
-    # scan should already be done, this is just the formal handoff.
+    # scan should already be done, this is just the formal handoff. If DONE
+    # never arrives we still proceed (non-fatal) but log loudly so operator
+    # can debug the stuck lobe.
     try
         _signals = VoteOrchestrator.wait_for_done(done_channel, 1; timeout_s = 5.0)
         # GRUG: signals is informational — log if any lobe reported an error.
@@ -1244,13 +1271,58 @@ function process_mission(mission_text::String)
         return
     end
 
-    cast_votes = Vote[]
-    for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
-        push!(cast_votes, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+    # GRUG: CAST-VOTE SUB-PROCESS DISPATCH!
+    # Building Vote objects from specimens is its own bounded sub-process.
+    # Each cast_vote touches NODE_MAP, selects a stochastic action, and can
+    # bump strength. Dispatched to its own Task with a unique name + timeout.
+    # Typical runtime: well under 1s for 1000 specimens. 10s guard is generous.
+    cast_votes_task_name, cast_votes_task = VoteOrchestrator.dispatch_task_with_timeout(
+        () -> begin
+            out = Vote[]
+            for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
+                push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+            end
+            return out
+        end,
+        "cast_votes",
+        10.0;
+        context = "run_mission.cast_votes"
+    )
+    cast_votes = try
+        VoteOrchestrator.fetch_with_timeout(cast_votes_task_name, cast_votes_task)
+    catch e
+        if e isa VoteOrchestrator.TaskTimeoutError
+            @error "[MAIN] cast_votes sub-process TIMEOUT: $e"
+        else
+            @error "[MAIN] cast_votes sub-process FAILED: $e"
+        end
+        rethrow(e)
     end
 
     println("--> $(length(cast_votes)) valid votes passed gate... compiling JIT superposition...")
-    output, sure_votes, unsure_votes = ephemeral_aiml_orchestrator(mission_text, cast_votes)
+
+    # GRUG: ORCHESTRATOR SUB-PROCESS DISPATCH!
+    # The AIML orchestrator is itself dispatched to a unique Task with a timeout.
+    # It reads votes, applies threshold + top-tier + strength-biased coinflip
+    # selection, then fires the generative engine. Typical runtime: <2s.
+    # 20s guard catches any deadlock in the generative path (JIT layer can
+    # occasionally take time on first-hit compilation). NO SILENT FAILURES.
+    orch_task_name, orch_task = VoteOrchestrator.dispatch_task_with_timeout(
+        () -> ephemeral_aiml_orchestrator(mission_text, cast_votes),
+        "aiml_orchestrator",
+        20.0;
+        context = "run_mission.orchestrator"
+    )
+    output, sure_votes, unsure_votes = try
+        VoteOrchestrator.fetch_with_timeout(orch_task_name, orch_task)
+    catch e
+        if e isa VoteOrchestrator.TaskTimeoutError
+            @error "[MAIN] AIML orchestrator sub-process TIMEOUT: $e"
+        else
+            @error "[MAIN] AIML orchestrator sub-process FAILED: $e"
+        end
+        rethrow(e)
+    end
 
     t_elapsed = time() - t_start
 

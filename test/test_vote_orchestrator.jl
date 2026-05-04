@@ -300,10 +300,125 @@ end
 end
 
 # ==============================================================================
-# [15] Integration: DONE signal from multiple "lobes" in parallel Tasks
+# [15] TIMEOUT-BOUNDED TASK DISPATCH
 # ==============================================================================
 
-@testset "[15] End-to-end: simulated lobes send DONE after firing" begin
+@testset "[15A] dispatch_task with timeout — fast task returns value" begin
+    # GRUG: Task finishes well before timeout.
+    name, t = VoteOrchestrator.dispatch_task(
+        () -> (sleep(0.01); 123),
+        "fast_timeout";
+        timeout_s = 1.0,
+        context = "test_15A"
+    )
+    @test VoteOrchestrator.fetch_with_timeout(name, t) == 123
+end
+
+@testset "[15B] dispatch_task with timeout — slow task throws TaskTimeoutError" begin
+    # GRUG: Task exceeds timeout — TaskTimeoutError must fire.
+    name, t = VoteOrchestrator.dispatch_task(
+        () -> (sleep(2.0); :never),
+        "slow_timeout";
+        timeout_s = 0.2,
+        context = "test_15B"
+    )
+    @test_throws VoteOrchestrator.TaskTimeoutError VoteOrchestrator.fetch_with_timeout(name, t)
+end
+
+@testset "[15C] dispatch_task with timeout — internal error still propagates" begin
+    # GRUG: If Task throws before timeout, original error surfaces (not timeout).
+    name, t = VoteOrchestrator.dispatch_task(
+        () -> error("boom_inside"),
+        "err_timeout";
+        timeout_s = 1.0,
+        context = "test_15C"
+    )
+    # GRUG: Must NOT be TaskTimeoutError — must be original TaskFailedException.
+    err_ref = Ref{Any}(nothing)
+    try
+        VoteOrchestrator.fetch_with_timeout(name, t)
+    catch e
+        err_ref[] = e
+    end
+    @test !isnothing(err_ref[])
+    @test !(err_ref[] isa VoteOrchestrator.TaskTimeoutError)
+end
+
+@testset "[15D] fetch_with_timeout — no timeout = plain fetch" begin
+    # GRUG: Task dispatched without timeout, fetch_with_timeout without arg —
+    # behaves like plain fetch. No timeout enforced.
+    name, t = VoteOrchestrator.dispatch_task(() -> 77, "notimeout"; context = "test_15D")
+    @test VoteOrchestrator.fetch_with_timeout(name, t) == 77
+end
+
+@testset "[15E] dispatch_task_with_timeout — convenience wrapper" begin
+    name, t = VoteOrchestrator.dispatch_task_with_timeout(
+        () -> 555, "conv", 1.0;
+        context = "test_15E"
+    )
+    @test VoteOrchestrator.fetch_with_timeout(name, t) == 555
+
+    # GRUG: Zero/negative timeout rejected loudly.
+    @test_throws VoteOrchestrator.VoteOrchestratorError VoteOrchestrator.dispatch_task_with_timeout(
+        () -> 1, "bad", 0.0
+    )
+    @test_throws VoteOrchestrator.VoteOrchestratorError VoteOrchestrator.dispatch_task_with_timeout(
+        () -> 1, "bad", -5.0
+    )
+end
+
+@testset "[15F] parallel_fire_batches — per-batch timeout catches stuck batch" begin
+    # GRUG: A batch with a stuck fire_one must TaskTimeoutError-out cleanly.
+    fc = VoteOrchestrator.FireCounter("timeout_batch", 1000)
+    ids = ["n$i" for i in 1:30]
+    @test_throws VoteOrchestrator.TaskTimeoutError VoteOrchestrator.parallel_fire_batches(
+        ids, fc,
+        (nid, counter) -> begin
+            if nid == "n5"
+                sleep(5.0)  # Force batch to blow deadline.
+            end
+            VoteOrchestrator.try_claim_fire_slot!(counter) ? nid : nothing
+        end;
+        batch_size = 10,
+        batch_timeout_s = 0.4
+    )
+end
+
+@testset "[15G] parallel_fire_batches — happy path with tight timeout" begin
+    # GRUG: Normal fast batches never hit timeout.
+    fc = VoteOrchestrator.FireCounter("tight_timeout", 1000)
+    ids = ["n$i" for i in 1:200]
+    results = VoteOrchestrator.parallel_fire_batches(
+        ids, fc,
+        (nid, counter) -> VoteOrchestrator.try_claim_fire_slot!(counter) ? nid : nothing;
+        batch_size = 32,
+        batch_timeout_s = 2.0
+    )
+    @test length(results) == 200
+end
+
+@testset "[15H] dispatch_task — negative or zero timeout rejected" begin
+    @test_throws VoteOrchestrator.VoteOrchestratorError VoteOrchestrator.dispatch_task(
+        () -> 1, "x"; timeout_s = -0.1
+    )
+    @test_throws VoteOrchestrator.VoteOrchestratorError VoteOrchestrator.dispatch_task(
+        () -> 1, "x"; timeout_s = 0.0
+    )
+end
+
+@testset "[15I] TaskTimeoutError — showerror renders useful message" begin
+    err = VoteOrchestrator.TaskTimeoutError("test#42", "ctx_name", 1.234)
+    msg = sprint(showerror, err)
+    @test occursin("test#42", msg)
+    @test occursin("ctx_name", msg)
+    @test occursin("1.234", msg)
+end
+
+# ==============================================================================
+# [16] Integration: DONE signal from multiple "lobes" in parallel Tasks
+# ==============================================================================
+
+@testset "[16] End-to-end: simulated lobes send DONE after firing" begin
     lobe_ids = ["lobe_alpha", "lobe_beta", "lobe_gamma", "lobe_delta"]
     fc = VoteOrchestrator.FireCounter("e2e_lobe", 1000)
     done_ch = VoteOrchestrator.make_done_channel(length(lobe_ids))

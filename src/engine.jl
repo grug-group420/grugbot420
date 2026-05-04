@@ -2011,16 +2011,23 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     end
 
     # GRUG: Launch parallel fire. Each batch is its own Task with unique name.
-    # Errors from any Task surface here via fetch.
+    # Errors from any Task surface here via fetch_with_timeout inside
+    # parallel_fire_batches. TaskTimeoutError distinguishable from other errors
+    # so caller can choose retry vs abort. NO SILENT FAILURES.
     fire_results = try
         VoteOrchestrator.parallel_fire_batches(
             active_keys, fire_counter, fire_one;
-            batch_size = VoteOrchestrator.FIRE_BATCH_SIZE,
-            task_prefix = "scan_fire"
+            batch_size       = VoteOrchestrator.FIRE_BATCH_SIZE,
+            task_prefix      = "scan_fire",
+            batch_timeout_s  = VoteOrchestrator.FIRE_BATCH_TIMEOUT_S
         )
     catch e
-        # GRUG: Parallel fire exploded. Scream, don't hide.
-        @error "[ENGINE] parallel_fire_batches failed during scan_specimens: $e"
+        # GRUG: Parallel fire exploded or timed out. Scream, don't hide.
+        if e isa VoteOrchestrator.TaskTimeoutError
+            @error "[ENGINE] parallel_fire_batches TIMEOUT during scan_specimens: $e"
+        else
+            @error "[ENGINE] parallel_fire_batches failed during scan_specimens: $e"
+        end
         rethrow(e)
     end
 

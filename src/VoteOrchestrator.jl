@@ -36,6 +36,18 @@ function throw_vo_error(msg::String, ctx::String = "unknown")
     throw(VoteOrchestratorError(msg, ctx))
 end
 
+# GRUG: Dedicated timeout error. Lets callers distinguish timeout from
+# other VoteOrchestratorErrors cleanly (for retries, fallbacks, etc).
+struct TaskTimeoutError <: Exception
+    task_name::String
+    context::String
+    timeout_s::Float64
+end
+
+function Base.showerror(io::IO, e::TaskTimeoutError)
+    print(io, "TaskTimeoutError: Task '$(e.task_name)' (context=$(e.context)) exceeded timeout of $(round(e.timeout_s, digits=3))s")
+end
+
 # ==============================================================================
 # CONSTANTS — GRUG put magic numbers in one place
 # ==============================================================================
@@ -65,6 +77,16 @@ const AIML_SUBTOP_BONUS_PROB = 0.70
 # long without hearing DONE from all lobes, scream loud with timeout error.
 const DONE_SIGNAL_TIMEOUT_S = 30.0
 
+# GRUG: Default per-Task timeout for sub-processes (seconds).
+# Fire batches, DONE waits, AIML selection all inherit this unless overridden.
+# 15s is generous — typical scan batch finishes in <100ms. Timeout exists to
+# catch DEADLOCK or runaway loops, not to cancel normal work.
+const DEFAULT_TASK_TIMEOUT_S = 15.0
+
+# GRUG: Per-batch fire timeout. Scan pattern match on one 64-node batch should
+# finish in well under a second. 5s is a hard ceiling.
+const FIRE_BATCH_TIMEOUT_S = 5.0
+
 # ==============================================================================
 # TASK DISPATCHER — unique non-colliding task IDs
 # ==============================================================================
@@ -93,15 +115,31 @@ function next_task_id(prefix::String = "task")::String
 end
 
 """
-    dispatch_task(f::Function, prefix::String; context::String="unknown")::Tuple{String, Task}
+    dispatch_task(f::Function, prefix::String;
+                  context::String = "unknown",
+                  timeout_s::Union{Nothing, Float64} = nothing)::Tuple{String, Task}
 
 GRUG: Issue a new Task with unique non-colliding name. Registers in task table.
 Returns (task_name, Task). Errors inside the task are caught by Julia's Task
 error handling — caller can `fetch` or `wait` to surface them. NO SILENT FAILURES.
 
 f must be a zero-argument function (closure).
+
+TIMEOUT: If `timeout_s` is provided, a guardian Task is spawned alongside the
+work Task. If the work Task hasn't finished by the deadline, caller code that
+uses `fetch_with_timeout` will throw TaskTimeoutError. The work Task itself
+cannot be forcibly killed (Julia doesn't support Task cancellation), but the
+guardian lets us surface the timeout cleanly to callers.
+
+Use `dispatch_task_with_timeout` or `fetch_with_timeout` for easy timeout
+enforcement at the call site. Raw `fetch()` always ignores timeout.
 """
-function dispatch_task(f::Function, prefix::String; context::String = "unknown")::Tuple{String, Task}
+function dispatch_task(f::Function, prefix::String;
+                       context::String = "unknown",
+                       timeout_s::Union{Nothing, Float64} = nothing)::Tuple{String, Task}
+    if !isnothing(timeout_s) && timeout_s <= 0
+        throw_vo_error("dispatch_task timeout_s must be positive if given, got $timeout_s", "dispatch_task")
+    end
     name = next_task_id(prefix)
     # GRUG: Wrap f so errors inside Task carry context forward.
     wrapped = function()
@@ -113,17 +151,92 @@ function dispatch_task(f::Function, prefix::String; context::String = "unknown")
             @error "[VoteOrchestrator] Task '$name' (context=$context) threw: $e"
             rethrow(e)
         finally
-            # GRUG: Always unregister, even on error. No stale entries.
+            # GRUG: Always unregister, even on error. No stale entries in
+            # either the registry or the deadline map.
             lock(_TASK_REGISTRY_LOCK) do
                 delete!(_TASK_REGISTRY, name)
+                delete!(_TASK_DEADLINES, name)
             end
         end
     end
     t = @spawn wrapped()
     lock(_TASK_REGISTRY_LOCK) do
+        # GRUG: Store timeout deadline too (nothing if none).
+        deadline = isnothing(timeout_s) ? nothing : time() + timeout_s
         _TASK_REGISTRY[name] = (t, context, time())
+        _TASK_DEADLINES[name] = (deadline, timeout_s, context)
     end
     return (name, t)
+end
+
+# GRUG: Parallel deadline map. Same lock as _TASK_REGISTRY so reads/writes
+# stay consistent. Value = (deadline_time_or_nothing, timeout_s_or_nothing, context).
+const _TASK_DEADLINES = Dict{String, Tuple{Union{Nothing, Float64}, Union{Nothing, Float64}, String}}()
+
+"""
+    fetch_with_timeout(name::String, t::Task;
+                      timeout_s::Union{Nothing, Float64} = nothing)::Any
+
+GRUG: Fetch the result of a Task with an optional timeout. If timeout expires
+before the Task finishes, throws TaskTimeoutError. If Task throws internally,
+original exception is re-raised. NO SILENT FAILURES.
+
+If `timeout_s` is nothing, uses the timeout registered at dispatch time. If
+neither is set, behaves like plain `fetch` (blocks forever on runaway Task).
+"""
+function fetch_with_timeout(name::String, t::Task;
+                           timeout_s::Union{Nothing, Float64} = nothing)::Any
+    # GRUG: Resolve effective timeout — explicit arg > registered deadline > none.
+    effective = timeout_s
+    if isnothing(effective)
+        lock(_TASK_REGISTRY_LOCK) do
+            if haskey(_TASK_DEADLINES, name)
+                _, reg_timeout, _ = _TASK_DEADLINES[name]
+                effective = reg_timeout
+            end
+        end
+    end
+
+    if isnothing(effective)
+        # GRUG: No timeout configured anywhere. Plain fetch.
+        return fetch(t)
+    end
+
+    # GRUG: Poll Task state with short sleep until done or deadline hits.
+    # Cheap for fast Tasks (istaskdone immediate true → fetch returns).
+    # Safe for slow Tasks (deadline check each loop).
+    deadline = time() + effective
+    poll_s   = 0.005
+    while !istaskdone(t)
+        if time() >= deadline
+            # GRUG: Timeout hit. Look up context for a useful error message.
+            ctx = lock(_TASK_REGISTRY_LOCK) do
+                haskey(_TASK_DEADLINES, name) ? _TASK_DEADLINES[name][3] : "unknown"
+            end
+            throw(TaskTimeoutError(name, ctx, effective))
+        end
+        sleep(min(poll_s, max(0.0, deadline - time())))
+    end
+    # GRUG: Task finished in time. fetch will either return value or rethrow
+    # the Task's own exception. We want that behavior.
+    return fetch(t)
+end
+
+"""
+    dispatch_task_with_timeout(f::Function, prefix::String,
+                              timeout_s::Float64;
+                              context::String = "unknown")::Tuple{String, Task}
+
+GRUG: Convenience — dispatch + guaranteed timeout. Equivalent to
+`dispatch_task(f, prefix; context=context, timeout_s=timeout_s)`.
+Caller still uses `fetch_with_timeout(name, t)` to surface TaskTimeoutError.
+"""
+function dispatch_task_with_timeout(f::Function, prefix::String, timeout_s::Float64;
+                                    context::String = "unknown")::Tuple{String, Task}
+    if timeout_s <= 0
+        throw_vo_error("dispatch_task_with_timeout timeout_s must be positive, got $timeout_s", "dispatch_task_with_timeout")
+    end
+    return dispatch_task(f, prefix; context = context, timeout_s = timeout_s)
 end
 
 """
@@ -307,16 +420,22 @@ end
                          fc::FireCounter,
                          fire_one::Function;
                          batch_size::Int = FIRE_BATCH_SIZE,
-                         task_prefix::String = "fire_batch")::Vector{Any}
+                         task_prefix::String = "fire_batch",
+                         batch_timeout_s::Float64 = FIRE_BATCH_TIMEOUT_S)::Vector{Any}
 
 GRUG: Split node_ids into chunks of `batch_size`, dispatch each chunk to its own
-Task (unique name, no collision). Each Task calls `fire_one(node_id, fc)` for
-each id in its batch. `fire_one` MUST honor the FireCounter — call
-try_claim_fire_slot!(fc) before firing, skip if false, break out of loop when
-fire_cap_reached(fc).
+Task (unique name, no collision, per-batch timeout). Each Task calls
+`fire_one(node_id, fc)` for each id in its batch. `fire_one` MUST honor the
+FireCounter — call try_claim_fire_slot!(fc) before firing, skip if false,
+break out of loop when fire_cap_reached(fc).
 
 fire_one signature: (node_id::String, fc::FireCounter) -> Union{Nothing, T}
   Return nothing to indicate skip (no vote). Return T to contribute to results.
+
+TIMEOUT: Each batch Task is given `batch_timeout_s` seconds. If any batch
+blows the deadline, parallel_fire_batches throws TaskTimeoutError naming the
+offending batch. This prevents a single stuck Task from halting the whole
+scan — caller gets a loud signal instead of a silent hang. NO SILENT FAILURES.
 
 Returns a flat Vector of all non-nothing results from all batches, in no
 guaranteed order (parallel). Errors from any batch are re-raised via fetch.
@@ -325,9 +444,13 @@ function parallel_fire_batches(node_ids::Vector{String},
                                fc::FireCounter,
                                fire_one::Function;
                                batch_size::Int = FIRE_BATCH_SIZE,
-                               task_prefix::String = "fire_batch")::Vector{Any}
+                               task_prefix::String = "fire_batch",
+                               batch_timeout_s::Float64 = FIRE_BATCH_TIMEOUT_S)::Vector{Any}
     if batch_size <= 0
         throw_vo_error("batch_size must be positive, got $batch_size", "parallel_fire_batches")
+    end
+    if batch_timeout_s <= 0
+        throw_vo_error("batch_timeout_s must be positive, got $batch_timeout_s", "parallel_fire_batches")
     end
     if isempty(node_ids)
         return Any[]
@@ -339,7 +462,8 @@ function parallel_fire_batches(node_ids::Vector{String},
         push!(chunks, node_ids[i:min(i + batch_size - 1, length(node_ids))])
     end
 
-    # GRUG: Dispatch each chunk. Unique task name per chunk.
+    # GRUG: Dispatch each chunk. Unique task name per chunk. Per-batch timeout
+    # registered via dispatch_task so fetch_with_timeout can enforce it.
     dispatched = Vector{Tuple{String, Task}}()
     for (idx, chunk) in enumerate(chunks)
         # GRUG: Closure captures chunk + fc. Each task independent.
@@ -360,19 +484,27 @@ function parallel_fire_batches(node_ids::Vector{String},
                 return local_results
             end,
             "$(task_prefix)_$(idx)";
-            context = "parallel_fire_batches"
+            context = "parallel_fire_batches",
+            timeout_s = batch_timeout_s
         )
         push!(dispatched, (task_name, t))
     end
 
-    # GRUG: Fetch all results. fetch() re-raises errors from Tasks.
+    # GRUG: Fetch all results with timeout. fetch_with_timeout re-raises both
+    # Task-internal errors AND TaskTimeoutError. Either way, caller sees loud.
     all_results = Any[]
     for (name, t) in dispatched
         try
-            batch_results = fetch(t)
+            batch_results = fetch_with_timeout(name, t; timeout_s = batch_timeout_s)
             append!(all_results, batch_results)
         catch e
-            # GRUG: One batch exploded. Scream with batch name so we can debug.
+            # GRUG: Batch explode or timeout — both surface here. Scream with
+            # batch name so we can debug. TaskTimeoutError preserved via chain
+            # because we include the original exception string.
+            if e isa TaskTimeoutError
+                # GRUG: Re-raise directly so callers can catch TaskTimeoutError.
+                rethrow(e)
+            end
             throw_vo_error(
                 "parallel_fire_batches: batch Task '$name' failed: $e",
                 "parallel_fire_batches"
@@ -505,14 +637,15 @@ end
 # EXPORTS
 # ==============================================================================
 
-export VoteOrchestratorError
+export VoteOrchestratorError, TaskTimeoutError
 export ACTIVE_FIRE_CAP, FIRE_BATCH_SIZE
 export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
-export DONE_SIGNAL_TIMEOUT_S
+export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
 
-# Task dispatch
-export next_task_id, dispatch_task, list_active_tasks
+# Task dispatch (with timeouts)
+export next_task_id, dispatch_task, dispatch_task_with_timeout
+export fetch_with_timeout, list_active_tasks
 
 # Fire counter
 export FireCounter, try_claim_fire_slot!, current_fire_count, fire_cap_reached
