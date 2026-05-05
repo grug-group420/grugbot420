@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.7</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.8</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.7</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.8</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -225,6 +225,9 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#action-tone">15. ActionTonePredictor: Input Classification</a></li>
         <li><a href="#full-lobe-scanner">15.5 FullLobeScanner: Phase-Gated Lobe Sweep</a> <span class="new-badge">v7.5</span></li>
         <li><a href="#immune-thread-pool">15.6 ImmuneThreadPool: Hardened Task Execution</a> <span class="new-badge">v7.5</span></li>
+        <li><a href="#vote-orchestrator">15.7 VoteOrchestrator: Parallel Fire + Bounded Voting</a> <span class="new-badge">v7.8</span></li>
+        <li><a href="#timeout-dispatch">15.8 Timeout-Bounded Sub-Process Dispatch</a> <span class="new-badge">v7.8</span></li>
+        <li><a href="#relational-strict">15.9 Strict Relational-Triple Coupling</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -1084,6 +1087,236 @@ dispatching to workers, preventing the pool from being clogged by expensive work
 </div>
 
 <!-- ================================================================ -->
+<h2 id="vote-orchestrator">15.7 VoteOrchestrator: Parallel Fire + Bounded Voting <span class="new-badge">v7.8</span></h2>
+
+<p>
+The <strong>VoteOrchestrator</strong> is the hard-bounded fire/vote engine that sits under the whole
+pipeline. Every fire &mdash; pattern scan, drop-table relay, lobe cascade, NodeAttach relay &mdash; is
+routed through it. It provides unique non-colliding Task names, a global atomic fire cap shared
+across all fire types, batched parallel dispatch, DONE-signal synchronization, and strength-biased
+AIML vote selection. <strong>No silent failures, no unbounded parallelism, no colliding task names.</strong>
+</p>
+
+<div class="grug-box">
+    <p>Grug have many rocks and many fires at same time. Bad idea to let ALL rocks fire at once &mdash;
+    cave catch fire, bad! So Grug make <strong>fire counter</strong>. One counter for whole cave. Only
+    1000 fires allowed at any time. Fire slot full? New fire wait, or skip. Grug also give every
+    fire a <strong>name tag</strong> &mdash; no two fires have same name. When fire break, Grug know EXACTLY
+    which fire broke. No mystery. No silent fail. Smart cave brain.</p>
+</div>
+
+<h3>Global Fire Counter</h3>
+<p>
+A single atomic <code>FireCounter</code> is shared across the entire engine. Every fire path &mdash; pattern
+scan, relational fire, drop-table, attachment relay, lobe cascade &mdash; must successfully call
+<code>try_claim_fire_slot!(fc)</code> before igniting. Failed claim means cap is full; the caller
+either skips that fire or queues for the next cycle. Enforcement is unified, so no single subsystem
+can monopolize concurrency budget.
+</p>
+
+<h3>Unique Task Dispatch</h3>
+<p>
+<code>next_task_id(prefix)</code> returns <code>prefix#N</code> where <code>N</code> comes from a
+process-wide atomic counter. Two Tasks can never collide. <code>dispatch_task(f, prefix)</code>
+wraps a function in a fresh Task with such a name, and optionally registers a deadline with
+<code>_TASK_DEADLINES</code>. <code>list_active_tasks()</code> returns a snapshot of every live task
+with its prefix, start time, and deadline &mdash; useful for stuck-cycle diagnosis.
+</p>
+
+<h3>Batched Parallel Fire</h3>
+<p>
+<code>parallel_fire_batches(ids, fc, firefunc; batch_size, timeout_s)</code> dispatches node IDs in
+batches of <code>FIRE_BATCH_SIZE = 64</code>. Each batch is its own Task with its own
+<code>FIRE_BATCH_TIMEOUT_S = 5.0</code>s deadline. A failed or timed-out batch re-raises with the
+batch's task name attached, so the stack trace names the exact failing batch.
+</p>
+
+<h3>DONE Signaling</h3>
+<p>
+Phase-gated lobes use typed <code>Channel{DoneSignal}</code>s. Workers call
+<code>send_done!(ch, sig)</code> when they finish. AIML vote collection calls
+<code>wait_for_done(ch, expected)</code> which blocks until either <code>expected</code> signals
+arrive or <code>DONE_SIGNAL_TIMEOUT_S = 30.0</code>s passes &mdash; whichever comes first. A timed-out
+DONE gate still releases (so AIML never hangs forever), but logs a loud warning naming the lobes
+that did not signal.
+</p>
+
+<h3>Strength-Biased Vote Selection</h3>
+<p>
+<code>select_aiml_votes(candidates)</code> implements a two-tier filter:
+</p>
+<ul>
+    <li><strong>Threshold gate:</strong> reject any candidate with confidence below <code>AIML_CONFIDENCE_THRESHOLD = 0.15</code>.</li>
+    <li><strong>Top tier:</strong> every candidate within <code>AIML_TOP_TIER_WINDOW = 0.05</code> of the max confidence always fires.</li>
+    <li><strong>Sub-top:</strong> below-top candidates fire via strength-biased coinflip with base probability <code>AIML_SUBTOP_BASE_PROB = 0.20</code> plus up to <code>AIML_SUBTOP_BONUS_PROB = 0.70</code> weighted by node strength.</li>
+</ul>
+
+<h3>Constants</h3>
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Purpose</th></tr>
+    <tr><td><code>ACTIVE_FIRE_CAP</code></td><td>1000</td><td>Hard cap on concurrent fires across ALL fire types</td></tr>
+    <tr><td><code>FIRE_BATCH_SIZE</code></td><td>64</td><td>Nodes per parallel fire batch</td></tr>
+    <tr><td><code>FIRE_BATCH_TIMEOUT_S</code></td><td>5.0</td><td>Per-batch deadline inside parallel_fire_batches</td></tr>
+    <tr><td><code>DEFAULT_TASK_TIMEOUT_S</code></td><td>15.0</td><td>Default deadline for dispatch_task_with_timeout</td></tr>
+    <tr><td><code>DONE_SIGNAL_TIMEOUT_S</code></td><td>30.0</td><td>Max wait on DONE channel before AIML gate releases</td></tr>
+    <tr><td><code>AIML_CONFIDENCE_THRESHOLD</code></td><td>0.15</td><td>Minimum confidence to enter vote</td></tr>
+    <tr><td><code>AIML_TOP_TIER_WINDOW</code></td><td>0.05</td><td>Confidence window that counts as top tier</td></tr>
+    <tr><td><code>AIML_SUBTOP_BASE_PROB</code></td><td>0.20</td><td>Sub-top base fire probability</td></tr>
+    <tr><td><code>AIML_SUBTOP_BONUS_PROB</code></td><td>0.70</td><td>Sub-top strength-weighted bonus probability</td></tr>
+</table>
+
+<h3>Core API</h3>
+<table>
+    <tr><th>Function</th><th>Description</th></tr>
+    <tr><td><code>next_task_id(prefix)</code></td><td>Atomic counter → unique <code>prefix#N</code> task name</td></tr>
+    <tr><td><code>dispatch_task(f, prefix; timeout_s=nothing)</code></td><td>Run <code>f</code> in a fresh Task with optional deadline</td></tr>
+    <tr><td><code>dispatch_task_with_timeout(f, prefix, timeout_s)</code></td><td>Deadline-required variant &mdash; always times out</td></tr>
+    <tr><td><code>fetch_with_timeout(name, task)</code></td><td>Fetch task result or raise <code>TaskTimeoutError</code></td></tr>
+    <tr><td><code>list_active_tasks()</code></td><td>Snapshot of the live task registry</td></tr>
+    <tr><td><code>FireCounter(cycle_id, cap)</code></td><td>Construct atomic fire-slot counter</td></tr>
+    <tr><td><code>try_claim_fire_slot!(fc)</code></td><td>Atomic claim &mdash; returns <code>true</code> if claim succeeded</td></tr>
+    <tr><td><code>parallel_fire_batches(ids, fc, firefunc; ...)</code></td><td>Batched threaded fire with shared cap + per-batch deadline</td></tr>
+    <tr><td><code>make_done_channel(n)</code> / <code>send_done!</code> / <code>wait_for_done</code></td><td>DONE signaling for phase-gated lobes</td></tr>
+    <tr><td><code>select_aiml_votes(candidates; ...)</code></td><td>Threshold + top-tier + strength-biased coinflip</td></tr>
+</table>
+
+<h3>Error Types</h3>
+<ul>
+    <li><code>VoteOrchestratorError</code> &mdash; generic orchestrator failure with <code>message</code> + <code>context</code> breadcrumb.</li>
+    <li><code>TaskTimeoutError</code> &mdash; distinguishable subtype carrying <code>task_name</code>, <code>context</code>, <code>timeout_s</code>. Custom <code>showerror</code> method renders a human-readable trace. Callers pattern-match on this type to choose retry vs. abort.</li>
+</ul>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> The VoteOrchestrator replaces ad-hoc <code>@async</code> calls scattered
+    across subsystems with a single, uniformly-bounded dispatch layer. Uniform bounding means one global
+    fire cap, one task-naming scheme, and one deadline protocol &mdash; so runaway work in one subsystem cannot
+    exhaust resources for others. Unique task IDs and the active-task registry turn "parallel Julia hung
+    somewhere" into "task <code>scan_batch#1274</code> exceeded its 5.0s deadline" &mdash; a deterministic
+    debugging signal. The two-tier strength-biased voter preserves exploration (sub-top occasionally wins)
+    while guaranteeing that near-maximum-confidence candidates always get heard (top tier always fires).
+</div>
+
+<!-- ================================================================ -->
+<h2 id="timeout-dispatch">15.8 Timeout-Bounded Sub-Process Dispatch <span class="new-badge">v7.8</span></h2>
+
+<p>
+Per architecture spec: <em>"subsystems not only get their own unique tasks, they also have timeouts."</em>
+Every sub-process dispatched through the engine and <code>Main.jl</code> now runs in its own unique
+non-colliding Task under a hard-bounded deadline. <strong>No silent failures. No infinite hangs.</strong>
+</p>
+
+<div class="grug-box">
+    <p>Grug say: rock must answer in reasonable time. If rock take too long &mdash; maybe rock stuck, maybe
+    rock broken, maybe rock in infinite loop. Grug not wait forever! Every rock gets <strong>deadline</strong>.
+    Deadline hit? Grug raise loud alarm with rock's name. Not silent. Not guessing. Named.</p>
+</div>
+
+<h3>The Protocol</h3>
+<ol>
+    <li>Caller invokes <code>dispatch_task(f, prefix; timeout_s=5.0)</code> or the mandatory-timeout variant <code>dispatch_task_with_timeout(f, prefix, timeout_s)</code>.</li>
+    <li>The function is wrapped in a fresh Task with name <code>prefix#N</code>. Name and deadline are registered in <code>_TASK_DEADLINES</code>.</li>
+    <li>Caller awaits with <code>fetch_with_timeout(name, task)</code>, which uses <code>timedwait</code> on the registered deadline.</li>
+    <li>On success: result is returned.</li>
+    <li>On timeout: <code>TaskTimeoutError</code> is raised, carrying <code>task_name</code>, <code>context</code>, and <code>timeout_s</code>.</li>
+    <li>On other error: the original exception is rethrown with task name attached &mdash; <strong>never swallowed</strong>.</li>
+</ol>
+
+<h3>Call-Site Convention</h3>
+<p>
+Pipeline stages import named constants from <code>VoteOrchestrator</code> rather than hard-coding
+timeout numbers:
+</p>
+<pre><code>using GrugBot420.VoteOrchestrator: FIRE_BATCH_TIMEOUT_S, DONE_SIGNAL_TIMEOUT_S
+
+# later:
+parallel_fire_batches(ids, fc, firefunc; timeout_s = FIRE_BATCH_TIMEOUT_S)</code></pre>
+<p>
+This way the whole engine moves in lockstep when a timeout is tuned in one place.
+</p>
+
+<h3>Retry Pattern</h3>
+<pre><code>try
+    result = fetch_with_timeout(name, task)
+catch e
+    if e isa TaskTimeoutError
+        @warn "task timed out" task=e.task_name context=e.context timeout=e.timeout_s
+        # abort this cycle or schedule retry &mdash; caller's explicit choice
+    else
+        rethrow()  # never swallow non-timeout errors
+    end
+end</code></pre>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> Without bounded dispatch, a single stuck sub-process (GC pause,
+    network stall, logic bug) could silently freeze an entire vote cycle. With bounded dispatch, stalls
+    become loud, named, and recoverable. The <code>TaskTimeoutError</code> subtype is the key &mdash; it lets
+    callers implement retry-vs-abort policies per stage without a brittle string-matching dance on
+    generic errors.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="relational-strict">15.9 Strict Relational-Triple Coupling <span class="new-badge">v7.8</span></h2>
+
+<p>
+Relational-triple extraction is now strictly coupled to scan complexity. Complex inputs
+<strong>must</strong> use the dynamic (high-fidelity) extractor; simple inputs use the basic one.
+There is no silent fallback from dynamic to basic.
+</p>
+
+<div class="grug-box">
+    <p>Grug have two knives. <strong>Small knife</strong> for small cut &mdash; cheap, fast, not very sharp.
+    <strong>Big knife</strong> for big cut &mdash; sharp, expensive, slow. Old Grug: if big knife break,
+    quietly use small knife, pretend cut still clean. Big lie! Cut was bad. New Grug: big job NEEDS big
+    knife. Big knife break? Grug YELL, not pretend. Honest cave.</p>
+</div>
+
+<h3>The Rule</h3>
+<table>
+    <tr><th><code>scan_mode</code></th><th>Complexity</th><th>Extractor</th><th>On failure</th></tr>
+    <tr><td>1</td><td>Cheap (token overlap)</td><td><code>extract_relational_triples</code> (basic)</td><td>Log + return empty &mdash; non-fatal</td></tr>
+    <tr><td>2</td><td>Medium</td><td><code>extract_relational_triples</code> (basic)</td><td>Log + return empty &mdash; non-fatal</td></tr>
+    <tr><td><strong>3+</strong></td><td><strong>High-res / complex</strong></td><td><strong><code>extract_dynamic_relational_triples</code></strong></td><td><strong>RETHROW &mdash; hard failure</strong></td></tr>
+</table>
+
+<h3>Why</h3>
+<p>
+Previously, a complex input (<code>scan_mode >= 3</code>) that failed dynamic extraction silently
+fell back to basic extraction. The caller got a result that looked fine but was quietly degraded
+&mdash; a clean violation of the no-silent-failure principle. Now:
+</p>
+<ul>
+    <li>Complex inputs <strong>require</strong> dynamic extraction. Extractor failure rethrows out of <code>scan_specimens</code>.</li>
+    <li>Simple inputs use the basic extractor. Failure is logged and returns empty &mdash; because basic extraction is best-effort by design.</li>
+</ul>
+<p>
+A complex input can therefore never receive basic-quality relational output without a loud,
+stack-trace-bearing error. The failure mode is impossible to miss.
+</p>
+
+<h3>Complexity Detection</h3>
+<p>
+<code>screen_input_complexity(input)</code> returns a scan mode in <code>{1, 2, 3}</code> based on
+input length, token diversity, punctuation density, and known complexity markers. The decision is
+cheap (sub-millisecond) and runs before any extractor work so that the correct extractor is
+selected the first time.
+</p>
+
+<h3>Test Coverage</h3>
+<p>
+<code>test/test_relational_strict.jl</code> exercises the strict coupling with 9 test groups
+including: both extractors callable, <code>screen_input_complexity</code> returns the right mode
+bands, simple <code>scan_specimens</code> smoke, and complex <code>scan_specimens</code> smoke
+with a dynamic-extraction round trip. All green.
+</p>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> Silent fallback to a lower-fidelity algorithm is the single
+    most pernicious form of silent failure &mdash; downstream consumers have no way to know their input
+    was degraded. The strict-coupling rule converts this into a loud typed error. Fidelity guarantees
+    propagate.
+</div>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -1550,90 +1783,111 @@ The signal is not in the wire. Only the computation is. And the computation was 
 <!-- ================================================================ -->
 <h2 id="files">19. File Reference</h2>
 
-<h3>Core Modules (17 files, ~11,200 lines)</h3>
+<h3>Core Modules (21 files, ~19,100 lines)</h3>
 <table>
     <tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
+    <tr><td><code>GrugBot420.jl</code></td><td>143</td><td>Module root: include/using order, re-exports from all submodules</td></tr>
     <tr><td><code>stochastichelper.jl</code></td><td>168</td><td>@coinflip macro, Categorical distribution DSL</td></tr>
-    <tr><td><code>patternscanner.jl</code></td><td>249</td><td>Token overlap matching, pattern compilation</td></tr>
-    <tr><td><code>ImageSDF.jl</code></td><td>460</td><td>Image binary detection, SDF conversion, jitter</td></tr>
-    <tr><td><code>EyeSystem.jl</code></td><td>443</td><td>Edge blur, attention map, arousal modulation</td></tr>
-    <tr><td><code>ChatterMode.jl</code></td><td>575</td><td>Gossip sessions, pattern blending, input queue</td></tr>
-    <tr><td><code>SemanticVerbs.jl</code></td><td>391</td><td>Runtime verb registry, synonym normalization, triple extraction</td></tr>
-    <tr><td><code>ActionTonePredictor.jl</code></td><td>562</td><td>Input classification, arousal nudge, weight multiplier</td></tr>
-    <tr><td><code>engine.jl</code></td><td>1,487</td><td>Core engine: nodes, scanning, voting, Hopfield cache, action packets</td></tr>
-    <tr><td><code>Lobe.jl</code></td><td>381</td><td>Lobe registry, connections, node assignment</td></tr>
-    <tr><td><code>LobeTable.jl</code></td><td>627</td><td>Per-lobe chunked hash storage</td></tr>
-    <tr><td><code>BrainStem.jl</code></td><td>333</td><td>Winner-take-all dispatch, lateral inhibition</td></tr>
+    <tr><td><code>patternscanner.jl</code></td><td>249</td><td>Token overlap matching, pattern compilation, cheap/medium/high-res scan tiers</td></tr>
     <tr><td><code>InputQueue.jl</code></td><td>256</td><td>FIFO priority queue + NegativeThesaurus inhibition filter</td></tr>
+    <tr><td><code>BrainStem.jl</code></td><td>333</td><td>Winner-take-all dispatch, lateral inhibition, fire-count decay</td></tr>
+    <tr><td><code>Lobe.jl</code></td><td>392</td><td>Lobe registry, connections, node assignment</td></tr>
+    <tr><td><code>SemanticVerbs.jl</code></td><td>391</td><td>Runtime verb registry, synonym normalization, triple extraction</td></tr>
+    <tr><td><code>EyeSystem.jl</code></td><td>443</td><td>Edge blur, attention map, arousal modulation</td></tr>
+    <tr><td><code>LobeTable.jl</code></td><td>636</td><td>Per-lobe chunked hash storage (nodes, json, drop, hopfield, meta chunks)</td></tr>
+    <tr><td><code>VoteOrchestrator.jl</code></td><td>661</td><td><strong>v7.8</strong> &mdash; Parallel fire + bounded voting: unique Task dispatch, atomic FireCounter (1000 cap), <code>parallel_fire_batches</code>, <code>TaskTimeoutError</code>, DONE channels, strength-biased vote selection</td></tr>
     <tr><td><code>Thesaurus.jl</code></td><td>698</td><td>Dimensional similarity, synonym bridging, gate filter, runtime seed injection</td></tr>
-    <tr><td><code>PhagyMode.jl</code></td><td>611</td><td>6 maintenance automata, self-pruning cycles</td></tr>
-    <tr><td><code>Main.jl</code></td><td>2,390</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence</td></tr>
-    <tr><td><code>ImmuneSystem.jl</code></td><td>850</td><td>Specimen immune system: AST scanning, Hopfield immune memory, quarantine→patch→delete pipeline</td></tr>
-    <tr><td><code>ImmuneThreadPool.jl</code></td><td>520</td><td>Hardened task executor: 8-worker priority-lane pool, TokenBucket rate limiting, TripwireMonitor</td></tr>
-    <tr><td><code>FullLobeScanner.jl</code></td><td>1,050</td><td>Phase-gated full-lobe associative scanner: bounded activation, spreading activation, AIML gating</td></tr>
+    <tr><td><code>ChatterMode.jl</code></td><td>758</td><td>Gossip sessions, pattern blending, 24h morph cooldown, weak-only morph</td></tr>
+    <tr><td><code>ImageSDF.jl</code></td><td>786</td><td>Image binary detection, SDF conversion, GPU kernel dispatch (KernelAbstractions.jl)</td></tr>
+    <tr><td><code>FullLobeScanner.jl</code></td><td>825</td><td>Phase-gated full-lobe scanner (INIT→GATHER→ACTIVATE→CONTINUE→DONE), bounded activation, spreading activation, AIML gating</td></tr>
+    <tr><td><code>ImmuneSystem.jl</code></td><td>897</td><td>Specimen immune system: AST scanning, Hopfield immune memory, quarantine→patch→delete pipeline</td></tr>
+    <tr><td><code>AIMLNodeSystem.jl</code></td><td>934</td><td>Per-lobe AIML node tribes: isolated populations, population caps, grave-exclusion accounting, cycle-aware reinforcement</td></tr>
+    <tr><td><code>ActionTonePredictor.jl</code></td><td>1,030</td><td>Input classification, arousal nudge, weight multiplier, trajectory ring buffer</td></tr>
+    <tr><td><code>PhagyMode.jl</code></td><td>1,302</td><td>7 maintenance automata, self-pruning cycles, memory forensics</td></tr>
+    <tr><td><code>ImmuneThreadPool.jl</code></td><td>1,679</td><td>Hardened 8-worker priority-lane pool, TokenBucket rate limiting, TripwireMonitor state machine</td></tr>
+    <tr><td><code>engine.jl</code></td><td>2,645</td><td>Core engine: nodes, scanning, voting, drop-table expansion, relational fire, strict-coupling extractor routing</td></tr>
+    <tr><td><code>Main.jl</code></td><td>3,917</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence, admin system</td></tr>
 </table>
 
-<h3>Test Files (13 files)</h3>
+<h3>Test Files (17 in runner, 20 total on disk)</h3>
+<p>
+<code>test/runtests.jl</code> runs 17 test files as isolated Julia subprocesses &mdash; each test file
+<code>include()</code>s <code>src/</code> modules directly, so running them in the same process
+would cause module-redefinition errors. Non-zero subprocess exit = test failure; no silent swallow.
+</p>
 <table>
-    <tr><th>File</th><th>Groups</th><th>Assertions</th><th>Coverage</th></tr>
-    <tr><td><code>test_smoke.jl</code></td><td>16</td><td>~80</td><td>All modules integration: ImageSDF, EyeSystem, Engine, ChatterMode, SemanticVerbs, ActionTone</td></tr>
-    <tr><td><code>test_lobes.jl</code></td><td>—</td><td>123</td><td>Lobe CRUD, connections, capacity, node assignment</td></tr>
-    <tr><td><code>test_lobe_table.jl</code></td><td>—</td><td>193</td><td>LobeTable chunks, Hopfield, JSON serialization</td></tr>
-    <tr><td><code>test_brainstem.jl</code></td><td>—</td><td>39</td><td>BrainStem dispatch, propagation, error resilience</td></tr>
-    <tr><td><code>test_thesaurus.jl</code></td><td>—</td><td>151</td><td>Dimensional similarity, gate filter, synonym groups</td></tr>
-    <tr><td><code>test_chat_specimen.jl</code></td><td>18</td><td>—</td><td>Chat specimen format, command registration, pipe-delimited packets</td></tr>
-    <tr><td><code>test_input_queue.jl</code></td><td>20</td><td>1095</td><td>InputQueue FIFO/priority/overflow + NegativeThesaurus CRUD/filter/stress</td></tr>
-    <tr><td><code>test_action_packet.jl</code></td><td>18</td><td>111</td><td>Parser v2: pipe format, negatives, commas, weights, dedup, integration</td></tr>
-    <tr><td><code>test_load_specimen.jl</code></td><td>14</td><td>102</td><td>Specimen persistence: gzip round-trip, node/lobe/verb/hopfield/brainstem serialization, full save+load cycle</td></tr>
-    <tr><td><code>test_phagy.jl</code></td><td>—</td><td>—</td><td>Phagy automaton cycle (placeholder)</td></tr>
-    <tr><td><code>live_training_test.jl</code></td><td>22</td><td>—</td><td>Multi-lobe training: 7 lobes, 21 nodes, cascade, cross-domain</td></tr>
-    <tr><td><code>test_immune.jl</code></td><td>20</td><td>~300</td><td>Immune system: Hopfield memory, quarantine/patch/delete pipeline, familiarity tracking</td></tr>
-    <tr><td><code>test_immune_thread_pool.jl</code></td><td>15</td><td>~150</td><td>ImmuneThreadPool: priority lanes, TokenBucket, TripwireMonitor, cost-weighted balancing</td></tr>
-    <tr><td><code>test_full_lobe_scanner.jl</code></td><td>18</td><td>~200</td><td>FullLobeScanner: phase machine, PatternMatch/SemanticMatch, AIML gating, bounded activation</td></tr>
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td><code>test_smoke.jl</code></td><td>All-module integration smoke: ImageSDF, EyeSystem, Engine, ChatterMode, SemanticVerbs, ActionTone</td></tr>
+    <tr><td><code>test_lobes.jl</code></td><td>Lobe CRUD, connections, capacity, node assignment</td></tr>
+    <tr><td><code>test_lobe_table.jl</code></td><td>LobeTable chunks, Hopfield, JSON serialization</td></tr>
+    <tr><td><code>test_brainstem.jl</code></td><td>BrainStem dispatch, propagation, error resilience</td></tr>
+    <tr><td><code>test_thesaurus.jl</code></td><td>Dimensional similarity, gate filter, synonym groups, runtime seed injection</td></tr>
+    <tr><td><code>test_input_queue.jl</code></td><td>InputQueue FIFO/priority/overflow + NegativeThesaurus CRUD/filter/stress</td></tr>
+    <tr><td><code>test_action_packet.jl</code></td><td>Action packet v2 parser: pipe format, negatives, weights, dedup</td></tr>
+    <tr><td><code>test_phagy.jl</code></td><td>Phagy maintenance automata cycle</td></tr>
+    <tr><td><code>test_node_attach.jl</code></td><td>Relational Fire: <code>/nodeAttach</code>, strength-biased gating, Pass-3 relay, save/load</td></tr>
+    <tr><td><code>test_immune.jl</code></td><td>Immune system: Hopfield memory, quarantine/patch/delete pipeline, familiarity tracking</td></tr>
+    <tr><td><code>test_immune_thread_pool.jl</code></td><td>ImmuneThreadPool: priority lanes, TokenBucket, TripwireMonitor, cost-weighted balancing</td></tr>
+    <tr><td><code>test_full_lobe_scanner.jl</code></td><td>FullLobeScanner: phase machine, PatternMatch/SemanticMatch, AIML gating, bounded activation</td></tr>
+    <tr><td><code>test_vote_ties.jl</code></td><td>Tie-breaking and certainty in strength-biased vote selection</td></tr>
+    <tr><td><code>test_comprehensive.jl</code></td><td>End-to-end cave lifecycle: grow, fire, vote, save, reload, retrain</td></tr>
+    <tr><td><code>test_aiml_node_system.jl</code></td><td>Per-lobe AIML tribes: population caps, grave exclusion, cycle-aware reinforcement, save/load</td></tr>
+    <tr><td><code>test_vote_orchestrator.jl</code> <span class="new-badge">v7.8</span></td><td>VoteOrchestrator: unique Task IDs, FireCounter cap, <code>parallel_fire_batches</code>, DONE channels, <code>TaskTimeoutError</code>, vote selection tiers</td></tr>
+    <tr><td><code>test_relational_strict.jl</code> <span class="new-badge">v7.8</span></td><td>Strict relational-triple coupling: <code>screen_input_complexity</code> bands, basic vs. dynamic extractor routing, hard-fail on dynamic failure at scan_mode ≥ 3</td></tr>
 </table>
+
+<h4>Additional test files on disk (not in runner)</h4>
+<ul>
+    <li><code>test_admin_system.jl</code> &mdash; admin auth (<code>/login</code>, <code>/logout</code>, <code>/writeSave</code>), session timeout, password hashing</li>
+    <li><code>test_chat_specimen.jl</code> &mdash; chat specimen format, command registration, pipe-delimited packets</li>
+    <li><code>test_load_specimen.jl</code> &mdash; full specimen persistence round-trip (gzip, 21 state categories)</li>
+    <li><code>live_training_test.jl</code> &mdash; multi-lobe live training scenarios (run manually)</li>
+</ul>
 
 <!-- ================================================================ -->
 <h2 id="testing">20. Test Suite</h2>
 
 <h3>Running Tests</h3>
-<pre><code># Run all tests
-julia test_smoke.jl          # 16 integration groups
-julia test_lobes.jl          # 123 assertions
-julia test_lobe_table.jl     # 193 assertions
-julia test_brainstem.jl      # 39 assertions
-julia test_thesaurus.jl      # 151 assertions
-julia test_chat_specimen.jl  # 18 specimens
-julia test_input_queue.jl    # 20 groups, 1095 assertions
-julia test_action_packet.jl  # 18 groups, 111 assertions
-julia test_load_specimen.jl  # 14 groups, 102 assertions
-julia test_phagy.jl          # Phagy cycle
-julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code></pre>
+<pre><code># Run the full suite (17 isolated subprocesses)
+julia --project=. test/runtests.jl
 
-<h3>Test Results Summary (v7)</h3>
+# Or run a single test file directly
+julia --project=. test/test_vote_orchestrator.jl
+julia --project=. test/test_relational_strict.jl
+julia --project=. test/test_smoke.jl</code></pre>
+
+<p>
+<code>runtests.jl</code> spawns each test file as an isolated Julia subprocess. Non-zero exit = test
+failure. There is <strong>no silent swallowing</strong> of per-file failures — a failing subprocess
+fails the parent <code>@testset</code>.
+</p>
+
+<h3>Test Suite Status (v7.8)</h3>
 <table>
-    <tr><th>Test File</th><th>Result</th><th>Details</th></tr>
-    <tr><td>test_smoke.jl</td><td style="color:#00ff88;">✅ 16/16</td><td>All module integration groups pass</td></tr>
-    <tr><td>test_lobes.jl</td><td style="color:#00ff88;">✅ 123/123</td><td>Full Lobe.jl coverage</td></tr>
-    <tr><td>test_lobe_table.jl</td><td style="color:#00ff88;">✅ 193/193</td><td>Full LobeTable.jl coverage</td></tr>
-    <tr><td>test_brainstem.jl</td><td style="color:#00ff88;">✅ 39/39</td><td>Dispatch + error resilience</td></tr>
-    <tr><td>test_thesaurus.jl</td><td style="color:#00ff88;">✅ 151/151</td><td>Similarity + gate filter</td></tr>
-    <tr><td>test_chat_specimen.jl</td><td style="color:#00ff88;">✅ 0 errors</td><td>18 specimens validated</td></tr>
-    <tr><td>test_input_queue.jl</td><td style="color:#00ff88;">✅ 1095</td><td>20 groups including stress test</td></tr>
-    <tr><td>test_action_packet.jl</td><td style="color:#00ff88;">✅ 111</td><td>18 groups, pipe format validated</td></tr>
-    <tr><td>test_load_specimen.jl</td><td style="color:#00ff88;">✅ 102/102</td><td>14 groups, full specimen persistence coverage</td></tr>
-    <tr><td>test_phagy.jl</td><td style="color:#00ff88;">✅ OK</td><td>Phagy cycle clean</td></tr>
-    <tr><td>live_training_test.jl</td><td style="color:#00ff88;">✅ 0 hard fail</td><td>12+ pass, soft misses expected</td></tr>
+    <tr><th>Metric</th><th>Value</th></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>17</td></tr>
+    <tr><td>Total test files on disk</td><td>20</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 17 / 17 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~90 s on 8-core Linux</td></tr>
 </table>
 
 <div class="tip">
-    <strong>💡 Soft misses</strong> in live_training_test are expected — they mean the scanner needs more
-    nodes or lower thresholds for full domain coverage. The key metric is <strong>zero hard failures</strong>
-    (crashes or wrong action selection).
+    <strong>💡 Extra test files</strong> (<code>test_admin_system.jl</code>, <code>test_chat_specimen.jl</code>,
+    <code>test_load_specimen.jl</code>, <code>live_training_test.jl</code>) are kept on disk for targeted
+    debugging but are not in the default runner. Run them explicitly when working on the related subsystem.
 </div>
 
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.8 — Parallel Vote Orchestrator + Bounded Dispatch + Strict Relational Coupling</h3>
+    <ul>
+        <li><strong>VoteOrchestrator</strong> (<code>src/VoteOrchestrator.jl</code>, 661 lines): unified parallel-fire and vote-selection layer. Atomic <code>FireCounter</code> enforces <code>ACTIVE_FIRE_CAP = 1000</code> concurrent fires across ALL fire types (pattern scan, drop-table, attachment relay, lobe cascade). Unique non-colliding Task names via process-wide atomic counter. <code>parallel_fire_batches</code> for batched threaded fire (<code>FIRE_BATCH_SIZE = 64</code>, <code>FIRE_BATCH_TIMEOUT_S = 5.0</code>). Typed <code>Channel{DoneSignal}</code> for phase-gated lobe completion. Strength-biased <code>select_aiml_votes</code> with top-tier (always fires) and sub-top (coinflip) bands. See §15.7.</li>
+        <li><strong>Timeout-bounded sub-process dispatch</strong>: <code>dispatch_task_with_timeout</code> + <code>fetch_with_timeout</code> with a dedicated <code>TaskTimeoutError</code> subtype (carries <code>task_name</code>, <code>context</code>, <code>timeout_s</code>). Every sub-process in the engine and <code>Main.jl</code> runs under a hard deadline. Timeouts rethrow loud, named errors &mdash; never swallow. See §15.8.</li>
+        <li><strong>Strict relational-triple coupling</strong> (<code>src/engine.jl</code>): <code>scan_mode ≥ 3</code> (high-res / complex input) MUST use <code>extract_dynamic_relational_triples</code>. Dynamic-extractor failure rethrows as a hard error &mdash; no silent fallback to basic extraction. Simple inputs (<code>scan_mode ≤ 2</code>) keep best-effort basic extraction. See §15.9.</li>
+        <li><strong>Test suite expanded</strong>: <code>test_vote_orchestrator.jl</code> and <code>test_relational_strict.jl</code> added to the default runner. 17 / 17 passing.</li>
+        <li><strong>Documentation</strong>: README.md and this whitepaper resynchronized with the current codebase (21 source files, ~19.1k lines). New §15.7–15.9.</li>
+    </ul>
     <h3>v7.7 — Persistence Completeness v2.4</h3>
     <ul>
         <li><strong>LAST_VOTER_IDS persistence</strong>: Node IDs that voted in the last cycle now saved/restored so <code>/wrong</code> feedback works after reload</li>
@@ -1723,7 +1977,7 @@ julia live_training_test.jl  # Multi-lobe training (12+ pass, 0 hard fail)</code
 </div>
 
 <div class="signature">
-    <p>GrugBot Neuromorphic Engine v7.7 &mdash; Technical Whitepaper</p>
+    <p>GrugBot Neuromorphic Engine v7.8 &mdash; Technical Whitepaper</p>
     <p>🦴 "Cave brain think different. That is why cave brain strong." &mdash; Grug</p>
 </div>
 

@@ -1088,7 +1088,14 @@ function _start_worker(id::Int, immune_module, pool::ImmunePool)::ImmuneWorker
             # GRUG: Worker died with a fatal error (OOM etc). SCREAM LOUD.
             @error "💀 IMMUNE WORKER #$id FATALLY CRASHED" exception=(fatal_e, catch_backtrace())
             worker.alive[] = false
-            # GRUG: Drain remaining inbox items, poison their futures
+            # GRUG: Drain remaining inbox items, poison their futures with the fatal
+            # cause so callers see a real error instead of a silent hang.
+            # ACADEMIC: The bare catch below is INTENTIONAL and NOT a silent failure.
+            # During worker death, the inbox Channel may be closed mid-drain by another
+            # task (normal shutdown race). That close surfaces as an InvalidStateException
+            # from take!/isready/put!. The only correct response is to stop draining,
+            # because the channel is gone. We exit the loop; any un-drained futures are
+            # handled by the pool-level shutdown path which poisons them uniformly.
             while isready(inbox)
                 try
                     item = take!(inbox)
@@ -1096,7 +1103,12 @@ function _start_worker(id::Int, immune_module, pool::ImmunePool)::ImmuneWorker
                     if isopen(item.future.result_channel)
                         put!(item.future.result_channel, death)
                     end
-                catch
+                catch drain_e
+                    # Channel-closed-mid-drain is the only expected error class here.
+                    # Anything else is a real bug we want to know about.
+                    if !(drain_e isa InvalidStateException)
+                        @warn "worker $id drain loop hit unexpected error" exception=(drain_e, catch_backtrace())
+                    end
                     break
                 end
             end

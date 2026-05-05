@@ -495,6 +495,103 @@ The DONE gate is enforced at the API level — you cannot accidentally read resu
 
 ---
 
+## Parallel Vote Orchestrator (`VoteOrchestrator`) — v7.8
+
+The `VoteOrchestrator` module is the hard-bounded fire/vote engine that sits under the whole pipeline. Every fire — pattern scan, drop-table relay, lobe cascade, NodeAttach relay — is routed through it. No silent failures, no unbounded parallelism, no colliding task names.
+
+### Key Guarantees
+
+- **Global fire cap** — at most `ACTIVE_FIRE_CAP = 1000` concurrent fire slots across the entire engine. Enforced by an atomic `FireCounter`, shared by every fire type.
+- **Unique Task names** — every sub-process gets a `prefix#id` task ID from a global atomic counter. No two live tasks can share a name. Makes debugging parallel crashes deterministic.
+- **Deadline-bounded dispatch** — every sub-process can run under a hard timeout. Deadline hits → `TaskTimeoutError` with the task name attached. Callers distinguish this from other errors so they can pick retry vs. abort.
+- **Batched parallel fire** — `parallel_fire_batches` dispatches nodes in batches of `FIRE_BATCH_SIZE = 64`. Each batch is its own Task with its own `FIRE_BATCH_TIMEOUT_S = 5.0`s deadline. Batch failure re-raises with batch name, never swallowed.
+- **DONE channels** — lobes signal completion over typed `Channel{DoneSignal}`s. AIML is gated until expected DONE count arrives or the `DONE_SIGNAL_TIMEOUT_S = 30.0`s window expires (whichever comes first).
+- **Strength-biased voting** — `strength_biased_vote_coinflip` and `select_aiml_votes` implement the top-tier (within `AIML_TOP_TIER_WINDOW = 0.05` of max confidence, always fires) and sub-top (fires at `AIML_SUBTOP_BASE_PROB = 0.20` + up to `AIML_SUBTOP_BONUS_PROB = 0.70` based on strength) selection rules.
+
+### Key Constants
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `ACTIVE_FIRE_CAP` | 1000 | Hard cap on concurrent fires (all types, all lobes) |
+| `FIRE_BATCH_SIZE` | 64 | Nodes per parallel fire batch |
+| `DEFAULT_TASK_TIMEOUT_S` | 15.0 | Default deadline for `dispatch_task_with_timeout` |
+| `FIRE_BATCH_TIMEOUT_S` | 5.0 | Per-batch deadline inside `parallel_fire_batches` |
+| `DONE_SIGNAL_TIMEOUT_S` | 30.0 | Max wait on the DONE channel before AIML gate releases |
+| `AIML_CONFIDENCE_THRESHOLD` | 0.15 | Minimum confidence for a candidate to enter AIML vote |
+| `AIML_TOP_TIER_WINDOW` | 0.05 | Distance from max confidence that counts as top-tier |
+
+### Core API
+
+| Function | Description |
+|---|---|
+| `next_task_id(prefix)` | Atomic counter → unique non-colliding `prefix#N` task name |
+| `dispatch_task(f, prefix; timeout_s=nothing)` | Run `f` in a fresh Task with a unique name, optional deadline |
+| `dispatch_task_with_timeout(f, prefix, timeout_s)` | Deadline-required variant — always times out |
+| `fetch_with_timeout(name, task)` | Safely fetch a task result or raise `TaskTimeoutError` |
+| `list_active_tasks()` | Snapshot of the active task registry (debug/observability) |
+| `FireCounter(cycle_id, cap)` / `try_claim_fire_slot!(fc)` | Atomic fire-slot claim |
+| `parallel_fire_batches(ids, fc, firefunc; batch_size, timeout_s)` | Batched threaded fire with shared cap + per-batch deadline |
+| `make_done_channel(n)` / `send_done!` / `wait_for_done` | DONE signaling for phase-gated lobes |
+| `select_aiml_votes(candidates; threshold, top_window)` | Threshold + top-tier + strength-biased coinflip selection |
+
+### Error Model
+
+- `VoteOrchestratorError` — generic orchestrator-layer failure with `message` + `context` breadcrumb.
+- `TaskTimeoutError` — distinguishable subtype: carries `task_name`, `context`, `timeout_s`. Custom `showerror` renders a human-readable trace. Callers pattern-match on this subtype to decide retry vs. abort. **Never swallowed** — always rethrown out of `fetch_with_timeout`.
+
+---
+
+## Timeout-Bounded Sub-Process Dispatch — v7.8
+
+Every sub-process dispatched through the engine and `Main.jl` runs in its own unique non-colliding Task under a hard deadline. This is the cross-cutting "no infinite hangs" rule.
+
+- `dispatch_task` accepts an optional `timeout_s` kwarg; when set, the task is registered in `_TASK_DEADLINES` and monitored.
+- `fetch_with_timeout` uses `timedwait` on the registered deadline. Timeout → `TaskTimeoutError`, not a generic hang.
+- Call-site convention: pipeline stages import `VoteOrchestrator.FIRE_BATCH_TIMEOUT_S` and the other named constants rather than hard-coding numbers, so the whole engine moves in lockstep when a constant is tuned.
+
+Callers that need retry semantics pattern-match:
+
+```julia
+try
+    result = fetch_with_timeout(name, task)
+catch e
+    if e isa TaskTimeoutError
+        @warn "task timed out, skipping this cycle" name=e.task_name timeout=e.timeout_s
+        # abort or retry — caller's decision, never silently ignored
+    else
+        rethrow()
+    end
+end
+```
+
+---
+
+## Strict Relational-Triple Coupling — v7.8
+
+Relational-triple extraction is now **strictly coupled** to scan complexity. No silent degradation.
+
+| `scan_mode` | Complexity | Extractor | On failure |
+|---|---|---|---|
+| 1 | Cheap (token overlap) | `extract_relational_triples` (basic) | Log + empty — non-fatal |
+| 2 | Medium | `extract_relational_triples` (basic) | Log + empty — non-fatal |
+| **3+** | **High-res / complex** | **`extract_dynamic_relational_triples` (dynamic)** | **RETHROW — hard failure** |
+
+### Why
+
+Before this change, a complex input that triggered high-res pattern scan would call the dynamic extractor. If that failed, the engine silently fell back to the basic extractor — producing a quietly degraded result that looked normal from the outside. That violated the no-silent-failure rule.
+
+Now:
+- Complex inputs (`scan_mode >= 3`) **require** dynamic extraction. Failure is a hard error that rethrows out of `scan_specimens`.
+- Simple inputs (`scan_mode <= 2`) use the basic extractor. Failure is logged and returns an empty triple list — because basic extraction is best-effort by design.
+
+This means a complex input never gets basic-quality relational output without a loud, stack-trace-bearing error.
+
+### Detection
+
+`screen_input_complexity(input)` returns a scan mode in `{1, 2, 3}`. It looks at input length, token diversity, punctuation density, and known complexity markers. Tests for the strict coupling live in `test/test_relational_strict.jl` (9 groups, all green).
+
+---
+
 ## File Reference
 
 | File | Role |
@@ -517,6 +614,8 @@ The DONE gate is enforced at the API level — you cannot accidentally read resu
 | `src/ImmuneSystem.jl` | Specimen immune system: automata-based anomaly handling for growth/ledger commands. AST scanning, Hopfield immune memory, quarantine-patch-delete pipeline. |
 | `src/ImmuneThreadPool.jl` | 8-worker immune thread pool with priority lanes (CRITICAL/NORMAL/LOW/JUNK), per-source rate limiting, cost-weighted load balancing, and tripwire state machine (NORMAL→ELEVATED→HARDENED→CRITICAL). |
 | `src/FullLobeScanner.jl` | Full-lobe scanning system: bounded activation (max 1,000 active nodes), phase-gated scan pipeline (INIT→GATHER→ACTIVATE→CONTINUE→DONE), pattern + semantic matches, multithreaded candidate gathering. AIML gated until DONE signal. |
+| `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes: isolated AIML node populations per lobe, configurable population caps (default node_cap ÷ 3), grave-exclusion cap accounting, cycle-aware reinforcement, full save/load serialization. |
+| `src/VoteOrchestrator.jl` | Parallel vote orchestrator (v7.8): unique non-colliding Task dispatch, atomic `FireCounter` with hard 1000-slot cap across ALL fire types, `parallel_fire_batches` (batch size 64), `TaskTimeoutError` + `dispatch_task_with_timeout` for deadline-bounded sub-processes, `DoneSignal` channels, strength-biased vote coinflip with top-tier / sub-top windows. No silent failures — timeouts rethrow distinguishable errors. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---
