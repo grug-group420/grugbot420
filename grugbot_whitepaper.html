@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.11</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.17</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.11</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.17</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -231,6 +231,11 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#relational-jitter">15.10 Per-Activation Relational Jitter</a> <span class="new-badge">v7.9</span></li>
         <li><a href="#aiml-jitter">15.11 AIML Activation Jitter: Strength, Delta, and Coin Gates</a> <span class="new-badge">v7.10</span></li>
         <li><a href="#brainstorm-scope">15.12 /brainstorm: Scoped Heavy-Jitter Override</a> <span class="new-badge">v7.11</span></li>
+        <li><a href="#context-intensity">15.13 Context-Intensity Jitter: Per-Message Relevance Snap-Back</a> <span class="new-badge">v7.12</span></li>
+        <li><a href="#fresh-memory-gate">15.14 Two-Stage Fresh Memory Gate: Threshold + Coinflip</a> <span class="new-badge">v7.13</span></li>
+        <li><a href="#digest-history">15.15 Digest-Only Message History: Killing O(N²) Context Pollution</a> <span class="new-badge">v7.14</span></li>
+        <li><a href="#aiml-synthesis">15.16 AIML Vote-to-Speech Synthesis (Thesaurus-Orchestrated Reply)</a> <span class="new-badge">v7.15 / v7.16</span></li>
+        <li><a href="#chunked-scans">15.17 Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</a> <span class="new-badge">v7.17</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -1845,6 +1850,217 @@ mission:
 </div>
 
 <!-- ================================================================ -->
+<h2 id="context-intensity">15.13 Context-Intensity Jitter: Per-Message Relevance Snap-Back <span class="new-badge">v7.12</span></h2>
+
+<p>Before v7.12, Fresh Memory was a hard-coded <em>last 5 unpinned messages</em> slice. That worked for
+a fresh cave, but after a few <code>/status</code> dumps the context window was dominated by irrelevant
+diagnostic banners while a hot, topic-adjacent message from 20 turns ago fell out of view. v7.12 replaces the
+fixed slice with a <strong>per-message intensity score</strong> that rises toward relevance and gets a tiny
+zero-mean jitter every cycle &mdash; a relevance-biased coinflip sample.</p>
+
+<h3>Per-Message Intensity Field</h3>
+<p>Every <code>ChatMessage</code> now carries an <code>intensity :: Float64</code> clamped to
+<code>[CONTEXT_INTENSITY_FLOOR=0.0, CONTEXT_INTENSITY_CAP=3.0]</code> with baseline
+<code>CONTEXT_INTENSITY_BASELINE=0.5</code>. The field is updated every <code>/mission</code> by
+<code>refresh_message_intensities!(user_input)</code>, which for each message:</p>
+<ol>
+    <li>Tokenises the user input (<code>_tokenize_for_relevance</code>: lowercase, drop short tokens, strip punctuation).</li>
+    <li>Computes <code>score_message_relevance</code> (lexical overlap + relational-triple overlap, dynamic triples included so the same verb extractor used by the engine populates relevance).</li>
+    <li>Snaps back toward relevance: <code>snapped = intensity + CONTEXT_SNAP_ALPHA &middot; (relevance - intensity)</code>, with <code>CONTEXT_SNAP_ALPHA &asymp; 0.35</code>.</li>
+    <li>Adds zero-mean jitter via <code>RelationalJitter.jitter_value(snapped)</code> &mdash; the same primitive used by the relational dialectics layer, so <code>/brainstorm</code> scope automatically amplifies the context nudge.</li>
+    <li>Clamps back into <code>[FLOOR, CAP]</code> via <code>clamp_intensity</code>.</li>
+</ol>
+
+<h3>Relevance-Biased Fresh Memory Coinflip</h3>
+<p>When AIML builds its memory block, each unpinned message is coin-flipped newest-first with
+<code>p = clamp(intensity / CAP, COIN_P_FLOOR, COIN_P_CEIL)</code>. A hot message (intensity = 2.0) surfaces
+with <code>p &asymp; 0.67</code>; a cold banner (intensity = 0.1) with <code>p &asymp; 0.03</code>. Pinned
+messages bypass the coinflip entirely. The final Fresh Memory is capped at
+<code>MAX_FRESH_CONTEXT=8</code>, and the selected message ids are cached in
+<code>LAST_SELECTED_MSG_IDS</code> so <code>/right</code> and <code>/wrong</code> can reinforce or penalise
+the context that led to the last answer.</p>
+
+<h3>Feedback Loop: /right and /wrong</h3>
+<p>v7.12 also wires the context layer into the feedback loop. <code>/right</code> bumps intensity of
+every message that contributed to the last Fresh Memory by
+<code>CONTEXT_FEEDBACK_RIGHT_DELTA = +0.5</code>; <code>/wrong</code> sags them by <code>-0.5</code>. Clamp
+always holds. If no prior mission populated <code>LAST_SELECTED_MSG_IDS</code>, feedback is a no-op &mdash;
+no silent failures, no spurious side effects.</p>
+
+<div class="tip">
+    <strong>Why jitter context?</strong> A deterministic top-5-by-intensity would lock in the early relevance
+    hits and starve late-topic messages. The coinflip preserves stochastic exploration in the context layer,
+    exactly mirroring the vote layer.
+</div>
+
+<!-- ================================================================ -->
+<h2 id="fresh-memory-gate">15.14 Two-Stage Fresh Memory Gate: Threshold + Coinflip <span class="new-badge">v7.13</span></h2>
+
+<p>v7.12's coinflip works perfectly for caves with tens of messages. For caves approaching the
+<code>MAX_HISTORY=10,000</code> cap, the coinflip pool itself becomes the bottleneck &mdash; flipping 10,000
+coins per <code>/mission</code> is both slow and unnecessary. v7.13 front-loads a
+<strong>threshold gate</strong> before the coinflip.</p>
+
+<h3>Auto-Tuned Intensity Threshold</h3>
+<p><code>auto_tune_intensity_threshold(unpinned)</code> binary-searches the intensity threshold that lands
+the eligible set (messages with <code>intensity > threshold</code>) in the target band
+<code>[CONTEXT_ELIGIBLE_MIN=5, CONTEXT_ELIGIBLE_MAX=10]</code>:</p>
+<ul>
+    <li>If <code>count > MAX</code> &rarr; raise threshold (narrow the pool).</li>
+    <li>If <code>count < MIN</code> &rarr; lower threshold (widen the pool).</li>
+    <li>Otherwise &rarr; stop, return current threshold.</li>
+</ul>
+<p>Search space is <code>[FLOOR, CAP]</code>, with budget <code>CONTEXT_THRESHOLD_STEPS=12</code>
+(log<sub>2</sub> of CAP resolution is plenty since intensities are real Float64s). Edge cases:</p>
+<ul>
+    <li><strong>Fewer than MIN unpinned total</strong> &rarr; threshold = FLOOR so everything passes (cannot conjure messages).</li>
+    <li><strong>All identical intensity</strong> &rarr; binary search converges just under that value, all pass (no infinite loop).</li>
+    <li><strong>Jitter drove everyone to FLOOR</strong> &rarr; returns FLOOR; the downstream coinflip still narrows.</li>
+</ul>
+
+<h3>Pipeline Ordering</h3>
+<pre><code>pinned                    -> always surface (bypass all gates)
+unpinned                  -> [auto-tuned threshold gate]
+eligible survivors        -> [intensity-biased coinflip, newest-first]
+chosen                    -> capped at MAX_FRESH_CONTEXT
+                             cached in LAST_SELECTED_MSG_IDS
+Fresh Memory block header -> "threshold=X eligible=N" telemetry</code></pre>
+
+<p>A 10k-message cave now puts roughly 5&ndash;10 messages through the coinflip per mission, not 10,000.
+The pool stays tight; stochastic exploration character from v7.12 is preserved; context-pollution blow-up
+is killed.</p>
+
+<!-- ================================================================ -->
+<h2 id="digest-history">15.15 Digest-Only Message History: Killing O(N²) Context Pollution <span class="new-badge">v7.14</span></h2>
+
+<p>Before v7.14, every <code>/mission</code> appended its <em>entire AIML scaffold</em> (~2&ndash;3 KB of
+stats, votes, tied alternatives, memory bank) to <code>MESSAGE_HISTORY</code>. The next mission then re-read
+that scaffold back in as context, re-emitted an even bigger scaffold that <em>included</em> the previous
+scaffold, and so on &mdash; classic recursive context pollution with <strong>O(N²)</strong> growth.</p>
+
+<p>v7.14 replaces the scaffold write with a <strong>compact one-line digest</strong>:</p>
+
+<pre><code>Mission "explain how force relates to acceleration and mass" &rarr;
+primary=explain conf=0.55 node=node_11</code></pre>
+
+<p>The digest captures exactly what downstream missions need &mdash; the primary action, confidence, and
+winning node &mdash; in ~80 bytes instead of ~3 KB. AIML scaffolds are still emitted to stdout as before;
+they are simply no longer stored in the message wall.</p>
+
+<div class="tip">
+    <strong>Raw log sizes after v7.14</strong>: comprehensive specimen run shrank from <strong>~2.7 MB
+    uncompressed</strong> (pre-v7.14) to <strong>~40 KB</strong> for the same 8-cycle conversation &mdash;
+    roughly a <strong>70&times; reduction</strong>. The gain compounds with cave lifetime.
+</div>
+
+<h3>Interview-Style conversation.md Formatter</h3>
+<p>v7.14 also rewrote <code>specimen_demo/format_conversation.py</code> to present the run as a literal
+dialogue: <code>Interviewer</code> asks (from <code>/mission</code> or <code>/brainstorm</code>),
+<code>Grug</code> replies (the AIML scaffold that cycle emitted), with telemetry and directives folded into
+collapsed <code><details></code> sections. The formatter auto-decompresses <code>.log.gz</code>,
+bounds the read with head+tail slicing if the plain log ballooned beyond 36 MB, and exits non-zero on a
+missing raw log &mdash; no silent failures.</p>
+
+<!-- ================================================================ -->
+<h2 id="aiml-synthesis">15.16 AIML Vote-to-Speech Synthesis (Thesaurus-Orchestrated Reply) <span class="new-badge">v7.15 / v7.16</span></h2>
+
+<p>Before v7.15, <code>generate_aiml_payload</code> emitted a stats dump as its primary output: primary
+action, sure actions, unsure actions, winning node, constraints, memory bank, and a tiny
+<code>jit_response</code> buried at the bottom. The stats <em>are</em> useful &mdash; for operators, tests,
+and <code>/status</code> &mdash; but they are not a reply a downstream LLM can speak. v7.15 reordered the
+scaffold to lead with a conversational line, then put stats behind a
+<code>--- DEBUG TELEMETRY ---</code> separator. v7.16 went further and made the scaffold
+<strong>actually synthesize the reply from vote data</strong>.</p>
+
+<h3>The Orchestration Toolbox</h3>
+<p>Every word routed into the synthesized reply passes through four filters:</p>
+<ul>
+    <li><code>Thesaurus.SYNONYM_SEED_MAP</code> &mdash; bidirectional canonical&harr;synset dictionary (40+ seed groups, rich defaults).</li>
+    <li><code>SemanticVerbs._SYNONYM_MAP</code> &mdash; alias&rarr;canonical map populated at runtime by <code>/addSynonym</code>. Both directions are scanned, so <code>/addSynonym causes triggers</code> makes <code>"triggers"</code> an orchestration option whenever <code>"causes"</code> appears.</li>
+    <li><code>InputQueue.is_inhibited(word)</code> &mdash; negative-thesaurus check. Words marked for inhibition are filtered from the candidate pool.</li>
+    <li>Per-node <code>drop_table</code> &mdash; node-specific forbidden words. A winning node can say "never orchestrate these terms even if they are valid synonyms in the global thesaurus."</li>
+</ul>
+<p>A fifth invariant protects semantics: words listed in <code>node.required_relations</code> are
+<strong>never swapped</strong>. They stay canonical so the node's contract with its attached
+relational-triple neighbours is preserved.</p>
+
+<h3>Reply Assembly Pipeline</h3>
+<pre><code>[voice_prefix]   &larr; winning node's system_prompt, cleaned to one clause
+[skeleton]       &larr; keyed by primary action family:
+    explain/clarify/describe  -> "Here is the picture: {CLAIM}.{SUPPORT}"
+    greet/welcome/smile        -> "Hello — here is what matters: {CLAIM}.{SUPPORT}"
+    warn/reject                -> "A caution: {CLAIM}.{SUPPORT}"
+    comfort/acknowledge/affirm -> "To acknowledge what matters here: {CLAIM}.{SUPPORT}"
+    flee/dodge                 -> "A concern worth raising: {CLAIM}.{SUPPORT}"
+    reason/analyze (default)   -> "Thinking it through: {CLAIM}.{SUPPORT}"
+[CLAIM]          &larr; winning node's pattern, word-swapped via the toolbox
+[SUPPORT]        &larr; relational triples + sure companions + UNSURE hedge
+[cave_tag]       &larr; "(from the X cave)" if lobe resolved
+[pinned_citation] &larr; topicality-gated pinned-memory quote
+[directives]     &larr; orchestration rules as shaping suffix
+--- DEBUG TELEMETRY ---
+[full stats block, unchanged from v7.11]
+=========================================</code></pre>
+
+<h3>Key Helpers</h3>
+<ul>
+    <li><code>_pick_synonym(word, drop_table, required_relations)</code> &mdash; builds candidate pool from both synonym maps (bidirectional), filters by inhibition + drop_table, short-circuits required relations, picks uniformly from survivors.</li>
+    <li><code>_swap_words_in(sentence, drop_table, required_relations)</code> &mdash; tokenises on whitespace, strips punctuation for lookup, reattaches it, preserves capitalisation of the first character, rejoins with single spaces (fixes Julia's <code>split(s, regex; keepempty=true)</code> separator-dropping behaviour).</li>
+</ul>
+
+<div class="tip">
+    <strong>Example outputs from the comprehensive specimen</strong>:<br>
+    &bull; "Here is the picture: fermentation produces flavor through microbial action. A companion frame: timbre distinguishes instruments with identical pitch." <em>(cooking cave, node_11)</em><br>
+    &bull; "Thinking it through: consider consider contend gauge. A companion frame: salt enhances flavor when applied in moderation." <em>(reason family, synonym-swap visible)</em><br>
+    &bull; "Hello &mdash; here is what matters: hello hi greeting mornin." <em>(greet skeleton, thesaurus variation)</em>
+</div>
+
+<!-- ================================================================ -->
+<h2 id="chunked-scans">15.17 Chunked MESSAGE_HISTORY Scans with DONE Checkpoints <span class="new-badge">v7.17</span></h2>
+
+<p>Every Fresh Memory scan site used to walk <code>MESSAGE_HISTORY</code> in one tight loop. On a
+10,000-message cave that loop is an uninterruptible CPU burst &mdash; other Tasks (CLI reader, phagy
+forensics, chatter) stall until the whole scan completes. v7.17 breaks every such scan into
+<strong><code>CONTEXT_SCAN_CHUNK=1000</code>-sized batches</strong>, publishes a
+<strong>DONE checkpoint</strong> after each batch, and yields the scheduler before the next batch begins.</p>
+
+<h3>The DONE Checkpoint Contract</h3>
+<p>Every chunked scan site calls a single shared helper after each batch:</p>
+<pre><code>function _chunk_done!(label::String)
+    # 1) Increment per-label counter under CONTEXT_CHUNK_LOCK
+    # 2) Optional @debug trace gated behind CONTEXT_CHUNK_DEBUG[]
+    # 3) yield() — let waiting Tasks get a slot before next batch
+end</code></pre>
+<p>The scan <strong>does not</strong> move to its next 1k batch until <code>_chunk_done!</code> has run.
+This is the "scan 1000, submit DONE for everything to continue, then move on" semantics &mdash; the batch
+is published as a checkpoint before the next one begins, instead of the whole 10k scan running as one
+uninterruptible unit.</p>
+
+<h3>Four Chunked Sites</h3>
+<table>
+    <tr><th>Site</th><th>Label</th><th>Chunks on 10k cave</th></tr>
+    <tr><td><code>refresh_message_intensities!</code></td><td><code>refresh_intensities</code></td><td>10 (full walk)</td></tr>
+    <tr><td><code>apply_last_selected_feedback!</code></td><td><code>feedback_scan</code></td><td>1 (short-circuits after all target ids found)</td></tr>
+    <tr><td><code>auto_tune_intensity_threshold</code></td><td><code>threshold_scan</code></td><td>~1 per step on overshoot (aborts when count > ELIGIBLE_MAX)</td></tr>
+    <tr><td><code>extract_aiml_memory_context</code></td><td><code>pinned_scan</code> + <code>unpinned_materialize</code> + <code>coinflip_scan</code></td><td>10 + 10 + up to MAX_FRESH_CONTEXT/CHUNK</td></tr>
+</table>
+
+<h3>Introspection Surface</h3>
+<ul>
+    <li><code>reset_chunk_counters!()</code> &mdash; zero every per-label DONE counter (tests call this before a scan under test).</li>
+    <li><code>get_chunk_counter(label)</code> &mdash; read-only access to the per-label counter.</li>
+    <li><code>CONTEXT_CHUNK_DEBUG :: Ref{Bool}</code> &mdash; operator toggle to enable <code>@debug</code> traces.</li>
+</ul>
+
+<div class="tip">
+    <strong>Early-exit big win</strong>: <code>/right</code> or <code>/wrong</code> feedback on 3 ids in a
+    10,000-message cave now emits exactly <strong>1 DONE marker</strong> (target_hits reached in the first
+    chunk), not 10. An all-hot 10k cave's threshold tuner caps each step at
+    <code>CONTEXT_SCAN_CHUNK + ELIGIBLE_MAX &asymp; 1010</code> comparisons, not 10,000. Both verified by
+    test group <strong>[J]</strong> in <code>test_context_intensity.jl</code>.
+</div>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -2231,11 +2447,15 @@ The signal is not in the wire. Only the computation is. And the computation was 
 <table>
     <tr><th>Command</th><th>Description</th><th>Example</th></tr>
     <tr><td><code>/mission <text></code></td><td>Main input. Scan, vote, orchestrate, respond.</td><td><code>/mission what is truth?</code></td></tr>
-    <tr><td><code>/wrong</code></td><td>Penalize last response voters via coinflip.</td><td><code>/wrong</code></td></tr>
+    <tr><td><code>/brainstorm <text></code> <span class="new-badge">v7.11</span></td><td>Same pipeline as <code>/mission</code> but wraps the run in <code>with_brainstorm_jitter</code> &mdash; wider entropy window, heavier far-jumps for one mission only.</td><td><code>/brainstorm harmonies in cooking?</code></td></tr>
+    <tr><td><code>/right</code> <span class="new-badge">v7.12</span></td><td>Reinforce the context that led to the last response. Bumps <code>intensity += CONTEXT_FEEDBACK_RIGHT_DELTA</code> on every message in <code>LAST_SELECTED_MSG_IDS</code>. No-op if no prior mission scanned.</td><td><code>/right</code></td></tr>
+    <tr><td><code>/wrong</code></td><td>Penalise last response's context voters. Sags <code>intensity += CONTEXT_FEEDBACK_WRONG_DELTA</code> (negative). Clamp always honoured.</td><td><code>/wrong</code></td></tr>
+    <tr><td><code>/aimlRight</code> <span class="new-badge">v7.10</span></td><td>Reinforce the AIML tribe nodes that fired for the last mission (coin-gated via <code>jitter_coin_threshold</code>).</td><td><code>/aimlRight</code></td></tr>
+    <tr><td><code>/aimlWrong</code> <span class="new-badge">v7.10</span></td><td>Penalise the AIML tribe nodes that fired for the last mission (coin-gated, honest-net-loss contract preserved).</td><td><code>/aimlWrong</code></td></tr>
     <tr><td><code>/explicit <cmd> [<id>] <text></code></td><td>Force a command on a specific node.</td><td><code>/explicit reason [node_0] why?</code></td></tr>
     <tr><td><code>/grow <json></code></td><td>Plant new nodes from JSON packet.</td><td><code>/grow {"nodes":[...]}</code></td></tr>
     <tr><td><code>/addRule <rule> [prob=X]</code></td><td>Add stochastic AIML orchestration rule.</td><td><code>/addRule Be concise [prob=0.8]</code></td></tr>
-    <tr><td><code>/pin <text></code></td><td>Pin text to persistent memory wall.</td><td><code>/pin always be polite</code></td></tr>
+    <tr><td><code>/pin <text></code></td><td>Pin text to persistent memory wall. Pinned messages bypass every Fresh Memory gate &mdash; they are always surfaced to AIML regardless of intensity.</td><td><code>/pin always be polite</code></td></tr>
     <tr><td><code>/help</code></td><td>Full command reference scroll.</td><td><code>/help</code></td></tr>
 </table>
 
@@ -2396,13 +2616,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.11)</h3>
+<h3>Test Suite Status (v7.17)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>20</td></tr>
-    <tr><td>Total test files on disk</td><td>23</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 20 / 20 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~95 s on 8-core Linux</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>21</td></tr>
+    <tr><td>Total test files on disk</td><td>26</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 21 / 21 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~105 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints)</td></tr>
 </table>
 
 <div class="tip">
@@ -2414,6 +2635,58 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.17 &mdash; Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</h3>
+    <ul>
+        <li><strong>New constant</strong> <code>CONTEXT_SCAN_CHUNK = 1000</code>: batch size for every chunked Fresh Memory scan. Fits in L1/L2 cache (~8 KB of Float64s), divides the 10k <code>MAX_HISTORY</code> cap cleanly, and dominates per-chunk bookkeeping overhead.</li>
+        <li><strong>New shared helper</strong> <code>_chunk_done!(label)</code>: every chunked scan calls this after each batch. It increments a per-label counter under <code>CONTEXT_CHUNK_LOCK</code>, emits an optional <code>@debug</code> trace gated behind <code>CONTEXT_CHUNK_DEBUG[]</code>, and <code>yield()</code>s the scheduler &mdash; the scan does not advance to its next 1k batch until DONE has run.</li>
+        <li><strong>Four scan sites chunked</strong>: <code>refresh_message_intensities!</code> (10 DONEs per 10k cave), <code>apply_last_selected_feedback!</code> (1 DONE when all target ids in first chunk &mdash; short-circuits), <code>auto_tune_intensity_threshold</code> (aborts mid-chunk when count > <code>ELIGIBLE_MAX</code> &mdash; caps each binary-search step at ~1 chunk on all-hot 10k caves), and <code>extract_aiml_memory_context</code> (three chunked sub-scans: pinned, unpinned materialisation, coinflip).</li>
+        <li><strong>Introspection surface</strong>: <code>reset_chunk_counters!()</code> and <code>get_chunk_counter(label)</code> expose the per-label DONE counts so tests and operators can empirically verify "scan emitted N chunks for a 10k cave."</li>
+        <li><strong>Test suite</strong>: test group <code>[J]</code> added to <code>test_context_intensity.jl</code> with 8 sub-tests &mdash; <code>CONTEXT_SCAN_CHUNK</code> bounds, 10k straddling cave threshold convergence under chunking, all-hot 10k overshoot bounded to &le; 1 chunk, <code>refresh_message_intensities!</code> touches every message across off-boundary cave sizes, feedback short-circuit bumps exactly target ids, and DONE checkpoint counts exactly match expected values for refresh / feedback / full extract. <strong>All 21 / 21 test groups green</strong> in ~1m45s.</li>
+    </ul>
+
+    <h3>v7.16 &mdash; AIML Synthesizes Natural-Language Replies from Vote Data</h3>
+    <ul>
+        <li><strong>AIML scaffold leads with speech</strong>: <code>generate_aiml_payload</code> in <code>src/Main.jl</code> rewritten so the emitted scaffold IS the conversational reply, not instructions for a downstream LLM. Stats still exist below a <code>--- DEBUG TELEMETRY ---</code> separator for <code>/status</code>, operators, and tests.</li>
+        <li><strong>Orchestration toolbox</strong>: every word in the synthesized reply routes through <code>_pick_synonym(word, drop_table, required_relations)</code> which pulls candidates from BOTH <code>Thesaurus.SYNONYM_SEED_MAP</code> (bidirectional canonical&harr;synset) AND <code>SemanticVerbs._SYNONYM_MAP</code> (alias&rarr;canonical, populated at runtime by <code>/addSynonym</code>). Candidates are filtered by <code>InputQueue.is_inhibited</code> (negative thesaurus) and per-node <code>drop_table</code>. <code>required_relations</code> words are never swapped &mdash; they stay canonical to preserve the node's semantic contract.</li>
+        <li><strong>Sentence skeletons by action family</strong>: explain/clarify/describe &rarr; "Here is the picture:"; greet/welcome/smile &rarr; "Hello &mdash; here is what matters:"; warn/reject &rarr; "A caution:"; comfort/acknowledge &rarr; "To acknowledge what matters here:"; flee/dodge &rarr; "A concern worth raising:"; reason/analyze (default) &rarr; "Thinking it through:". The claim comes from the winning node's pattern (synonym-swapped); support is built from relational triples, sure companions, and an UNSURE hedge clause when confidence is shaky.</li>
+        <li><strong>Whitespace / separator fix</strong>: <code>_swap_words_in</code> originally used <code>split(s, regex; keepempty=true)</code> which drops separators; rewritten to use simple <code>split(sentence)</code> and <code>join(out_tokens, " ")</code>. Capitalisation of the first character is preserved across swap.</li>
+        <li><strong>Lobe-context doubling fix</strong>: <code>extract_lobe_aware_context()</code> returns a string already prefixed with <code>"Lobe Context: "</code>. Both the <code>{LOBE_CONTEXT}</code> template substitution and the telemetry <code>Lobe Context:</code> line now strip the prefix before adding their own, killing the <code>"Lobe Context: Lobe Context:"</code> bug.</li>
+        <li><strong>Formatter</strong>: <code>specimen_demo/format_conversation.py</code> rewritten to match the v7.16 single-reply-line scaffold shape. Renders each cycle as Interviewer prompt &rarr; <code>Grug (as <voice>, from the <cave> cave)</code> &rarr; blockquoted reply &rarr; compact stats strip &rarr; collapsed directives &rarr; collapsed full telemetry.</li>
+    </ul>
+
+    <h3>v7.15 &mdash; AIML Scaffold Orchestrates Votes into Conversational Reply</h3>
+    <ul>
+        <li><strong>Scaffold output reordered</strong>: <code>generate_aiml_payload</code> now leads with a conversational voice+verb+directives line, stats moved behind <code>--- DEBUG TELEMETRY (orchestration internals, not for speech) ---</code>. Downstream consumers get the reply first, operators and tests still get every stat.</li>
+        <li><strong>Seed rules rewritten as tone/voice directives</strong>: 8 orchestration rules in <code>specimen_demo/seed_comprehensive.txt</code> changed from variable-echo templates (e.g. "Surface the winning node {NODE_ID} from lobe {LOBE_CONTEXT}") to shaping directives like "Answer the mission in one tight paragraph &mdash; no lists, no hedging ladders", "Ground the reply in a concrete example before stating any general principle", "Stay inside the {LOBE_CONTEXT} frame &mdash; do not wander into unrelated domains". Rules now shape the voice, not echo template variables.</li>
+        <li><strong>Background</strong>: v7.15 surfaced the <em>contract</em> (reply is speech, stats are telemetry); v7.16 delivered the <em>synthesis</em> (reply is actually orchestrated from votes).</li>
+    </ul>
+
+    <h3>v7.14 &mdash; Digest-Only Message History + Interview-Style Transcript</h3>
+    <ul>
+        <li><strong>Message history stores digests, not scaffolds</strong>: previously every <code>/mission</code> appended the full AIML scaffold (~2&ndash;3 KB) to <code>MESSAGE_HISTORY</code>, and the next mission re-read that scaffold back in as context &mdash; classic O(N²) recursive context pollution. v7.14 replaces the write with a one-line digest: <code>Mission "X" &rarr; primary=Y conf=Z node=W</code> (~80 bytes). Scaffolds are still emitted to stdout as before, they are simply no longer stored in the message wall.</li>
+        <li><strong>Log shrink</strong>: comprehensive specimen run dropped from ~2.7 MB uncompressed to ~40 KB &mdash; roughly a 70&times; reduction on an 8-cycle conversation. Gain compounds with cave lifetime.</li>
+        <li><strong>Interview-style <code>format_conversation.py</code></strong>: full rewrite. Presents the run as literal dialogue (<code>Interviewer</code> asks, <code>Grug</code> replies) instead of a stats dump. Auto-decompresses <code>.log.gz</code>, bounds read with head+tail slicing above a 36 MB budget, exits non-zero on missing raw log.</li>
+        <li><strong>User-driven</strong>: the rewrite landed because the user explicitly asked for <em>"the conversation log to include not just stats but actual conversation. you querying the AI replying."</em></li>
+    </ul>
+
+    <h3>v7.13 &mdash; Two-Stage Fresh Memory Gate (Threshold + Coinflip)</h3>
+    <ul>
+        <li><strong>Auto-tuned intensity threshold</strong>: <code>auto_tune_intensity_threshold(unpinned)</code> binary-searches the threshold that lands the eligible set in <code>[CONTEXT_ELIGIBLE_MIN=5, CONTEXT_ELIGIBLE_MAX=10]</code>. Search space <code>[FLOOR, CAP]</code>, budget <code>CONTEXT_THRESHOLD_STEPS=12</code> (log<sub>2</sub> of resolution). Edge cases explicit: fewer than MIN unpinned &rarr; FLOOR passes everything; all-identical intensities &rarr; converge just under that value with no infinite loop; jitter-to-FLOOR &rarr; returns FLOOR and lets the downstream coinflip narrow.</li>
+        <li><strong>Pipeline</strong>: pinned always surface, unpinned pass through the threshold gate first, eligible survivors then go through the v7.12 intensity-biased coinflip, newest-first, capped at <code>MAX_FRESH_CONTEXT=8</code>. Selected message ids cached in <code>LAST_SELECTED_MSG_IDS</code> so <code>/right</code> / <code>/wrong</code> can close the feedback loop. Fresh Memory block header now carries <code>[threshold=X eligible=N]</code> telemetry.</li>
+        <li><strong>Why</strong>: v7.12's coinflip worked for tens of messages but a 10k-message cave would throw 10k coin-flips every mission. The threshold gate clamps the coinflip pool to 5&ndash;10 survivors so the stochastic character is preserved without the per-mission cost scaling to total cave size.</li>
+        <li><strong>Test suite</strong>: groups <code>[H]</code> (narrow large caves to band, 7 sub-tests) and <code>[I]</code> (extract_aiml_memory_context bounded on 10k cave, 4 sub-tests) added to <code>test_context_intensity.jl</code>.</li>
+    </ul>
+
+    <h3>v7.12 &mdash; Context-Intensity Jitter: Per-Message Relevance Snap-Back</h3>
+    <ul>
+        <li><strong>Per-message intensity field</strong>: every <code>ChatMessage</code> carries <code>intensity :: Float64</code> in <code>[FLOOR=0.0, CAP=3.0]</code>, baseline 0.5. Replaces the hard-coded "last 5 unpinned" Fresh Memory heuristic with a relevance-biased coinflip sample.</li>
+        <li><strong>Refresh loop</strong>: <code>refresh_message_intensities!(user_input)</code> is called every <code>/mission</code>. For each message it tokenises via <code>_tokenize_for_relevance</code>, computes <code>score_message_relevance</code> (lexical + relational-triple overlap with dynamic triples included), snap-backs toward relevance with <code>CONTEXT_SNAP_ALPHA &asymp; 0.35</code>, adds zero-mean jitter via <code>RelationalJitter.jitter_value</code> (so <code>/brainstorm</code> scope amplifies context nudge automatically), and clamps.</li>
+        <li><strong>Feedback loop wired in</strong>: <code>/right</code> bumps selected message intensities by <code>+0.5</code>; <code>/wrong</code> sags them by <code>-0.5</code>; clamp always honoured. If no prior mission populated <code>LAST_SELECTED_MSG_IDS</code>, feedback is a no-op &mdash; no silent failure, no spurious side-effect.</li>
+        <li><strong>Fresh Memory coinflip</strong>: unpinned messages are coin-flipped newest-first with <code>p = clamp(intensity/CAP, COIN_P_FLOOR, COIN_P_CEIL)</code>. Hot message (intensity=2.0) &asymp; 0.67 surface probability; cold banner (intensity=0.1) &asymp; 0.03. Pinned bypass the coinflip. Final Fresh Memory capped at <code>MAX_FRESH_CONTEXT=8</code>, selected ids cached for the feedback loop.</li>
+        <li><strong>Test suite</strong>: new file <code>test/test_context_intensity.jl</code> with groups <code>[A]</code>&ndash;<code>[G]</code> covering clamp saturation + non-finite rejection, lexical tokenizer filters, relevance score monotonicity (identical > disjoint), snap-back + zero-mean jitter, pinned-always / unpinned-biased surfacing, feedback clamp + empty-set no-op, and <code>/brainstorm</code> scope alignment (jitter widens under scope). <strong>All green</strong>.</li>
+    </ul>
+
     <h3>v7.11 — /brainstorm Scoped Heavy-Jitter Override</h3>
     <ul>
         <li><strong>New CLI command</strong> <code>/brainstorm <text></code> in <code>src/Main.jl</code>: same capture shape and pipeline as <code>/mission</code>, but wraps <code>process_mission</code> in a <code>with_brainstorm_jitter()</code> scope so every jitter-wired code path (relational dialectics + AIML strength/delta/coin gates) sees a wider entropy window for that one mission. Two CLI-level guards: empty/whitespace-only prompts are rejected before scope entry, and an already-active scope is refused with a friendly message.</li>
