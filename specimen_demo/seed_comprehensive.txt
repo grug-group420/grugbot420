@@ -150,14 +150,19 @@
 # Magic word tags get substituted by the vote orchestrator when a rule
 # fires (coinflip against fire_probability).
 # ----------------------------------------------------------------------------
-/addRule On mission {MISSION} with primary action {PRIMARY_ACTION} at confidence {CONFIDENCE}, focus on the winning frame. [prob=1.0]
-/addRule When confidence {CONFIDENCE} is low, suggest alternatives from {UNSURE_ACTIONS} rather than forcing a choice. [prob=0.7]
-/addRule If {VOTE_CERTAINTY} shows a tie, name the tied alternatives {TIED_ALTERNATIVES} and ask the user to disambiguate. [prob=0.9]
-/addRule Surface the winning node {NODE_ID} from lobe {LOBE_CONTEXT} so provenance is clear. [prob=0.85]
-/addRule If pinned memory {MEMORY} is relevant, cite it before proposing an action from {ALL_ACTIONS}. [prob=0.6]
-/addRule When {PRIMARY_ACTION} involves warn or harm scrutiny, include a concrete safeguard. [prob=1.0]
-/addRule For ambiguous missions, list {SURE_ACTIONS} first then {UNSURE_ACTIONS} as fallbacks. [prob=0.5]
-/addRule When {CONFIDENCE} exceeds high threshold, commit to one recommendation instead of hedging. [prob=0.4]
+# GRUG v7.15: Orchestration rules are TONE / VOICE DIRECTIVES, not
+# variable-echo templates. The scaffold is a conversational reply —
+# rules shape how it is spoken, they do not name internal IDs, confidences,
+# or vote states. All placeholders that DO appear are conversational
+# flavor, not statistics (e.g. {MISSION} is the user's question).
+/addRule Answer "{MISSION}" in one tight paragraph — no lists, no hedging ladders. [prob=1.0]
+/addRule Ground the reply in a concrete example before stating any general principle. [prob=0.8]
+/addRule Stay inside the {LOBE_CONTEXT} frame — do not wander into unrelated domains. [prob=0.85]
+/addRule If the claim leans on a cause-effect chain, state the cause first, then the effect. [prob=0.7]
+/addRule When the topic touches harm, consent, or fairness, include at least one mitigating consideration. [prob=1.0]
+/addRule Speak with the persona in the system_prompt — do not break voice mid-reply. [prob=0.9]
+/addRule If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats. [prob=0.6]
+/addRule Close with a short, actionable takeaway the reader can use. [prob=0.5]
 
 /negativeThesaurus add maybe --reason hedging noise
 /negativeThesaurus add probably --reason hedging noise

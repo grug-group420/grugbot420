@@ -299,45 +299,45 @@ Brain > [ENGINE] 🔗  Node 'node_19' attached to target 'node_18' with pattern 
    → Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4)
    → Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4)
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_explain' in lobe 'physics' with strength 5.127600492314092
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_explain' in lobe 'physics' with strength 5.024265601216002
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_analyze' in lobe 'physics' with strength 5.037963686263498
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_analyze' in lobe 'physics' with strength 5.0617322935077835
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_warn' in lobe 'physics' with strength 5.098873946588126
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_warn' in lobe 'physics' with strength 4.903319567594652
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_advise' in lobe 'cooking' with strength 5.111395479410945
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_advise' in lobe 'cooking' with strength 5.08540741020012
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_warn' in lobe 'cooking' with strength 4.961578506599047
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_warn' in lobe 'cooking' with strength 5.096008027751568
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_explain' in lobe 'cooking' with strength 5.00967503279566
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_explain' in lobe 'cooking' with strength 4.971801383771248
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_analyze' in lobe 'music' with strength 4.947462779952532
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_analyze' in lobe 'music' with strength 4.959633109249499
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_describe' in lobe 'music' with strength 4.898840935845295
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_describe' in lobe 'music' with strength 4.86970538000442
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_define' in lobe 'music' with strength 5.078261618968691
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_define' in lobe 'music' with strength 4.9199847552558795
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_reason' in lobe 'ethics' with strength 5.066274791243909
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_reason' in lobe 'ethics' with strength 4.871091201208417
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_acknowledge' in lobe 'ethics' with strength 5.016711454016776
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_acknowledge' in lobe 'ethics' with strength 4.992120278333042
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_warn' in lobe 'ethics' with strength 4.993379418147302
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_warn' in lobe 'ethics' with strength 5.117647104805271
 
-Brain > ⚙️ Rule tied to tree: [On mission {MISSION} with primary action {PRIMARY_ACTION} at confidence {CONFIDENCE}, focus on the winning frame.] (fire_prob=1.0)
+Brain > ⚙️ Rule tied to tree: [Answer "{MISSION}" in one tight paragraph — no lists, no hedging ladders.] (fire_prob=1.0)
 
-Brain > ⚙️ Rule tied to tree: [When confidence {CONFIDENCE} is low, suggest alternatives from {UNSURE_ACTIONS} rather than forcing a choice.] (fire_prob=0.7)
+Brain > ⚙️ Rule tied to tree: [Ground the reply in a concrete example before stating any general principle.] (fire_prob=0.8)
 
-Brain > ⚙️ Rule tied to tree: [If {VOTE_CERTAINTY} shows a tie, name the tied alternatives {TIED_ALTERNATIVES} and ask the user to disambiguate.] (fire_prob=0.9)
+Brain > ⚙️ Rule tied to tree: [Stay inside the {LOBE_CONTEXT} frame — do not wander into unrelated domains.] (fire_prob=0.85)
 
-Brain > ⚙️ Rule tied to tree: [Surface the winning node {NODE_ID} from lobe {LOBE_CONTEXT} so provenance is clear.] (fire_prob=0.85)
+Brain > ⚙️ Rule tied to tree: [If the claim leans on a cause-effect chain, state the cause first, then the effect.] (fire_prob=0.7)
 
-Brain > ⚙️ Rule tied to tree: [If pinned memory {MEMORY} is relevant, cite it before proposing an action from {ALL_ACTIONS}.] (fire_prob=0.6)
+Brain > ⚙️ Rule tied to tree: [When the topic touches harm, consent, or fairness, include at least one mitigating consideration.] (fire_prob=1.0)
 
-Brain > ⚙️ Rule tied to tree: [When {PRIMARY_ACTION} involves warn or harm scrutiny, include a concrete safeguard.] (fire_prob=1.0)
+Brain > ⚙️ Rule tied to tree: [Speak with the persona in the system_prompt — do not break voice mid-reply.] (fire_prob=0.9)
 
-Brain > ⚙️ Rule tied to tree: [For ambiguous missions, list {SURE_ACTIONS} first then {UNSURE_ACTIONS} as fallbacks.] (fire_prob=0.5)
+Brain > ⚙️ Rule tied to tree: [If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.] (fire_prob=0.6)
 
-Brain > ⚙️ Rule tied to tree: [When {CONFIDENCE} exceeds high threshold, commit to one recommendation instead of hedging.] (fire_prob=0.4)
+Brain > ⚙️ Rule tied to tree: [Close with a short, actionable takeaway the reader can use.] (fire_prob=0.5)
 
 Brain > 🚫 Inhibition registered: 'maybe'  reason: hedging noise
    NegativeThesaurus size: 1 / 256
@@ -475,9 +475,9 @@ Brain > --> Grug freezing entire cave to specimen file...
 ║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
 ╠══════════════════════════════════════════════════════════════╣
   📁  File             : grugbot420_comprehensive.specimen.gz
-  📦  JSON size        : 97539 bytes
-  🗜️   Compressed size  : 15453 bytes (84.2% smaller)
-  ⏱️   Time             : 0.43s
+  📦  JSON size        : 97425 bytes
+  🗜️   Compressed size  : 15386 bytes (84.2% smaller)
+  ⏱️   Time             : 0.44s
   ─────────────────────────────────────────────
   🌱  Nodes            : 23
   🧠  Lobes            : 4

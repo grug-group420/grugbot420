@@ -4,7 +4,7 @@ _Auto-generated from `specimen_demo/conversation_raw.log` by_ `specimen_demo/for
 
 **Specimen:** `grugbot420_comprehensive.specimen.gz` (23 nodes / 4 lobes / 8 orchestration rules / 12 AIML tribe nodes / 10 attachments / 3 inhibitions / 3 pinned memories).
 
-Below is an interview between a human **Interviewer** and **Grug** (the GrugBot420 engine after the comprehensive specimen has been loaded). Each cycle presents the prompt, Grug's scaffolded reply (the exact payload a downstream LLM would receive), and a compact stats strip showing which node and lobe won the vote. `/mission` uses standard jitter (snap-back dominant); `/brainstorm` uses heavy scoped jitter (far-jump dominant).
+Below is an interview between a human **Interviewer** and **Grug** (the GrugBot420 engine after the comprehensive specimen has been loaded). AIML's job is to turn raw votes into a **conversational reply** — what a downstream LLM would speak. Statistics live behind a debug-telemetry separator, out of speech. `/mission` uses standard jitter (snap-back dominant); `/brainstorm` uses heavy scoped jitter (far-jump dominant).
 
 ---
 
@@ -52,39 +52,47 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** explain how force relates to acceleration and mass
 
-**🧠 Grug:** _speaking as **cooking** (node_14) — **Harmony theorist**_ → primary action: **`analyze`** _(confidence **0.55**, certainty **UNSURE**)_.
+**🧠 Grug** _(as **Fermentation microbiologist. Explain microbial flavor production and contamination risks.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.55).
-> Mission: 'explain how force relates to acceleration and mass'
-> Primary Action: analyze
-> Sure Actions: [analyze, explain, explain]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission explain how force relates to acceleration and mass with primary action analyze at confidence 0.55, focus on the winning frame. | If UNSURE shows a tie, name the tied alternatives node_4(explain,conf=0.54), node_11(explain,conf=0.54) and ask the user to disambiguate. | Surface the winning node node_14 from lobe Lobe Context: [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)] so provenance is clear. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.79) | [System]: /nodeAttach: Attached 'node_9' to 'node_8' with pattern "salt and flavor" (base_conf=0.3, 1/4) | Attached 'node_10' to 'node_8' with pattern "acid balance" (base_conf=0.193, 2/4) (intensity=0.66) is relevant, cite it before proposing an action from describe, analyze, explain, explain. | When analyze involves warn or harm scrutiny, include a concrete safeguard.]
-> Constraints: [None]
-> Context: 'Harmony theorist. Explain interval stacking and chord construction.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: UNSURE
-> Tied Alternatives (not selected):
->   🪨 node_4 | action=explain | conf=0.54 | relations=None
->   🪨 node_11 | action=explain | conf=0.54 | relations=None
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.79) | [System]: /nodeAttach: Attached 'node_9' to 'node_8' with pattern "salt and flavor" (base_conf=0.3, 1/4) | Attached 'node_10' to 'node_8' with pattern "acid balance" (base_conf=0.193, 2/4) (intensity=0.66)
-> =========================================
-> ```
+> On "explain how force relates to acceleration and mass" — I'll lay it out plainly (and describe, explain, and explain if the situation calls for it). I'm not fully locked in — analyze is also on the table.
+> Shaping directives:
+>   • Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+>   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+>   • Close with a short, actionable takeaway the reader can use.
 
-<sub>primary `analyze` · sure `[analyze, explain, explain]` · unsure `[None]` · winning node `node_14` · lobe context `[cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=8` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `describe` · conf `0.55` · certainty `UNSURE` · sure `[describe, explain, explain]` · unsure `[analyze]` · winning node `node_11` · lobe `[cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=8` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain how force relates to acceleration and mass'
+Primary Action: describe  (conf=0.55, certainty=UNSURE)
+Sure Actions: [describe, explain, explain]
+Unsure Actions (Coinflip Side-Features): [analyze]
+Constraints: [None]
+Winning Node: node_11
+Lobe Context: [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_16 | action=explain | conf=0.55 | relations=None
+  🪨 node_4 | action=explain | conf=0.54 | relations=None
+Other Possibilities (strong but not winners):
+  🔸 node_5 | action=analyze | conf=0.5 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.8) | [System]: /nodeAttach: Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4) | Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4) (intensity=0.7)
+=========================================
+```
+</details>
 
 ---
 
@@ -92,39 +100,43 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** explain how force relates to acceleration and mass
 
-**🧠 Grug:** _speaking as **cooking** (?) — **Energy conservation specialist**_ → primary action: **`describe`** _(confidence **0.55**, certainty **UNSURE**)_.
+**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.55).
-> Mission: 'explain how force relates to acceleration and mass'
-> Primary Action: describe
-> Sure Actions: [describe, explain, analyze]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission explain how force relates to acceleration and mass with primary action describe at confidence 0.55, focus on the winning frame. | When confidence 0.55 is low, suggest alternatives from None rather than forcing a choice. | If UNSURE shows a tie, name the tied alternatives node_11(explain,conf=0.55), node_16(analyze,conf=0.54) and ask the user to disambiguate. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attached 'node_14' to 'node_13' with pattern "melody and harmony" (base_conf=0.175, 1/4) | Attached 'node_15' to 'node_13' with pattern "harmony chords" (base_conf=0.05, 2/4) (intensity=0.5) | [User]: explain how force relates to acceleration and mass (intensity=1.57) | [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=1.13) | [User]: explain how force relates to acceleration and mass (intensity=1.29) is relevant, cite it before proposing an action from analyze, explain, describe. | When describe involves warn or harm scrutiny, include a concrete safeguard. | For ambiguous missions, list describe, explain, analyze first then None as fallbacks.]
-> Constraints: [None]
-> Context: 'Energy conservation specialist. Describe transformations between kinetic and potential forms.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: UNSURE
-> Tied Alternatives (not selected):
->   🪨 node_11 | action=explain | conf=0.55 | relations=None
->   🪨 node_16 | action=analyze | conf=0.54 | relations=None
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attached 'node_14' to 'node_13' with pattern "melody and harmony" (base_conf=0.175, 1/4) | Attached 'node_15' to 'node_13' with pattern "harmony chords" (base_conf=0.05, 2/4) (intensity=0.5) | [User]: explain how force relates to acceleration and mass (intensity=1.57) | [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=1.13) | [User]: explain how force relates to acceleration and mass (intensity=1.29)
-> =========================================
-> ```
+> On "explain how force relates to acceleration and mass" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [cooking (0/5 active)] | [ethics (0/5 active)] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+>   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
 
-<sub>primary `describe` · sure `[describe, explain, analyze]` · unsure `[None]` · winning node `?` · lobe context `[cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=10` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `explain` · conf `0.49` · certainty `SURE` · sure `[explain]` · unsure `[explain]` · winning node `node_8` · lobe `[cooking (0/5 active)] | [ethics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=10` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain how force relates to acceleration and mass'
+Primary Action: explain  (conf=0.49, certainty=SURE)
+Sure Actions: [explain]
+Unsure Actions (Coinflip Side-Features): [explain]
+Constraints: [None]
+Winning Node: node_8
+Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_10 | action=explain | conf=0.25 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.62) | [System]: /nodeAttach: Attached 'node_6' to 'node_5' with pattern "wave and frequency pitch" (base_conf=0.05, 1/4) | Attached 'node_7' to 'node_5' with pattern "friction heat" (base_conf=0.05, 2/4) (intensity=0.47) | [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_11 (intensity=1.0) | [User]: explain how force relates to acceleration and mass (intensity=1.33)
+=========================================
+```
+</details>
 
 ---
 
@@ -132,36 +144,42 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
-**🧠 Grug:** _speaking as **cooking** (node_9) — **Seasoning advisor**_ → primary action: **`describe`** _(confidence **0.3**, certainty **SURE**)_.
+**🧠 Grug** _(as **Thermodynamics tutor. Explain energy dissipation and heat generation from friction.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.3).
-> Mission: 'explain how acid balances richness in a heavy dish'
-> Primary Action: describe
-> Sure Actions: [describe]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission explain how acid balances richness in a heavy dish with primary action describe at confidence 0.3, focus on the winning frame. | If SURE shows a tie, name the tied alternatives None and ask the user to disambiguate. | Surface the winning node node_9 from lobe Lobe Context: [cooking (0/5 active)] so provenance is clear. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.39) | [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=0.79) is relevant, cite it before proposing an action from describe. | When describe involves warn or harm scrutiny, include a concrete safeguard.]
-> Constraints: [None]
-> Context: 'Seasoning advisor. Acknowledge salt's role while cautioning against overuse.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [cooking (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: SURE
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.39) | [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=0.79)
-> =========================================
-> ```
+> On "explain how acid balances richness in a heavy dish" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
+>   • Stay inside the [physics (0/5 active)] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+>   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
 
-<sub>primary `describe` · sure `[describe]` · unsure `[None]` · winning node `node_9` · lobe context `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `explain` · conf `0.54` · certainty `SURE` · sure `[explain]` · unsure `[reason]` · winning node `node_6` · lobe `[physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain how acid balances richness in a heavy dish'
+Primary Action: explain  (conf=0.54, certainty=SURE)
+Sure Actions: [explain]
+Unsure Actions (Coinflip Side-Features): [reason]
+Constraints: [None]
+Winning Node: node_6
+Lobe Context: [physics (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_1 | action=reason | conf=0.33 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_11 (intensity=0.73) | [User]: explain how force relates to acceleration and mass (intensity=0.97)
+=========================================
+```
+</details>
 
 ---
 
@@ -169,38 +187,41 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
-**🧠 Grug:** _speaking as **cooking** (?) — **Flavor-balance chef**_ → primary action: **`explain`** _(confidence **0.68**, certainty **SURE**)_.
+**🧠 Grug** _(as **Flavor-balance chef. Explain how acidity cuts through fat and richness.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.68).
-> Mission: 'explain how acid balances richness in a heavy dish'
-> Primary Action: explain
-> Sure Actions: [explain]
-> Unsure Actions (Coinflip Side-Features): [reason]
-> Dynamic Rules (Stochastic): [On mission explain how acid balances richness in a heavy dish with primary action explain at confidence 0.68, focus on the winning frame. | When confidence 0.68 is low, suggest alternatives from reason rather than forcing a choice. | If SURE shows a tie, name the tied alternatives None and ask the user to disambiguate. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.75 eligible=5] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=1.57) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=describe conf=0.3 node=node_9 (intensity=1.03) | [User]: explain how acid balances richness in a heavy dish (intensity=1.34) is relevant, cite it before proposing an action from welcome, acknowledge, reason, explain, describe. | When explain involves warn or harm scrutiny, include a concrete safeguard. | For ambiguous missions, list explain first then reason as fallbacks.]
-> Constraints: [None]
-> Context: 'Flavor-balance chef. Explain how acidity cuts through fat and richness.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)] | [physics (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: SURE
-> Other Possibilities (strong but not winners):
->   🔸 node_19 | action=reason | conf=0.28 | relations=None
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.75 eligible=5] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=1.57) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=describe conf=0.3 node=node_9 (intensity=1.03) | [User]: explain how acid balances richness in a heavy dish (intensity=1.34)
-> =========================================
-> ```
+> On "explain how acid balances richness in a heavy dish" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [cooking (0/5 active)] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
 
-<sub>primary `explain` · sure `[explain]` · unsure `[reason]` · winning node `?` · lobe context `[cooking (0/5 active)] | [ethics (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.75, eligible=5` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `explain` · conf `0.69` · certainty `SURE` · sure `[explain]` · unsure `[greet]` · winning node `node_10` · lobe `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain how acid balances richness in a heavy dish'
+Primary Action: explain  (conf=0.69, certainty=SURE)
+Sure Actions: [explain]
+Unsure Actions (Coinflip Side-Features): [greet]
+Constraints: [None]
+Winning Node: node_10
+Lobe Context: [cooking (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_0 | action=greet | conf=0.33 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "explain how acid balances richness in a heavy dish" → primary=explain conf=0.54 node=node_6 (intensity=1.01)
+=========================================
+```
+</details>
 
 ---
 
@@ -208,36 +229,41 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** describe how melody and harmony work together
 
-**🧠 Grug:** _speaking as **physics** (node_5) — **Acoustics bridge node**_ → primary action: **`explain`** _(confidence **0.27**, certainty **SURE**)_.
+**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.27).
-> Mission: 'describe how melody and harmony work together'
-> Primary Action: explain
-> Sure Actions: [explain]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission describe how melody and harmony work together with primary action explain at confidence 0.27, focus on the winning frame. | If SURE shows a tie, name the tied alternatives None and ask the user to disambiguate. | Surface the winning node node_5 from lobe Lobe Context: [physics (0/5 active)] so provenance is clear. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=9] (Recent): [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=0.44) | [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_4 (intensity=0.44) | [User]: explain how acid balances richness in a heavy dish (intensity=1.08) | [User]: describe how melody and harmony work together (intensity=1.29) is relevant, cite it before proposing an action from explain. | When explain involves warn or harm scrutiny, include a concrete safeguard. | For ambiguous missions, list explain first then None as fallbacks.]
-> Constraints: [None]
-> Context: 'Acoustics bridge node. Connect wave physics to musical pitch perception.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [physics (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: SURE
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=9] (Recent): [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.55 node=node_14 (intensity=0.44) | [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_4 (intensity=0.44) | [User]: explain how acid balances richness in a heavy dish (intensity=1.08) | [User]: describe how melody and harmony work together (intensity=1.29)
-> =========================================
-> ```
+> On "describe how melody and harmony work together" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
 
-<sub>primary `explain` · sure `[explain]` · unsure `[None]` · winning node `node_5` · lobe context `[physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `explain` · conf `0.6` · certainty `SURE` · sure `[explain]` · unsure `[explain]` · winning node `node_8` · lobe `[cooking (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe how melody and harmony work together'
+Primary Action: explain  (conf=0.6, certainty=SURE)
+Sure Actions: [explain]
+Unsure Actions (Coinflip Side-Features): [explain]
+Constraints: [None]
+Winning Node: node_8
+Lobe Context: [cooking (0/5 active)] | [physics (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_5 | action=explain | conf=0.27 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=0.95) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=explain conf=0.69 node=node_10 (intensity=0.7)
+=========================================
+```
+</details>
 
 ---
 
@@ -245,37 +271,40 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** describe how melody and harmony work together
 
-**🧠 Grug:** _speaking as **ethics** (node_19) — **Autonomy advocate**_ → primary action: **`acknowledge`** _(confidence **0.3**, certainty **UNSURE**)_.
+**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.3).
-> Mission: 'describe how melody and harmony work together'
-> Primary Action: acknowledge
-> Sure Actions: [acknowledge, describe]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission describe how melody and harmony work together with primary action acknowledge at confidence 0.3, focus on the winning frame. | When confidence 0.3 is low, suggest alternatives from None rather than forcing a choice. | Surface the winning node node_19 from lobe Lobe Context: [ethics (0/5 active)] | [physics (0/5 active)] so provenance is clear. | When acknowledge involves warn or harm scrutiny, include a concrete safeguard.]
-> Constraints: [None]
-> Context: 'Autonomy advocate. Reason from consent as the foundation of legitimate interaction.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [ethics (0/5 active)] | [physics (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: UNSURE
-> Tied Alternatives (not selected):
->   🪨 node_5 | action=describe | conf=0.28 | relations=None
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=10] (Recent): [User]: describe how melody and harmony work together (intensity=1.37) | [User]: describe how melody and harmony work together (intensity=1.37)
-> =========================================
-> ```
+> On "describe how melody and harmony work together" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [cooking (0/5 active)] frame — do not wander into unrelated domains.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+>   • Close with a short, actionable takeaway the reader can use.
 
-<sub>primary `acknowledge` · sure `[acknowledge, describe]` · unsure `[None]` · winning node `node_19` · lobe context `[ethics (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=10` · user triples `None` · node triples `None`</sub>
+<sub>verb `lay it out plainly` · primary `describe` · conf `0.6` · certainty `SURE` · sure `[describe]` · unsure `[None]` · winning node `node_8` · lobe `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=10` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe how melody and harmony work together'
+Primary Action: describe  (conf=0.6, certainty=SURE)
+Sure Actions: [describe]
+Unsure Actions (Coinflip Side-Features): [None]
+Constraints: [None]
+Winning Node: node_8
+Lobe Context: [cooking (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=10] (Recent): [User]: describe how melody and harmony work together (intensity=1.19)
+=========================================
+```
+</details>
 
 ---
 
@@ -283,44 +312,85 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** reason about fairness when cases look similar but feel different
 
-**🧠 Grug:** _speaking as **cooking** (node_15) — **Rhythm instructor**_ → primary action: **`describe`** _(confidence **0.54**, certainty **UNSURE**)_.
+**🧠 Grug** _(as **Highly polite greeting protocols active.**)_:
 
-> **Full AIML payload Grug handed back:**
->
-> ```text
-> 🤖 AIML Output Scaffold:
-> SYNTHESIZED PAYLOAD. (Primary Confidence: 0.54).
-> Mission: 'reason about fairness when cases look similar but feel different'
-> Primary Action: describe
-> Sure Actions: [describe, describe]
-> Unsure Actions (Coinflip Side-Features): [None]
-> Dynamic Rules (Stochastic): [On mission reason about fairness when cases look similar but feel different with primary action describe at confidence 0.54, focus on the winning frame. | When confidence 0.54 is low, suggest alternatives from None rather than forcing a choice. | If UNSURE shows a tie, name the tied alternatives node_10(describe,conf=0.53) and ask the user to disambiguate. | Surface the winning node node_15 from lobe Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)] | [music (0/5 active)] so provenance is clear. | If pinned memory Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "describe how melody and harmony work together" → primary=explain conf=0.27 node=node_5 (intensity=0.69) | [System]: Mission "describe how melody and harmony work together" → primary=acknowledge conf=0.3 node=node_19 (intensity=0.63) is relevant, cite it before proposing an action from describe, reassure, describe, acknowledge, reason, warn. | When describe involves warn or harm scrutiny, include a concrete safeguard. | When 0.54 exceeds high threshold, commit to one recommendation instead of hedging.]
-> Constraints: [None]
-> Context: 'Rhythm instructor. Describe how pulse and meter organize musical time.'
-> --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-> Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)] | [music (0/5 active)]
-> --- RELATIONAL CONTEXT ---
-> User Triples: None
-> Node Triples: None
-> Anti-Match Detected: false
-> --- VOTE CERTAINTY ---
-> Certainty: UNSURE
-> Tied Alternatives (not selected):
->   🪨 node_10 | action=describe | conf=0.53 | relations=None
-> --- AIML MEMORY BANK ---
-> Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-> Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "describe how melody and harmony work together" → primary=explain conf=0.27 node=node_5 (intensity=0.69) | [System]: Mission "describe how melody and harmony work together" → primary=acknowledge conf=0.3 node=node_19 (intensity=0.63)
-> =========================================
-> ```
+> On "reason about fairness when cases look similar but feel different" — I'll greet the question.
+> Shaping directives:
+>   • Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [Unassigned nodes - no lobe context] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+>   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+>   • Close with a short, actionable takeaway the reader can use.
 
-<sub>primary `describe` · sure `[describe, describe]` · unsure `[None]` · winning node `node_15` · lobe context `[cooking (0/5 active)] | [ethics (0/5 active)] | [music (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+<sub>verb `greet the question` · primary `smile` · conf `0.43` · certainty `SURE` · sure `[smile]` · unsure `[None]` · winning node `node_0` · lobe `[Unassigned nodes - no lobe context]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'reason about fairness when cases look similar but feel different'
+Primary Action: smile  (conf=0.43, certainty=SURE)
+Sure Actions: [smile]
+Unsure Actions (Coinflip Side-Features): [None]
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness when cases look similar but feel different (intensity=1.31)
+=========================================
+```
+</details>
 
 ---
 
-## 🤐 Silent cycles
+### Cycle 8 · `/brainstorm`
 
-Grug went silent on **1** prompt(s) — no pattern in any lobe matched and the gate produced no votes. That is NOT a failure, it's an explicit "I don't know from my seeded patterns" answer. The engine prints `No valid specimens found for this input. Cave is silent.` in those cycles.
+**🗣️ Interviewer:** reason about fairness when cases look similar but feel different
+
+**🧠 Grug** _(as **Flavor-balance chef. Explain how acidity cuts through fat and richness.**)_:
+
+> On "reason about fairness when cases look similar but feel different" — I'll lay it out plainly.
+> Shaping directives:
+>   • Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
+>   • Ground the reply in a concrete example before stating any general principle.
+>   • Stay inside the [cooking (0/5 active)] | [ethics (0/5 active)] frame — do not wander into unrelated domains.
+>   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
+>   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+>   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+
+<sub>verb `lay it out plainly` · primary `describe` · conf `0.53` · certainty `SURE` · sure `[describe]` · unsure `[None]` · winning node `node_10` · lobe `[cooking (0/5 active)] | [ethics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🔧 Debug telemetry (orchestration internals)</summary>
+
+```text
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'reason about fairness when cases look similar but feel different'
+Primary Action: describe  (conf=0.53, certainty=SURE)
+Sure Actions: [describe]
+Unsure Actions (Coinflip Side-Features): [None]
+Constraints: [None]
+Winning Node: node_10
+Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness when cases look similar but feel different (intensity=1.48) | [User]: reason about fairness when cases look similar but feel different (intensity=1.23)
+=========================================
+```
+</details>
+
+---
 
 ## 🔍 Final diagnostics — `/status`
 
@@ -330,7 +400,7 @@ GRUGBOT SYSTEM STATUS
   ENGINE                                          
   Nodes in cave   : 23
   Hopfield cache  : 0 entries
-  Memory messages : 25
+  Memory messages : 26
   Est. memory use : ~35 KB
   Trajectory buf  : 16 entries
   Temporal coher  : 0 entries
@@ -375,7 +445,7 @@ GRUGBOT SYSTEM STATUS
 ## 📊 Transcript summary
 
 - Scripted `/mission` and `/brainstorm` commands: **8**
-- AIML scaffolds Grug emitted: **7**
-- Silent cycles: **1**
-- Raw log size (on disk): **52,545 bytes**
-- Raw log size (read into formatter): **49,955 bytes** (head + tail slice; the plain log would balloon O(N²) without v7.12–v7.14 context gating)
+- AIML scaffolds Grug emitted: **8**
+- Silent cycles: **0**
+- Raw log size (on disk): **38,895 bytes**
+- Raw log size (read into formatter): **36,191 bytes** (head + tail slice; the plain log would balloon O(N²) without v7.12–v7.14 context gating)

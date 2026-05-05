@@ -35,16 +35,26 @@ from pathlib import Path
 # GRUG: Recognise either of the two prompt commands we support.
 MISSION_RE = re.compile(r"^(/mission|/brainstorm)\s+(.+?)$", flags=re.MULTILINE)
 
-# GRUG: Scaffold header block. The rest of the payload runs until the
-# next 'Brain >' prompt or the end of stream; extract_scaffold_block()
-# handles that.
+# GRUG v7.15: Scaffold now LEADS with a conversational reply and puts
+# stats behind a --- DEBUG TELEMETRY --- separator. The regex picks up
+# the scaffold start + voice + opener + mission, and we fish out the
+# stats from the telemetry block separately.
 SCAFFOLD_RE = re.compile(
     r"🤖 AIML Output Scaffold:\n"
-    r"SYNTHESIZED PAYLOAD\. \(Primary Confidence: ([0-9.]+)\)\.\n"
+    r"\[Voice: (.+?)\]\n"
+    r"On \"(.+?)\" — I'll (.+?)\.\n"
+)
+# Extract the stats we need from the debug telemetry block that follows
+# the scaffold header. The telemetry block is bounded by the separator
+# line and the next '=====' divider.
+TELEMETRY_RE = re.compile(
+    r"--- DEBUG TELEMETRY \(orchestration internals, not for speech\) ---\n"
     r"Mission: '(.+?)'\n"
-    r"Primary Action: (\S+)\n"
+    r"Primary Action: (\S+)\s+\(conf=([0-9.]+), certainty=(\w+)\)\n"
     r"Sure Actions: \[(.*?)\]\n"
     r"Unsure Actions \(Coinflip Side-Features\): \[(.*?)\]\n"
+    r".*?Winning Node: (\S+)\n",
+    flags=re.DOTALL
 )
 SILENT_RE = re.compile(r"--> No valid specimens found for this input\. Cave is silent\.")
 
@@ -133,6 +143,20 @@ def grug_headline(primary: str, node_ctx: str, winner: str, lobe_ctx: str) -> st
 # Main dialogue builder
 # ---------------------------------------------------------------------------
 
+def _split_reply_and_telemetry(scaf: str):
+    """
+    GRUG v7.15: Scaffold is `reply || --- DEBUG TELEMETRY --- || stats`.
+    Return (reply_block, telemetry_block). If the separator is missing
+    (truncated/malformed), return the whole scaf as reply and empty
+    telemetry so we never silently drop a cycle.
+    """
+    sep = "--- DEBUG TELEMETRY (orchestration internals, not for speech) ---"
+    if sep in scaf:
+        reply_part, tele_part = scaf.split(sep, 1)
+        return reply_part.rstrip(), sep + "\n" + tele_part.strip()
+    return scaf.rstrip(), ""
+
+
 def build_transcript(raw: str, true_raw_size: int) -> str:
     scaffolds = list(SCAFFOLD_RE.finditer(raw))
     commands = list(MISSION_RE.finditer(raw))
@@ -151,10 +175,10 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
     out.append(
         "Below is an interview between a human **Interviewer** and "
         "**Grug** (the GrugBot420 engine after the comprehensive "
-        "specimen has been loaded). Each cycle presents the prompt, "
-        "Grug's scaffolded reply (the exact payload a downstream LLM "
-        "would receive), and a compact stats strip showing which node "
-        "and lobe won the vote. `/mission` uses standard jitter "
+        "specimen has been loaded). AIML's job is to turn raw votes "
+        "into a **conversational reply** — what a downstream LLM "
+        "would speak. Statistics live behind a debug-telemetry "
+        "separator, out of speech. `/mission` uses standard jitter "
         "(snap-back dominant); `/brainstorm` uses heavy scoped jitter "
         "(far-jump dominant).\n\n"
     )
@@ -169,11 +193,9 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
     out.append("---\n\n## 🎙️ The Interview\n\n")
 
     for idx, sc in enumerate(scaffolds, start=1):
-        conf = sc.group(1)
+        voice = sc.group(1)
         mission = sc.group(2)
-        primary = sc.group(3)
-        sure = sc.group(4) or "None"
-        unsure = sc.group(5) or "None"
+        verb_phrase = sc.group(3)
 
         # Bound the scaffold at the next '=====' divider or next Brain >
         start = sc.start()
@@ -185,14 +207,27 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         end = start + (min(candidates) if candidates else min(50000, len(raw) - start))
         scaf = raw[start:end]
 
-        cert = extract_field(scaf, r"Certainty: (\w+)")
-        lobe_ctx = extract_lobe_context(scaf)
-        node_ctx = extract_node_context(scaf)
-        winner = extract_winner_node(scaf)
-        antim = extract_field(scaf, r"Anti-Match Detected: (\w+)")
-        user_triples = extract_field(scaf, r"User Triples: (.+?)\n")
-        node_triples = extract_field(scaf, r"Node Triples: (.+?)\n")
-        threshold_note = extract_threshold_note(scaf)
+        # v7.15: split reply from telemetry
+        reply_block, tele_block = _split_reply_and_telemetry(scaf)
+
+        # Pull stats from the telemetry block (may be empty on malformed)
+        tele_match = TELEMETRY_RE.search(tele_block) if tele_block else None
+        if tele_match:
+            primary = tele_match.group(2)
+            conf    = tele_match.group(3)
+            cert    = tele_match.group(4)
+            sure    = tele_match.group(5) or "None"
+            unsure  = tele_match.group(6) or "None"
+            winner  = tele_match.group(7)
+        else:
+            primary, conf, cert = "?", "?", "?"
+            sure, unsure, winner = "None", "None", "?"
+
+        lobe_ctx       = extract_lobe_context(tele_block) if tele_block else "?"
+        antim          = extract_field(tele_block, r"Anti-Match Detected: (\w+)") if tele_block else "?"
+        user_triples   = extract_field(tele_block, r"User Triples: (.+?)\n") if tele_block else "?"
+        node_triples   = extract_field(tele_block, r"Node Triples: (.+?)\n") if tele_block else "?"
+        threshold_note = extract_threshold_note(tele_block) if tele_block else "—"
 
         # Determine /mission vs /brainstorm by matching the nth
         # occurrence of this prompt text in the script file.
@@ -211,34 +246,52 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
                 if same_text_before < len(matches_for_this):
                     kind = matches_for_this[same_text_before].group(1)
 
-        headline = grug_headline(primary, node_ctx, winner, lobe_ctx)
-        full_scaffold_clean = clean_box(scaf)
+        # Trim verb_phrase to the first clause for the stats strip
+        # (the full verb may include hedges like "... I'm not fully
+        # locked in — analyze is also on the table"). The reply block
+        # still shows the whole thing; this is just the compact tag.
+        verb_short = verb_phrase.split(".")[0].split("(")[0].strip()
+        if len(verb_short) > 60:
+            verb_short = verb_short[:57] + "..."
 
         # ----------- Render the dialogue turn ---------------------
         out.append(f"### Cycle {idx} · `{kind}`\n\n")
         out.append(f"**🗣️ Interviewer:** {mission}\n\n")
-        out.append(f"**🧠 Grug:** {headline} _(confidence **{conf}**, certainty **{cert}**)_.\n\n")
+        out.append(f"**🧠 Grug** _(as **{voice}**)_:\n\n")
 
-        # The full reply payload — NOT hidden in a collapsible this time.
-        # This is what the user asked for: the actual reply, visible.
-        out.append("> **Full AIML payload Grug handed back:**\n>\n")
-        out.append("> ```text\n")
-        for line in full_scaffold_clean.split("\n"):
-            out.append(f"> {line}\n")
-        out.append("> ```\n\n")
+        # Pure reply — strip the AIML scaffold header and the Voice tag
+        # (we already surfaced voice in the "as X" line above).
+        reply_clean = clean_box(reply_block)
+        reply_clean = re.sub(r"^🤖 AIML Output Scaffold:\s*\n", "", reply_clean)
+        reply_clean = re.sub(r"^\[Voice: .+?\]\s*\n", "", reply_clean)
+        for line in reply_clean.split("\n"):
+            out.append(f"> {line}\n" if line else ">\n")
+        out.append("\n")
 
-        # Compact stats strip — the "under the hood" facts, brief.
+        # Compact stats strip under the reply.
         out.append("<sub>")
+        out.append(f"verb `{verb_short}` · ")
         out.append(f"primary `{primary}` · ")
+        out.append(f"conf `{conf}` · ")
+        out.append(f"certainty `{cert}` · ")
         out.append(f"sure `[{sure}]` · ")
         out.append(f"unsure `[{unsure}]` · ")
         out.append(f"winning node `{winner}` · ")
-        out.append(f"lobe context `{lobe_ctx}` · ")
+        out.append(f"lobe `{lobe_ctx}` · ")
         out.append(f"anti-match `{antim}` · ")
         out.append(f"fresh-mem gate `{threshold_note}` · ")
         out.append(f"user triples `{user_triples}` · ")
         out.append(f"node triples `{node_triples}`")
         out.append("</sub>\n\n")
+
+        # Debug telemetry — collapsed, available but not in-your-face.
+        if tele_block:
+            out.append("<details>\n")
+            out.append("<summary>🔧 Debug telemetry (orchestration internals)</summary>\n\n")
+            out.append("```text\n")
+            out.append(clean_box(tele_block))
+            out.append("\n```\n")
+            out.append("</details>\n\n")
         out.append("---\n\n")
 
     # ---- Silent cycles ---------------------------------------------

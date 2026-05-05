@@ -1049,7 +1049,11 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             processed = replace(processed, "{CONFIDENCE}"     => string(round(primary_vote.confidence, digits=2)))
             processed = replace(processed, "{NODE_ID}"        => primary_vote.node_id)
             processed = replace(processed, "{MEMORY}"         => memory_str)
-            processed = replace(processed, "{LOBE_CONTEXT}"   => lobe_str)
+            # GRUG v7.15: strip the "Lobe Context: " prefix so rules that
+            # say "Stay inside the {LOBE_CONTEXT} frame" don't render as
+            # "Stay inside the Lobe Context: [cooking...] frame".
+            _lobe_display = startswith(lobe_str, "Lobe Context: ") ? lobe_str[length("Lobe Context: ")+1:end] : lobe_str
+            processed = replace(processed, "{LOBE_CONTEXT}"   => _lobe_display)
             processed = replace(processed, "{VOTE_CERTAINTY}"     => vote_certainty)
             processed = replace(processed, "{TIED_ALTERNATIVES}"  => tied_alt_str)
             push!(evaluated_rules, processed)
@@ -1063,51 +1067,113 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # GRUG: Put relation verb-noun sandwiches into the prompt to provide grammar context.
     u_triples = isempty(primary_vote.user_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.user_triples], ", ")
     n_triples = isempty(primary_vote.node_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.node_triples], ", ")
-    
-    # GRUG DOC 3.4: Dynamic Stochastic Generation!
-    # Grug uses the primary action AND the side-feature unsure actions to construct a highly varied output.
-    jit_response = "[System Prompt Active: $system_prompt]\n"
-    if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
-        jit_response *= "Hello human! I have received your input: '$mission'. "
+
+    # =====================================================================
+    # GRUG v7.15: AIML ORCHESTRATES VOTES INTO CONVERSATIONAL OUTPUT.
+    # =====================================================================
+    # AIML's job is to turn raw vote data into a reply a human would want
+    # to read. Not "Primary Action: analyze. Sure Actions: [analyze, explain]"
+    # — that is orchestration telemetry, not speech.
+    #
+    # The canonical return is the CONVERSATIONAL REPLY block. Stats live
+    # behind a --- DEBUG TELEMETRY --- separator so /status, the test
+    # harness, and the formatter can still inspect them, but downstream
+    # Fresh Memory ingestion and LLM consumers see the reply first.
+    #
+    # The reply is built in voice (system_prompt sets persona), uses the
+    # primary action as the verb, and folds any evaluated orchestration
+    # rules in as shaping directives rather than variable-dumps. No
+    # bracket-lists. No "I am entirely sure that I should: [X, Y]".
+    # =====================================================================
+
+    # GRUG: Small helper so we weave sure/unsure actions into natural
+    # prose. e.g. ["analyze","explain"] becomes "analyze and explain".
+    function _prose_join(items::Vector{String})::String
+        if isempty(items);          return "" end
+        if length(items) == 1;      return items[1] end
+        if length(items) == 2;      return "$(items[1]) and $(items[2])" end
+        return join(items[1:end-1], ", ") * ", and " * items[end]
+    end
+
+    sure_actions_prose   = _prose_join([v.action for v in sure_votes])
+    unsure_actions_prose = _prose_join([v.action for v in unsure_votes])
+
+    # Voice opener: pick a natural verb phrase for the primary action
+    # family. These are SHORT so the reply stays crisp.
+    verb_phrase = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
+        "greet the question"
     elseif primary_vote.action in ["flee", "hide", "fight"]
-        jit_response *= "Warning! Evasive action protocol triggered by input: '$mission'. "
+        "flag a concern"
+    elseif primary_vote.action in ["comfort", "support", "validate", "acknowledge", "reassure"]
+        "acknowledge what matters here"
+    elseif primary_vote.action in ["alert", "warn", "caution", "notify", "flag"]
+        "give a careful warning"
+    elseif primary_vote.action in ["explain", "clarify", "describe", "define", "elaborate"]
+        "lay it out plainly"
     else
-        jit_response *= "Processing input... Executing logical analysis on: '$mission'. "
+        "reason it through"
     end
 
-    jit_response *= "I am entirely sure that I should: [$sure_str]. "
-    if !isempty(unsure_votes)
-        jit_response *= "However, due to stochastic variations, I am also considering these side features: [$unsure_str]. "
+    # GRUG: Build the conversational reply. Voice first (system_prompt),
+    # then the shaped action, then whatever orchestration rules survived
+    # their coinflip — but the rules are presented as SHAPING DIRECTIVES
+    # the downstream LLM should honour, NOT as stats to parrot.
+    reply_io = IOBuffer()
+    # Persona / voice header — downstream LLM uses this as system prompt.
+    println(reply_io, "[Voice: $system_prompt]")
+    # The question and the primary stance.
+    print(reply_io, "On \"$mission\" — I'll $verb_phrase")
+    if !isempty(sure_actions_prose) && sure_actions_prose != primary_vote.action
+        print(reply_io, " (and $sure_actions_prose if the situation calls for it)")
     end
-
+    print(reply_io, ".")
+    # Hedge clause: only if we have genuine unsure side-features AND
+    # the vote was tied. This keeps hedges honest, not noise.
+    if !isempty(unsure_votes) && vote_certainty == "UNSURE"
+        print(reply_io, " I'm not fully locked in — $unsure_actions_prose is also on the table.")
+    end
+    println(reply_io)
+    # Orchestration rules → shaping directives. We present them as
+    # bullet instructions the LLM should follow while generating, not
+    # as "here are the stats that fired". If no rules fired, we omit
+    # the block entirely — a silent rule board is not noise worth
+    # surfacing in the reply.
     if !isempty(evaluated_rules)
-        jit_response *= "\n[ENFORCING DYNAMIC USER RULES]:\n"
+        println(reply_io, "Shaping directives:")
         for r in evaluated_rules
-            jit_response *= " -> $r\n"
+            println(reply_io, "  • $r")
         end
     end
+    conversational_reply = String(take!(reply_io))
 
     # GRUG: Wait little bit so cpu fire not burn down hut.
-    sleep(0.3) 
-    
-    out  = "SYNTHESIZED PAYLOAD. (Primary Confidence: $(round(primary_vote.confidence, digits=2))).\n"
-    out *= "Mission: '$mission'\n"
-    out *= "Primary Action: $(primary_vote.action)\n"
-    out *= "Sure Actions: [$sure_str]\n"
-    out *= "Unsure Actions (Coinflip Side-Features): [$unsure_str]\n"
-    out *= "Dynamic Rules (Stochastic): [$rules_str]\n"
-    out *= "Constraints: [$neg_str]\n"
-    out *= "Context: '$system_prompt'\n"
-    out *= "--- LOBE CONTEXT (PREFRONTAL CORTEX) ---\n"
-    out *= "$lobe_str\n"
-    out *= "--- RELATIONAL CONTEXT ---\n"
-    out *= "User Triples: $u_triples\n"
-    out *= "Node Triples: $n_triples\n"
-    out *= "Anti-Match Detected: $(primary_vote.antimatch)\n"
-    out *= "--- VOTE CERTAINTY ---\n"
-    out *= "Certainty: $vote_certainty\n"
+    sleep(0.3)
+
+    # =====================================================================
+    # Assemble the payload: conversational reply first, debug telemetry
+    # below a clear separator. extract_aiml_memory_context() now stores
+    # a compact digest of this cycle (v7.14), so the stats dump is NOT
+    # re-ingested next cycle — it is purely for /status and operators.
+    # =====================================================================
+    payload_io = IOBuffer()
+    print(payload_io, conversational_reply)
+    println(payload_io)
+    println(payload_io, "--- DEBUG TELEMETRY (orchestration internals, not for speech) ---")
+    println(payload_io, "Mission: '$mission'")
+    println(payload_io, "Primary Action: $(primary_vote.action)  (conf=$(round(primary_vote.confidence, digits=2)), certainty=$vote_certainty)")
+    println(payload_io, "Sure Actions: [$(join([v.action for v in sure_votes], ", "))]")
+    println(payload_io, "Unsure Actions (Coinflip Side-Features): [$(isempty(unsure_votes) ? "None" : join([v.action for v in unsure_votes], ", "))]")
+    println(payload_io, "Constraints: [$neg_str]")
+    println(payload_io, "Winning Node: $(primary_vote.node_id)")
+    # GRUG v7.15: lobe_str already includes the "Lobe Context: " prefix
+    # (from extract_lobe_aware_context), so strip it to avoid doubling.
+    _lobe_line = startswith(lobe_str, "Lobe Context: ") ? lobe_str[length("Lobe Context: ")+1:end] : lobe_str
+    println(payload_io, "Lobe Context: $_lobe_line")
+    println(payload_io, "User Triples: $u_triples")
+    println(payload_io, "Node Triples: $n_triples")
+    println(payload_io, "Anti-Match Detected: $(primary_vote.antimatch)")
     if !isempty(tied_alternatives)
-        out *= "Tied Alternatives (not selected):\n"
+        println(payload_io, "Tied Alternatives (not selected):")
         for tv in tied_alternatives
             tv_node = lock(() -> get(NODE_MAP, tv.node_id, nothing), NODE_LOCK)
             tv_triples_str = if !isnothing(tv_node) && !isempty(tv_node.relational_patterns)
@@ -1115,11 +1181,11 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             else
                 "None"
             end
-            out *= "  🪨 $(tv.node_id) | action=$(tv.action) | conf=$(round(tv.confidence, digits=2)) | relations=$tv_triples_str\n"
+            println(payload_io, "  🪨 $(tv.node_id) | action=$(tv.action) | conf=$(round(tv.confidence, digits=2)) | relations=$tv_triples_str")
         end
     end
     if !isempty(unsure_votes)
-        out *= "Other Possibilities (strong but not winners):\n"
+        println(payload_io, "Other Possibilities (strong but not winners):")
         for uv in unsure_votes
             uv_node = lock(() -> get(NODE_MAP, uv.node_id, nothing), NODE_LOCK)
             uv_triples_str = if !isnothing(uv_node) && !isempty(uv_node.relational_patterns)
@@ -1127,14 +1193,13 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             else
                 "None"
             end
-            out *= "  🔸 $(uv.node_id) | action=$(uv.action) | conf=$(round(uv.confidence, digits=2)) | relations=$uv_triples_str\n"
+            println(payload_io, "  🔸 $(uv.node_id) | action=$(uv.action) | conf=$(round(uv.confidence, digits=2)) | relations=$uv_triples_str")
         end
     end
-    out *= "--- AIML MEMORY BANK ---\n$memory_str\n"
-    out *= "=========================================\n"
-    out *= "🗣️ STOCHASTIC GENERATION (JIT AIML):\n$jit_response\n"
-    out *= "========================================="
-    return out
+    println(payload_io, "AIML Memory Bank:")
+    println(payload_io, memory_str)
+    print(payload_io, "=========================================")
+    return String(take!(payload_io))
 end
 
 # GRUG: Family of brain actions. Command must take all vote states now!
