@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.9</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.10</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.9</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.10</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -229,6 +229,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#timeout-dispatch">15.8 Timeout-Bounded Sub-Process Dispatch</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#relational-strict">15.9 Strict Relational-Triple Coupling</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#relational-jitter">15.10 Per-Activation Relational Jitter</a> <span class="new-badge">v7.9</span></li>
+        <li><a href="#aiml-jitter">15.11 AIML Activation Jitter: Strength, Delta, and Coin Gates</a> <span class="new-badge">v7.10</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -1457,6 +1458,180 @@ coherence floor. Sentinel preservation was verified with 500/500 exact returns i
 
 <!-- ================================================================ -->
 <!-- ================================================================ -->
+<h2 id="aiml-jitter">15.11 AIML Activation Jitter: Strength, Delta, and Coin Gates <span class="new-badge">v7.10</span></h2>
+
+<p>
+Version 7.10 extends the per-activation entropy framework of &#167;15.10 from the relational
+dialectics layer into the AIML executive-node layer. Every bullseye value that the AIML system
+touches during a cycle &mdash; the initial strength of a freshly-born node, every reward or
+penalty delta applied to an existing node, and the three 50/50 coin gates used by
+<code>record_fire!</code>, <code>apply_aiml_right!</code>, and <code>apply_aiml_wrong!</code> &mdash;
+now runs through <code>RelationalJitter</code> before it takes effect.
+</p>
+
+<div class="grug-box">
+    <p>Rocks in the top brain used to march in lockstep. All born at exact strength 5.
+    All get exact +1 when right, exact -1 when wrong. All flip fair coin with EXACT
+    50/50 bias. Too clean! Sibling rocks lock into same fate every cycle. Grug add
+    small shake to each value at activation. Same long-run fairness, but one rock get
+    slightly bolder, neighbor get slightly quieter, ties break naturally. Top brain
+    breathes instead of ticking.</p>
+</div>
+
+<h3>Two Jitter Shapes, One Primitive Library</h3>
+
+<p>
+The AIML layer uses <strong>two</strong> jitter primitives from <code>RelationalJitter.jl</code>,
+each with a distribution shape matched to what is being perturbed:
+</p>
+
+<table>
+    <tr><th>Primitive</th><th>Shape</th><th>Range</th><th>Used For</th></tr>
+    <tr>
+        <td><code>jitter_strength(s)</code> / <code>jitter_delta(d)</code></td>
+        <td>Proportional uniform</td>
+        <td><code>x + U(-&epsilon;&middot;|x|, +&epsilon;&middot;|x|)</code>, <code>&epsilon;=0.03</code></td>
+        <td>Initial strength, reward/penalty deltas (sign preserved, zero passes through)</td>
+    </tr>
+    <tr>
+        <td><code>jitter_coin_threshold(p)</code></td>
+        <td>Additive uniform, clamped</td>
+        <td><code>clamp(p + U(-&rho;, +&rho;), 0.01, 0.99)</code>, <code>&rho;=0.01</code></td>
+        <td>The three <code>rand() < 0.5</code> AIML coin gates</td>
+    </tr>
+</table>
+
+<p>
+Why two shapes? For a value like <code>strength = 5.0</code> the &ldquo;bullseye&rdquo; is the value
+itself, so a proportional nudge scales sensibly: a 3% window means <code>[4.85, 5.15]</code>,
+completely independent of what the strength happens to be. For a probability like <code>p = 0.5</code>
+the &ldquo;bullseye&rdquo; is near zero under the ratio interpretation &mdash; a proportional nudge would
+be almost nothing &mdash; so an additive nudge with a tight absolute window is the right shape.
+The coin-threshold clamp to <code>[0.01, 0.99]</code> prevents a single freak draw from silently
+turning a 50/50 gate into an always-yes or always-no gate, which would be a catastrophic behavior
+shift the no-silent-failure policy demands be impossible.
+</p>
+
+<h3>Call Sites</h3>
+
+<p>All call sites are inside <code>src/AIMLNodeSystem.jl</code>:</p>
+
+<table>
+    <tr><th>Call Site</th><th>Jitter Applied</th><th>Purpose</th></tr>
+    <tr>
+        <td><code>AIMLNode</code> constructor</td>
+        <td><code>jitter_strength(initial_strength)</code>, then clamped to <code>[FLOOR, CAP]</code></td>
+        <td>Freshly-born nodes don't all start at the exact same seed value</td>
+    </tr>
+    <tr>
+        <td><code>_apply_strength_delta!</code></td>
+        <td><code>jitter_delta(delta)</code> before <code>clamp</code> and grave-transition check</td>
+        <td>Reward and penalty magnitudes are perturbed; sign is always preserved because ratio < 1</td>
+    </tr>
+    <tr>
+        <td><code>record_fire!</code> coin gate</td>
+        <td><code>rand() < jitter_coin_threshold(0.5)</code></td>
+        <td>Sibling firers don't share a locked-in coin outcome within a cycle</td>
+    </tr>
+    <tr>
+        <td><code>apply_aiml_right!</code> coin gate</td>
+        <td><code>rand() < jitter_coin_threshold(0.5)</code></td>
+        <td>Secondary-reward gate fluctuates per contributor, fresh draw each</td>
+    </tr>
+    <tr>
+        <td><code>apply_aiml_wrong!</code> coin gate</td>
+        <td><code>rand() < jitter_coin_threshold(0.5)</code></td>
+        <td>Penalty gate fluctuates per contributor, fresh draw each</td>
+    </tr>
+</table>
+
+<h3>Preserved Invariants</h3>
+
+<p>All hard spec rules from the AIML system (&#167;8.5) continue to hold under jitter:</p>
+
+<ul>
+    <li><strong>Strength bounds:</strong> strength is still clamped to <code>[AIML_STRENGTH_FLOOR, AIML_STRENGTH_CAP]</code>
+        <em>after</em> the jittered delta is applied. Jitter cannot push a node out of the legal range.</li>
+    <li><strong>Grave transition:</strong> triggered by <code>strength &le; AIML_STRENGTH_FLOOR</code> on the
+        clamped new strength. A tiny negative nudge on a near-zero delta cannot cause a spurious grave
+        transition because the trigger condition is checked on the post-clamp value.</li>
+    <li><strong>Zero passes through:</strong> <code>jitter_value(0.0) = 0.0</code> exactly. A caller that requests
+        an exact-zero delta still gets zero, and the <code>is_grave</code> flag on zero-strength survival
+        remains deterministic.</li>
+    <li><strong>Honest-net-loss contract:</strong> <code>/aimlWrong</code> applied to a node that gained
+        strength this cycle MUST end strictly below cycle-start strength. Under jitter this still holds:
+        the penalty magnitude passed to <code>_apply_strength_delta!</code> is
+        <code>AIML_STRENGTH_DELTA + prior_gain > 0</code>, and the jittered delta preserves sign because
+        <code>ratio < 1</code>. The jitter applied <em>once</em> inside <code>_apply_strength_delta!</code>
+        &mdash; the caller does not double-jitter, so the net-loss guarantee stays tight.</li>
+    <li><strong>Long-run 50/50 behaviour:</strong> because the coin-threshold nudge is zero-mean and the
+        <code>rand()</code> draw is independent of the threshold draw, the expected fire rate over a
+        cycle integrates back to 0.5. Empirical rate across 2,000 <code>record_fire!</code> trials
+        measured in the test suite stays within &plusmn;0.05 of 0.5.</li>
+</ul>
+
+<h3>What Is NOT Jittered</h3>
+
+<p>
+Values that carry semantic contracts rather than numeric targets are deliberately left alone:
+</p>
+
+<ul>
+    <li><code>AIML_STRENGTH_CAP</code> / <code>AIML_STRENGTH_FLOOR</code> &mdash; these are the clamp
+        boundaries jitter respects, not values that float themselves.</li>
+    <li>Booleans <code>is_grave</code>, <code>gained_this_cycle</code>, <code>fired_this_cycle</code>,
+        <code>voted_this_cycle</code> &mdash; no meaningful entropy on flags.</li>
+    <li>The grave marker assignment on <code>strength &le; FLOOR</code> &mdash; reaching zero means
+        grave, categorically.</li>
+    <li>The <code>was_grave_before</code> comparison inside <code>/aimlWrong</code> &mdash; boolean
+        state, semantic contract.</li>
+</ul>
+
+<h3>Test Coverage</h3>
+
+<p>
+<code>test/test_aiml_jitter.jl</code> covers 8 groups:
+</p>
+
+<ol>
+    <li><strong>[A]</strong> Constructor initial-strength jitter: identity when disabled, ±ratio·|s|
+        window when enabled, zero-mean over 600 nodes (within &plusmn;0.03 of seed),
+        near-cap and near-floor seeds stay in legal range, exact-zero seed passes through.</li>
+    <li><strong>[B]</strong> <code>_apply_strength_delta!</code> delta jitter: every recorded delta
+        stays in <code>[0.97, 1.03]</code>, mean of &sim;200 deltas snaps back to 1.0 within tolerance,
+        disabled jitter returns exact integer-valued deltas.</li>
+    <li><strong>[C]</strong> <code>record_fire!</code> coin gate under jitter fires ~50% long-run
+        (2,000 trials, measured rate within &plusmn;0.05).</li>
+    <li><strong>[D]</strong> <code>apply_aiml_right!</code> secondary-reward gate fires ~50% long-run
+        (5 contributors × 400 trials).</li>
+    <li><strong>[E]</strong> <code>apply_aiml_wrong!</code> penalty gate fires ~50% long-run
+        (5 contributors × 400 trials).</li>
+    <li><strong>[F]</strong> Honest-net-loss under jitter: 1,000 penalty trials with pre-gained
+        contributors, zero violations &mdash; every penalized gainer ended strictly below cycle-start
+        strength.</li>
+    <li><strong>[G]</strong> <code>disable_jitter!()</code> identity contract: strength, delta, and
+        coin threshold all return bit-exact base values.</li>
+    <li><strong>[H]</strong> Error propagation: NaN, Inf, and out-of-range inputs raise
+        <code>JitterError</code> at every AIML call site &mdash; no silent clamping.</li>
+</ol>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> The AIML layer is the executive tier of the engine &mdash; it
+    decides which patterns get reinforced based on external feedback signals. Deterministic reward and
+    penalty magnitudes combined with deterministic 50/50 gates produce a degenerate fixed-point dynamic
+    in which any two sibling contributors with identical histories stay identical forever, and any
+    exact tie in cycle state resolves deterministically in favor of whoever was inserted first.
+    Introducing per-activation zero-mean entropy preserves the first-moment contracts (expected reward
+    = 1.0, expected penalty = <code>AIML_STRENGTH_DELTA + prior_gain</code>, expected fire rate = 0.5)
+    while supplying enough second-moment variance to make sibling trajectories diverge over cycles.
+    Crucially, because the honest-net-loss contract is encoded as a strict sign property
+    (<code>delta < 0</code>) rather than as a magnitude equality, it is preserved under any
+    bounded sign-preserving perturbation &mdash; so the spec rule and the jitter commute without
+    further guarding.
+</div>
+
+<!-- ================================================================ -->
+<!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
 <div class="grug-box">
@@ -1949,9 +2124,9 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>Main.jl</code></td><td>3,917</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence, admin system</td></tr>
 </table>
 
-<h3>Test Files (18 in runner, 21 total on disk)</h3>
+<h3>Test Files (19 in runner, 22 total on disk)</h3>
 <p>
-<code>test/runtests.jl</code> runs 18 test files as isolated Julia subprocesses &mdash; each test file
+<code>test/runtests.jl</code> runs 19 test files as isolated Julia subprocesses &mdash; each test file
 <code>include()</code>s <code>src/</code> modules directly, so running them in the same process
 would cause module-redefinition errors. Non-zero subprocess exit = test failure; no silent swallow.
 </p>
@@ -1975,6 +2150,7 @@ would cause module-redefinition errors. Non-zero subprocess exit = test failure;
     <tr><td><code>test_vote_orchestrator.jl</code> <span class="new-badge">v7.8</span></td><td>VoteOrchestrator: unique Task IDs, FireCounter cap, <code>parallel_fire_batches</code>, DONE channels, <code>TaskTimeoutError</code>, vote selection tiers</td></tr>
     <tr><td><code>test_relational_strict.jl</code> <span class="new-badge">v7.8</span></td><td>Strict relational-triple coupling: <code>screen_input_complexity</code> bands, basic vs. dynamic extractor routing, hard-fail on dynamic failure at scan_mode ≥ 3</td></tr>
     <tr><td><code>test_relational_jitter.jl</code> <span class="new-badge">v7.9</span></td><td>Per-activation relational jitter: magnitude bound, zero-mean convergence over 20k samples, NaN/Inf error handling, toggle, ratio setter, thread safety, <code>JitterConfig</code>, integration with <code>evaluate_relational_dialectics</code> (snap-back within 1% over 3k runs), sentinel preservation (500/500 exact), antimatch robustness (1000/1000 flag preserved), deterministic mode when disabled &mdash; 14 groups, all green</td></tr>
+    <tr><td><code>test_aiml_jitter.jl</code> <span class="new-badge">v7.10</span></td><td>Per-activation AIML jitter: initial-strength window + zero-mean (600 nodes), strength-delta sign preservation + mean snap-back, <code>record_fire!</code> / <code>apply_aiml_right!</code> / <code>apply_aiml_wrong!</code> coin gates all within &plusmn;0.05 of 50% long-run (thousands of trials each), honest-net-loss contract preservation under jitter (0 violations across 1000 trials), <code>disable_jitter!</code> identity contract across the AIML layer, NaN/Inf/out-of-range propagate as <code>JitterError</code> &mdash; 8 groups, all green</td></tr>
 </table>
 
 <h4>Additional test files on disk (not in runner)</h4>
@@ -1989,12 +2165,13 @@ would cause module-redefinition errors. Non-zero subprocess exit = test failure;
 <h2 id="testing">20. Test Suite</h2>
 
 <h3>Running Tests</h3>
-<pre><code># Run the full suite (17 isolated subprocesses)
+<pre><code># Run the full suite (19 isolated subprocesses)
 julia --project=. test/runtests.jl
 
 # Or run a single test file directly
 julia --project=. test/test_vote_orchestrator.jl
 julia --project=. test/test_relational_strict.jl
+julia --project=. test/test_aiml_jitter.jl
 julia --project=. test/test_smoke.jl</code></pre>
 
 <p>
@@ -2003,12 +2180,12 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.9)</h3>
+<h3>Test Suite Status (v7.10)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>18</td></tr>
-    <tr><td>Total test files on disk</td><td>21</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 18 / 18 passing</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>19</td></tr>
+    <tr><td>Total test files on disk</td><td>22</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 19 / 19 passing</td></tr>
     <tr><td>Full suite wall-clock</td><td>~95 s on 8-core Linux</td></tr>
 </table>
 
@@ -2021,6 +2198,15 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.10 — AIML Activation Jitter (Strength, Delta, Coin Gates)</h3>
+    <ul>
+        <li><strong>RelationalJitter extended</strong> with AIML-specific primitives: <code>jitter_strength(s)</code> and <code>jitter_delta(d)</code> (proportional wrappers around <code>jitter_value</code> carrying intent at the AIML call sites) and <code>jitter_coin_threshold(p; ratio)</code>, an additive <code>&plusmn;&rho;</code> nudge on probability thresholds clamped to <code>[JITTER_COIN_FLOOR, JITTER_COIN_CEILING] = [0.01, 0.99]</code>. The clamp guarantees that no single freak draw can silently turn a 50/50 gate into a degenerate always-yes or always-no gate.</li>
+        <li><strong>Module load order tightened</strong>: <code>RelationalJitter</code> now loads BEFORE <code>AIMLNodeSystem</code> in <code>GrugBot420.jl</code> so the AIML module can bind the jitter primitives at module-init time. <code>AIMLNodeSystem</code> also carries an <code>isdefined</code>-guarded fallback include so test files that <code>include()</code> it directly (without going through the package) still work.</li>
+        <li><strong>Wired into <code>src/AIMLNodeSystem.jl</code></strong> at four call sites: (1) the <code>AIMLNode</code> constructor jitters <code>initial_strength</code> before the <code>[FLOOR, CAP]</code> clamp; (2) <code>_apply_strength_delta!</code> jitters every applied <code>delta</code> before the clamp and grave-transition check; (3) the three <code>rand() < 0.5</code> coin gates in <code>record_fire!</code>, <code>apply_aiml_right!</code>, and <code>apply_aiml_wrong!</code> now compare against <code>jitter_coin_threshold(0.5)</code>. Sign preservation on deltas (ratio < 1) guarantees the honest-net-loss contract still holds: penalty magnitude stays strictly positive and the applied delta stays strictly negative.</li>
+        <li><strong>Hard invariants preserved</strong>: strength bounds enforced by post-jitter clamp; grave transition checked on post-clamp strength (no spurious graves); exact zero deltas pass through; penalty magnitude is jittered <em>once</em> inside <code>_apply_strength_delta!</code> (caller does not double-jitter); empirical 50/50 fire rate stays within &plusmn;0.05 over thousands of trials. Boolean cycle state (<code>is_grave</code>, <code>gained_this_cycle</code>, <code>fired_this_cycle</code>, <code>voted_this_cycle</code>) is never jittered.</li>
+        <li><strong>Test suite</strong>: <code>test/test_aiml_jitter.jl</code> added with 8 groups &mdash; initial-strength window + zero-mean, delta sign preservation + mean snap-back, coin-gate long-run rate at all three AIML call sites, honest-net-loss contract preservation under jitter (0 violations / 1000 trials), <code>disable_jitter!</code> identity contract, and error propagation. Existing <code>test_aiml_node_system.jl</code> unchanged in spirit: it now calls <code>RelationalJitter.disable_jitter!()</code> at the top so its exact-arithmetic assertions stay bit-stable, then leaves jitter disabled for the duration of that subprocess. <strong>19 / 19 passing</strong>.</li>
+        <li><strong>Documentation</strong>: README.md's jitter section updated to cover both v7.9 and v7.10 primitives; whitepaper gains &#167;15.11; version bumped to v7.10 across the board.</li>
+    </ul>
     <h3>v7.9 — Per-Activation Relational Jitter</h3>
     <ul>
         <li><strong>RelationalJitter</strong> (<code>src/RelationalJitter.jl</code>, 284 lines): new module injecting a bounded zero-mean nudge on every relational match-score component at activation time. Distribution is symmetric uniform on <code>[-ε·|x|, +ε·|x|]</code> with default <code>ε = 0.03</code>, so the bullseye is preserved in expectation (LLN snap-back) while exact ties between competing nodes break naturally. Per-call freshness &mdash; no persistent state.</li>

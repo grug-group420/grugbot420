@@ -35,10 +35,13 @@ using Random
 using Base.Threads: ReentrantLock
 
 export JITTER_RATIO_DEFAULT, HARD_REQ_MISS_SENTINEL
+export JITTER_COIN_RATIO_DEFAULT, JITTER_COIN_FLOOR, JITTER_COIN_CEILING
 export JitterConfig, JitterError
 export jitter_value, jitter_score, jitter_weight
+export jitter_strength, jitter_delta, jitter_coin_threshold
 export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
+export set_jitter_coin_ratio!, get_jitter_coin_ratio
 
 # ==============================================================================
 # ERROR TYPE — GRUG hate silent failures
@@ -88,15 +91,51 @@ const HARD_REQ_MISS_SENTINEL = -9999.0
 const JITTER_EPS_FLOOR = 1e-9
 
 # ==============================================================================
+# COIN-THRESHOLD JITTER — GRUG nudge the 50/50 bias, not just the payout
+# ==============================================================================
+# ACADEMIC: Coin-threshold jitter is an ADDITIVE perturbation on probabilities
+# like `rand() < 0.5`. It differs from `jitter_value`:
+#   (a) the "bullseye" is typically 0.5 — a value near zero under the ratio
+#       interpretation — so proportional nudging is useless here.
+#   (b) the result MUST stay in [0, 1] to remain a valid probability.
+#   (c) we want a tight absolute-magnitude window by default, not a %-of-value
+#       window. 50 ± 1% is the right feel for AIML reward gates.
+#
+# Formula for jitter_coin_threshold:
+#   δ ~ U(-ρ, +ρ)  with  ρ = JITTER_COIN_RATIO   (default 0.01 = ±1 percentage point)
+#   result = clamp(p + δ, JITTER_COIN_FLOOR, JITTER_COIN_CEILING)
+#
+# The floor/ceiling (default 0.01/0.99) guard against accidentally producing a
+# gate that fires either NEVER or ALWAYS — both of which would silently break
+# downstream coin-gated logic. A gate becoming a permanent yes/no is a
+# catastrophic behavior shift, so we refuse to let jitter produce it.
+
+# GRUG: Default ± percentage-point swing on coin-threshold. 0.01 means a 0.5
+# gate fluctuates in [0.49, 0.51] — enough to break locked-in 50/50 streaks
+# but not enough to meaningfully shift the long-run fire/skip ratio.
+const JITTER_COIN_RATIO_DEFAULT = 0.01
+
+# GRUG: Maximum coin-ratio accepted. Beyond this we are not "nudging" the
+# gate — we are deciding for it.
+const JITTER_COIN_RATIO_MAX = 0.10
+
+# GRUG: Lower / upper clamps so the result never becomes a degenerate
+# gate (always-yes or always-no). ACADEMIC: corresponds to requiring the
+# Bernoulli parameter to stay interior to (0, 1).
+const JITTER_COIN_FLOOR    = 0.01
+const JITTER_COIN_CEILING  = 0.99
+
+# ==============================================================================
 # CONFIG — GRUG keep toggles tight and thread-safe
 # ==============================================================================
 
 # GRUG: Ratio lives in a Ref so tests can tune it without mutating a const.
 # Lock protects the rare write path; read path is lockless atomic by Julia
 # memory model for Ref{Float64} (single-word read).
-const _JITTER_RATIO  = Ref{Float64}(JITTER_RATIO_DEFAULT)
-const _JITTER_ENABLED = Ref{Bool}(true)
-const _CONFIG_LOCK    = ReentrantLock()
+const _JITTER_RATIO      = Ref{Float64}(JITTER_RATIO_DEFAULT)
+const _JITTER_COIN_RATIO = Ref{Float64}(JITTER_COIN_RATIO_DEFAULT)
+const _JITTER_ENABLED    = Ref{Bool}(true)
+const _CONFIG_LOCK       = ReentrantLock()
 
 """
     enable_jitter!()
@@ -161,6 +200,41 @@ end
 Returns the current maximum nudge ratio.
 """
 get_jitter_ratio()::Float64 = _JITTER_RATIO[]
+
+"""
+    set_jitter_coin_ratio!(r::Float64)
+
+Set the maximum ± percentage-point swing for coin-threshold jitter. Must
+satisfy `0.0 <= r <= JITTER_COIN_RATIO_MAX`. Throws `JitterError` on NaN,
+Inf, or out-of-range input — NO silent clamp.
+"""
+function set_jitter_coin_ratio!(r::Float64)
+    if isnan(r)
+        throw_jitter_error("coin ratio is NaN", "set_jitter_coin_ratio!")
+    end
+    if isinf(r)
+        throw_jitter_error("coin ratio is Inf", "set_jitter_coin_ratio!")
+    end
+    if r < 0.0
+        throw_jitter_error("coin ratio $r is negative; must be in [0.0, $JITTER_COIN_RATIO_MAX]",
+                           "set_jitter_coin_ratio!")
+    end
+    if r > JITTER_COIN_RATIO_MAX
+        throw_jitter_error("coin ratio $r exceeds hard cap $JITTER_COIN_RATIO_MAX",
+                           "set_jitter_coin_ratio!")
+    end
+    lock(_CONFIG_LOCK) do
+        _JITTER_COIN_RATIO[] = r
+    end
+    return nothing
+end
+
+"""
+    get_jitter_coin_ratio() -> Float64
+
+Returns the current ± coin-threshold swing.
+"""
+get_jitter_coin_ratio()::Float64 = _JITTER_COIN_RATIO[]
 
 # ==============================================================================
 # CORE PRIMITIVE — GRUG do the actual shake here
@@ -255,6 +329,91 @@ nudge preserves sign because it is strictly smaller in magnitude than `w`
 `jitter_value`.
 """
 jitter_weight(w::Float64)::Float64 = jitter_value(w)
+
+"""
+    jitter_strength(s::Float64) -> Float64
+
+Nudge an AIML node strength value. Intent-carrying wrapper around
+`jitter_value` for the executive-layer strength field. Same contract:
+NaN/Inf throw, zero passes through, sentinel propagates, result stays
+within ratio·|s| of `s`. The AIML layer itself is responsible for the
+final `clamp(.., AIML_STRENGTH_FLOOR, AIML_STRENGTH_CAP)` that keeps
+strength inside its legal range — jitter does not perform that clamp
+because it does not know the caller's legal range.
+"""
+jitter_strength(s::Float64)::Float64 = jitter_value(s)
+
+"""
+    jitter_delta(d::Float64) -> Float64
+
+Nudge a strength-delta value (reward or penalty magnitude). Wrapper around
+`jitter_value` carrying intent at the AIML call site. Sign is preserved
+because ratio is bounded below 1.0, so a +1.0 delta stays positive and a
+−1.0 delta stays negative. The grave-transition behavior in
+`_apply_strength_delta!` is preserved because: (a) the grave-trigger
+condition is `strength <= FLOOR`, which is checked on the clamped new
+strength, not on the delta itself; and (b) zero deltas pass through
+unchanged, so a caller requesting exactly-zero change still gets zero.
+"""
+jitter_delta(d::Float64)::Float64 = jitter_value(d)
+
+"""
+    jitter_coin_threshold(p::Float64; ratio::Float64 = get_jitter_coin_ratio()) -> Float64
+
+Return `p` perturbed by a uniform ± `ratio` additive nudge, then clamped
+into `[JITTER_COIN_FLOOR, JITTER_COIN_CEILING]`. Intended for thresholds
+used in `rand() < p` coin gates (e.g. AIML reward/penalty gates).
+
+Contract:
+- If jitter is globally disabled → return `p` unchanged.
+- If `p` is NaN or Inf → throw `JitterError`.
+- If `p < 0.0` or `p > 1.0` → throw `JitterError` (it is not a probability).
+- Out-of-range `ratio` kwarg → throw `JitterError`.
+- Otherwise: draw δ ~ U(−ratio, +ratio), clamp `p + δ` to
+  [`JITTER_COIN_FLOOR`, `JITTER_COIN_CEILING`].
+
+The clamp to (0, 1) interior prevents the nudge from silently turning a
+50/50 gate into a degenerate always-fire or never-fire gate. This is the
+coin-threshold analogue of the sentinel pass-through rule for scores.
+"""
+function jitter_coin_threshold(p::Float64; ratio::Float64 = get_jitter_coin_ratio())::Float64
+    # GRUG: Fail loud on bad inputs. A coin threshold that is NaN would
+    # silently make every `rand() < p` fail because NaN comparisons are false.
+    if isnan(p)
+        throw_jitter_error("probability is NaN", "jitter_coin_threshold")
+    end
+    if isinf(p)
+        throw_jitter_error("probability is Inf", "jitter_coin_threshold")
+    end
+    if p < 0.0 || p > 1.0
+        throw_jitter_error("probability $p is outside [0.0, 1.0]", "jitter_coin_threshold")
+    end
+    if isnan(ratio) || isinf(ratio)
+        throw_jitter_error("coin ratio is NaN/Inf", "jitter_coin_threshold")
+    end
+    if ratio < 0.0 || ratio > JITTER_COIN_RATIO_MAX
+        throw_jitter_error("coin ratio $ratio out of [0.0, $JITTER_COIN_RATIO_MAX]",
+                           "jitter_coin_threshold")
+    end
+
+    # GRUG: Global kill switch — test mode returns identity.
+    if !_JITTER_ENABLED[]
+        return p
+    end
+
+    # GRUG: Symmetric uniform on (-ratio, +ratio]. Zero-mean.
+    δ = (2.0 * rand() - 1.0) * ratio
+
+    # GRUG: Clamp to legal interior. The floor/ceiling guards against
+    # a single freak nudge turning the gate into always-yes or always-no.
+    nudged = p + δ
+    if nudged < JITTER_COIN_FLOOR
+        nudged = JITTER_COIN_FLOOR
+    elseif nudged > JITTER_COIN_CEILING
+        nudged = JITTER_COIN_CEILING
+    end
+    return nudged
+end
 
 # ==============================================================================
 # CONFIG STRUCT — GRUG for when a caller wants a scoped nudge policy

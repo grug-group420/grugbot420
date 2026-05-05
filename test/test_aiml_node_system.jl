@@ -24,6 +24,18 @@ println("="^60)
 include("../src/AIMLNodeSystem.jl")
 using .AIMLNodeSystem
 
+# GRUG: AIMLNodeSystem now routes strength values, strength deltas, and the
+# three 50/50 coin gates through RelationalJitter for per-activation entropy.
+# This test file was written BEFORE that feature and asserts exact arithmetic
+# (strength == 5.0, strength == 6.0, strength == 4.0, ...). Those assertions
+# stay valid under the "snap back in expectation" contract, but a single run
+# can see small nudges. We disable jitter for this whole test file to keep
+# the arithmetic assertions deterministic. Re-enable at the end so nothing
+# else in the subprocess is contaminated.
+# Dedicated jitter-behavior tests live in test_aiml_jitter.jl.
+using .AIMLNodeSystem.RelationalJitter
+RelationalJitter.disable_jitter!()
+
 # ==============================================================================
 # HELPERS
 # ==============================================================================

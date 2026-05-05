@@ -15,6 +15,16 @@ module AIMLNodeSystem
 using Base.Threads: ReentrantLock
 using Random
 
+# GRUG: RelationalJitter — per-activation zero-mean nudge on strength values,
+# strength deltas, and coin thresholds. Loaded at package level by
+# GrugBot420.jl BEFORE this file, so the import here just binds the name.
+# The isdefined guard keeps test files that include this module directly
+# (without going through GrugBot420.jl) from exploding.
+if !isdefined(@__MODULE__, :RelationalJitter)
+    include(joinpath(@__DIR__, "RelationalJitter.jl"))
+end
+using .RelationalJitter
+
 # ==============================================================================
 # ERROR TYPES — GRUG hate silent failures!
 # ==============================================================================
@@ -97,9 +107,18 @@ function AIMLNode(id::String, lobe_id::String, template::String;
             "AIMLNode constructor"
         )
     end
+    # GRUG: Initial strength gets a small zero-mean nudge so freshly-born
+    # AIML nodes don't all start at the exact same bullseye. The nudge is
+    # re-clamped into the legal strength range so a near-cap / near-floor
+    # seed cannot escape its boundary through jitter alone. See RelationalJitter.jl.
+    jittered_initial = clamp(
+        RelationalJitter.jitter_strength(initial_strength),
+        AIML_STRENGTH_FLOOR,
+        AIML_STRENGTH_CAP,
+    )
     return AIMLNode(
         id, lobe_id, template,
-        initial_strength,
+        jittered_initial,
         false, "",
         false, false, false, 0.0,
         time()
@@ -430,8 +449,16 @@ function _apply_strength_delta!(node::AIMLNode, delta::Float64)
         # via passive strength nudges. Phagy or explicit revive would be needed.
         return
     end
+    # GRUG: Every strength delta gets a small zero-mean nudge at application
+    # time. Sign is preserved (ratio < 1 so +1.0 stays positive, −1.0 stays
+    # negative) and the caller-requested delta is preserved in expectation.
+    # The downstream clamp to [FLOOR, CAP] still enforces the hard boundary,
+    # so jitter cannot push strength out of legal range. The grave-trigger
+    # condition (`strength <= FLOOR`) is checked on the clamped value, so a
+    # jittered near-zero delta cannot cause a spurious grave transition.
+    jittered_delta = RelationalJitter.jitter_delta(delta)
     old_strength = node.strength
-    new_strength = clamp(node.strength + delta, AIML_STRENGTH_FLOOR, AIML_STRENGTH_CAP)
+    new_strength = clamp(node.strength + jittered_delta, AIML_STRENGTH_FLOOR, AIML_STRENGTH_CAP)
     applied_delta = new_strength - old_strength
     node.strength = new_strength
     node.strength_delta_this_cycle += applied_delta
@@ -466,7 +493,12 @@ function record_fire!(node::AIMLNode)
             # phase as anti-pattern anchors, but they DO NOT receive rewards.
             return
         end
-        if rand() < 0.5
+        # GRUG: Coin-threshold jitter — the 0.5 reward gate fluctuates in
+        # ~[0.49, 0.51] per activation (default coin-ratio = 0.01). Zero-mean
+        # so long-run fire/skip ratio is still 50/50; any single cycle breaks
+        # lockstep streaks across siblings. Guaranteed to stay in (0, 1) by
+        # the floor/ceiling clamp inside jitter_coin_threshold.
+        if rand() < RelationalJitter.jitter_coin_threshold(0.5)
             _apply_strength_delta!(node, AIML_STRENGTH_DELTA)
         end
     end
@@ -567,7 +599,10 @@ function apply_aiml_right!()::Dict{String, Any}
                 push!(skipped_double_reward, node.id)
                 continue
             end
-            if rand() < 0.5
+            # GRUG: Coin-threshold jitter on the secondary-reward gate. Same
+            # shape as record_fire! but a fresh draw per contributor so two
+            # sibling contributors don't share a locked-in lucky/unlucky coin.
+            if rand() < RelationalJitter.jitter_coin_threshold(0.5)
                 # GRUG: Secondary reinforcement - contributor gets a second chance.
                 _apply_strength_delta!(node, AIML_STRENGTH_DELTA)
                 push!(rewarded, node.id)
@@ -629,11 +664,22 @@ function apply_aiml_wrong!()::Dict{String, Any}
                 push!(grave_skipped, node.id)
                 continue
             end
-            if rand() < 0.5
+            # GRUG: Coin-threshold jitter on the penalty gate. 0.5 ± ~0.01
+            # per activation, zero-mean. Long-run penalize/spare ratio is
+            # still 50/50 — jitter just prevents sibling contributors from
+            # sharing a locked-in coin outcome within a single cycle.
+            if rand() < RelationalJitter.jitter_coin_threshold(0.5)
                 # GRUG: Coinflip said penalize. Figure out magnitude.
                 # If node already snacked this cycle, over-compensate to
                 # guarantee strength ends BELOW cycle-start strength.
                 prior_gain = max(node.strength_delta_this_cycle, 0.0)
+                # GRUG: Base penalty magnitude is AIML_STRENGTH_DELTA +
+                # prior_gain. _apply_strength_delta! will jitter the delta
+                # itself internally, so we do NOT double-jitter here.
+                # That preserves the honest-net-loss guarantee: even under
+                # jitter the applied delta stays strictly negative because
+                # (AIML_STRENGTH_DELTA + prior_gain) is strictly > 0 and
+                # the jitter ratio is < 1.
                 penalty_magnitude = AIML_STRENGTH_DELTA + prior_gain
                 # GRUG: Apply as negative delta. _apply_strength_delta! clamps
                 # and handles grave transition.

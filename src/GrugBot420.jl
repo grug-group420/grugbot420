@@ -72,10 +72,17 @@ using .ImmuneThreadPool
 include("FullLobeScanner.jl")
 using .FullLobeScanner
 
+# GRUG: Relational jitter — per-activation zero-mean nudge on scored values
+# and coin thresholds. Must load BEFORE AIMLNodeSystem (AIML strength/delta
+# call sites use jitter_strength/jitter_delta/jitter_coin_threshold) AND
+# BEFORE engine.jl (evaluate_relational_dialectics uses jitter_score/jitter_weight).
+include("RelationalJitter.jl")
+using .RelationalJitter
+
 # GRUG: AIML node tribes - lobe-specific executive node populations.
 # Must load BEFORE Main.jl so command handlers can reach the API. Ordering
 # matters: Lobe must already exist so AIML knows what parent cap to read
-# when registering a lobe's AIML tribe.
+# when registering a lobe's AIML tribe. Depends on RelationalJitter above.
 include("AIMLNodeSystem.jl")
 using .AIMLNodeSystem
 
@@ -83,12 +90,6 @@ using .AIMLNodeSystem
 # Must load BEFORE engine.jl so engine can call parallel_fire_batches and FireCounter.
 include("VoteOrchestrator.jl")
 using .VoteOrchestrator
-
-# GRUG: Relational jitter — per-activation zero-mean nudge on match scores.
-# Must load BEFORE engine.jl so extract_* and evaluate_relational_dialectics
-# can apply the jitter at their respective call sites.
-include("RelationalJitter.jl")
-using .RelationalJitter
 
 include("engine.jl")
 include("Main.jl")
@@ -147,13 +148,17 @@ export record_fire!, record_vote!
 export apply_aiml_right!, apply_aiml_wrong!
 export aiml_phagy_sweep!, get_aiml_status_summary
 
-# GRUG: RelationalJitter exports — per-activation zero-mean nudge on match scores.
-# Nested module is still reachable as GrugBot420.RelationalJitter; these
-# re-exports make the common primitives available directly on the package.
+# GRUG: RelationalJitter exports — per-activation zero-mean nudge on match scores
+# and AIML strength/delta/coin-threshold values. Nested module is still reachable
+# as GrugBot420.RelationalJitter; these re-exports surface the common primitives
+# directly on the package namespace.
 export JitterError, JitterConfig
 export JITTER_RATIO_DEFAULT, HARD_REQ_MISS_SENTINEL
+export JITTER_COIN_RATIO_DEFAULT, JITTER_COIN_FLOOR, JITTER_COIN_CEILING
 export jitter_value, jitter_score, jitter_weight
+export jitter_strength, jitter_delta, jitter_coin_threshold
 export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
+export set_jitter_coin_ratio!, get_jitter_coin_ratio
 
 end # module GrugBot420

@@ -592,9 +592,12 @@ This means a complex input never gets basic-quality relational output without a 
 
 ---
 
-## Per-Activation Relational Jitter (`RelationalJitter`) — v7.9
+## Per-Activation Jitter (`RelationalJitter`) — v7.9 (relational) + v7.10 (AIML)
 
-Relational match-score components (`weight`, exact-match `+2.0`, partial-match `+1.0`, orthogonal `+0.5`, final-dampener `+0.1`) used to be deterministic constants. Now they get a tiny zero-mean nudge at activation time — so exact ties between competing nodes get broken naturally, and quiet neighbors occasionally win a coinflip they'd otherwise always lose.
+Bullseye values across the engine used to be deterministic constants. Now they get a tiny zero-mean nudge at activation time — exact ties between competing nodes break naturally, quiet neighbors occasionally win a coinflip they'd otherwise always lose, and sibling AIML nodes stop marching in lockstep on 50/50 gates.
+
+- **v7.9** applied per-activation jitter to the relational dialectics match-score components (`weight`, exact-match `+2.0`, partial-match `+1.0`, orthogonal `+0.5`, final-dampener `+0.1`).
+- **v7.10** extends the same treatment to the AIML executive layer: initial node strength, every strength delta, and the three 50/50 coin gates (`record_fire!`, `apply_aiml_right!`, `apply_aiml_wrong!`).
 
 ### The Idea
 
@@ -618,34 +621,50 @@ Relational match-score components (`weight`, exact-match `+2.0`, partial-match `
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `JITTER_RATIO_DEFAULT` | 0.03 | Nudge magnitude as fraction of `|x|` |
+| `JITTER_RATIO_DEFAULT` | 0.03 | Value-jitter magnitude as fraction of `|x|` |
 | `JITTER_RATIO_MAX` | 0.10 | Hard upper bound accepted by `set_jitter_ratio!` |
 | `JITTER_ABS_CAP` | 1.0 | Maximum absolute nudge on any single value |
 | `JITTER_EPS_FLOOR` | 1e-9 | Below this, `|x|` is treated as zero |
 | `HARD_REQ_MISS_SENTINEL` | -9999.0 | Propagates untouched through jitter |
+| `JITTER_COIN_RATIO_DEFAULT` | 0.01 | ± percentage-point swing on coin thresholds (additive, not proportional) |
+| `JITTER_COIN_RATIO_MAX` | 0.10 | Hard upper bound accepted by `set_jitter_coin_ratio!` |
+| `JITTER_COIN_FLOOR` | 0.01 | Lower clamp on jittered coin threshold (prevents never-fire gate) |
+| `JITTER_COIN_CEILING` | 0.99 | Upper clamp on jittered coin threshold (prevents always-fire gate) |
 
 ### API
 
 | Function | Description |
 |---|---|
-| `jitter_value(x; ratio=get_jitter_ratio())` | Core primitive: returns nudged value |
+| `jitter_value(x; ratio=get_jitter_ratio())` | Core primitive: returns nudged value (proportional, ±ratio·\|x\|) |
 | `jitter_score(s)` / `jitter_weight(w)` | Intent-carrying wrappers used by dialectics |
-| `enable_jitter!()` / `disable_jitter!()` | Global toggle (default: ON) |
+| `jitter_strength(s)` / `jitter_delta(d)` | Intent-carrying wrappers used by AIMLNodeSystem |
+| `jitter_coin_threshold(p; ratio=get_jitter_coin_ratio())` | Additive ±ratio nudge on a probability, clamped to `[JITTER_COIN_FLOOR, JITTER_COIN_CEILING]` |
+| `enable_jitter!()` / `disable_jitter!()` | Global toggle (default: ON) — affects all `jitter_*` primitives |
 | `is_jitter_enabled()` | Current state |
-| `set_jitter_ratio!(r)` / `get_jitter_ratio()` | Tune / inspect the global ratio |
+| `set_jitter_ratio!(r)` / `get_jitter_ratio()` | Tune / inspect the value-jitter ratio |
+| `set_jitter_coin_ratio!(r)` / `get_jitter_coin_ratio()` | Tune / inspect the coin-threshold ratio |
 | `JitterConfig(ratio, enabled)` | Immutable policy bundle for scoped passing |
 
 ### Where It's Applied
 
-Inside `evaluate_relational_dialectics`:
+Inside `evaluate_relational_dialectics` (v7.9):
 - Each `weight` lookup is nudged via `jitter_weight`.
 - Each match-score contribution (`+2.0·w` exact, `-2.0·w` antimatch, `+1.0·w` partial, `+0.5·w` orthogonal) is nudged via `jitter_score`.
 - The final `orthogonal_penalty * 0.1` dampener is nudged via `jitter_score`.
 
+Inside `AIMLNodeSystem` (v7.10):
+- `AIMLNode` constructor passes `initial_strength` through `jitter_strength` before the `[FLOOR, CAP]` clamp.
+- `_apply_strength_delta!` jitters every delta (reward or penalty magnitude) via `jitter_delta` before the clamp + grave-transition check. Because `ratio < 1`, sign is always preserved — a `+1.0` delta stays positive, a `−1.0` delta stays negative.
+- The three `rand() < 0.5` coin gates (`record_fire!`, `apply_aiml_right!`, `apply_aiml_wrong!`) now compare against `jitter_coin_threshold(0.5)` instead, so sibling contributors don't share a locked-in coin outcome within a cycle.
+- The honest-net-loss contract (`/aimlWrong` on a prior-gain node MUST end strictly below cycle-start strength) is preserved because penalty magnitude = `AIML_STRENGTH_DELTA + prior_gain > 0` and the delta jitter preserves sign.
+
 What's **not** jittered:
 - The hard-requirement-miss sentinel path (`-9999.0`) — must stay exact.
 - The antimatch flag (`is_antimatch`) — a boolean, no entropy to add.
-- The `max(0.1, …)` floor — the floor value 0.1 is constant by design.
+- The `max(0.1, …)` floor in dialectics — floor value 0.1 is constant by design.
+- `AIML_STRENGTH_CAP` / `AIML_STRENGTH_FLOOR` — these are the clamp boundaries jitter respects, not values that float themselves.
+- Boolean cycle state (`is_grave`, `gained_this_cycle`, `fired_this_cycle`, `voted_this_cycle`) — no meaningful entropy on flags.
+- Penalty magnitude is jittered **only once** inside `_apply_strength_delta!` — the caller does NOT pre-jitter the magnitude, so the net-loss guarantee stays tight.
 
 ### Error Handling
 
@@ -654,6 +673,8 @@ All bad inputs (`NaN`, `Inf`, out-of-range ratio) throw `JitterError`. The error
 ### Tests
 
 `test/test_relational_jitter.jl` — 14 test groups covering: magnitude bounds, zero-mean convergence (empirical mean snaps back within 1%·|x| over 20k samples), error handling, toggle, ratio setter, semantic wrappers, thread safety under `@threads`, `JitterConfig`, integration with `evaluate_relational_dialectics` (snap-back in live dialectics), sentinel preservation (500/500 exact), antimatch robustness (1000/1000 flag-flip preserved), and bit-exact determinism when disabled.
+
+`test/test_aiml_jitter.jl` — 8 test groups covering: initial-strength jitter (window + zero-mean + near-cap / near-floor / exact-zero behaviour), strength-delta jitter (sign preservation + mean snap-back), coin-threshold jitter at all three AIML call sites (long-run rate stays ~50% across thousands of trials), honest-net-loss contract preservation under jitter (zero violations across 1000 penalty trials), `disable_jitter!` identity contract across every AIML path, and error propagation (NaN/Inf/out-of-range inputs raise `JitterError`, no silent clamping).
 
 ### Disabling for Deterministic Tests
 
@@ -688,9 +709,9 @@ enable_jitter!()
 | `src/ImmuneSystem.jl` | Specimen immune system: automata-based anomaly handling for growth/ledger commands. AST scanning, Hopfield immune memory, quarantine-patch-delete pipeline. |
 | `src/ImmuneThreadPool.jl` | 8-worker immune thread pool with priority lanes (CRITICAL/NORMAL/LOW/JUNK), per-source rate limiting, cost-weighted load balancing, and tripwire state machine (NORMAL→ELEVATED→HARDENED→CRITICAL). |
 | `src/FullLobeScanner.jl` | Full-lobe scanning system: bounded activation (max 1,000 active nodes), phase-gated scan pipeline (INIT→GATHER→ACTIVATE→CONTINUE→DONE), pattern + semantic matches, multithreaded candidate gathering. AIML gated until DONE signal. |
-| `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes: isolated AIML node populations per lobe, configurable population caps (default node_cap ÷ 3), grave-exclusion cap accounting, cycle-aware reinforcement, full save/load serialization. |
+| `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes: isolated AIML node populations per lobe, configurable population caps (default node_cap ÷ 3), grave-exclusion cap accounting, cycle-aware reinforcement, full save/load serialization. v7.10 routes initial strength, every strength delta, and the three 50/50 reward/penalty coin gates through `RelationalJitter` for per-activation entropy. |
 | `src/VoteOrchestrator.jl` | Parallel vote orchestrator (v7.8): unique non-colliding Task dispatch, atomic `FireCounter` with hard 1000-slot cap across ALL fire types, `parallel_fire_batches` (batch size 64), `TaskTimeoutError` + `dispatch_task_with_timeout` for deadline-bounded sub-processes, `DoneSignal` channels, strength-biased vote coinflip with top-tier / sub-top windows. No silent failures — timeouts rethrow distinguishable errors. |
-| `src/RelationalJitter.jl` | Per-activation zero-mean nudge on relational match-score components (v7.9). Symmetric uniform jitter on `[-ε·\|x\|, +ε·\|x\|]` with `ε = 0.03` default, so the bullseye is preserved in expectation while exact ties break naturally. Sentinel (`-9999.0`) and zero pass through untouched; `NaN`/`Inf` throw `JitterError`; global toggle for deterministic tests. |
+| `src/RelationalJitter.jl` | Per-activation zero-mean nudge on scored values and coin thresholds. v7.9: proportional jitter on `[-ε·\|x\|, +ε·\|x\|]` with `ε = 0.03` default for relational match-score components (bullseye preserved in expectation, exact ties break naturally). v7.10: additive `±ρ` nudge on probability thresholds with `ρ = 0.01` default, clamped to `[0.01, 0.99]` interior so gates never degenerate to always-yes or always-no. Consumed by engine dialectics and AIMLNodeSystem. Sentinel (`-9999.0`) and zero pass through untouched; `NaN`/`Inf`/out-of-range inputs throw `JitterError`; global toggle for deterministic tests. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---
