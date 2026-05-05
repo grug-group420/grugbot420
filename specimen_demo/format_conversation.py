@@ -200,8 +200,23 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
                 )
                 if same_text_before < len(matches_for_this):
                     kind = matches_for_this[same_text_before].group(1)
+        # GRUG v7.13: Capture the full scaffold payload emitted for this
+        # cycle so the transcript shows the actual Grug output, not just
+        # the statistics distilled from it. We bound the capture at the
+        # first 'Brain >' prompt that follows the scaffold start, then
+        # fall back to the scaffold end-marker; whichever is closer.
+        # NO SILENT FAILURES: if neither boundary is found (truncated log)
+        # we emit whatever we have and flag it.
+        reply_end_m = re.search(r"\nBrain >", raw[start:start + 80000])
+        reply_end = start + (reply_end_m.start() if reply_end_m else
+                             min(20000, len(raw) - start))
+        full_scaffold = raw[start:reply_end]
+        # Strip box drawing glyphs so the fenced block renders cleanly.
+        full_scaffold_clean = clean_box(full_scaffold)
+
         out.append(f"### Cycle {idx} — `{kind}` · confidence {conf}\n")
         out.append(f"**Prompt:** {mission}\n\n")
+        out.append(f"**Summary**\n\n")
         out.append(f"| Field | Value |\n|---|---|\n")
         out.append(f"| Primary action | `{primary}` |\n")
         out.append(f"| Sure actions | `[{sure}]` |\n")
@@ -213,6 +228,18 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         out.append(f"| User relational triples | {user_triples} |\n")
         out.append(f"| Node relational triples | {node_triples} |\n")
         out.append(f"| Winning node's system prompt | _{node_ctx}_ |\n\n")
+        # GRUG v7.13: The FULL reply Grug emitted for this cycle. Wrapped
+        # in a collapsible <details> block so the table stays skimmable
+        # but the exact payload (mission, primary/sure/unsure, dynamic
+        # rules, deep + fresh memory, lobe context, certainty, user &
+        # node triples) is always one click away. This is what a
+        # downstream LLM would actually receive.
+        out.append("<details>\n")
+        out.append("<summary>📜 Full AIML response payload</summary>\n\n")
+        out.append("```text\n")
+        out.append(full_scaffold_clean)
+        out.append("\n```\n")
+        out.append("</details>\n\n")
 
     # GRUG: Now list prompts that produced NO scaffold (silent cycles).
     # We cross-reference command text vs scaffold missions and report the
