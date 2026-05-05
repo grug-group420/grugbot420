@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.18</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.19</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.18</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.19</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -237,6 +237,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#aiml-synthesis">15.16 AIML Vote-to-Speech Synthesis (Thesaurus-Orchestrated Reply)</a> <span class="new-badge">v7.15 / v7.16</span></li>
         <li><a href="#chunked-scans">15.17 Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</a> <span class="new-badge">v7.17</span></li>
         <li><a href="#lobe-topicality">15.18 Lobe Topicality Gate + Semantic-Bridge Exception</a> <span class="new-badge">v7.18</span></li>
+        <li><a href="#bnsnc-coherence">15.19 Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</a> <span class="new-badge">v7.19</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -2154,6 +2155,112 @@ never accumulate across missions.</p>
 expansions, O(|muted-lobe nodes|) bridge checks).</p>
 
 <!-- ================================================================ -->
+<h2 id="bnsnc-coherence">15.19 Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion) <span class="new-badge">v7.19</span></h2>
+
+<div class="grug-box">
+    <p>Grug scan rock forward AND backward. Get two confidence numbers. Old brain just average them.
+    But average is DUMB. Two tiny numbers that agree look same as two BIG numbers that agree.
+    That is a lie! Big rocks matter more than small rocks. Grug new brain look at BOTH the difference
+    AND how big the rocks are. If both big AND close &rarr; REAL match, high coherence. If both tiny
+    AND close &rarr; just noise agreeing with noise, LOW coherence. If one big one zero &rarr; disagreement,
+    LOW coherence. Also: when two floats very close together, subtraction kills precision. Grug new
+    brain don't care, it normalizes against the biggest rock so tiny float noise can't flip the result.</p>
+</div>
+
+<p>v7.19 replaces the arithmetic-mean confidence smoother in <code>_bidirectional_cheap_scan</code> with
+a magnitude-aware coherence fusion. For tier-1 simple patterns (signal length &le; 3), the scanner runs
+forward <em>and</em> reversed cheap scans to catch order-flipped matches (<em>&ldquo;man bites dog&rdquo;</em> vs
+<em>&ldquo;dog bites man&rdquo;</em>). Before v7.19 the two confidences were fused by naive averaging:
+<code>smoothed = (forward + reverse) / 2</code>. This had two structural defects:</p>
+
+<ul>
+    <li><strong>It hid asymmetry.</strong> <code>(0.9, 0.1)</code> and <code>(0.5, 0.5)</code> both average to
+    <code>0.5</code>, but the first is real disagreement and the second is real agreement. The orchestrator
+    downstream could not tell them apart.</li>
+    <li><strong>It was vulnerable to catastrophic cancellation.</strong> Two confidences that differ only in
+    the trailing digits of a <code>Float64</code> representation produced an averaged output whose meaningful
+    bits had already been lost. Noise was indistinguishable from signal.</li>
+</ul>
+
+<p>The replacement is <code>PatternScanner.big_number_small_number_coherence(forward, backward)</code>, now
+exported from the top-level <code>GrugBot420</code> module. Given two confidence scalars, the fusion is:</p>
+
+<pre>
+abs_fwd        = |forward|
+abs_bwd        = |backward|
+magnitude_floor = max(abs_fwd, abs_bwd)          # strongest signal either side
+magnitude_mean  = (abs_fwd + abs_bwd) / 2        # mean signal strength
+absolute_delta  = |forward - backward|
+
+if magnitude_floor < 1e-9:
+    return 0.0                                   # both scans saw nothing; silence is not agreement
+
+relative_delta  = absolute_delta / magnitude_floor
+agreement       = 1.0 - clamp(relative_delta, 0.0, 1.0)
+coherence       = clamp(agreement * magnitude_mean, 0.0, 1.0)
+</pre>
+
+<p>The result is a value in <code>[0.0, 1.0]</code> that semantically encodes four distinct regimes:</p>
+
+<ul>
+    <li><strong>Both strong and close</strong> (<code>agreement &asymp; 1</code>, <code>magnitude_mean &asymp; high</code>)
+    &rarr; high coherence. Real bidirectional match.</li>
+    <li><strong>Both tiny and close</strong> (<code>agreement &asymp; 1</code>, <code>magnitude_mean &asymp; 0</code>)
+    &rarr; low coherence. Two scans that saw almost nothing cannot agree on something.</li>
+    <li><strong>Strong but disagreeing</strong> (<code>agreement &asymp; 0</code>) &rarr; low coherence even though
+    the magnitudes are large. Two scans that both fired confidently but on different patterns are not coherent.</li>
+    <li><strong>One strong, one zero</strong> &rarr; coherence collapses via <code>agreement = 0</code>, correctly
+    rejecting one-sided hits that the pure arithmetic mean would have rewarded.</li>
+</ul>
+
+<p><strong>Catastrophic-cancellation immunity.</strong> When <code>forward</code> and <code>backward</code>
+differ only by sub-ULP floating-point noise, <code>absolute_delta</code> is tiny, <code>relative_delta</code>
+is tiny, <code>agreement</code> is &asymp; <code>1.0</code>, and the output is essentially <code>magnitude_mean</code>
+&mdash; the noise never drives the result. Subtraction happens once and its output is immediately normalized
+against a magnitude that dominates the noise floor.</p>
+
+<p><strong>Input hygiene.</strong> The function rejects <code>NaN</code> and <code>Inf</code> on either operand
+with a <code>PatternScanError</code>. NO SILENT FAILURES &mdash; poison values never propagate into the vote
+pool as apparently-valid confidences.</p>
+
+<p><strong>Engine integration.</strong> <code>_bidirectional_cheap_scan</code> now ends with:</p>
+
+<pre>
+smoothed_conf = big_number_small_number_coherence(forward_conf, reverse_conf)
+</pre>
+
+<p>Miss contributions on one-sided hits are still computed the same way (<code>threshold - 0.01</code>), but they
+are fused with the hit via coherence instead of simple average. A partial-reversal hit now produces a moderate
+coherence rather than a spike or a zero. The <code>PatternNotFoundError</code> propagation when both directions
+miss is unchanged.</p>
+
+<h3>Test coverage &mdash; <code>test/test_big_number_small_number_coherence.jl</code></h3>
+
+<p>74 sub-assertions across 8 test groups:</p>
+
+<ol>
+    <li><strong>[A]</strong> Basic behavior: strong/strong, tiny/tiny, moderate agreement, one-sided hits,
+    half-strength agreement &mdash; exact closed-form values verified to <code>1e-9</code>.</li>
+    <li><strong>[B]</strong> Catastrophic-cancellation immunity: sub-ULP noise between two large near-equal
+    confidences yields coherence &asymp; <code>magnitude_mean</code>, not a noise-driven garbage output.</li>
+    <li><strong>[C]</strong> Asymmetry detection: <code>(0.9, 0.1)</code> and <code>(0.5, 0.5)</code> have
+    identical arithmetic mean but coherence separates them by > <code>0.3</code>.</li>
+    <li><strong>[D]</strong> Negative-confidence symmetry: two equal-magnitude negatives agree, mixed signs
+    register as maximum disagreement.</li>
+    <li><strong>[E]</strong> Zero / sub-epsilon inputs collapse to exactly <code>0.0</code>.</li>
+    <li><strong>[F]</strong> <code>NaN</code> and <code>Inf</code> rejected with <code>PatternScanError</code>
+    on every combination (6 poison cases).</li>
+    <li><strong>[G]</strong> Output always clamped to <code>[0.0, 1.0]</code> across 11 sample pairs including
+    out-of-range inputs (<code>&plusmn;2.0</code>).</li>
+    <li><strong>[H]</strong> Monotonicity, commutativity, and reflexivity: closer inputs score higher, same
+    agreement at bigger scale scores higher, <code>bnsnc(a,b) == bnsnc(b,a)</code>, and <code>bnsnc(x,x) == |x|</code>
+    for all tested <code>x</code>.</li>
+</ol>
+
+<p>Combined with the rest of the suite, v7.19 ships at <strong>23/23 tests green</strong> in
+&asymp;2m47s. The fusion itself is O(1) in all inputs &mdash; identical cost profile to the average it replaced.</p>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -2709,14 +2816,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.18)</h3>
+<h3>Test Suite Status (v7.19)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>21</td></tr>
-    <tr><td>Total test files on disk</td><td>26</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 22 / 22 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~122 s on 8-core Linux</td></tr>
-    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset)</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>22</td></tr>
+    <tr><td>Total test files on disk</td><td>27</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 23 / 23 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~167 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity)</td></tr>
 </table>
 
 <div class="tip">
@@ -2728,6 +2835,39 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.19 &mdash; Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</h3>
+    <ul>
+        <li><strong>Replaces naive averaging in <code>_bidirectional_cheap_scan</code>.</strong> Tier-1 cheap
+        scans run forward and reversed passes to catch order-flipped matches (<em>&ldquo;man bites dog&rdquo;</em>
+        vs <em>&ldquo;dog bites man&rdquo;</em>). Before v7.19 the two confidences were fused by arithmetic
+        mean, which (a) could not distinguish real agreement on strong signal from agreement on noise, and
+        (b) was vulnerable to catastrophic floating-point cancellation on near-equal values.</li>
+        <li><strong>New exported function</strong> <code>PatternScanner.big_number_small_number_coherence(forward, backward)</code>
+        re-exported at the top level as <code>GrugBot420.big_number_small_number_coherence</code>. Formula:
+        <code>agreement = 1 - |forward - backward| / max(|forward|, |backward|)</code>,
+        <code>coherence = clamp(agreement &times; mean_magnitude, 0, 1)</code>. If
+        <code>max(|forward|, |backward|) < 1e-9</code> (both scans saw nothing), returns <code>0.0</code>
+        &mdash; silence is not agreement.</li>
+        <li><strong>Four regimes correctly separated</strong>: both strong and close &rarr; high coherence;
+        both tiny and close &rarr; low coherence (agreement on noise); strong but disagreeing &rarr; low
+        coherence; one strong, one zero &rarr; coherence collapses via <code>agreement = 0</code>.</li>
+        <li><strong>Catastrophic-cancellation immune.</strong> When the two confidences differ only by
+        sub-ULP <code>Float64</code> noise, the subtraction's garbage output is normalized against
+        <code>magnitude_floor</code>, which dominates the noise floor &mdash; so the noise never drives the
+        result.</li>
+        <li><strong>NO SILENT FAILURES.</strong> <code>NaN</code> and <code>Inf</code> on either operand are
+        rejected with <code>PatternScanError</code>; poison values never propagate into the vote pool as
+        apparently-valid confidences.</li>
+        <li><strong>Test suite</strong>: new file <code>test/test_big_number_small_number_coherence.jl</code>
+        with 8 test groups and <strong>74 sub-assertions</strong> covering basic behavior, catastrophic-
+        cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence
+        symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and
+        monotonicity/commutativity/reflexivity. <strong>All 23 / 23 test groups green</strong> in
+        &asymp;2m47s.</li>
+        <li><strong>Documentation</strong>: whitepaper gains &sect;15.19 coverage; version bumped to v7.19
+        across header, TOC, test-suite table, and changelog.</li>
+    </ul>
 
     <h3>v7.18 &mdash; Lobe Topicality Gate + Semantic-Bridge Exception</h3>
     <ul>

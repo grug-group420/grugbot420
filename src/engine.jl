@@ -1844,9 +1844,11 @@ Pattern complexity thresholds:
 
 BIDIRECTIONAL AT TIER 1: When effective_mode == 1, scan_and_expand uses
 _bidirectional_cheap_scan() instead of plain cheap_scan(). Forward + reverse
-passes are both run and confidence is smoothed (averaged). This catches
-order-reversed matches that forward-only scanning would miss — "man bites dog"
-aligns with "dog bites man" when the reverse pass runs.
+passes are both run and fused via big_number_small_number_coherence — NOT
+averaged — so that agreement on strong signal is rewarded while agreement
+on weak/noise signal is correctly suppressed. This catches order-reversed
+matches that forward-only scanning would miss — "man bites dog" aligns
+with "dog bites man" when the reverse pass runs.
 
 Why: Short patterns have so few signal values that the sliding window
 variance penalty in high_res_scan is numerically meaningless, and the
@@ -1901,21 +1903,23 @@ BIDIRECTIONAL FIX:
   1. Forward scan:  cheap_scan(target, pattern)         — normal left-to-right
   2. Reverse scan:  cheap_scan(target, reverse(pattern)) — reversed pattern signal
 
-SMOOTHING FORMULA:
-  Both succeed  → smoothed = (forward_conf + reverse_conf) / 2
-                  Neither direction dominates. True bidirectional match averages out.
-  One succeeds  → smoothed = (hit_conf + threshold - ε) / 2
-                  One direction found a match; the other didn't meet threshold.
-                  We use (threshold - ε) as the miss contribution — not zero
-                  (which would harshly punish partial reversal) and not threshold
-                  (which would inflate). This gives a moderate signal, not a spike.
-  Both fail     → rethrow PatternNotFoundError from forward direction.
+COHERENCE FUSION (v7.19 — replaces averaging):
+  Both succeed  → coherence = big_number_small_number_coherence(forward_conf, reverse_conf)
+                  Two strong confidences that agree -> near 1.0.
+                  Two weak confidences that "agree" -> near 0.0 (correctly distrusted).
+                  Strong on one side, weak on the other -> penalized by magnitude_mean.
+  One succeeds  → coherence = big_number_small_number_coherence(hit_conf, miss_contribution)
+                  miss_contribution is just below threshold so a partial reversal gets
+                  a moderate coherence, not a spike and not zero.
+  Both fail     → rethrow PatternNotFoundError.
                   No match either way. Consistent with single-direction behavior.
 
-WHY AVERAGING WORKS:
-  High overlap in both directions → high smooth score (true bidirectional match)
-  High in one direction only      → moderate score (partial/lucky alignment)
-  Low in both                     → below threshold, PatternNotFoundError propagates
+WHY COHERENCE BEATS AVERAGING:
+  Averaging hides asymmetry: forward=0.9/reverse=0.1 and forward=0.5/reverse=0.5
+  both average to 0.5, but one is real disagreement and the other is real agreement.
+  Averaging also suffers catastrophic cancellation on close values. Coherence fuses
+  |forward - reverse| normalized by max magnitude, then scales by mean magnitude —
+  so agreement on strong signal wins, agreement on noise does not.
 
 Called only for effective_mode == 1 (cheap scan tier, simple patterns ≤ 3 signal
 elements). Medium and high-res tiers don't need this — they already scan every
@@ -1989,9 +1993,14 @@ function _bidirectional_cheap_scan(
         ))
     end
 
-    # GRUG: Smoothed confidence = average of forward and reverse contributions.
-    # If only one succeeded, the miss_contribution softens (not zeroes) the average.
-    smoothed_conf = (forward_conf + reverse_conf) / 2.0
+    # GRUG v7.19: Fuse forward and reverse confidences via big-number/small-number
+    # coherence instead of plain averaging. This rewards agreement on strong signal,
+    # suppresses agreement on noise, and is immune to catastrophic cancellation
+    # between close floats. See PatternScanner.big_number_small_number_coherence
+    # for the full formula. If only one direction hit, miss_contribution stands in
+    # for the missing side so a partial reversal gets a moderate score instead of
+    # a spike (pure average) or a zero (hard drop).
+    smoothed_conf = big_number_small_number_coherence(forward_conf, reverse_conf)
 
     # GRUG: Return best alignment index (forward preferred; reverse is orientation-flipped
     # so its index doesn't map back to the original signal cleanly).

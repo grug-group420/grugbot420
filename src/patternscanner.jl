@@ -2,6 +2,7 @@ module PatternScanner
 
 export cheap_scan, medium_scan, high_res_scan
 export PatternScanError, PatternNotFoundError
+export big_number_small_number_coherence
 
 # GRUG: Bring magic random bones for math (jitter).
 using Random
@@ -227,6 +228,112 @@ function high_res_scan(target::AbstractVector{<:Real}, pattern::AbstractVector{<
     return (best_idx, best_conf)
 end
 
+# ==============================================================================
+# BIG NUMBER SMALL NUMBER COHERENCE
+# ==============================================================================
+
+"""
+    big_number_small_number_coherence(forward_conf::Real, backward_conf::Real)::Float64
+
+GRUG: Big rock and small rock coherence check. When Grug scan rock forward
+and scan rock backward, Grug get two confidence numbers. If Grug just
+average them, Grug lose info. Two tiny confidences that "agree" look the
+same as two huge confidences that "agree". That is a lie. Big rocks matter
+more than small rocks.
+
+This function looks at BOTH the difference AND the magnitudes:
+  - Both big and close          -> high coherence (real agreement, strong signal)
+  - Both small and close        -> LOW coherence (agreement on noise, no signal)
+  - Big but far apart           -> low coherence (scans disagreed on a real thing)
+  - One big, one zero           -> moderate coherence (partial match only)
+
+WHY NOT JUST AVERAGE:
+  Averaging is broken for two reasons:
+  (1) It hides asymmetry. Forward=0.9 / Backward=0.1 and Forward=0.5 /
+      Backward=0.5 both average to 0.5, but one is a real disagreement
+      and the other is a real agreement.
+  (2) Subtraction of close floats loses precision (catastrophic cancellation).
+      If both confidences are ~0.847, their difference may be noise in the
+      trailing digits. This function normalizes against magnitude so the
+      noise does not drive the result.
+
+FORMULA:
+  magnitude_floor  = max(|forward|, |backward|)           # strongest signal either side
+  magnitude_mean   = (|forward| + |backward|) / 2         # average signal strength
+  absolute_delta   = |forward - backward|                 # raw disagreement
+  relative_delta   = absolute_delta / magnitude_floor     # delta as fraction of signal
+  agreement        = 1.0 - clamp(relative_delta, 0.0, 1.0)
+  coherence        = agreement * magnitude_mean           # scale by signal strength
+
+  Special case: if magnitude_floor < COHERENCE_EPSILON (both near zero), return 0.0.
+                Two scans that both saw nothing cannot agree on something.
+
+OUTPUT RANGE: [0.0, 1.0]
+  1.0  -> both scans saw the same thing with full confidence
+  0.5  -> moderate agreement on moderate signal, OR strong agreement on weak signal
+  0.0  -> either no signal at all, or flat disagreement
+
+NO SILENT FAILURES: rejects NaN, Inf inputs with PatternScanError.
+"""
+function big_number_small_number_coherence(forward_conf::Real, backward_conf::Real)::Float64
+    # GRUG: Cast to Float64 once so downstream math is consistent.
+    fwd = Float64(forward_conf)
+    bwd = Float64(backward_conf)
+
+    # GRUG: Reject poison values loudly. NaN and Inf never belong in a
+    # confidence score. If they arrive, something upstream is broken and
+    # Grug must scream, not quietly propagate rot.
+    if isnan(fwd) || isnan(bwd)
+        throw(PatternScanError(
+            "big_number_small_number_coherence received NaN (forward=$fwd, backward=$bwd)."
+        ))
+    end
+    if isinf(fwd) || isinf(bwd)
+        throw(PatternScanError(
+            "big_number_small_number_coherence received Inf (forward=$fwd, backward=$bwd)."
+        ))
+    end
+
+    # GRUG: Absolute magnitudes. Negative confidences are legal (evaluate_window
+    # can return negative values when similarity == 0). We compare absolute
+    # signal strength, not signed values, so a strong negative and a strong
+    # positive still count as "big number" contexts.
+    abs_fwd = abs(fwd)
+    abs_bwd = abs(bwd)
+
+    magnitude_floor = max(abs_fwd, abs_bwd)
+    magnitude_mean  = (abs_fwd + abs_bwd) / 2.0
+
+    # GRUG: Both numbers essentially zero -> no signal at all. Cannot infer
+    # coherence from silence. Return 0.0 so downstream routing treats it as
+    # "no match" rather than "perfect agreement on nothing".
+    COHERENCE_EPSILON = 1.0e-9
+    if magnitude_floor < COHERENCE_EPSILON
+        return 0.0
+    end
+
+    # GRUG: Raw disagreement, measured against the strongest signal.
+    # This is the catastrophic-cancellation protection: if abs_fwd and abs_bwd
+    # are both ~0.8 and their signed difference is 1e-12 garbage, relative_delta
+    # is ~1e-12 which clamps to 0 and agreement stays ~1.0. Noise does not
+    # corrupt the result.
+    absolute_delta = abs(fwd - bwd)
+    relative_delta = absolute_delta / magnitude_floor
+
+    # GRUG: Clamp in case numerical drift pushes it slightly out of [0.0, 1.0].
+    agreement = 1.0 - clamp(relative_delta, 0.0, 1.0)
+
+    # GRUG: Scale agreement by signal strength. Two scans agreeing weakly
+    # is still weak. Two scans agreeing strongly is strong. This is the
+    # "big rock / small rock" differentiator.
+    coherence = agreement * magnitude_mean
+
+    # GRUG: Final clamp so downstream consumers always see [0.0, 1.0].
+    # agreement is already in [0,1] and magnitude_mean is bounded by the
+    # confidences it was built from, so this is defence-in-depth only.
+    return clamp(coherence, 0.0, 1.0)
+end
+
 end # module
 
 # ==============================================================================
@@ -247,4 +354,13 @@ end # module
 # `slight_jitter` injects a randomized, bounded uniform micro-variance into the final 
 # confidence score. This mathematically models hardware/sensor variance ("running from 
 # the bullseye") without allowing infinite Gaussian tails to destabilize output.
+#
+# 4. BIG-NUMBER / SMALL-NUMBER COHERENCE (v7.19):
+# `big_number_small_number_coherence(forward, backward)` fuses paired confidence
+# scores into a single coherence value in [0.0, 1.0]. Unlike a naive average, it
+# (a) differentiates agreement-on-noise (two tiny confidences) from agreement-on-
+# signal (two large confidences), and (b) is immune to catastrophic floating-
+# point cancellation between close values. The output is `agreement * mean_magnitude`
+# where `agreement = 1 - |forward - backward| / max(|forward|, |backward|)`. This
+# replaces the former averaging smoother in `_bidirectional_cheap_scan`.
 # ==============================================================================

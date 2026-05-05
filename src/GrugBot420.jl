@@ -98,7 +98,7 @@ include("Main.jl")
 # Re-exports for public API
 # --------------------------------------------------------------------------
 export @coinflip, bias
-export cheap_scan, medium_scan, high_res_scan
+export cheap_scan, medium_scan, high_res_scan, big_number_small_number_coherence
 export detect_image_binary, image_to_sdf_params, SDFParams, apply_sdf_jitter
 export sdf_to_signal, JITGPU
 export add_verb!, add_relation_class!, add_synonym!
