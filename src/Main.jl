@@ -83,20 +83,77 @@ using JSON
 
 # GRUG DOC 3.6: These big memory rocks disappear when Grug goes to sleep (CLI closes).
 # Future Grug need to learn how to write on permanent cave walls (Persistence feature).
+#
+# GRUG v7.12: ChatMessage now carries an `intensity` field. Intensity lives in
+# [CONTEXT_INTENSITY_FLOOR, CONTEXT_INTENSITY_CAP]. At the pattern-bind /
+# relational phase of every /mission (before the AIML orchestrator runs),
+# we score each message's relevance to the current user input (lexical token
+# overlap + relational triple overlap), pull intensity toward that score
+# (snap-back), then add the same zero-mean RelationalJitter nudge the rest
+# of the engine uses so /brainstorm's heavy-jump mode automatically
+# amplifies context drift. When building the Fresh Memory slice, unpinned
+# messages are coinflipped in with `p = intensity / CAP`. Pinned messages
+# still always survive. Net effect: irrelevant banners decay and stop
+# appearing in future Fresh Memory blocks, which kills the O(N^2) context
+# explosion we saw when every /mission re-embedded the last 5 system
+# messages verbatim.
+# GRUG v7.12: Context-intensity tuning knobs. Must be declared BEFORE the
+# ChatMessage back-compat constructor that defaults to BASELINE. Reasonable
+# defaults chosen to mirror the AIML strength cap style and the existing
+# jitter ratios. All tunable later if needed. NO SILENT FAILURE:
+# clamp_intensity below enforces the [FLOOR, CAP] interval.
+const CONTEXT_INTENSITY_CAP      = 3.0    # Upper bound on per-message intensity
+const CONTEXT_INTENSITY_FLOOR    = 0.0    # Lower bound; irrelevant msgs decay here
+const CONTEXT_INTENSITY_BASELINE = 1.0    # New messages start here (neutral)
+const CONTEXT_SNAP_ALPHA         = 0.35   # Pull strength toward current relevance
+const CONTEXT_RELEVANCE_LEX_W    = 0.6    # Lexical token-overlap weight
+const CONTEXT_RELEVANCE_REL_W    = 0.4    # Relational-triple overlap weight
+const MAX_FRESH_CONTEXT          = 8      # Hard cap on post-coinflip Fresh Memory
+const CONTEXT_COIN_P_FLOOR       = 0.05   # Minimum coinflip p even at intensity=0
+const CONTEXT_COIN_P_CEIL        = 0.95   # Maximum coinflip p even at intensity=CAP
+const CONTEXT_FEEDBACK_RIGHT_DELTA = 0.5  # /right bonus to last-selected messages
+const CONTEXT_FEEDBACK_WRONG_DELTA = -0.5 # /wrong penalty to last-selected messages
+
 mutable struct ChatMessage
     id::Int
     role::String
     text::String
     pinned::Bool
+    intensity::Float64    # GRUG v7.12: relevance-biased, jittered per cycle
 end
+
+# GRUG v7.12: Back-compat positional constructor — old call sites that pass
+# four args default intensity to the baseline. NO SILENT FAILURE: we still
+# go through the struct so Julia type-checks every field.
+ChatMessage(id::Int, role::String, text::String, pinned::Bool) =
+    ChatMessage(id, role, text, pinned, CONTEXT_INTENSITY_BASELINE)
 
 const MAX_HISTORY   = 10000
 const MESSAGE_HISTORY = Vector{ChatMessage}()
 const MSG_ID_COUNTER       = Atomic{Int}(0)
 const MESSAGE_HISTORY_LOCK = ReentrantLock()  # GRUG: Lock for phagy forensics read-access to MESSAGE_HISTORY
 
+# GRUG v7.12: Track which messages contributed to the LAST /mission's
+# Fresh Memory so /right and /wrong can reinforce/punish them. Reset at
+# the top of every mission cycle via refresh_message_intensities!.
+const LAST_SELECTED_MSG_IDS = Ref(Set{Int}())
+const LAST_SELECTED_MSG_LOCK = ReentrantLock()
+
 # GRUG FIX 3.1: Strict Role Validation!
 # Grug no let random strangers paint on memory wall.
+#
+# GRUG 7.12-FIX: The ALLOWED_ROLES set was referenced by add_message_to_history!
+# (see ~line 343) but never defined at module scope, causing every command that
+# writes to MESSAGE_HISTORY (/mission, /grow, /addRule, /pin, /saveSpecimen,
+# immune gates, etc.) to throw UndefVarError(:ALLOWED_ROLES). The outer CLI
+# try/catch swallowed it as a SYSTEM ERROR banner so interactive users rarely
+# noticed, but scripted pipelines hit it on every command. Role whitelist lives
+# right next to MESSAGE_HISTORY so it stays under the same mental model.
+# Matches the canonical set in test/test_chat_specimen.jl so both paths agree.
+# NO SILENT FAILURE: any unknown role still throws loudly inside
+# add_message_to_history!.
+const ALLOWED_ROLES = Set{String}(["User", "System", "User_Pinned", "Engine_Voice"])
+
 # ==============================================================================
 # ADMIN COMMAND SYSTEM
 # ==============================================================================
@@ -437,42 +494,264 @@ function extract_lobe_aware_context(votes::Vector{Vote})::String
 end
 
 """
+clamp_intensity(x::Float64)::Float64
+
+GRUG v7.12: Clamp an intensity scalar into the configured
+[CONTEXT_INTENSITY_FLOOR, CONTEXT_INTENSITY_CAP] interval. No silent
+saturation — callers must pass finite floats (NaN/Inf will raise because
+we compare with Float64 literals). This is the single gate between
+relevance math and the ChatMessage storage.
+"""
+@inline function clamp_intensity(x::Float64)::Float64
+    if !isfinite(x)
+        error("!!! FATAL: clamp_intensity got non-finite value $x — relevance math blew up! !!!")
+    end
+    return clamp(x, CONTEXT_INTENSITY_FLOOR, CONTEXT_INTENSITY_CAP)
+end
+
+"""
+_tokenize_for_relevance(text::String)::Set{String}
+
+GRUG v7.12: Lowercased whitespace-split token set used for the lexical
+half of the message/user relevance score. Short (<3 char) tokens are
+dropped to avoid 'the'/'a'/'of' saturating the overlap.
+"""
+function _tokenize_for_relevance(text::String)::Set{String}
+    toks = Set{String}()
+    for t in split(lowercase(text))
+        s = strip(String(t), [',', '.', ';', ':', '!', '?', '"', '\''])
+        if length(s) >= 3
+            push!(toks, s)
+        end
+    end
+    return toks
+end
+
+"""
+_relational_overlap(mission_triples, msg_triples)::Float64
+
+GRUG v7.12: Jaccard-style overlap between the current user input's
+RelationalTriples (as surfaced by `extract_dynamic_relational_triples`,
+which includes dynamic relations the verb registry did NOT pre-declare
+— see engine.jl) and a candidate message's cached triples. Comparison
+uses the canonical string form subject|relation|object so synonym
+normalization performed upstream still counts.
+Returns a value in [0.0, 1.0].
+"""
+function _relational_overlap(mission_triples::Vector, msg_triples::Vector)::Float64
+    if isempty(mission_triples) || isempty(msg_triples)
+        return 0.0
+    end
+    to_key(t) = string(t.subject, "|", t.relation, "|", t.object)
+    a = Set(to_key(t) for t in mission_triples)
+    b = Set(to_key(t) for t in msg_triples)
+    inter = length(intersect(a, b))
+    uni = length(union(a, b))
+    return uni == 0 ? 0.0 : inter / uni
+end
+
+"""
+score_message_relevance(msg, user_tokens, user_triples)::Float64
+
+GRUG v7.12: Weighted sum of
+  * lexical token overlap (Jaccard of cleaned tokens)
+  * relational triple overlap (dynamic triples included)
+Weights are CONTEXT_RELEVANCE_LEX_W and CONTEXT_RELEVANCE_REL_W. Result
+is mapped into [0, CONTEXT_INTENSITY_CAP] so the snap-back step can pull
+intensity directly toward it without an extra scale transform.
+
+The message's own triples are re-extracted on each call. That keeps the
+scorer honest against live verb-registry changes (/addVerb,
+/addRelationClass); we accept the small CPU cost because MESSAGE_HISTORY
+is bounded by MAX_HISTORY and `scan_mode` is clamped inside
+extract_dynamic_relational_triples anyway.
+"""
+function score_message_relevance(msg::ChatMessage,
+                                 user_tokens::Set{String},
+                                 user_triples::Vector)::Float64
+    msg_tokens = _tokenize_for_relevance(msg.text)
+    lex = if isempty(msg_tokens) || isempty(user_tokens)
+        0.0
+    else
+        inter = length(intersect(msg_tokens, user_tokens))
+        uni = length(union(msg_tokens, user_tokens))
+        uni == 0 ? 0.0 : inter / uni
+    end
+
+    # GRUG v7.12: Dynamic relational extraction — scan_mode=3 requests the
+    # high-res path so complex inputs surface triples the static verb
+    # registry never saw. Simple inputs fall back automatically per the
+    # engine's own complexity wave.
+    msg_triples = try
+        extract_dynamic_relational_triples(msg.text, 3)
+    catch
+        # GRUG: Relation extraction is best-effort for scoring. If a
+        # malformed stored message blows it up, treat relational overlap
+        # as zero and move on; lexical half still counts. NO SILENT
+        # FAILURE in the broader system — the @warn surfaces it.
+        @warn "[Main v7.12] relational extraction failed for msg $(msg.id) during relevance scoring"
+        RelationalTriple[]
+    end
+    rel = _relational_overlap(user_triples, msg_triples)
+
+    raw = CONTEXT_RELEVANCE_LEX_W * lex + CONTEXT_RELEVANCE_REL_W * rel
+    # Map [0,1] → [0, CAP] so snap-back targets land on the same scale.
+    return clamp_intensity(raw * CONTEXT_INTENSITY_CAP)
+end
+
+"""
+refresh_message_intensities!(user_input::String)
+
+GRUG v7.12: Called at the pattern-bind / relational phase of every
+/mission and /brainstorm (AFTER the pattern scanner has surfaced dynamic
+relational triples, BEFORE the AIML orchestrator builds its payload).
+
+For every message in MESSAGE_HISTORY:
+  1. Compute relevance score against `user_input` (lexical + relational,
+     with dynamic triples included).
+  2. Snap-back: intensity += CONTEXT_SNAP_ALPHA * (relevance - intensity)
+  3. Zero-mean jitter: intensity += RelationalJitter.jitter_value(intensity)
+     — /brainstorm scope automatically amplifies via is_brainstorm_active,
+     so intensity jitter aligns with the rest of the engine's jitter regime.
+  4. Clamp into [FLOOR, CAP].
+
+Pinned messages follow the exact same rules so future features can use
+their intensity (e.g. pinned-but-irrelevant vs. pinned-and-hot) without
+a second code path.
+
+This is the single hook that lets irrelevant /status banners decay out of
+Fresh Memory and stops the O(N^2) context-recursion blow-up we hit at
+v7.12 pre-intensity.
+"""
+function refresh_message_intensities!(user_input::String)
+    isempty(MESSAGE_HISTORY) && return
+
+    user_tokens = _tokenize_for_relevance(user_input)
+    user_triples = try
+        extract_dynamic_relational_triples(user_input, 3)
+    catch
+        @warn "[Main v7.12] dynamic relational extraction failed for user input; " *
+              "falling back to lexical-only relevance"
+        RelationalTriple[]
+    end
+
+    lock(MESSAGE_HISTORY_LOCK) do
+        for m in MESSAGE_HISTORY
+            relevance = score_message_relevance(m, user_tokens, user_triples)
+            # Snap-back toward relevance
+            snapped = m.intensity + CONTEXT_SNAP_ALPHA * (relevance - m.intensity)
+            # Zero-mean jitter (reuses the engine's RelationalJitter so
+            # /brainstorm scope automatically amplifies the nudge)
+            nudged = RelationalJitter.jitter_value(snapped)
+            m.intensity = clamp_intensity(nudged)
+        end
+    end
+end
+
+"""
+apply_last_selected_feedback!(delta::Float64)
+
+GRUG v7.12: /right and /wrong feedback hook. Walks the set of message
+ids that contributed to the last /mission's Fresh Memory and bumps
+their intensity by `delta`, clamped into the usual interval. Closes the
+learning loop on context selection: a context that led to a good answer
+gets reinforced, a bad one gets penalised.
+
+If no prior mission has populated LAST_SELECTED_MSG_IDS (fresh cave,
+immediately after /loadSpecimen, or the last mission produced no
+scaffold because the scan went silent), this is a no-op — NO SILENT
+FAILURE but also no spurious side-effect.
+"""
+function apply_last_selected_feedback!(delta::Float64)
+    selected_ids = lock(LAST_SELECTED_MSG_LOCK) do
+        copy(LAST_SELECTED_MSG_IDS[])
+    end
+    isempty(selected_ids) && return 0
+
+    bumped = 0
+    lock(MESSAGE_HISTORY_LOCK) do
+        for m in MESSAGE_HISTORY
+            if m.id in selected_ids
+                m.intensity = clamp_intensity(m.intensity + delta)
+                bumped += 1
+            end
+        end
+    end
+    return bumped
+end
+
+"""
 extract_aiml_memory_context()::String
 
-GRUG: Chief Orchestrator reads memory wall — pinned and recent messages.
-Formats them for AIML context injection. Throws on read failure — NO SILENT FAILURES.
+GRUG v7.12: Chief Orchestrator reads the memory wall — pinned messages
+(always surfaced) plus an intensity-biased coinflip sample of unpinned
+messages (see refresh_message_intensities! for how intensity is
+maintained). Selection rules:
+
+  * Pinned messages always in, regardless of intensity.
+  * Unpinned messages are iterated newest-first; each one coinflipped
+    with p = clamp(intensity/CAP, COIN_P_FLOOR, COIN_P_CEIL). Winners
+    fill a Fresh Memory slice capped at MAX_FRESH_CONTEXT entries.
+  * Selected message ids are cached in LAST_SELECTED_MSG_IDS so /right
+    and /wrong can reinforce/punish them.
+
+Throws on read failure — NO SILENT FAILURES.
 """
 function extract_aiml_memory_context()::String
     total_msgs = length(MESSAGE_HISTORY)
     if total_msgs == 0
         return "Memory Cave: [EMPTY]"
     end
-    
+
     pinned_msgs = String[]
     recent_msgs = String[]
-    
+    selected_ids = Set{Int}()
+
     try
-        # 1. Grab all pinned rocks
+        # 1. Pinned — always surface, newest-first order preserved.
         for m in MESSAGE_HISTORY
             if m.pinned
                 push!(pinned_msgs, "[$(m.role)]: $(m.text)")
+                push!(selected_ids, m.id)
             end
         end
-        
-        # GRUG FIX 3.2: Grug want last 5 UNPINNED rocks. 
-        # If Grug just check last 5 spots and all are pinned, recent sounds is empty!
-        # So Grug filter first, then take last 5.
-        unpinned_history = [m for m in MESSAGE_HISTORY if !m.pinned]
-        recent_count = min(5, length(unpinned_history))
-        
-        for i in (length(unpinned_history) - recent_count + 1):length(unpinned_history)
-            m = unpinned_history[i]
-            push!(recent_msgs, "[$(m.role)]: $(m.text)")
+
+        # 2. Unpinned — intensity-biased coinflip, walking newest-first.
+        # We collect candidates in reverse chronological order so the
+        # earliest inserted message has the lowest priority when the cap
+        # kicks in. Probability per message = clamp(intensity/CAP,
+        # COIN_P_FLOOR, COIN_P_CEIL) so even cold messages get an occasional
+        # chance and hot messages don't 100%-saturate (preserves exploration).
+        # We use rand() directly here; the @coinflip macro elsewhere is for
+        # multi-outcome weighted picks and takes a pair-array shape we
+        # don't need for a simple gate.
+        unpinned = [m for m in MESSAGE_HISTORY if !m.pinned]
+        chosen = ChatMessage[]
+        for i in length(unpinned):-1:1
+            length(chosen) >= MAX_FRESH_CONTEXT && break
+            m = unpinned[i]
+            p = clamp(m.intensity / CONTEXT_INTENSITY_CAP,
+                      CONTEXT_COIN_P_FLOOR, CONTEXT_COIN_P_CEIL)
+            if rand() < p
+                push!(chosen, m)
+                push!(selected_ids, m.id)
+            end
         end
-        
+        # Restore chronological order for human readability.
+        reverse!(chosen)
+        for m in chosen
+            push!(recent_msgs,
+                  "[$(m.role)]: $(m.text) (intensity=$(round(m.intensity, digits=2)))")
+        end
+
+        # 3. Cache selected ids for /right and /wrong feedback.
+        lock(LAST_SELECTED_MSG_LOCK) do
+            LAST_SELECTED_MSG_IDS[] = selected_ids
+        end
+
         pinned_str = isempty(pinned_msgs) ? "No pinned rocks" : join(pinned_msgs, " | ")
         recent_str = isempty(recent_msgs) ? "No recent sounds" : join(recent_msgs, " | ")
-        
+
         return "Deep Memory (Pinned): $pinned_str\nFresh Memory (Recent): $recent_str"
     catch e
         error("!!! FATAL: Chief Orchestrator failed to read memory wall: $e !!!")
@@ -1102,6 +1381,7 @@ const HELP_MSG = """
 ║    Use for runtime modifications to saved specimen data.    ║
 ║                                                              ║
 ║  /help                      Show this scroll                ║
+║  /quit (or /exit)           Close cave and exit CLI loop    ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  🛡  IMMUNE SYSTEM (auto-gates all structure-storing cmds)  ║
 ║  Gated: /grow /lobeGrow /addRule /pin /addVerb              ║
@@ -1239,7 +1519,13 @@ function process_mission(mission_text::String)
     # orchestrator layer". The orchestrator (ephemeral_aiml_orchestrator)
     # will only run after DONE is received.
     try
-        scan_fc = Main._LAST_FIRE_COUNTER[]
+        # GRUG: _LAST_FIRE_COUNTER is declared in engine.jl, which is included
+        # into the SAME enclosing module as this file (the GrugBot420 package
+        # module when loaded via `using GrugBot420`, or the user's top-level
+        # Main when dev-included directly). Either way, the Ref is a sibling
+        # binding — reference it bare, never via `Main.` which only resolves
+        # in the dev-include case and breaks the packaged path.
+        scan_fc = _LAST_FIRE_COUNTER[]
         fires_total = isnothing(scan_fc) ? 0 : VoteOrchestrator.current_fire_count(scan_fc)
         VoteOrchestrator.send_done!(done_channel, VoteOrchestrator.DoneSignal(
             "scan_pass",
@@ -1273,6 +1559,27 @@ function process_mission(mission_text::String)
     if isempty(valid_specimens)
         println("--> No valid specimens found for this input. Cave is silent.")
         return
+    end
+
+    # GRUG v7.12: CONTEXT INTENSITY REFRESH (pattern-bind / relational phase).
+    # Scan just finished - relational triples for the user input are hot.
+    # Now (BEFORE vote casting and AIML payload build) we:
+    #   1. Re-score every message in MESSAGE_HISTORY for relevance to the
+    #      current mission text (lexical + dynamic-relational overlap).
+    #   2. Snap each intensity toward its relevance score (SNAP_ALPHA pull).
+    #   3. Apply the same zero-mean RelationalJitter used everywhere else so
+    #      the stochastic character of the cave stays aligned across layers.
+    #   4. Clamp to [FLOOR, CAP].
+    # Downstream, extract_aiml_memory_context() coinflips unpinned messages
+    # biased by intensity instead of blindly grabbing the last N. Irrelevant
+    # chatter decays and drops out; relevant history rises and sticks.
+    # Wrapped: the refresh must never abort the mission. If anything inside
+    # explodes we scream loudly (no silent failures) and continue with the
+    # existing intensities.
+    try
+        refresh_message_intensities!(mission_text)
+    catch e
+        @error "[MAIN] Context intensity refresh FAILED (continuing with stale intensities): $e"
     end
 
     # GRUG: CAST-VOTE SUB-PROCESS DISPATCH!
@@ -1527,11 +1834,15 @@ function save_specimen_to_file!(filepath::String)::String
 
     # ── 4. MESSAGE HISTORY ────────────────────────────────────────────────
     # GRUG: Serialize the full message cave (up to 10k entries). Pins are preserved.
+    # GRUG v7.12: intensity also persists so context heat carries across saves.
+    # Older specimens without the field load fine — restore path defaults to
+    # CONTEXT_INTENSITY_BASELINE when key is missing (see /loadSpecimen below).
     msg_list = [Dict{String, Any}(
-        "id"     => m.id,
-        "role"   => m.role,
-        "text"   => m.text,
-        "pinned" => m.pinned
+        "id"        => m.id,
+        "role"      => m.role,
+        "text"      => m.text,
+        "pinned"    => m.pinned,
+        "intensity" => m.intensity
     ) for m in MESSAGE_HISTORY]
     specimen["message_history"] = msg_list
 
@@ -1833,9 +2144,17 @@ function save_specimen_to_file!(filepath::String)::String
     push!(lines, "  🕐  Temporal coherence : $(length(tcl_list))")
     push!(lines, "  ⏳  Morph cooldowns    : $(length(cooldown_data))")
     # GRUG: Show AIML stats if aiml_system was saved
+    # GRUG 7.12-FIX: serialize_aiml_state()["registry"] is a
+    # Dict{String, Vector{Dict}} where each value IS the list of node dicts
+    # (see AIMLNodeSystem.serialize_aiml_state §registry_data[lobe_id] =
+    # nodes_list). The previous version tried get(v, "nodes", []) which
+    # threw MethodError(get, (<Vector{Dict}>, "nodes", ...)) because `get`
+    # on a Vector expects an Int index, not a String. Count directly.
+    # NO SILENT FAILURE: if the schema ever regresses to a nested dict
+    # shape, length() on a Dict still returns the node count sensibly.
     _aiml_data = get(specimen, "aiml_system", Dict())
     _aiml_registry = get(_aiml_data, "registry", Dict())
-    _aiml_total_nodes = isempty(_aiml_registry) ? 0 : sum(length(get(v, "nodes", [])) for v in values(_aiml_registry))
+    _aiml_total_nodes = isempty(_aiml_registry) ? 0 : sum(length(v) for v in values(_aiml_registry))
     push!(lines, "  🤖  AIML nodes       : $(_aiml_total_nodes)")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
@@ -2274,7 +2593,15 @@ function load_specimen_from_file!(filepath::String)::String
                         String(get(nd, "grave_reason", "")),
                         Float64.(get(nd, "response_times", Float64[])),
                         Float64(get(nd, "ledger_last_cleared", time())),
-                        parse(UInt64, string(get(nd, "hopfield_key", "0")))
+                        parse(UInt64, string(get(nd, "hopfield_key", "0"))),
+                        # GRUG: Per-cycle transient flags — always reset to defaults on load.
+                        # These are runtime scratch state (who fired this cycle, who gained strength);
+                        # they have no meaning across a save/load boundary, so we deliberately drop
+                        # any persisted value and start the restored node in a clean pre-cycle state.
+                        false,   # fired_this_cycle
+                        false,   # voted_this_cycle
+                        false,   # gained_this_cycle
+                        0.0      # strength_delta_this_cycle
                     )
                     NODE_MAP[node.id] = node
                     n_nodes += 1
@@ -2361,11 +2688,24 @@ function load_specimen_from_file!(filepath::String)::String
     if haskey(specimen, "message_history") && isa(specimen["message_history"], AbstractVector)
         for mentry in specimen["message_history"]
             try
+                # GRUG v7.12: intensity is persisted per-message in v7.12+.
+                # Older specimens lack the key - default to BASELINE so the
+                # first pattern-bind refresh scores them from a neutral start.
+                # Clamp on load because a malformed file could hand us NaN/Inf
+                # and we do not want that silently corrupting the coinflip.
+                raw_intensity = Float64(get(mentry, "intensity", CONTEXT_INTENSITY_BASELINE))
+                intensity = if isnan(raw_intensity) || isinf(raw_intensity)
+                    @warn "loadSpecimen: non-finite intensity on message; resetting to BASELINE."
+                    CONTEXT_INTENSITY_BASELINE
+                else
+                    clamp_intensity(raw_intensity)
+                end
                 msg = ChatMessage(
                     Int(mentry["id"]),
                     String(mentry["role"]),
                     String(mentry["text"]),
-                    Bool(get(mentry, "pinned", false))
+                    Bool(get(mentry, "pinned", false)),
+                    intensity
                 )
                 push!(MESSAGE_HISTORY, msg)
                 n_messages += 1
@@ -2840,9 +3180,28 @@ function run_cli()
         # In standard Julia CLI, readline() blocks. So idle action runs between prompts.
         maybe_run_idle()
 
+        # GRUG 7.12: Hard EOF gate. When stdin is a closed pipe (scripted input
+        # / redirected file), readline() returns "" forever and the loop would
+        # spin. Check eof(stdin) up-front and exit cleanly. NO SILENT FAILURE:
+        # we print a visible shutdown banner so operators can see the REPL
+        # terminated on its own, not via a /quit command.
+        if eof(stdin)
+            println("\n[GRUG] ☁ stdin closed (EOF). Cave goes quiet. Shutting down CLI loop.")
+            break
+        end
+
         line = strip(readline())
-        
+
         line == "" && continue
+
+        # GRUG 7.12: /quit (and /exit alias) — explicit, loud shutdown. Scripted
+        # drivers use this as the last command of a seed/conversation file so
+        # Julia exits with code 0 and log capture tools see a clean close.
+        # NO SILENT FAILURE: always print a shutdown banner before returning.
+        if line == "/quit" || line == "/exit"
+            println("[GRUG] 👋 /quit received. Cave closes. Goodbye.")
+            break
+        end
 
         # GRUG: Update last input time so idle detector resets
         LAST_INPUT_TIME[] = time()
@@ -2981,6 +3340,22 @@ function run_cli()
                     println("❌  /wrong applied. $(length(contributor_ids)) contributor(s) penalized via coinflip.")
                 end
 
+                # GRUG v7.12: Context-intensity feedback.
+                # The message-history entries that were coinflipped INTO the
+                # last AIML payload get a negative nudge. They were part of
+                # the context that produced the "wrong" answer, so their
+                # intensity should sag → lower chance of re-selection next
+                # cycle. Wrapped: never let a bad last-selected set break
+                # the feedback path.
+                try
+                    ctx_hit = apply_last_selected_feedback!(CONTEXT_FEEDBACK_WRONG_DELTA)
+                    if ctx_hit > 0
+                        println("   ↳ context intensity nudged down on $ctx_hit message(s) used last cycle.")
+                    end
+                catch e
+                    @error "[MAIN] /wrong context-intensity feedback FAILED: $e"
+                end
+
 elseif !isnothing(m_right)
                 # GRUG: /right - user says last response was good.
                 # CRITICAL: Only nodes that actually contributed (fired) get secondary reinforcement.
@@ -2994,7 +3369,23 @@ elseif !isnothing(m_right)
                 else
                     result = apply_right_feedback!(contributor_ids)
                     println("✅ /right applied. $(length(contributor_ids)) contributor(s) processed: $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained), $(length(result["coinflip_missed"])) missed coinflip.")
-                end            elseif !isnothing(m_aimlright)
+                end
+
+                # GRUG v7.12: Context-intensity feedback (positive).
+                # Messages coinflipped INTO the last AIML payload get a
+                # positive intensity bump. They helped produce the "right"
+                # answer, so they should be more likely to be reselected
+                # next cycle. Wrapped: feedback failure never propagates.
+                try
+                    ctx_hit = apply_last_selected_feedback!(CONTEXT_FEEDBACK_RIGHT_DELTA)
+                    if ctx_hit > 0
+                        println("   ↳ context intensity nudged up on $ctx_hit message(s) used last cycle.")
+                    end
+                catch e
+                    @error "[MAIN] /right context-intensity feedback FAILED: $e"
+                end
+
+            elseif !isnothing(m_aimlright)
                 # GRUG: /aimlRight - user says AIML executive layer did good this cycle.
                 # Rewards AIML nodes that contributed (fired), BUT skips any that already gained
                 # strength from use in the same cycle (no double snack rule).
@@ -3021,22 +3412,18 @@ elseif !isnothing(m_right)
             elseif !isnothing(m_aimlstatus)
                 # GRUG: /aimlStatus - show AIML tribe status across all lobes.
                 # GRUG: Gives overview of population, caps, and grave count.
+                # GRUG 7.12-FIX: get_aiml_status_summary() returns a preformatted
+                # String (see AIMLNodeSystem.jl §get_aiml_status_summary). The
+                # previous version indexed it as a Dict which threw
+                # MethodError(getindex, (<String>, "total_lobes"), ...) for every
+                # /aimlStatus call. NO SILENT FAILURE: we now print the string
+                # directly inside the status banner.
                 summary = AIMLNodeSystem.get_aiml_status_summary()
-                println("\n╔══════════════════════════════════════════════════════════════╗")
+                println("\n╔════════════════════════════════════════════════════════════╗")
                 println("║                    🤖 AIML TRIBE STATUS                      ║")
-                println("╠══════════════════════════════════════════════════════════════╣")
-                println("  Total Lobes      : $(summary["total_lobes"])")
-                println("  Total Nodes      : $(summary["total_nodes"])")
-                println("  Alive Nodes      : $(summary["alive_nodes"])")
-                println("  Grave Nodes      : $(summary["grave_nodes"])")
-                println("  Current Cycle    : $(summary["current_cycle"])")
-                println("  ─────────────────────────────────────────────────────────────")
-                for (lobe_id, lobe_info) in summary["lobes"]
-                    println("  📍 $lobe_id:")
-                    println("     Nodes: $(lobe_info["population"])/$(lobe_info["cap"]) (cap)")
-                    println("     Alive: $(lobe_info["alive"]), Graves: $(lobe_info["graves"])")
-                end
-                println("╚══════════════════════════════════════════════════════════════╝")
+                println("╠════════════════════════════════════════════════════════════╣")
+                println(summary)
+                println("╚════════════════════════════════════════════════════════════╝")
 
             elseif !isnothing(m_aimllist)
                 # GRUG: /aimlList <lobe_id> - list all AIML nodes in a specific lobe.

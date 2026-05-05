@@ -1,0 +1,499 @@
+WARNING: redefinition of constant GrugBot420.CAUSAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.SPATIAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.TEMPORAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.COMMANDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ID_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_HIT_COUNTS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_FIRE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.AIML_DROP_TABLE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ALLOWED_RULE_TAGS. This may fail, cause incorrect answers, or produce other errors.
+┌ Warning: Replacing docs for `GrugBot420.words_to_signal :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.rewrite_passive_mission :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_relational_triples :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_dynamic_relational_triples :: Tuple{String, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.evaluate_relational_dialectics :: Tuple{Vector{GrugBot420.RelationalTriple}, Vector{GrugBot420.RelationalTriple}, Vector{String}, Dict{String, Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_input_hash :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_lookup :: Tuple{UInt64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_record! :: Tuple{UInt64, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.bump_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.penalize_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_grave! :: Tuple{GrugBot420.Node, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_contributor! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.try_link_nodes! :: Tuple{GrugBot420.Node, GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.find_best_latch_target :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._token_overlap_similarity :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_node! :: Tuple{String, String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.detach_node! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.fire_attachments! :: Tuple{String, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachment_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachments_for_target :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sdf_signal_similarity :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_image_node! :: Tuple{String, String, Vector{UInt8}, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.reset_throttle! :: Tuple{GrugBot420.Node, Float64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.create_node :: Tuple{String, String, Dict, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.parse_action_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.select_action :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.screen_input_complexity :: Tuple{Vector{Float64}, Vector{GrugBot420.RelationalTriple}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._effective_scan_mode :: Tuple{Int64, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._bidirectional_cheap_scan :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_drop_table_neighbors :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.strength_biased_scan_coinflip :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_specimens :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_and_expand :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_vote :: NTuple{5, Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_explicit_vote :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_right_feedback! :: Tuple{Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.grow_nodes_from_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_node_status_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.add_orchestration_rule! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.count_alive_nodes_in_lobe :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+[ Info: [SEMANTIC] ✅  New relation class added: 'epistemic'
+[ Info: [SEMANTIC] ✅  New relation class added: 'aesthetic'
+[ Info: [SEMANTIC] ✅  Verb 'implies' added to class 'epistemic'
+[ Info: [SEMANTIC] ✅  Verb 'entails' added to class 'epistemic'
+[ Info: [SEMANTIC] ✅  Verb 'resembles' added to class 'aesthetic'
+[ Info: [SEMANTIC] ✅  Verb 'evokes' added to class 'aesthetic'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'triggers' -> 'causes'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'provokes' -> 'causes'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'mirrors' -> 'resembles'
+Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...
+System Online. Grug waiting at cave entrance for instructions.
+Primary  : /mission <input>                    (text or image binary)
+Feedback : /wrong                              (penalize last response voters)
+Explicit : /explicit <cmd> [<node_id>] <input>
+Grow     : /grow <single_line_json_packet>
+Rules    : /addRule <rule text> [prob=0.0-1.0]
+           Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+Memory   : /pin <text>
+Nodes    : /nodes                              (show node map status)
+Status   : /status                             (show chatter + system status)
+Arousal  : /arousal <0.0-1.0>                 (set eye system arousal level)
+Verbs    : /addVerb <verb> <class>             (add verb to relation class)
+         : /addRelationClass <name>            (create new verb class bucket)
+         : /addSynonym <canonical> <alias>     (normalize alias->canonical)
+         : /listVerbs                          (show all verb classes + synonyms)
+Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
+         : /connectLobes <id_a> <id_b>         (connect two lobes)
+         : /lobeGrow <lobe_id> <json_packet>   (grow node into specific lobe)
+         : /lobes                              (list all lobes + node counts)
+         : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
+         : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
+Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
+         : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
+NegThes  : /negativeThesaurus add|remove|list|check|flush
+Attach   : /nodeAttach <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <target> <id>         (detach image node from target)
+         : /attachments                         (show all node attachments)
+Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
+         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Help     : /help                               (full command reference)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  SPECIMEN SEEDING GUIDE (read before /grow)                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Automatic neighbor latching is SUPPRESSED below 1000 nodes.   ║
+║  Below that threshold, YOU control topology via drop_table.     ║
+║                                                                  ║
+║  For a coherent specimen from the start:                        ║
+║  1. Seed ORTHOGONAL archetypes first - distinct semantic poles. ║
+║     Don't plant 50 near-identical nodes up front.               ║
+║  2. Use required_relations as semantic GATES from day one.      ║
+║     Nodes that demand specific verbs won't fire on noise.       ║
+║  3. Name action_packets deliberately - distinct action families ║
+║     give the superposition orchestrator something to work with. ║
+║  4. Wire drop_tables manually for known co-activation pairs.    ║
+║     Don't rely on the latch system to discover semantics.       ║
+║  5. Your first ~100 nodes are the specimen's DNA.               ║
+║     The engine enforces structure at scale (1000+ nodes).       ║
+║     You enforce MEANING at the start.                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Brain > ╔══════════════════════════════════════════════════╗
+║              GRUGBOT SYSTEM STATUS               ║
+╠══════════════════════════════════════════════════╣
+║  ENGINE                                          ║
+  Nodes in cave   : 3
+  Hopfield cache  : 0 entries
+  Memory messages : 0
+  Est. memory use : ~3 KB
+  Trajectory buf  : 0 entries
+  Temporal coher  : 0 entries
+  Morph cooldowns : 0 active
+  Current arousal : 0.3
+  Last input ago  : 0.0s
+║  LOBES                                           ║
+  Lobes registered: 0
+  Nodes in lobes  : 0
+  Top lobe (fires): none
+║  BRAINSTEM                                       ║
+  Dispatches run  : 0
+  Last winner     : none
+  Propagations    : 0
+  Is dispatching  : false
+║  CHATTER                                         ║
+  Chatter running : false
+  Input queue     : 0 pending
+  Sessions run    : 0
+║  AIML NODE TRIBES                                ║
+=== AIML NODE TRIBES (cycle=0) ===
+  [no lobes registered]
+╚══════════════════════════════════════════════════╝
+
+Brain > 🧠 Lobe 'physics' created for subject: 'mechanics and waves and energy'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'cooking' created for subject: 'food preparation and heat transfer'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'music' created for subject: 'harmony and rhythm and timbre'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'ethics' created for subject: 'moral reasoning and fairness'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🔗 Lobes 'physics' ↔ 'music' connected.
+
+Brain > 🔗 Lobes 'cooking' ↔ 'ethics' connected.
+
+Brain > 🗂  Relation class 'epistemic' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'aesthetic' created. Use /addVerb to populate.
+
+Brain > 🔧 Verb 'implies' added to class 'epistemic'. Active immediately.
+
+Brain > 🔧 Verb 'entails' added to class 'epistemic'. Active immediately.
+
+Brain > 🔧 Verb 'resembles' added to class 'aesthetic'. Active immediately.
+
+Brain > 🔧 Verb 'evokes' added to class 'aesthetic'. Active immediately.
+
+Brain > 📖 Synonym registered: 'triggers' → 'causes'. Normalization active.
+
+Brain > 📖 Synonym registered: 'provokes' → 'causes'. Normalization active.
+
+Brain > 📖 Synonym registered: 'mirrors' → 'resembles'. Normalization active.
+
+Brain > === SEMANTIC VERB REGISTRY ===
+  [aesthetic]: evokes, resembles
+  [causal]: causes, contradicts, hits, increases, makes, reduces, routes
+  [epistemic]: entails, implies
+  [spatial]: are, connects, is, was, were
+  [temporal]: chasing, follows, precedes
+  --- Synonyms ---
+    mirrors → resembles
+    provokes → causes
+    triggers → causes
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'physics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'physics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'physics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'physics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'physics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'cooking'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'cooking'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'cooking'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'cooking'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'cooking'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'music'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'music'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'music'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'music'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'music'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'ethics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'ethics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'ethics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'ethics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > !!! ERROR in /lobeGrow: GrugBot420.LobeTable.LobeTableError("No table found for lobe 'ethics'. Call create_lobe_table! first.", "_get_chunk") [ctx: _get_chunk] !!!
+
+Brain > [ENGINE] 🔗  Node 'node_4' attached to target 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4 slots used).
+[ENGINE] 🔗  Node 'node_5' attached to target 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4)
+   → Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4)
+
+Brain > [ENGINE] 🔗  Node 'node_6' attached to target 'node_5' with pattern "wave and frequency pitch" (base_conf=0.05, 1/4 slots used).
+[ENGINE] 🔗  Node 'node_7' attached to target 'node_5' with pattern "friction heat" (base_conf=0.05, 2/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_6' to 'node_5' with pattern "wave and frequency pitch" (base_conf=0.05, 1/4)
+   → Attached 'node_7' to 'node_5' with pattern "friction heat" (base_conf=0.05, 2/4)
+
+Brain > [ENGINE] 🔗  Node 'node_9' attached to target 'node_8' with pattern "salt and flavor" (base_conf=0.3, 1/4 slots used).
+[ENGINE] 🔗  Node 'node_10' attached to target 'node_8' with pattern "acid balance" (base_conf=0.193, 2/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_9' to 'node_8' with pattern "salt and flavor" (base_conf=0.3, 1/4)
+   → Attached 'node_10' to 'node_8' with pattern "acid balance" (base_conf=0.193, 2/4)
+
+Brain > [ENGINE] 🔗  Node 'node_14' attached to target 'node_13' with pattern "melody and harmony" (base_conf=0.175, 1/4 slots used).
+[ENGINE] 🔗  Node 'node_15' attached to target 'node_13' with pattern "harmony chords" (base_conf=0.05, 2/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_14' to 'node_13' with pattern "melody and harmony" (base_conf=0.175, 1/4)
+   → Attached 'node_15' to 'node_13' with pattern "harmony chords" (base_conf=0.05, 2/4)
+
+Brain > [ENGINE] 🔗  Node 'node_19' attached to target 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4 slots used).
+[ENGINE] 🔗  Node 'node_20' attached to target 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4)
+   → Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4)
+
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_explain' in lobe 'physics' with strength 4.941983975296713
+
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_analyze' in lobe 'physics' with strength 4.929545383485426
+
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_warn' in lobe 'physics' with strength 4.943353457413914
+
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_advise' in lobe 'cooking' with strength 4.903755910052381
+
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_warn' in lobe 'cooking' with strength 5.124951989043927
+
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_explain' in lobe 'cooking' with strength 5.006256634646494
+
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_analyze' in lobe 'music' with strength 5.059141760736881
+
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_describe' in lobe 'music' with strength 5.136095789611433
+
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_define' in lobe 'music' with strength 5.030821331562052
+
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_reason' in lobe 'ethics' with strength 5.014857805973739
+
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_acknowledge' in lobe 'ethics' with strength 5.139963053859702
+
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_warn' in lobe 'ethics' with strength 5.034604700932893
+
+Brain > ⚙️ Rule tied to tree: [On mission {MISSION} with primary action {PRIMARY_ACTION} at confidence {CONFIDENCE}, focus on the winning frame.] (fire_prob=1.0)
+
+Brain > ⚙️ Rule tied to tree: [When confidence {CONFIDENCE} is low, suggest alternatives from {UNSURE_ACTIONS} rather than forcing a choice.] (fire_prob=0.7)
+
+Brain > ⚙️ Rule tied to tree: [If {VOTE_CERTAINTY} shows a tie, name the tied alternatives {TIED_ALTERNATIVES} and ask the user to disambiguate.] (fire_prob=0.9)
+
+Brain > ⚙️ Rule tied to tree: [Surface the winning node {NODE_ID} from lobe {LOBE_CONTEXT} so provenance is clear.] (fire_prob=0.85)
+
+Brain > ⚙️ Rule tied to tree: [If pinned memory {MEMORY} is relevant, cite it before proposing an action from {ALL_ACTIONS}.] (fire_prob=0.6)
+
+Brain > ⚙️ Rule tied to tree: [When {PRIMARY_ACTION} involves warn or harm scrutiny, include a concrete safeguard.] (fire_prob=1.0)
+
+Brain > ⚙️ Rule tied to tree: [For ambiguous missions, list {SURE_ACTIONS} first then {UNSURE_ACTIONS} as fallbacks.] (fire_prob=0.5)
+
+Brain > ⚙️ Rule tied to tree: [When {CONFIDENCE} exceeds high threshold, commit to one recommendation instead of hedging.] (fire_prob=0.4)
+
+Brain > 🚫 Inhibition registered: 'maybe'  reason: hedging noise
+   NegativeThesaurus size: 1 / 256
+
+Brain > 🚫 Inhibition registered: 'probably'  reason: hedging noise
+   NegativeThesaurus size: 2 / 256
+
+Brain > 🚫 Inhibition registered: 'somewhat'  reason: weak qualifier
+   NegativeThesaurus size: 3 / 256
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > ╔══════════════════════════════════════════════════╗
+║              GRUGBOT SYSTEM STATUS               ║
+╠══════════════════════════════════════════════════╣
+║  ENGINE                                          ║
+  Nodes in cave   : 23
+  Hopfield cache  : 0 entries
+  Memory messages : 8
+  Est. memory use : ~26 KB
+  Trajectory buf  : 0 entries
+  Temporal coher  : 0 entries
+  Morph cooldowns : 0 active
+  Current arousal : 0.3
+  Last input ago  : 0.0s
+║  LOBES                                           ║
+  Lobes registered: 4
+  Nodes in lobes  : 20
+  Top lobe (fires): physics (0 fires)
+║  BRAINSTEM                                       ║
+  Dispatches run  : 0
+  Last winner     : none
+  Propagations    : 0
+  Is dispatching  : false
+║  CHATTER                                         ║
+  Chatter running : false
+  Input queue     : 0 pending
+  Sessions run    : 0
+║  AIML NODE TRIBES                                ║
+=== AIML NODE TRIBES (cycle=0) ===
+  cooking | pop=3/6666 | live=3 | grave=0
+  ethics | pop=3/6666 | live=3 | grave=0
+  music | pop=3/6666 | live=3 | grave=0
+  physics | pop=3/6666 | live=3 | grave=0
+╚══════════════════════════════════════════════════╝
+
+Brain > === LOBE REGISTRY (4 lobes, 20 nodes indexed) ===
+  cooking | subject='food preparation and heat transfer' | nodes=5/20000 | fires=0 | inhibits=0 | connected=[ethics] | tbl[nodes=5 json=0 drop=0 hopf=0]
+  ethics | subject='moral reasoning and fairness' | nodes=5/20000 | fires=0 | inhibits=0 | connected=[cooking] | tbl[nodes=5 json=0 drop=0 hopf=0]
+  music | subject='harmony and rhythm and timbre' | nodes=5/20000 | fires=0 | inhibits=0 | connected=[physics] | tbl[nodes=5 json=0 drop=0 hopf=0]
+  physics | subject='mechanics and waves and energy' | nodes=5/20000 | fires=0 | inhibits=0 | connected=[music] | tbl[nodes=5 json=0 drop=0 hopf=0]
+
+Brain > === NODE MAP STATUS (23 nodes) ===
+  node_0 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="hello hi greeting mornin"
+  node_1 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="think ponder reason calculate"
+  node_10 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="acid balances richness in heavy dishes"
+  node_11 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="fermentation produces flavor through mic"
+  node_12 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="fresh ingredients yield better final dis"
+  node_13 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="melody carries emotion through pitch mot"
+  node_14 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="harmony stacks intervals to produce chor"
+  node_15 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="rhythm organizes time into pulse pattern"
+  node_16 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="timbre distinguishes instruments with id"
+  node_17 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="dissonance creates tension that resoluti"
+  node_18 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="fairness requires treating equal cases e"
+  node_19 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="consent grounds legitimate interpersonal"
+  node_2 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="grug hits rock and makes fire"
+  node_20 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="harm to others triggers moral scrutiny"
+  node_21 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="honesty builds long term trust between p"
+  node_22 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="responsibility follows from capacity to "
+  node_3 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="force causes acceleration of mass"
+  node_4 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="energy transforms between kinetic and po"
+  node_5 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="wave frequency determines pitch percepti"
+  node_6 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="friction dissipates kinetic energy into "
+  node_7 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="gravity attracts massive bodies toward e"
+  node_8 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="heat transforms raw ingredients into coo"
+  node_9 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="salt enhances flavor when applied in mod"
+
+=== ATTACHMENT MAP (5 targets with attachments) ===
+  🎯 node_13 (2/4 attached):
+      🔗 node_14 [ALIVE str=1.0] | base_conf=0.175 | connector="melody and harmony"
+      🔗 node_15 [ALIVE str=1.0] | base_conf=0.05 | connector="harmony chords"
+  🎯 node_18 (2/4 attached):
+      🔗 node_19 [ALIVE str=1.0] | base_conf=0.193 | connector="fairness and consent"
+      🔗 node_20 [ALIVE str=1.0] | base_conf=0.383 | connector="harm scrutiny"
+  🎯 node_3 (2/4 attached):
+      🔗 node_4 [ALIVE str=1.0] | base_conf=0.175 | connector="force and acceleration"
+      🔗 node_5 [ALIVE str=1.0] | base_conf=0.05 | connector="mass and energy"
+  🎯 node_5 (2/4 attached):
+      🔗 node_6 [ALIVE str=1.0] | base_conf=0.05 | connector="wave and frequency pitch"
+      🔗 node_7 [ALIVE str=1.0] | base_conf=0.05 | connector="friction heat"
+  🎯 node_8 (2/4 attached):
+      🔗 node_9 [ALIVE str=1.0] | base_conf=0.3 | connector="salt and flavor"
+      🔗 node_10 [ALIVE str=1.0] | base_conf=0.193 | connector="acid balance"
+
+Brain > 
+╔════════════════════════════════════════════════════════════╗
+║                    🤖 AIML TRIBE STATUS                      ║
+╠════════════════════════════════════════════════════════════╣
+=== AIML NODE TRIBES (cycle=0) ===
+  cooking | pop=3/6666 | live=3 | grave=0
+  ethics | pop=3/6666 | live=3 | grave=0
+  music | pop=3/6666 | live=3 | grave=0
+  physics | pop=3/6666 | live=3 | grave=0
+╚════════════════════════════════════════════════════════════╝
+
+Brain > 📋 NegativeThesaurus — 3 inhibited word(s):
+   🚫 'maybe'   reason: hedging noise   added: 0.0s ago
+   🚫 'probably'   reason: hedging noise   added: 0.0s ago
+   🚫 'somewhat'   reason: weak qualifier   added: 0.0s ago
+
+Brain > === ATTACHMENT MAP (5 targets with attachments) ===
+  🎯 node_13 (2/4 attached):
+      🔗 node_14 [ALIVE str=1.0] | base_conf=0.175 | connector="melody and harmony"
+      🔗 node_15 [ALIVE str=1.0] | base_conf=0.05 | connector="harmony chords"
+  🎯 node_18 (2/4 attached):
+      🔗 node_19 [ALIVE str=1.0] | base_conf=0.193 | connector="fairness and consent"
+      🔗 node_20 [ALIVE str=1.0] | base_conf=0.383 | connector="harm scrutiny"
+  🎯 node_3 (2/4 attached):
+      🔗 node_4 [ALIVE str=1.0] | base_conf=0.175 | connector="force and acceleration"
+      🔗 node_5 [ALIVE str=1.0] | base_conf=0.05 | connector="mass and energy"
+  🎯 node_5 (2/4 attached):
+      🔗 node_6 [ALIVE str=1.0] | base_conf=0.05 | connector="wave and frequency pitch"
+      🔗 node_7 [ALIVE str=1.0] | base_conf=0.05 | connector="friction heat"
+  🎯 node_8 (2/4 attached):
+      🔗 node_9 [ALIVE str=1.0] | base_conf=0.3 | connector="salt and flavor"
+      🔗 node_10 [ALIVE str=1.0] | base_conf=0.193 | connector="acid balance"
+
+Brain > --> Grug freezing entire cave to specimen file...
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : grugbot420_comprehensive.specimen.gz
+  📦  JSON size        : 97537 bytes
+  🗜️   Compressed size  : 15447 bytes (84.2% smaller)
+  ⏱️   Time             : 0.45s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 23
+  🧠  Lobes            : 4
+  📋  Lobe tables      : 0
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 8
+  💬  Messages         : 9
+  🔧  Verb classes     : 5
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 3
+  🔗  Attachments      : 10
+  🔮  Trajectory entries : 0
+  🕐  Temporal coherence : 0
+  ⏳  Morph cooldowns    : 0
+  🤖  AIML nodes       : 12
+  👁   Arousal          : 0.3
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > [GRUG] 👋 /quit received. Cave closes. Goodbye.

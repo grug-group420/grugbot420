@@ -1,0 +1,179 @@
+# ============================================================================
+# GRUG COMPREHENSIVE SPECIMEN SEED SCRIPT
+# ============================================================================
+# Pipe this file into the CLI (the build driver strips comments/blanks):
+#   julia --project=. -e 'using GrugBot420; GrugBot420.run_cli()' \
+#     < specimen_demo/seed_comprehensive.txt
+#
+# Seeds four orthogonal subject lobes (physics, cooking, music, ethics)
+# with lobe-attached nodes, AIML tribes, orchestration rules, verbs,
+# synonyms, thesaurus inhibitions, relational node attachments, and
+# pinned memory, then saves the whole cave to
+# grugbot420_comprehensive.specimen.gz.
+#
+# ACTION VOCABULARY CONSTRAINT:
+#   All action tokens in action_packet and /aimlAdd must come from the
+#   hardcoded COMMANDS registry in Main.jl. Valid families are:
+#     reason-family  : reason, analyze, ponder, calculate
+#     greet-family   : greet, welcome, smile, laugh
+#     survival-family: flee, hide, fight
+#     explain-family : explain, clarify, describe, define, elaborate
+#     empathy-family : comfort, support, validate, acknowledge, reassure
+#     warning-family : alert, warn, caution, notify, flag
+#   Unknown verbs crash the cast_votes sub-process with "unknown action"
+#   at runtime, so we stay strictly inside the registered vocabulary.
+#
+# NODE CONTEXT CONSTRAINT:
+#   generate_aiml_payload() reads node.json_data["system_prompt"] and
+#   throws FATAL if the key is missing. Every /lobeGrow payload below
+#   embeds an explicit system_prompt tailored to the node's subject.
+#
+# LOBE-ATTACHMENT CONSTRAINT:
+#   /grow mints a node into NODE_MAP but does NOT bind it to any lobe,
+#   leaving NODE_TO_LOBE_IDX empty and forcing lobe cascade/context
+#   extraction to return "[Unassigned nodes - no lobe context]". We use
+#   /lobeGrow <lobe> {...} instead so every node is registered to its
+#   owning lobe at creation time.
+#
+# JSON PACKET SHAPE FOR /lobeGrow:
+#   Unlike /grow, which nests arbitrary fields under "json_data" inside a
+#   "nodes" array, /lobeGrow expects the flat form:
+#     {"pattern":..., "action_packet":..., "data":{...}, "drop_table":[...]}
+#   The "data" sub-dict becomes the node's json_data. So system_prompt
+#   lives under data.system_prompt here.
+#
+# ID ARITHMETIC:
+#   Cave boots with 3 seed nodes (node_0..node_2). Each /lobeGrow mints
+#   ONE new node, so IDs are:
+#     physics : node_3  node_4  node_5  node_6  node_7
+#     cooking : node_8  node_9  node_10 node_11 node_12
+#     music   : node_13 node_14 node_15 node_16 node_17
+#     ethics  : node_18 node_19 node_20 node_21 node_22
+#   /nodeAttach commands reference these explicit IDs.
+# ============================================================================
+
+/status
+
+/newLobe physics mechanics and waves and energy
+/newLobe cooking food preparation and heat transfer
+/newLobe music harmony and rhythm and timbre
+/newLobe ethics moral reasoning and fairness
+
+/connectLobes physics music
+/connectLobes cooking ethics
+
+/addRelationClass epistemic
+/addRelationClass aesthetic
+
+/addVerb implies epistemic
+/addVerb entails epistemic
+/addVerb resembles aesthetic
+/addVerb evokes aesthetic
+
+/addSynonym causes triggers
+/addSynonym causes provokes
+/addSynonym resembles mirrors
+
+/listVerbs
+
+# ----------------------------------------------------------------------------
+# PHYSICS LOBE: node_3..node_7
+# ----------------------------------------------------------------------------
+/lobeGrow physics {"pattern":"force causes acceleration of mass","action_packet":"explain^3 | reason^2 | ponder^1","data":{"domain":"mechanics","system_prompt":"Newtonian mechanics expert. Explain force-mass-acceleration relations with clear causal framing.","required_relations":["causes"],"relation_weights":{"causes":1.5}},"drop_table":[]}
+/lobeGrow physics {"pattern":"energy transforms between kinetic and potential","action_packet":"explain^3 | describe^2","data":{"domain":"mechanics","system_prompt":"Energy conservation specialist. Describe transformations between kinetic and potential forms.","required_relations":["transforms"]},"drop_table":[]}
+/lobeGrow physics {"pattern":"wave frequency determines pitch perception","action_packet":"analyze^2 | explain^2 | describe^3","data":{"domain":"waves","system_prompt":"Acoustics bridge node. Connect wave physics to musical pitch perception.","required_relations":["determines"],"bridges":"music"},"drop_table":[]}
+/lobeGrow physics {"pattern":"friction dissipates kinetic energy into heat","action_packet":"explain^2 | warn^1 | describe^2","data":{"domain":"thermodynamics","system_prompt":"Thermodynamics tutor. Explain energy dissipation and heat generation from friction.","required_relations":["dissipates"]},"drop_table":[]}
+/lobeGrow physics {"pattern":"gravity attracts massive bodies toward each other","action_packet":"explain^3 | ponder^2","data":{"domain":"gravitation","system_prompt":"Gravitational dynamics guide. Explain mutual attraction of massive bodies.","required_relations":["attracts"]},"drop_table":[]}
+
+# ----------------------------------------------------------------------------
+# COOKING LOBE: node_8..node_12
+# ----------------------------------------------------------------------------
+/lobeGrow cooking {"pattern":"heat transforms raw ingredients into cooked food","action_packet":"describe^3 | explain^2 | warn^1","data":{"domain":"technique","system_prompt":"Cooking science coach. Describe how heat drives ingredient transformation.","required_relations":["transforms"]},"drop_table":[]}
+/lobeGrow cooking {"pattern":"salt enhances flavor when applied in moderation","action_packet":"acknowledge^3 | describe^2","data":{"domain":"seasoning","system_prompt":"Seasoning advisor. Acknowledge salt's role while cautioning against overuse."},"drop_table":[]}
+/lobeGrow cooking {"pattern":"acid balances richness in heavy dishes","action_packet":"explain^3 | describe^2","data":{"domain":"balance","system_prompt":"Flavor-balance chef. Explain how acidity cuts through fat and richness."},"drop_table":[]}
+/lobeGrow cooking {"pattern":"fermentation produces flavor through microbial action","action_packet":"explain^2 | describe^2 | warn^1","data":{"domain":"chemistry","system_prompt":"Fermentation microbiologist. Explain microbial flavor production and contamination risks.","required_relations":["produces"]},"drop_table":[]}
+/lobeGrow cooking {"pattern":"fresh ingredients yield better final dishes","action_packet":"acknowledge^3 | reassure^2","data":{"domain":"sourcing","system_prompt":"Ingredient-quality advocate. Acknowledge freshness as a prerequisite for good outcomes.","bridges":"ethics"},"drop_table":[]}
+
+# ----------------------------------------------------------------------------
+# MUSIC LOBE: node_13..node_17
+# ----------------------------------------------------------------------------
+/lobeGrow music {"pattern":"melody carries emotion through pitch motion","action_packet":"describe^3 | analyze^2","data":{"domain":"melody","system_prompt":"Melody analyst. Describe how pitch motion conveys emotional content.","required_relations":["carries"]},"drop_table":[]}
+/lobeGrow music {"pattern":"harmony stacks intervals to produce chords","action_packet":"explain^2 | analyze^3","data":{"domain":"harmony","system_prompt":"Harmony theorist. Explain interval stacking and chord construction.","required_relations":["produces"]},"drop_table":[]}
+/lobeGrow music {"pattern":"rhythm organizes time into pulse patterns","action_packet":"describe^3 | explain^2","data":{"domain":"rhythm","system_prompt":"Rhythm instructor. Describe how pulse and meter organize musical time.","required_relations":["organizes"]},"drop_table":[]}
+/lobeGrow music {"pattern":"timbre distinguishes instruments with identical pitch","action_packet":"explain^3 | analyze^2","data":{"domain":"timbre","system_prompt":"Timbre specialist. Explain spectral signatures that separate instruments at the same pitch.","required_relations":["distinguishes"]},"drop_table":[]}
+/lobeGrow music {"pattern":"dissonance creates tension that resolution releases","action_packet":"analyze^3 | describe^2","data":{"domain":"tension","system_prompt":"Voice-leading analyst. Analyze dissonance-resolution cycles and their emotional payoff.","required_relations":["creates"]},"drop_table":[]}
+
+# ----------------------------------------------------------------------------
+# ETHICS LOBE: node_18..node_22
+# ----------------------------------------------------------------------------
+/lobeGrow ethics {"pattern":"fairness requires treating equal cases equally","action_packet":"reason^3 | acknowledge^2 | ponder^2","data":{"domain":"justice","system_prompt":"Impartial ethics reasoner. Apply formal equality to similar cases.","required_relations":["requires"]},"drop_table":[]}
+/lobeGrow ethics {"pattern":"consent grounds legitimate interpersonal action","action_packet":"reason^3 | acknowledge^2","data":{"domain":"autonomy","system_prompt":"Autonomy advocate. Reason from consent as the foundation of legitimate interaction.","required_relations":["grounds"]},"drop_table":[]}
+/lobeGrow ethics {"pattern":"harm to others triggers moral scrutiny","action_packet":"warn^3 | reason^2 | flag^1","data":{"domain":"harm","system_prompt":"Harm-avoidance ethicist. Flag and scrutinize actions that produce harm to others.","required_relations":["triggers"]},"drop_table":[]}
+/lobeGrow ethics {"pattern":"honesty builds long term trust between people","action_packet":"acknowledge^3 | reassure^2","data":{"domain":"virtue","system_prompt":"Virtue-ethics voice. Acknowledge honesty's compounding role in long-term trust.","required_relations":["builds"]},"drop_table":[]}
+/lobeGrow ethics {"pattern":"responsibility follows from capacity to choose","action_packet":"reason^3 | ponder^2","data":{"domain":"agency","system_prompt":"Agency philosopher. Reason from chosen action to attributable responsibility.","required_relations":["follows"]},"drop_table":[]}
+
+# ----------------------------------------------------------------------------
+# RELATIONAL FIRE ATTACHMENTS
+# Bolt two co-activation siblings per anchor node. Confidence is JIT-baked
+# at attach time from the pattern's lexical overlap with the anchor's
+# pattern. No more than 4 attachments per target allowed.
+# ----------------------------------------------------------------------------
+/nodeAttach node_3 node_4 "force and acceleration" node_5 "mass and energy"
+/nodeAttach node_5 node_6 "wave and frequency pitch" node_7 "friction heat"
+/nodeAttach node_8 node_9 "salt and flavor" node_10 "acid balance"
+/nodeAttach node_13 node_14 "melody and harmony" node_15 "harmony chords"
+/nodeAttach node_18 node_19 "fairness and consent" node_20 "harm scrutiny"
+
+# ----------------------------------------------------------------------------
+# AIML EXECUTIVE TRIBES
+# One small cadre per lobe. Action packets must still use valid COMMANDS
+# verbs; AIML votes flow through the same cast_votes path as regular nodes.
+# ----------------------------------------------------------------------------
+/aimlAdd physics phys_exec_explain explain^3 | reason^2
+/aimlAdd physics phys_exec_analyze analyze^3 | describe^2
+/aimlAdd physics phys_exec_warn warn^2 | caution^1
+
+/aimlAdd cooking cook_exec_advise acknowledge^3 | describe^2
+/aimlAdd cooking cook_exec_warn warn^2 | flag^1
+/aimlAdd cooking cook_exec_explain explain^2 | describe^2
+
+/aimlAdd music mus_exec_analyze analyze^3 | explain^2
+/aimlAdd music mus_exec_describe describe^3 | elaborate^1
+/aimlAdd music mus_exec_define define^2 | describe^2
+
+/aimlAdd ethics eth_exec_reason reason^3 | ponder^2
+/aimlAdd ethics eth_exec_acknowledge acknowledge^3 | reassure^2
+/aimlAdd ethics eth_exec_warn warn^3 | reason^1
+
+# ----------------------------------------------------------------------------
+# STOCHASTIC ORCHESTRATION RULES
+# Magic word tags get substituted by the vote orchestrator when a rule
+# fires (coinflip against fire_probability).
+# ----------------------------------------------------------------------------
+/addRule On mission {MISSION} with primary action {PRIMARY_ACTION} at confidence {CONFIDENCE}, focus on the winning frame. [prob=1.0]
+/addRule When confidence {CONFIDENCE} is low, suggest alternatives from {UNSURE_ACTIONS} rather than forcing a choice. [prob=0.7]
+/addRule If {VOTE_CERTAINTY} shows a tie, name the tied alternatives {TIED_ALTERNATIVES} and ask the user to disambiguate. [prob=0.9]
+/addRule Surface the winning node {NODE_ID} from lobe {LOBE_CONTEXT} so provenance is clear. [prob=0.85]
+/addRule If pinned memory {MEMORY} is relevant, cite it before proposing an action from {ALL_ACTIONS}. [prob=0.6]
+/addRule When {PRIMARY_ACTION} involves warn or harm scrutiny, include a concrete safeguard. [prob=1.0]
+/addRule For ambiguous missions, list {SURE_ACTIONS} first then {UNSURE_ACTIONS} as fallbacks. [prob=0.5]
+/addRule When {CONFIDENCE} exceeds high threshold, commit to one recommendation instead of hedging. [prob=0.4]
+
+/negativeThesaurus add maybe --reason hedging noise
+/negativeThesaurus add probably --reason hedging noise
+/negativeThesaurus add somewhat --reason weak qualifier
+
+/pin Always cite the winning node id and lobe when giving a recommendation.
+/pin Prefer concrete examples over abstract generalities for the first response.
+/pin When answers involve harm or fairness, include at least one mitigating consideration.
+
+/status
+/lobes
+/nodes
+/aimlStatus
+/negativeThesaurus list
+/attachments
+
+/saveSpecimen grugbot420_comprehensive.specimen.gz
+
+/quit

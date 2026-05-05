@@ -18,8 +18,16 @@ KernelAbstractions = "0.9"
 SHA = "0.7.0"
 julia = "1.9"
 
+# GRUG 7.12: Test-only deps. Statistics is a stdlib used by
+# test_relational_jitter.jl and test_aiml_jitter.jl for mean/std assertions on
+# jitter distributions. Must be listed here (not in [deps]) so Pkg.test()
+# temp-env can find it but the runtime package stays lean. NO SILENT FAILURE:
+# before this, Pkg.test() would fail loudly with "Package Statistics not
+# found in current path" for those two files, even though direct
+# `julia --project=. test/x.jl` worked.
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [targets]
-test = ["Test"]
+test = ["Test", "Statistics"]

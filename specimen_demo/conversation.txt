@@ -1,0 +1,45 @@
+# ============================================================================
+# GRUG COMPREHENSIVE SPECIMEN CONVERSATION SCRIPT
+# ============================================================================
+# Runs after the specimen is built/loaded. Mixes /mission (standard jitter,
+# ratio=0.03) and /brainstorm (heavy scoped jitter, ratio=0.08, coin=0.05)
+# prompts across all four subject lobes so we can compare snap-back vs
+# far-jump behavior on parallel questions. Baseline /status is captured
+# once right after load; final /status + /aimlStatus at the end.
+#
+# SCOPE NOTE:
+#   The engine's Fresh Memory rolls the last 5 system messages into every
+#   /mission's generated payload verbatim, and each payload is itself
+#   stored as a system message. That creates an O(N^2) context bloat
+#   across many missions — 20+ missions can balloon the raw stdout past
+#   1 GB and OOM on smaller sandboxes. We therefore keep the conversation
+#   to 8 missions across 4 subjects (two per subject, one /mission and one
+#   /brainstorm each). This is still enough to compare snap-back vs
+#   far-jump behavior per lobe while keeping the raw log well under
+#   100 MB uncompressed.
+# ============================================================================
+
+/loadSpecimen grugbot420_comprehensive.specimen.gz
+
+/status
+
+# -------- PHYSICS: snap-back then far-jump --------
+/mission explain how force relates to acceleration and mass
+/brainstorm explain how force relates to acceleration and mass
+
+# -------- COOKING: snap-back then far-jump --------
+/mission explain how acid balances richness in a heavy dish
+/brainstorm explain how acid balances richness in a heavy dish
+
+# -------- MUSIC: snap-back then far-jump --------
+/mission describe how melody and harmony work together
+/brainstorm describe how melody and harmony work together
+
+# -------- ETHICS: snap-back then far-jump --------
+/mission reason about fairness when cases look similar but feel different
+/brainstorm reason about fairness when cases look similar but feel different
+
+/status
+/aimlStatus
+
+/quit

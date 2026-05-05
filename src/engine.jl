@@ -1732,10 +1732,10 @@ function collect_drop_table_neighbors(node::Node)::Vector{String}
     if isdefined(@__MODULE__, :LobeTable)
         # GRUG: Ask reverse index which lobe owns this node, then fetch drop chunk.
         if isdefined(@__MODULE__, :Lobe)
-            owning_lobe = Main.Lobe.find_lobe_for_node(node.id)
-            if !isnothing(owning_lobe) && Main.LobeTable.table_exists(owning_lobe)
+            owning_lobe = Lobe.find_lobe_for_node(node.id)
+            if !isnothing(owning_lobe) && LobeTable.table_exists(owning_lobe)
                 lobe_drop_ids = try
-                    Main.LobeTable.get_drop_neighbors(owning_lobe, node.id)
+                    LobeTable.get_drop_neighbors(owning_lobe, node.id)
                 catch e
                     # GRUG: Non-fatal. Fall back to vector if chunk lookup fails.
                     @warn "[Engine] collect_drop_table_neighbors: lobe table lookup failed for node '$(node.id)': $e"
@@ -2156,14 +2156,14 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
             # GRUG: Collect lobes that own the primary firing nodes
             primary_lobe_names = Set{String}()
             for (id, conf, _, _, _) in primary_results
-                lobe_name = Main.Lobe.find_lobe_for_node(id)
+                lobe_name = Lobe.find_lobe_for_node(id)
                 !isnothing(lobe_name) && push!(primary_lobe_names, lobe_name)
             end
 
             # GRUG: For each OTHER lobe not in primary set, cascade into it
             if !isempty(primary_lobe_names)
                 all_lobe_names = try
-                    Main.Lobe.get_lobe_ids()
+                    Lobe.get_lobe_ids()
                 catch ex
                     # GRUG: Lobe registry blew up — log it, don't kill the scan!
                     @warn "[ENGINE] ⚠ Failed to get lobe IDs for cascade: $ex"
@@ -2175,8 +2175,8 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
 
                     # GRUG: Get active node IDs from this lobe via LobeTable
                     lobe_node_ids = try
-                        Main.LobeTable.table_exists(lobe_name) ?
-                            Main.LobeTable.get_active_node_ids(lobe_name) : String[]
+                        LobeTable.table_exists(lobe_name) ?
+                            LobeTable.get_active_node_ids(lobe_name) : String[]
                     catch ex
                         # GRUG: One lobe table exploded — warn and skip, don't nuke cascade!
                         @warn "[ENGINE] ⚠ Failed to get node IDs from lobe '$lobe_name': $ex"
@@ -2648,7 +2648,7 @@ function count_alive_nodes_in_lobe(lobe_id::String)::Int
     if !isdefined(@__MODULE__, :Lobe)
         return 0
     end
-    lobe_rec = Main.Lobe.get_lobe(lobe_id)
+    lobe_rec = Lobe.get_lobe(lobe_id)
     if isnothing(lobe_rec)
         return 0
     end
