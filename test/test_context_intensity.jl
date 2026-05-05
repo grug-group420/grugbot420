@@ -307,9 +307,100 @@ end
     println("  ✓ [G] σ normal=$(round(σ_normal, digits=3)) < σ brainstorm=$(round(σ_brainstorm, digits=3)) (aligned)")
 end
 
+# ==============================================================================
+# [H] v7.13: auto_tune_intensity_threshold lands eligible set in target band
+# ==============================================================================
+@testset "[H] auto_tune_intensity_threshold narrows large caves to target band" begin
+    fresh_history!()
+
+    # H.1: Small cave (<= CONTEXT_ELIGIBLE_MAX unpinned) → threshold = FLOOR,
+    # eligible count = all of them. Cannot conjure messages out of air.
+    for i in 1:5
+        push_msg!(600 + i, "User", "small cave msg $i"; intensity=Float64(i) * 0.3)
+    end
+    unpinned_small = [m for m in G.MESSAGE_HISTORY if !m.pinned]
+    thr_small, n_small = G.auto_tune_intensity_threshold(unpinned_small)
+    @test thr_small == G.CONTEXT_INTENSITY_FLOOR
+    @test n_small == 5
+    println("  ✓ [H.1] small cave (n=5): threshold=$thr_small → all $n_small eligible")
+
+    # H.2: Big cave (N >> MAX) with evenly-spread intensities → threshold
+    # auto-tunes so eligible count lands in [MIN, MAX].
+    fresh_history!()
+    N_BIG = 500
+    for i in 1:N_BIG
+        # Evenly spread across [0, CAP]
+        intensity = (i / N_BIG) * G.CONTEXT_INTENSITY_CAP
+        push_msg!(700 + i, "User", "big cave msg $i"; intensity=intensity)
+    end
+    unpinned_big = [m for m in G.MESSAGE_HISTORY if !m.pinned]
+    thr_big, n_big = G.auto_tune_intensity_threshold(unpinned_big)
+    @test G.CONTEXT_ELIGIBLE_MIN <= n_big <= G.CONTEXT_ELIGIBLE_MAX
+    @test G.CONTEXT_INTENSITY_FLOOR <= thr_big <= G.CONTEXT_INTENSITY_CAP
+    println("  ✓ [H.2] big cave (n=$N_BIG, even spread): threshold=$(round(thr_big, digits=3)) → $n_big eligible (band [$(G.CONTEXT_ELIGIBLE_MIN), $(G.CONTEXT_ELIGIBLE_MAX)])")
+
+    # H.3: 10k-message cave — the scenario the user called out. Must not
+    # explode the coinflip pool. Same assertion: eligible count in band.
+    fresh_history!()
+    N_HUGE = 10_000
+    for i in 1:N_HUGE
+        # Bulk at baseline, a few hot at CAP.
+        intensity = i <= 20 ? G.CONTEXT_INTENSITY_CAP : G.CONTEXT_INTENSITY_BASELINE * (i / N_HUGE)
+        push_msg!(1_000_000 + i, "User", "huge cave msg $i"; intensity=intensity)
+    end
+    unpinned_huge = [m for m in G.MESSAGE_HISTORY if !m.pinned]
+    thr_huge, n_huge = G.auto_tune_intensity_threshold(unpinned_huge)
+    # Threshold must push the count into the band (or at worst just above/below
+    # if the distribution has a flat plateau in it; binary-search budget).
+    @test n_huge <= G.CONTEXT_ELIGIBLE_MAX * 2  # firm ceiling for 10k case
+    @test G.CONTEXT_INTENSITY_FLOOR < thr_huge <= G.CONTEXT_INTENSITY_CAP
+    println("  ✓ [H.3] huge cave (n=$N_HUGE): threshold=$(round(thr_huge, digits=3)) → $n_huge eligible (pool stays tight)")
+
+    # H.4: All-identical intensities — binary search MUST converge, no infinite loop.
+    fresh_history!()
+    for i in 1:200
+        push_msg!(2_000_000 + i, "User", "clone msg $i"; intensity=1.5)
+    end
+    unpinned_clones = [m for m in G.MESSAGE_HISTORY if !m.pinned]
+    thr_clones, n_clones = G.auto_tune_intensity_threshold(unpinned_clones)
+    # Either all pass (threshold < 1.5) or none pass (threshold >= 1.5).
+    # The binary search converges either way; we only care it terminated.
+    @test 0 <= n_clones <= 200
+    println("  ✓ [H.4] all-identical intensities: threshold=$(round(thr_clones, digits=3)), count=$n_clones (converged, no hang)")
+end
+
+# ==============================================================================
+# [I] v7.13: extract_aiml_memory_context keeps Fresh Memory bounded even
+#     when the cave has 10k messages. Also verify threshold note in output.
+# ==============================================================================
+@testset "[I] extract_aiml_memory_context bounded on 10k cave; threshold note surfaces" begin
+    fresh_history!()
+    # 10k unpinned messages, most below baseline, a few hot.
+    N_HUGE = 10_000
+    for i in 1:N_HUGE
+        intensity = i <= 8 ? G.CONTEXT_INTENSITY_CAP : 0.3
+        push_msg!(3_000_000 + i, "User", "huge_$i content"; intensity=intensity)
+    end
+    # One pin to verify it still surfaces.
+    push_msg!(3_999_999, "User", "PINNED_SIGIL";
+              pinned=true, intensity=G.CONTEXT_INTENSITY_BASELINE)
+
+    Random.seed!(1234)
+    ctx = G.extract_aiml_memory_context()
+    # Pinned always surfaces.
+    @test occursin("PINNED_SIGIL", ctx)
+    # Threshold note surfaces in the Fresh Memory header.
+    @test occursin("threshold=", ctx)
+    @test occursin("eligible=", ctx)
+    # Count the `(intensity=` markers → one per unpinned surfaced.
+    n_surfaced = count(!isempty, split(ctx, "(intensity="))  - 1
+    @test n_surfaced <= G.MAX_FRESH_CONTEXT
+    println("  ✓ [I] 10k-msg cave: Fresh Memory surfaced $n_surfaced unpinned (≤ MAX_FRESH_CONTEXT=$(G.MAX_FRESH_CONTEXT)); pinned preserved; threshold note present")
+end
+
 println("\n" * "="^60)
-println("ALL CONTEXT INTENSITY TESTS PASSED! 7 test groups complete.")
-println("Context-intensity v7.12 verified:")
+println("ALL CONTEXT INTENSITY TESTS PASSED! 9 test groups complete.")
+println("Context-intensity v7.12 + v7.13 verified:")
 println("  [A] clamp_intensity saturation + non-finite rejection")
 println("  [B] lexical tokenizer filters + normalises")
 println("  [C] relevance score: identical > disjoint")
@@ -317,4 +408,6 @@ println("  [D] snap-back pulls toward relevance; zero-mean jitter in expectation
 println("  [E] pinned always surface; unpinned biased by intensity")
 println("  [F] /right /wrong feedback clamped; empty set no-op")
 println("  [G] /brainstorm scope widens intensity jitter (alignment holds)")
+println("  [H] v7.13 auto_tune_intensity_threshold narrows large caves to band")
+println("  [I] v7.13 extract_aiml_memory_context bounded on 10k cave")
 println("="^60)

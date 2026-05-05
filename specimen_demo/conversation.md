@@ -40,39 +40,55 @@ GRUGBOT SYSTEM STATUS
 ## Cycle-by-cycle mission responses
 Each cycle records the prompt, the orchestrator's primary action pick, the vote certainty, the winning node and its owning lobe, and the system_prompt the JIT AIML pulled from the node's json_data. Cycles that produced no AIML scaffold (i.e. no pattern match survived the gate) are still listed so the transcript covers every prompt from the script.
 
-### Cycle 1 — `/mission` · confidence 0.55
+### Cycle 1 — `/mission` · confidence 0.49
 **Prompt:** explain how force relates to acceleration and mass
 
 | Field | Value |
 |---|---|
-| Primary action | `explain` |
-| Sure actions | `[explain, describe, analyze]` |
-| Unsure (side-features) | `[describe, warn]` |
-| Vote certainty | UNSURE |
-| Winning node | `node_14` |
-| Lobe context | [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)] |
+| Primary action | `describe` |
+| Sure actions | `[describe]` |
+| Unsure (side-features) | `[None]` |
+| Vote certainty | SURE |
+| Winning node | `node_8` |
+| Lobe context | [cooking (0/5 active)] |
 | Anti-match detected | false |
 | User relational triples | None |
 | Node relational triples | None |
-| Winning node's system prompt | _Harmony theorist. Explain interval stacking and chord construction._ |
+| Winning node's system prompt | _Cooking science coach. Describe how heat drives ingredient transformation._ |
 
 ### Cycle 2 — `/brainstorm` · confidence 0.55
 **Prompt:** explain how force relates to acceleration and mass
 
 | Field | Value |
 |---|---|
-| Primary action | `analyze` |
-| Sure actions | `[analyze]` |
+| Primary action | `explain` |
+| Sure actions | `[explain, greet]` |
 | Unsure (side-features) | `[None]` |
-| Vote certainty | SURE |
-| Winning node | `node_14` |
-| Lobe context | [music (0/5 active)] | [physics (0/5 active)] |
+| Vote certainty | UNSURE |
+| Winning node | `node_16` |
+| Lobe context | [cooking (0/5 active)] | [ethics (0/5 active)] | [music (0/5 active)] |
 | Anti-match detected | false |
 | User relational triples | None |
 | Node relational triples | None |
-| Winning node's system prompt | _Harmony theorist. Explain interval stacking and chord construction._ |
+| Winning node's system prompt | _Timbre specialist. Explain spectral signatures that separate instruments at the same pitch._ |
 
-### Cycle 3 — `/mission` · confidence 0.68
+### Cycle 3 — `/mission` · confidence 0.33
+**Prompt:** explain how acid balances richness in a heavy dish
+
+| Field | Value |
+|---|---|
+| Primary action | `welcome` |
+| Sure actions | `[welcome]` |
+| Unsure (side-features) | `[None]` |
+| Vote certainty | SURE |
+| Winning node | `node_0` |
+| Lobe context | [Unassigned nodes - no lobe context] |
+| Anti-match detected | false |
+| User relational triples | None |
+| Node relational triples | None |
+| Winning node's system prompt | _Highly polite greeting protocols active._ |
+
+### Cycle 4 — `/brainstorm` · confidence 0.68
 **Prompt:** explain how acid balances richness in a heavy dish
 
 | Field | Value |
@@ -88,29 +104,13 @@ Each cycle records the prompt, the orchestrator's primary action pick, the vote 
 | Node relational triples | None |
 | Winning node's system prompt | _Flavor-balance chef. Explain how acidity cuts through fat and richness._ |
 
-### Cycle 4 — `/brainstorm` · confidence 0.68
-**Prompt:** explain how acid balances richness in a heavy dish
-
-| Field | Value |
-|---|---|
-| Primary action | `explain` |
-| Sure actions | `[explain]` |
-| Unsure (side-features) | `[explain]` |
-| Vote certainty | SURE |
-| Winning node | `node_10` |
-| Lobe context | [cooking (0/5 active)] | [physics (0/5 active)] |
-| Anti-match detected | false |
-| User relational triples | None |
-| Node relational triples | None |
-| Winning node's system prompt | _Flavor-balance chef. Explain how acidity cuts through fat and richness._ |
-
 ### Cycle 5 — `/mission` · confidence 0.61
 **Prompt:** describe how melody and harmony work together
 
 | Field | Value |
 |---|---|
-| Primary action | `describe` |
-| Sure actions | `[describe]` |
+| Primary action | `explain` |
+| Sure actions | `[explain]` |
 | Unsure (side-features) | `[reason]` |
 | Vote certainty | SURE |
 | Winning node | `node_8` |
@@ -120,8 +120,24 @@ Each cycle records the prompt, the orchestrator's primary action pick, the vote 
 | Node relational triples | None |
 | Winning node's system prompt | _Cooking science coach. Describe how heat drives ingredient transformation._ |
 
-### Cycle 6 — `/brainstorm` · confidence 0.6
+### Cycle 6 — `/brainstorm` · confidence 0.4
 **Prompt:** describe how melody and harmony work together
+
+| Field | Value |
+|---|---|
+| Primary action | `welcome` |
+| Sure actions | `[welcome]` |
+| Unsure (side-features) | `[None]` |
+| Vote certainty | SURE |
+| Winning node | `node_0` |
+| Lobe context | [ethics (0/5 active)] | [music (0/5 active)] |
+| Anti-match detected | false |
+| User relational triples | None |
+| Node relational triples | None |
+| Winning node's system prompt | _Highly polite greeting protocols active._ |
+
+### Cycle 7 — `/mission` · confidence 0.55
+**Prompt:** reason about fairness when cases look similar but feel different
 
 | Field | Value |
 |---|---|
@@ -129,16 +145,28 @@ Each cycle records the prompt, the orchestrator's primary action pick, the vote 
 | Sure actions | `[describe]` |
 | Unsure (side-features) | `[None]` |
 | Vote certainty | SURE |
-| Winning node | `node_8` |
-| Lobe context | [music (0/5 active)] | [physics (0/5 active)] |
+| Winning node | `node_10` |
+| Lobe context | [cooking (0/5 active)] |
 | Anti-match detected | false |
 | User relational triples | None |
 | Node relational triples | None |
-| Winning node's system prompt | _Harmony theorist. Explain interval stacking and chord construction._ |
+| Winning node's system prompt | _Flavor-balance chef. Explain how acidity cuts through fat and richness._ |
 
-## Silent cycles (no AIML scaffold emitted)
-The engine reported `No valid specimens found for this input` 2 time(s). These are prompts whose pattern scan did not produce any gated votes; this is expected when a query's vocabulary falls outside the seeded lobe patterns.
+### Cycle 8 — `/brainstorm` · confidence 0.54
+**Prompt:** reason about fairness when cases look similar but feel different
 
+| Field | Value |
+|---|---|
+| Primary action | `explain` |
+| Sure actions | `[explain, describe]` |
+| Unsure (side-features) | `[welcome]` |
+| Vote certainty | UNSURE |
+| Winning node | `node_10` |
+| Lobe context | [cooking (0/5 active)] | [music (0/5 active)] |
+| Anti-match detected | false |
+| User relational triples | None |
+| Node relational triples | None |
+| Winning node's system prompt | _Flavor-balance chef. Explain how acidity cuts through fat and richness._ |
 
 ## Final diagnostics — GRUGBOT SYSTEM STATUS
 ```text
@@ -147,8 +175,8 @@ GRUGBOT SYSTEM STATUS
   ENGINE                                          
   Nodes in cave   : 23
   Hopfield cache  : 0 entries
-  Memory messages : 24
-  Est. memory use : ~34 KB
+  Memory messages : 26
+  Est. memory use : ~35 KB
   Trajectory buf  : 16 entries
   Temporal coher  : 0 entries
   Morph cooldowns : 0 active
@@ -188,7 +216,7 @@ GRUGBOT SYSTEM STATUS
 
 ## Transcript summary
 - Scripted /mission and /brainstorm commands: **8**
-- AIML scaffolds emitted: **6**
-- Silent cycles: **2**
-- Raw log size (on disk): **81,425 bytes**
-- Raw log size (read into formatter): **78,823 bytes** (truncated: O(N²) mission-memory recursion balloons the file; we keep the informative head+tail slices for parsing)
+- AIML scaffolds emitted: **8**
+- Silent cycles: **0**
+- Raw log size (on disk): **67,787 bytes**
+- Raw log size (read into formatter): **61,473 bytes** (truncated: O(N²) mission-memory recursion balloons the file; we keep the informative head+tail slices for parsing)

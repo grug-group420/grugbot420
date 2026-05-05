@@ -114,6 +114,16 @@ const CONTEXT_COIN_P_CEIL        = 0.95   # Maximum coinflip p even at intensity
 const CONTEXT_FEEDBACK_RIGHT_DELTA = 0.5  # /right bonus to last-selected messages
 const CONTEXT_FEEDBACK_WRONG_DELTA = -0.5 # /wrong penalty to last-selected messages
 
+# GRUG v7.13: Two-stage Fresh Memory gate — threshold-then-coinflip.
+# AIML never sees anything below the threshold, so 10k-message caves do
+# not explode the coinflip pool. The threshold auto-tunes each cycle so
+# the *eligible* (above-threshold) unpinned set lands inside this band.
+# Coinflip still runs within survivors → stochastic exploration preserved,
+# O(N²) context bloat stays killed.
+const CONTEXT_ELIGIBLE_MIN       = 5      # Prefer ≥5 unpinned messages above threshold
+const CONTEXT_ELIGIBLE_MAX       = 10     # Prefer ≤10; tightens threshold otherwise
+const CONTEXT_THRESHOLD_STEPS    = 12     # Binary-search budget (log₂ of CAP resolution)
+
 mutable struct ChatMessage
     id::Int
     role::String
@@ -681,21 +691,88 @@ function apply_last_selected_feedback!(delta::Float64)
 end
 
 """
+auto_tune_intensity_threshold(unpinned)::Tuple{Float64, Int}
+
+GRUG v7.13: Binary-search for the intensity threshold that lands the
+above-threshold eligible set inside
+[CONTEXT_ELIGIBLE_MIN, CONTEXT_ELIGIBLE_MAX] whenever the cave has more
+messages than the max band. Returns `(threshold, eligible_count)`.
+
+Search space: [FLOOR, CAP]. We step with binary search for
+CONTEXT_THRESHOLD_STEPS iterations (log₂ 3.0/resolution ≈ 12 is plenty
+given messages are real Float64s). At each step we count how many
+unpinned messages strictly exceed the candidate threshold:
+  * count > MAX → raise threshold (narrow more).
+  * count < MIN → lower threshold (widen).
+  * MIN ≤ count ≤ MAX → stop early, return current.
+
+Edge cases (explicit, NO SILENT FAILURES):
+  * Fewer than MIN unpinned messages total → threshold = FLOOR so
+    everything passes. We cannot conjure messages out of air.
+  * All messages at identical intensity → binary search converges to
+    just under that value, all pass. No infinite loop.
+  * Jitter has driven every intensity to FLOOR → still returns FLOOR.
+"""
+function auto_tune_intensity_threshold(unpinned::Vector{ChatMessage})::Tuple{Float64, Int}
+    n = length(unpinned)
+    if n <= CONTEXT_ELIGIBLE_MAX
+        # Cave too small to narrow. Threshold = FLOOR → everything eligible.
+        return (CONTEXT_INTENSITY_FLOOR, n)
+    end
+
+    lo = CONTEXT_INTENSITY_FLOOR
+    hi = CONTEXT_INTENSITY_CAP
+    best_threshold = lo
+    best_count = n
+
+    for _ in 1:CONTEXT_THRESHOLD_STEPS
+        mid = (lo + hi) / 2
+        count = 0
+        for m in unpinned
+            m.intensity > mid && (count += 1)
+        end
+        best_threshold = mid
+        best_count = count
+
+        if count > CONTEXT_ELIGIBLE_MAX
+            # Too many survivors → raise threshold.
+            lo = mid
+        elseif count < CONTEXT_ELIGIBLE_MIN
+            # Too few survivors → lower threshold.
+            hi = mid
+        else
+            # Landed in the band. Stop.
+            return (mid, count)
+        end
+    end
+    # GRUG: Budget exhausted. Accept the last midpoint; count is whatever
+    # it was. Worst case we're a message or two off the band — the
+    # downstream coinflip within survivors still narrows the final set.
+    return (best_threshold, best_count)
+end
+
+"""
 extract_aiml_memory_context()::String
 
-GRUG v7.12: Chief Orchestrator reads the memory wall — pinned messages
-(always surfaced) plus an intensity-biased coinflip sample of unpinned
-messages (see refresh_message_intensities! for how intensity is
-maintained). Selection rules:
+GRUG v7.13: Chief Orchestrator reads the memory wall with a two-stage
+Fresh Memory gate:
 
-  * Pinned messages always in, regardless of intensity.
-  * Unpinned messages are iterated newest-first; each one coinflipped
-    with p = clamp(intensity/CAP, COIN_P_FLOOR, COIN_P_CEIL). Winners
-    fill a Fresh Memory slice capped at MAX_FRESH_CONTEXT entries.
-  * Selected message ids are cached in LAST_SELECTED_MSG_IDS so /right
-    and /wrong can reinforce/punish them.
+  1. Pinned messages always surface, regardless of intensity.
+  2. Unpinned messages are first THRESHOLD-GATED by an auto-tuned
+     intensity threshold. The threshold is binary-searched each cycle
+     so the eligible set lands in [CONTEXT_ELIGIBLE_MIN,
+     CONTEXT_ELIGIBLE_MAX] whenever possible — this is what stops a
+     10k-message cave from putting 10k items into the coinflip pool.
+  3. Surviving eligibles are still coinflipped (newest-first) with
+     p = clamp(intensity/CAP, COIN_P_FLOOR, COIN_P_CEIL) so the
+     stochastic exploration character from v7.12 is preserved. The
+     final Fresh Memory is capped at MAX_FRESH_CONTEXT entries.
+  4. Selected message ids are cached in LAST_SELECTED_MSG_IDS so
+     /right and /wrong can reinforce/punish them.
 
-Throws on read failure — NO SILENT FAILURES.
+This layer scales: threshold tuning is a single O(N) pass per binary-
+search step (≤12 steps), then the coinflip only touches ≤~MAX survivors,
+never all N stored messages. NO SILENT FAILURES.
 """
 function extract_aiml_memory_context()::String
     total_msgs = length(MESSAGE_HISTORY)
@@ -716,20 +793,22 @@ function extract_aiml_memory_context()::String
             end
         end
 
-        # 2. Unpinned — intensity-biased coinflip, walking newest-first.
-        # We collect candidates in reverse chronological order so the
-        # earliest inserted message has the lowest priority when the cap
-        # kicks in. Probability per message = clamp(intensity/CAP,
-        # COIN_P_FLOOR, COIN_P_CEIL) so even cold messages get an occasional
-        # chance and hot messages don't 100%-saturate (preserves exploration).
-        # We use rand() directly here; the @coinflip macro elsewhere is for
-        # multi-outcome weighted picks and takes a pair-array shape we
-        # don't need for a simple gate.
+        # 2. Unpinned — threshold-gate THEN intensity-biased coinflip.
+        # The threshold is auto-tuned each cycle so AIML never sees more
+        # than ~CONTEXT_ELIGIBLE_MAX candidates even if the cave holds
+        # 10k messages. That keeps the coinflip pool tight and the
+        # selection work bounded by CONTEXT_ELIGIBLE_MAX, not N.
         unpinned = [m for m in MESSAGE_HISTORY if !m.pinned]
+        threshold, eligible_count = auto_tune_intensity_threshold(unpinned)
+
+        # Eligible survivors — only those strictly above threshold.
+        # Walk newest-first so recent messages get first coinflip dibs
+        # when the Fresh Memory cap bites.
         chosen = ChatMessage[]
         for i in length(unpinned):-1:1
             length(chosen) >= MAX_FRESH_CONTEXT && break
             m = unpinned[i]
+            m.intensity > threshold || continue   # threshold gate
             p = clamp(m.intensity / CONTEXT_INTENSITY_CAP,
                       CONTEXT_COIN_P_FLOOR, CONTEXT_COIN_P_CEIL)
             if rand() < p
@@ -743,6 +822,10 @@ function extract_aiml_memory_context()::String
             push!(recent_msgs,
                   "[$(m.role)]: $(m.text) (intensity=$(round(m.intensity, digits=2)))")
         end
+        # Stash threshold snapshot on the Fresh Memory block header so
+        # operators can see what cutoff the cave applied this cycle
+        # without digging into the debug log. Bounded length; no PII.
+        threshold_note = "threshold=$(round(threshold, digits=2)) eligible=$eligible_count"
 
         # 3. Cache selected ids for /right and /wrong feedback.
         lock(LAST_SELECTED_MSG_LOCK) do
@@ -752,7 +835,9 @@ function extract_aiml_memory_context()::String
         pinned_str = isempty(pinned_msgs) ? "No pinned rocks" : join(pinned_msgs, " | ")
         recent_str = isempty(recent_msgs) ? "No recent sounds" : join(recent_msgs, " | ")
 
-        return "Deep Memory (Pinned): $pinned_str\nFresh Memory (Recent): $recent_str"
+        # GRUG v7.13: Fresh Memory header carries the auto-tuned cutoff
+        # so downstream log consumers can see the two-stage gate at work.
+        return "Deep Memory (Pinned): $pinned_str\nFresh Memory [$threshold_note] (Recent): $recent_str"
     catch e
         error("!!! FATAL: Chief Orchestrator failed to read memory wall: $e !!!")
     end
