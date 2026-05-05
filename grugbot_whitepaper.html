@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.8</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.9</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.8</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.9</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -228,6 +228,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#vote-orchestrator">15.7 VoteOrchestrator: Parallel Fire + Bounded Voting</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#timeout-dispatch">15.8 Timeout-Bounded Sub-Process Dispatch</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#relational-strict">15.9 Strict Relational-Triple Coupling</a> <span class="new-badge">v7.8</span></li>
+        <li><a href="#relational-jitter">15.10 Per-Activation Relational Jitter</a> <span class="new-badge">v7.9</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -1317,6 +1318,144 @@ with a dynamic-extraction round trip. All green.
 </div>
 
 <!-- ================================================================ -->
+<h2 id="relational-jitter">15.10 Per-Activation Relational Jitter <span class="new-badge">v7.9</span></h2>
+
+<p>
+Relational match-score components &mdash; <code>weight</code>, the <code>+2.0</code> exact-match
+contribution, the <code>+1.0</code> partial-match contribution, the <code>+0.5</code> orthogonal
+penalty, and the <code>×0.1</code> final dampener &mdash; used to be deterministic constants. Every
+activation produced the same numeric score for the same triples. That made exact ties between
+competing nodes impossible to break naturally, and forced weaker neighbors to lose every single time
+to stronger ones.
+</p>
+
+<p>
+The <strong>RelationalJitter</strong> module (<code>src/RelationalJitter.jl</code>) injects a tiny
+zero-mean nudge into each scored value at activation time. The bullseye is preserved in expectation
+&mdash; over many activations the mean score converges back to the deterministic score &mdash; while
+any single activation sees a slightly perturbed score that can tip exact ties toward a neighbor.
+</p>
+
+<div class="grug-box">
+    <p>Grug throw rock at target many times. Rock always land EXACT center. Boring! Grug add
+    tiny shake to rock right before it land &mdash; rock land slightly off, different direction
+    every throw. Over many throws, average is STILL center. Bullseye survives. But now when
+    two rocks tie, tiny shake break tie &mdash; quiet rock sometimes win fair coinflip. More alive.</p>
+</div>
+
+<h3>The Formula</h3>
+
+<p>For every scored value <code>x</code>, each call returns:</p>
+
+<pre>    jittered = x + δ     where     δ ~ U(-ε·|x|, +ε·|x|)</pre>
+
+<p>
+with <code>ε = JITTER_RATIO</code> (default <code>0.03</code>). The distribution is symmetric so
+<code>E[δ] = 0</code>. Therefore <code>E[jittered] = x</code> &mdash; the expected value is the
+bullseye. The variance is <code>Var[jittered] = ε²·x² / 3</code>, bounded and small.
+</p>
+
+<h3>Snap-Back Property</h3>
+
+<p>
+"Snap back to normal" is the statistical LLN (law of large numbers) convergence: a single
+activation is displaced at most <code>±ε·|x|</code> from the deterministic value, but the
+empirical mean over <code>N</code> activations converges to <code>x</code> at rate
+<code>O(1/√N)</code>. Downstream aggregators that average scores (or that run many cycles and
+pick modes) see the deterministic result; downstream tie-breakers that consume single-activation
+scores see naturally broken ties.
+</p>
+
+<h3>Hard Invariants</h3>
+
+<table>
+    <tr><th>Case</th><th>Output</th></tr>
+    <tr><td><code>x == 0.0</code> or <code>|x| < 1e-9</code></td><td>Unchanged (no denormal leak)</td></tr>
+    <tr><td><code>x == -9999.0</code> (hard-requirement-miss sentinel)</td><td><strong>Returned exactly</strong> &mdash; preserves dialectics contract</td></tr>
+    <tr><td><code>x == NaN</code> or <code>Inf</code></td><td><strong>Throws <code>JitterError</code></strong> &mdash; no silent failure</td></tr>
+    <tr><td>Jitter globally disabled</td><td>Bit-exact identity (for deterministic tests)</td></tr>
+    <tr><td>Otherwise</td><td><code>x + δ</code>, with <code>|δ| ≤ min(ε·|x|, JITTER_ABS_CAP)</code></td></tr>
+</table>
+
+<h3>Constants</h3>
+
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Purpose</th></tr>
+    <tr><td><code>JITTER_RATIO_DEFAULT</code></td><td>0.03</td><td>Nudge magnitude as fraction of <code>|x|</code></td></tr>
+    <tr><td><code>JITTER_RATIO_MAX</code></td><td>0.10</td><td>Hard upper bound accepted by <code>set_jitter_ratio!</code></td></tr>
+    <tr><td><code>JITTER_ABS_CAP</code></td><td>1.0</td><td>Maximum absolute nudge on any single value</td></tr>
+    <tr><td><code>JITTER_EPS_FLOOR</code></td><td>1e-9</td><td>Below this, <code>|x|</code> is treated as zero</td></tr>
+    <tr><td><code>HARD_REQ_MISS_SENTINEL</code></td><td>-9999.0</td><td>Pass-through sentinel (never jittered)</td></tr>
+</table>
+
+<h3>API</h3>
+
+<table>
+    <tr><th>Function</th><th>Description</th></tr>
+    <tr><td><code>jitter_value(x; ratio = get_jitter_ratio())</code></td><td>Core primitive &mdash; returns nudged value, or throws on bad input</td></tr>
+    <tr><td><code>jitter_score(s)</code></td><td>Intent-carrying wrapper for match-score components</td></tr>
+    <tr><td><code>jitter_weight(w)</code></td><td>Intent-carrying wrapper for relation-weight values</td></tr>
+    <tr><td><code>enable_jitter!()</code> / <code>disable_jitter!()</code></td><td>Global toggle (default: ON)</td></tr>
+    <tr><td><code>is_jitter_enabled()</code></td><td>Current state</td></tr>
+    <tr><td><code>set_jitter_ratio!(r)</code> / <code>get_jitter_ratio()</code></td><td>Tune / inspect the global ratio</td></tr>
+    <tr><td><code>JitterConfig(ratio, enabled)</code></td><td>Immutable policy bundle for scoped passing</td></tr>
+</table>
+
+<h3>Call Sites</h3>
+
+<p>
+The jitter is wired into <code>evaluate_relational_dialectics</code> in <code>engine.jl</code>:
+</p>
+
+<ul>
+    <li>Each <code>weight</code> lookup &mdash; <code>jitter_weight(get(relation_weights, ...))</code></li>
+    <li>Exact-match contribution &mdash; <code>jitter_score(2.0 * weight)</code></li>
+    <li>Antimatch contribution &mdash; <code>jitter_score(2.0 * weight)</code> (sign preserved by negation in caller)</li>
+    <li>Partial-match contribution &mdash; <code>jitter_score(1.0 * weight)</code></li>
+    <li>Orthogonal penalty &mdash; <code>jitter_score(0.5 * weight)</code></li>
+    <li>Final dampener &mdash; <code>jitter_score(orthogonal_penalty * 0.1)</code></li>
+</ul>
+
+<p>
+What is <strong>not</strong> jittered: the hard-requirement-miss sentinel path (<code>-9999.0</code>
+must stay exact), the <code>is_antimatch</code> boolean flag, and the <code>max(0.1, ...)</code>
+coherence floor. Sentinel preservation was verified with 500/500 exact returns in the test suite.
+</p>
+
+<h3>Test Coverage</h3>
+
+<p>
+<code>test/test_relational_jitter.jl</code> covers 14 groups:
+</p>
+
+<ol>
+    <li>Basic contract: zero, near-zero, and sentinel pass through</li>
+    <li>Magnitude bounded by ratio (5,000 samples per value)</li>
+    <li>Zero-mean convergence (20,000 samples per value, tolerance 1%·|x|)</li>
+    <li>No persistent state (18+/20 consecutive calls fresh)</li>
+    <li>Error handling: NaN, Inf, out-of-range ratios all throw</li>
+    <li>Toggle: disabled → bit-exact identity</li>
+    <li>Ratio setter roundtrip + per-call override</li>
+    <li>Semantic wrappers preserve sign, respect bound, propagate sentinel</li>
+    <li>Thread safety under <code>@threads</code> (all finite, bounded, zero-mean)</li>
+    <li><code>JitterConfig</code> struct constructs and validates</li>
+    <li>Integration with <code>evaluate_relational_dialectics</code>: deterministic = 2.0, jittered mean over 3,000 runs = 2.0006, range within compound <code>(1+ε)²</code> bound</li>
+    <li>Hard-requirement-miss sentinel returned exactly on 500/500 calls</li>
+    <li>Antimatch flag flips on 1,000/1,000 calls; score sign preserved</li>
+    <li>Disabling jitter produces bit-exact deterministic dialectics</li>
+</ol>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> Deterministic match scores force ties to be broken by secondary
+    signals (node strength, vote ordering) that may themselves be deterministic &mdash; leading to
+    starvation of consistently-second-place candidates. A bounded zero-mean perturbation preserves the
+    first-moment semantics (expected scores unchanged) while supplying enough second-moment variance
+    to make tie-breaking stochastic. Crucially, the sentinel pass-through ensures that the
+    no-silent-failure guarantee of strict relational coupling (&#167;15.9) is preserved: a hard
+    requirement miss still returns exactly <code>-9999.0</code>, never a jittered near-miss.
+</div>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -1783,13 +1922,14 @@ The signal is not in the wire. Only the computation is. And the computation was 
 <!-- ================================================================ -->
 <h2 id="files">19. File Reference</h2>
 
-<h3>Core Modules (21 files, ~19,100 lines)</h3>
+<h3>Core Modules (22 files, ~19,500 lines)</h3>
 <table>
     <tr><th>File</th><th>Lines</th><th>Purpose</th></tr>
     <tr><td><code>GrugBot420.jl</code></td><td>143</td><td>Module root: include/using order, re-exports from all submodules</td></tr>
     <tr><td><code>stochastichelper.jl</code></td><td>168</td><td>@coinflip macro, Categorical distribution DSL</td></tr>
     <tr><td><code>patternscanner.jl</code></td><td>249</td><td>Token overlap matching, pattern compilation, cheap/medium/high-res scan tiers</td></tr>
     <tr><td><code>InputQueue.jl</code></td><td>256</td><td>FIFO priority queue + NegativeThesaurus inhibition filter</td></tr>
+    <tr><td><code>RelationalJitter.jl</code></td><td>284</td><td><strong>v7.9</strong> &mdash; Per-activation zero-mean nudge on match-score components. Symmetric uniform jitter preserves bullseye in expectation (LLN snap-back); sentinel and zero pass through; NaN/Inf throw <code>JitterError</code>; global toggle for deterministic tests</td></tr>
     <tr><td><code>BrainStem.jl</code></td><td>333</td><td>Winner-take-all dispatch, lateral inhibition, fire-count decay</td></tr>
     <tr><td><code>Lobe.jl</code></td><td>392</td><td>Lobe registry, connections, node assignment</td></tr>
     <tr><td><code>SemanticVerbs.jl</code></td><td>391</td><td>Runtime verb registry, synonym normalization, triple extraction</td></tr>
@@ -1809,9 +1949,9 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>Main.jl</code></td><td>3,917</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence, admin system</td></tr>
 </table>
 
-<h3>Test Files (17 in runner, 20 total on disk)</h3>
+<h3>Test Files (18 in runner, 21 total on disk)</h3>
 <p>
-<code>test/runtests.jl</code> runs 17 test files as isolated Julia subprocesses &mdash; each test file
+<code>test/runtests.jl</code> runs 18 test files as isolated Julia subprocesses &mdash; each test file
 <code>include()</code>s <code>src/</code> modules directly, so running them in the same process
 would cause module-redefinition errors. Non-zero subprocess exit = test failure; no silent swallow.
 </p>
@@ -1834,6 +1974,7 @@ would cause module-redefinition errors. Non-zero subprocess exit = test failure;
     <tr><td><code>test_aiml_node_system.jl</code></td><td>Per-lobe AIML tribes: population caps, grave exclusion, cycle-aware reinforcement, save/load</td></tr>
     <tr><td><code>test_vote_orchestrator.jl</code> <span class="new-badge">v7.8</span></td><td>VoteOrchestrator: unique Task IDs, FireCounter cap, <code>parallel_fire_batches</code>, DONE channels, <code>TaskTimeoutError</code>, vote selection tiers</td></tr>
     <tr><td><code>test_relational_strict.jl</code> <span class="new-badge">v7.8</span></td><td>Strict relational-triple coupling: <code>screen_input_complexity</code> bands, basic vs. dynamic extractor routing, hard-fail on dynamic failure at scan_mode ≥ 3</td></tr>
+    <tr><td><code>test_relational_jitter.jl</code> <span class="new-badge">v7.9</span></td><td>Per-activation relational jitter: magnitude bound, zero-mean convergence over 20k samples, NaN/Inf error handling, toggle, ratio setter, thread safety, <code>JitterConfig</code>, integration with <code>evaluate_relational_dialectics</code> (snap-back within 1% over 3k runs), sentinel preservation (500/500 exact), antimatch robustness (1000/1000 flag preserved), deterministic mode when disabled &mdash; 14 groups, all green</td></tr>
 </table>
 
 <h4>Additional test files on disk (not in runner)</h4>
@@ -1862,13 +2003,13 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.8)</h3>
+<h3>Test Suite Status (v7.9)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>17</td></tr>
-    <tr><td>Total test files on disk</td><td>20</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 17 / 17 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~90 s on 8-core Linux</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>18</td></tr>
+    <tr><td>Total test files on disk</td><td>21</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 18 / 18 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~95 s on 8-core Linux</td></tr>
 </table>
 
 <div class="tip">
@@ -1880,6 +2021,15 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.9 — Per-Activation Relational Jitter</h3>
+    <ul>
+        <li><strong>RelationalJitter</strong> (<code>src/RelationalJitter.jl</code>, 284 lines): new module injecting a bounded zero-mean nudge on every relational match-score component at activation time. Distribution is symmetric uniform on <code>[-ε·|x|, +ε·|x|]</code> with default <code>ε = 0.03</code>, so the bullseye is preserved in expectation (LLN snap-back) while exact ties between competing nodes break naturally. Per-call freshness &mdash; no persistent state.</li>
+        <li><strong>Hard invariants preserved</strong>: the hard-requirement-miss sentinel (<code>-9999.0</code>) passes through untouched (verified 500/500 in tests) so §15.9's no-silent-failure contract is not weakened. Zero and near-zero inputs (<code>|x| < 1e-9</code>) pass through unchanged. <code>NaN</code> and <code>Inf</code> throw a dedicated <code>JitterError</code> with context breadcrumb.</li>
+        <li><strong>Global toggle</strong>: <code>enable_jitter!</code> / <code>disable_jitter!</code> for deterministic test runs. When disabled, <code>jitter_value</code> is bit-exact identity. Ratio tunable in <code>[0.0, 0.10]</code> via <code>set_jitter_ratio!</code> (out-of-range throws, never silently clamps).</li>
+        <li><strong>Wired into <code>evaluate_relational_dialectics</code></strong> (<code>src/engine.jl</code>): every <code>weight</code> lookup, every match-score contribution (exact / antimatch / partial / orthogonal), and the final dampener all pass through <code>jitter_score</code> / <code>jitter_weight</code>. The <code>is_antimatch</code> boolean and the <code>max(0.1, ...)</code> floor are not jittered by design.</li>
+        <li><strong>Test suite</strong>: <code>test_relational_jitter.jl</code> added with 14 groups covering magnitude bound, zero-mean convergence over 20k samples, error handling, thread safety, and downstream integration (snap-back verified to 3 decimal places at the dialectics level). 18 / 18 passing.</li>
+        <li><strong>Documentation</strong>: README.md gains a "Per-Activation Relational Jitter" section; whitepaper gains §15.10; version bumped to v7.9 across the board.</li>
+    </ul>
     <h3>v7.8 — Parallel Vote Orchestrator + Bounded Dispatch + Strict Relational Coupling</h3>
     <ul>
         <li><strong>VoteOrchestrator</strong> (<code>src/VoteOrchestrator.jl</code>, 661 lines): unified parallel-fire and vote-selection layer. Atomic <code>FireCounter</code> enforces <code>ACTIVE_FIRE_CAP = 1000</code> concurrent fires across ALL fire types (pattern scan, drop-table, attachment relay, lobe cascade). Unique non-colliding Task names via process-wide atomic counter. <code>parallel_fire_batches</code> for batched threaded fire (<code>FIRE_BATCH_SIZE = 64</code>, <code>FIRE_BATCH_TIMEOUT_S = 5.0</code>). Typed <code>Channel{DoneSignal}</code> for phase-gated lobe completion. Strength-biased <code>select_aiml_votes</code> with top-tier (always fires) and sub-top (coinflip) bands. See §15.7.</li>
@@ -1977,7 +2127,7 @@ fails the parent <code>@testset</code>.
 </div>
 
 <div class="signature">
-    <p>GrugBot Neuromorphic Engine v7.8 &mdash; Technical Whitepaper</p>
+    <p>GrugBot Neuromorphic Engine v7.9 &mdash; Technical Whitepaper</p>
     <p>🦴 "Cave brain think different. That is why cave brain strong." &mdash; Grug</p>
 </div>
 

@@ -30,6 +30,7 @@ const ALL_TESTS = [
     "test_aiml_node_system.jl",
     "test_vote_orchestrator.jl",
     "test_relational_strict.jl",
+    "test_relational_jitter.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

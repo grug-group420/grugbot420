@@ -52,6 +52,14 @@ if !isdefined(@__MODULE__, :VoteOrchestrator)
     using .VoteOrchestrator
 end
 
+# GRUG: RelationalJitter — per-activation zero-mean nudge on match score
+# components. Loaded at package level by GrugBot420.jl; this guard lets
+# engine.jl also run standalone in tests (same pattern as VoteOrchestrator).
+if !isdefined(@__MODULE__, :RelationalJitter)
+    include("RelationalJitter.jl")
+    using .RelationalJitter
+end
+
 # ==============================================================================
 # SENSORY CONVERSION (TEXT TO SIGNAL)
 # ==============================================================================
@@ -329,27 +337,38 @@ function evaluate_relational_dialectics(
         end
     end
 
+    # GRUG: Per-activation jitter — each contribution below gets a tiny
+    # zero-mean nudge via RelationalJitter.jitter_score. The jitter is
+    # symmetric so repeated activations snap back to the deterministic
+    # match score in expectation; any single activation just sees a nudge
+    # that can tip exact ties toward weaker neighbors. See RelationalJitter.jl.
     for ut in user_triples
         for nt in node_triples
-            weight = get(relation_weights, ut.relation, 1.0)
+            # GRUG: Weight itself gets the first nudge — same bullseye every
+            # activation otherwise. jitter_weight is the sign-preserving wrapper.
+            weight = RelationalJitter.jitter_weight(get(relation_weights, ut.relation, 1.0))
             if ut.relation == nt.relation
                 if ut.subject == nt.object && ut.object == nt.subject
-                    match_score -= (2.0 * weight)
+                    match_score -= RelationalJitter.jitter_score(2.0 * weight)
                     is_antimatch = true
                 elseif ut.subject == nt.subject && ut.object == nt.object
-                    match_score += (2.0 * weight)
+                    match_score += RelationalJitter.jitter_score(2.0 * weight)
                 elseif ut.subject == nt.subject || ut.object == nt.object
-                    match_score += (1.0 * weight)
+                    match_score += RelationalJitter.jitter_score(1.0 * weight)
                 else
-                    orthogonal_penalty += (0.5 * weight)
+                    orthogonal_penalty += RelationalJitter.jitter_score(0.5 * weight)
                 end
             end
         end
     end
 
     # GRUG COHERENCE FIX: Don't let large user paragraphs nuke perfectly matched triples!
+    # GRUG: Final dampener also gets a jitter so the 0.1 floor and the 0.1
+    # penalty multiplier aren't deterministic constants. Sentinel (-9999.0)
+    # and true zero are handled internally by jitter_value and pass through
+    # untouched — the hard-requirement-miss contract is preserved.
     if match_score > 0
-        final_score = max(0.1, match_score - (orthogonal_penalty * 0.1))
+        final_score = max(0.1, match_score - RelationalJitter.jitter_score(orthogonal_penalty * 0.1))
     else
         final_score = match_score - orthogonal_penalty
     end

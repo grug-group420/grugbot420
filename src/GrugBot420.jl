@@ -84,6 +84,12 @@ using .AIMLNodeSystem
 include("VoteOrchestrator.jl")
 using .VoteOrchestrator
 
+# GRUG: Relational jitter — per-activation zero-mean nudge on match scores.
+# Must load BEFORE engine.jl so extract_* and evaluate_relational_dialectics
+# can apply the jitter at their respective call sites.
+include("RelationalJitter.jl")
+using .RelationalJitter
+
 include("engine.jl")
 include("Main.jl")
 
@@ -140,5 +146,14 @@ export begin_cycle!, current_cycle
 export record_fire!, record_vote!
 export apply_aiml_right!, apply_aiml_wrong!
 export aiml_phagy_sweep!, get_aiml_status_summary
+
+# GRUG: RelationalJitter exports — per-activation zero-mean nudge on match scores.
+# Nested module is still reachable as GrugBot420.RelationalJitter; these
+# re-exports make the common primitives available directly on the package.
+export JitterError, JitterConfig
+export JITTER_RATIO_DEFAULT, HARD_REQ_MISS_SENTINEL
+export jitter_value, jitter_score, jitter_weight
+export enable_jitter!, disable_jitter!, is_jitter_enabled
+export set_jitter_ratio!, get_jitter_ratio
 
 end # module GrugBot420

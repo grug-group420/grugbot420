@@ -592,6 +592,80 @@ This means a complex input never gets basic-quality relational output without a 
 
 ---
 
+## Per-Activation Relational Jitter (`RelationalJitter`) — v7.9
+
+Relational match-score components (`weight`, exact-match `+2.0`, partial-match `+1.0`, orthogonal `+0.5`, final-dampener `+0.1`) used to be deterministic constants. Now they get a tiny zero-mean nudge at activation time — so exact ties between competing nodes get broken naturally, and quiet neighbors occasionally win a coinflip they'd otherwise always lose.
+
+### The Idea
+
+> Each activation, every scored value runs slightly away from the bullseye — then snaps back to normal across activations.
+
+- **Per-activation**: every call to `evaluate_relational_dialectics` draws fresh nudges. Nothing is persisted.
+- **Snap-back**: the nudge is symmetric uniform on `[-ε·|x|, +ε·|x|]` with `E[δ] = 0`. The expected score equals the deterministic score — the bullseye is preserved in expectation. Over many activations, the mean converges back by the law of large numbers.
+- **Bounded**: default `JITTER_RATIO = 0.03` (3%). Sign is always preserved for any `|x|` above the epsilon floor. Absolute cap (`JITTER_ABS_CAP = 1.0`) prevents freak nudges on large scores.
+
+### Contract
+
+| Input | Output |
+|---|---|
+| `0.0` or `|x| < 1e-9` | returned unchanged (no denormal leak) |
+| `-9999.0` (hard-requirement-miss sentinel) | returned **exactly** unchanged (preserves the dialectics contract) |
+| `NaN` or `Inf` | **throws `JitterError`** — no silent failure |
+| Jitter globally disabled | returns input bit-exact (identity function) |
+| Anything else | `x + δ`, `δ ~ U(-ε·|x|, +ε·|x|)`, clamped to `|δ| ≤ 1.0` |
+
+### Key Constants
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `JITTER_RATIO_DEFAULT` | 0.03 | Nudge magnitude as fraction of `|x|` |
+| `JITTER_RATIO_MAX` | 0.10 | Hard upper bound accepted by `set_jitter_ratio!` |
+| `JITTER_ABS_CAP` | 1.0 | Maximum absolute nudge on any single value |
+| `JITTER_EPS_FLOOR` | 1e-9 | Below this, `|x|` is treated as zero |
+| `HARD_REQ_MISS_SENTINEL` | -9999.0 | Propagates untouched through jitter |
+
+### API
+
+| Function | Description |
+|---|---|
+| `jitter_value(x; ratio=get_jitter_ratio())` | Core primitive: returns nudged value |
+| `jitter_score(s)` / `jitter_weight(w)` | Intent-carrying wrappers used by dialectics |
+| `enable_jitter!()` / `disable_jitter!()` | Global toggle (default: ON) |
+| `is_jitter_enabled()` | Current state |
+| `set_jitter_ratio!(r)` / `get_jitter_ratio()` | Tune / inspect the global ratio |
+| `JitterConfig(ratio, enabled)` | Immutable policy bundle for scoped passing |
+
+### Where It's Applied
+
+Inside `evaluate_relational_dialectics`:
+- Each `weight` lookup is nudged via `jitter_weight`.
+- Each match-score contribution (`+2.0·w` exact, `-2.0·w` antimatch, `+1.0·w` partial, `+0.5·w` orthogonal) is nudged via `jitter_score`.
+- The final `orthogonal_penalty * 0.1` dampener is nudged via `jitter_score`.
+
+What's **not** jittered:
+- The hard-requirement-miss sentinel path (`-9999.0`) — must stay exact.
+- The antimatch flag (`is_antimatch`) — a boolean, no entropy to add.
+- The `max(0.1, …)` floor — the floor value 0.1 is constant by design.
+
+### Error Handling
+
+All bad inputs (`NaN`, `Inf`, out-of-range ratio) throw `JitterError`. The error carries a `context` string identifying the failing call site so stack traces are immediately actionable. The error type subclasses `Exception` so standard Julia `try` / `catch` works normally.
+
+### Tests
+
+`test/test_relational_jitter.jl` — 14 test groups covering: magnitude bounds, zero-mean convergence (empirical mean snaps back within 1%·|x| over 20k samples), error handling, toggle, ratio setter, semantic wrappers, thread safety under `@threads`, `JitterConfig`, integration with `evaluate_relational_dialectics` (snap-back in live dialectics), sentinel preservation (500/500 exact), antimatch robustness (1000/1000 flag-flip preserved), and bit-exact determinism when disabled.
+
+### Disabling for Deterministic Tests
+
+```julia
+using GrugBot420.RelationalJitter
+disable_jitter!()
+# ... deterministic assertions ...
+enable_jitter!()
+```
+
+---
+
 ## File Reference
 
 | File | Role |
@@ -616,6 +690,7 @@ This means a complex input never gets basic-quality relational output without a 
 | `src/FullLobeScanner.jl` | Full-lobe scanning system: bounded activation (max 1,000 active nodes), phase-gated scan pipeline (INIT→GATHER→ACTIVATE→CONTINUE→DONE), pattern + semantic matches, multithreaded candidate gathering. AIML gated until DONE signal. |
 | `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes: isolated AIML node populations per lobe, configurable population caps (default node_cap ÷ 3), grave-exclusion cap accounting, cycle-aware reinforcement, full save/load serialization. |
 | `src/VoteOrchestrator.jl` | Parallel vote orchestrator (v7.8): unique non-colliding Task dispatch, atomic `FireCounter` with hard 1000-slot cap across ALL fire types, `parallel_fire_batches` (batch size 64), `TaskTimeoutError` + `dispatch_task_with_timeout` for deadline-bounded sub-processes, `DoneSignal` channels, strength-biased vote coinflip with top-tier / sub-top windows. No silent failures — timeouts rethrow distinguishable errors. |
+| `src/RelationalJitter.jl` | Per-activation zero-mean nudge on relational match-score components (v7.9). Symmetric uniform jitter on `[-ε·\|x\|, +ε·\|x\|]` with `ε = 0.03` default, so the bullseye is preserved in expectation while exact ties break naturally. Sentinel (`-9999.0`) and zero pass through untouched; `NaN`/`Inf` throw `JitterError`; global toggle for deterministic tests. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---
