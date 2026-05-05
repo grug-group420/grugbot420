@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.17</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.18</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.17</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.18</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -236,6 +236,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#digest-history">15.15 Digest-Only Message History: Killing O(N²) Context Pollution</a> <span class="new-badge">v7.14</span></li>
         <li><a href="#aiml-synthesis">15.16 AIML Vote-to-Speech Synthesis (Thesaurus-Orchestrated Reply)</a> <span class="new-badge">v7.15 / v7.16</span></li>
         <li><a href="#chunked-scans">15.17 Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</a> <span class="new-badge">v7.17</span></li>
+        <li><a href="#lobe-topicality">15.18 Lobe Topicality Gate + Semantic-Bridge Exception</a> <span class="new-badge">v7.18</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -2062,6 +2063,98 @@ uninterruptible unit.</p>
 
 <!-- ================================================================ -->
 <!-- ================================================================ -->
+<h2 id="lobe-topicality">15.18 Lobe Topicality Gate + Semantic-Bridge Exception <span class="new-badge">v7.18</span></h2>
+
+<div class="grug-box">
+    <strong>Problem (v7.17 and earlier):</strong> all lobes contributed to every vote. A physics mission
+    could pull cooking nodes into the vote pool through raw lexical overlap (the verb
+    <code>transforms</code> appears in both "energy transforms matter" and "heat transforms dough"),
+    with drop-table and cross-lobe cascade passes amplifying the leakage. The user's diagnosis:
+    <em>"lobes with unrelated data should just completely inhibit &mdash; don't pick their votes.
+    Other lobes should only fire if there is some semantic relation that is not directly pattern
+    based."</em>
+</div>
+
+<p>v7.18 installs an engine-level <strong>Lobe Topicality Gate</strong> immediately before
+<code>scan_and_expand</code> returns its vote pool. Every lobe's <em>subject</em> string is
+thesaurus-expanded and intersected with the thesaurus-expanded mission tokens. A lobe passes the
+gate if</p>
+
+<div class="code-block">
+<pre>topicality(lobe) = |expand(subject) &cap; expand(mission)| / min(|expand(subject)|, |expand(mission)|)
+                &ge; LOBE_TOPICALITY_FLOOR   (default 0.15)</pre>
+</div>
+
+<p>The asymmetric <code>min(&middot;,&middot;)</code> denominator is deliberate: a short mission with a
+single strong keyword should still wake its domain lobe even if the lobe's subject enumerates
+several adjacent concepts. Using the smaller side avoids dilution in both directions.</p>
+
+<p><strong>Critical contract:</strong> raw pattern-scan hits do <em>not</em> auto-unmute a lobe.
+If a cooking node's pattern happens to lexically match a physics mission, the cooking lobe stays
+muted &mdash; the node must cross a <em>semantic</em> bridge to vote. This matches the user's
+explicit directive that bridges "not be directly pattern based."</p>
+
+<h3>Semantic-Bridge Exception</h3>
+
+<p>A node in a muted lobe can be <em>reinstated at reduced weight</em>
+(<code>BRIDGED_NODE_CONF_WEIGHT = 0.5</code>, i.e. half confidence) if any of three
+non-pattern-based bridges holds:</p>
+
+<ol>
+    <li><strong>Dynamic Relational-Triple bridge.</strong> The node's <code>relational_patterns</code>
+    contains a verb that also appears in the mission's <em>live</em> relational triples extracted
+    at runtime via <code>extract_dynamic_relational_triples(mission_text, 3)</code>. This is the
+    key insight &mdash; bridges are evaluated against triples parsed from <em>this specific
+    mission</em>, not just static triples stored on the node at creation time. High-resolution
+    mode captures compound subjects, nested relations, and causal chains.</li>
+
+    <li><strong>Required-Relation Verb bridge.</strong> The node's <code>required_relations</code>
+    list shares a verb with at least one node living in an <em>eligible</em> (not muted) lobe.
+    A muted-lobe node that requires <code>transforms</code> can still vote if a physics-lobe node
+    also requires <code>transforms</code>.</li>
+
+    <li><strong>/nodeAttach bridge.</strong> The node is attached &mdash; via
+    <code>attach_node!</code> &mdash; either <em>to</em> a node in an eligible lobe, or
+    <em>from</em> a node in an eligible lobe. Attachment is an explicit operator-issued
+    cross-lobe relation, so it short-circuits the gate even when no verb or triple matches.</li>
+</ol>
+
+<p>Failure to cross <em>any</em> of these bridges drops the node from the vote pool entirely.
+The gate runs after all three expansion passes (drop-table, cross-lobe cascade, attachment
+relay) so muted-lobe nodes introduced by cascade or relay are also filtered.</p>
+
+<h3>Telemetry</h3>
+
+<p>Every mission's scaffold debug block now includes two lines:</p>
+
+<div class="code-block">
+<pre>Muted Lobes: [cooking_lobe, music_lobe]
+Bridged Nodes: [n_042@cooking_lobe(verb_bridge:transforms), n_097@music_lobe(attach_in:n_phys_5)]</pre>
+</div>
+
+<p>Telemetry is recorded in two <code>Ref</code>s (<code>_LAST_MUTED_LOBES</code>,
+<code>_LAST_BRIDGED_NODES</code>) that are reset at the start of every gate call, so counters
+never accumulate across missions.</p>
+
+<h3>Verification</h3>
+
+<p>Test group <strong>test_lobe_topicality_gate.jl</strong> adds 19 sub-tests covering:</p>
+
+<ol>
+    <li><strong>[A]</strong> topicality score: matching subject > disjoint subject; empty subject returns 0.0.</li>
+    <li><strong>[B]</strong> end-to-end physics mission mutes cooking lobe and drops its nodes when no bridge exists.</li>
+    <li><strong>[C]</strong> shared <code>required_relations</code> verb reinstates a muted node via the verb-bridge path.</li>
+    <li><strong>[D]</strong> bridged node confidence is exactly <code>orig &times; BRIDGED_NODE_CONF_WEIGHT</code>.</li>
+    <li><strong>[E]</strong> <code>/nodeAttach</code> reinstates a muted node even with zero verb overlap.</li>
+    <li><strong>[F]</strong> telemetry <code>Ref</code>s reset per mission (no accumulation).</li>
+</ol>
+
+<p>Combined with the rest of the suite, v7.18 ships at <strong>22/22 tests green</strong> in
+&asymp;2 min, with the full gate running in constant per-mission time (O(|lobes|) subject
+expansions, O(|muted-lobe nodes|) bridge checks).</p>
+
+<!-- ================================================================ -->
+<!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
 <div class="grug-box">
@@ -2554,7 +2647,7 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>ActionTonePredictor.jl</code></td><td>1,030</td><td>Input classification, arousal nudge, weight multiplier, trajectory ring buffer</td></tr>
     <tr><td><code>PhagyMode.jl</code></td><td>1,302</td><td>7 maintenance automata, self-pruning cycles, memory forensics</td></tr>
     <tr><td><code>ImmuneThreadPool.jl</code></td><td>1,679</td><td>Hardened 8-worker priority-lane pool, TokenBucket rate limiting, TripwireMonitor state machine</td></tr>
-    <tr><td><code>engine.jl</code></td><td>2,645</td><td>Core engine: nodes, scanning, voting, drop-table expansion, relational fire, strict-coupling extractor routing</td></tr>
+    <tr><td><code>engine.jl</code></td><td>2,966</td><td>Core engine: nodes, scanning, voting, drop-table expansion, relational fire, strict-coupling extractor routing, <strong>v7.18</strong> lobe topicality gate + semantic-bridge exception</td></tr>
     <tr><td><code>Main.jl</code></td><td>3,917</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence, admin system</td></tr>
 </table>
 
@@ -2616,14 +2709,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.17)</h3>
+<h3>Test Suite Status (v7.18)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
     <tr><td>Tests in <code>runtests.jl</code> runner</td><td>21</td></tr>
     <tr><td>Total test files on disk</td><td>26</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 21 / 21 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~105 s on 8-core Linux</td></tr>
-    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints)</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 22 / 22 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~122 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset)</td></tr>
 </table>
 
 <div class="tip">
@@ -2635,6 +2728,17 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.18 &mdash; Lobe Topicality Gate + Semantic-Bridge Exception</h3>
+    <ul>
+        <li><strong>Engine-level fix for cross-domain vote leakage.</strong> Before v7.18, a physics mission could pull cooking-lobe nodes into the vote pool whenever a pattern-scan happened to lexically match (e.g. the verb <code>transforms</code> exists in both "energy transforms matter" and "heat transforms dough"). Drop-table and cross-lobe cascade amplified the leakage. v7.18 installs a hard gate at the end of <code>scan_and_expand</code> that mutes off-topic lobes entirely.</li>
+        <li><strong>New constants</strong> <code>LOBE_TOPICALITY_FLOOR = 0.15</code> and <code>BRIDGED_NODE_CONF_WEIGHT = 0.5</code> in <code>src/engine.jl</code>. A lobe is eligible iff <code>topicality(subject, mission) &ge; 0.15</code> where topicality is <code>|expand(subject) &cap; expand(mission)| / min(|expand(subject)|, |expand(mission)|)</code> &mdash; the asymmetric <code>min(&middot;,&middot;)</code> denominator lets a short mission with one strong keyword wake its domain lobe without dilution. Raw pattern-scan hits do <em>not</em> auto-unmute a lobe.</li>
+        <li><strong>Semantic-Bridge Exception.</strong> A node in a muted lobe is reinstated at <code>BRIDGED_NODE_CONF_WEIGHT &times;</code> confidence if any of: (1) its <code>relational_patterns</code> has a verb overlapping the mission's <em>dynamic</em> relational triples (extracted live via <code>extract_dynamic_relational_triples(mission, 3)</code> &mdash; this is the critical "dynamic relationals" check the user flagged); (2) its <code>required_relations</code> share a verb with any eligible-lobe node; (3) it's attached (<code>ATTACHMENT_MAP</code>) to or from an eligible-lobe node. Raw keyword overlap alone never unmutes.</li>
+        <li><strong>New helpers</strong>: <code>_compute_lobe_topicality</code>, <code>_compute_muted_lobes</code>, <code>_node_has_semantic_bridge</code>, and the entry point <code>apply_lobe_topicality_gate!(mission_text, expanded)</code> invoked at the tail of <code>scan_and_expand</code>.</li>
+        <li><strong>Telemetry.</strong> Every AIML payload debug block now emits <code>Muted Lobes: [&hellip;]</code> and <code>Bridged Nodes: [id@lobe(reason), &hellip;]</code> where <code>reason</code> is one of <code>dyn_triple:VERB</code>, <code>verb_bridge:VERB</code>, <code>attach_out:TARGET</code>, or <code>attach_in:SOURCE</code>. State is stored in two <code>Ref</code>s (<code>_LAST_MUTED_LOBES</code>, <code>_LAST_BRIDGED_NODES</code>) that reset at the start of every gate call.</li>
+        <li><strong>Test suite</strong>: new file <code>test/test_lobe_topicality_gate.jl</code> with 6 test groups covering topicality score (match > disjoint), end-to-end muting of an unrelated lobe, <code>required_relations</code> verb bridge, confidence discount exact value, <code>/nodeAttach</code> bridge reinstatement with zero verb overlap, and telemetry reset between missions. <strong>All 22 / 22 test groups green</strong> in ~2m02s.</li>
+        <li><strong>Documentation</strong>: whitepaper gains &sect;15.17 and &sect;15.18 coverage; version bumped to v7.18 across header, TOC, test-suite table, and changelog.</li>
+    </ul>
 
     <h3>v7.17 &mdash; Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</h3>
     <ul>

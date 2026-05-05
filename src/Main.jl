@@ -1638,6 +1638,26 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
     println(payload_io, "AIML Memory Bank:")
     println(payload_io, memory_str)
+    # GRUG v7.18: Lobe topicality gate telemetry — show which lobes the gate
+    # muted for THIS mission and which nodes were reinstated via semantic
+    # bridge (dynamic triple / required_relation / /nodeAttach).
+    try
+        muted_lobes = _LAST_MUTED_LOBES[]
+        bridged     = _LAST_BRIDGED_NODES[]
+        if isempty(muted_lobes)
+            println(payload_io, "Muted Lobes: None")
+        else
+            println(payload_io, "Muted Lobes: [$(join(muted_lobes, ", "))]")
+        end
+        if isempty(bridged)
+            println(payload_io, "Bridged Nodes: None")
+        else
+            bridged_str = join(["$(nid)@$(lid)($(reason))" for (nid, lid, reason) in bridged], ", ")
+            println(payload_io, "Bridged Nodes: [$bridged_str]")
+        end
+    catch e
+        println(payload_io, "Muted Lobes: <telemetry error: $e>")
+    end
     print(payload_io, "=========================================")
     return String(take!(payload_io))
 end

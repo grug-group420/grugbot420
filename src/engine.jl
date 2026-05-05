@@ -813,6 +813,295 @@ const MAX_ATTACHMENTS = 4
 # Magnitude is small (sigma=0.05) so it nudges but never dominates.
 const RELAY_CONF_JITTER_SIGMA = 0.05
 
+# ==============================================================================
+# v7.18 — LOBE TOPICALITY GATE + SEMANTIC-BRIDGE EXCEPTION
+# ==============================================================================
+# GRUG: Lobes with data unrelated to the mission should NOT vote. Their nodes
+# are muted before vote collection. A muted node may be REINSTATED (at half
+# weight) only if a semantic bridge exists. Bridges are NOT raw keyword
+# overlap — they are:
+#   1. Relational-triple overlap with the mission's DYNAMIC relational triples
+#      (extracted live via extract_dynamic_relational_triples).
+#   2. A required_relation verb that is also used by a node in an eligible lobe.
+#   3. A /nodeAttach attachment pointing to a node in an eligible lobe.
+# Raw pattern-keyword overlap does NOT unmute a lobe or its nodes.
+
+# GRUG: Topicality floor — a lobe's (thesaurus-expanded subject) must share at
+# least this fraction of tokens with the mission (also thesaurus-expanded) to
+# be eligible. Tuned low enough that domain-adjacent lobes still fire, high
+# enough to mute cooking when user asks about physics.
+const LOBE_TOPICALITY_FLOOR = 0.15
+
+# GRUG: Bridged-node confidence discount. Muted-lobe nodes that prove a
+# semantic bridge vote at half strength — their opinion is heard but it does
+# not win primary.
+const BRIDGED_NODE_CONF_WEIGHT = 0.5
+
+# GRUG: Telemetry for the scaffold debug block. Populated every scan_and_expand
+# call. Read by Main.jl when it builds the AIML payload.
+const _LAST_MUTED_LOBES    = Ref{Vector{String}}(String[])
+const _LAST_BRIDGED_NODES  = Ref{Vector{Tuple{String, String, String}}}(Tuple{String,String,String}[])
+# Tuple format: (node_id, lobe_id, bridge_reason)
+
+"""
+    _compute_lobe_topicality(subject, mission_expanded_tokens) -> Float64
+
+GRUG: Fraction of (thesaurus-expanded) lobe subject tokens that appear in the
+(thesaurus-expanded) mission token set. Returns 0.0 if subject is empty.
+"""
+function _compute_lobe_topicality(subject::String, mission_expanded::Set{String})::Float64
+    if isempty(strip(subject))
+        return 0.0
+    end
+    # Expand the subject through the same thesaurus gate used for missions.
+    subject_expanded = try
+        Thesaurus.thesaurus_gate_filter(subject)
+    catch
+        Set(lowercase.(filter(!isempty, map(strip, split(subject)))))
+    end
+    if isempty(subject_expanded) || isempty(mission_expanded)
+        return 0.0
+    end
+    hits = length(intersect(subject_expanded, mission_expanded))
+    if hits == 0
+        return 0.0
+    end
+    # GRUG: Use the SMALLER side as denominator so a short mission isn't
+    # penalised when it only carries one topical token (e.g. "gravity
+    # problem" hits "physics gravity motion force" at 1/4 subject = 0.25,
+    # 1/2 mission = 0.5 — we take the higher signal). This matches the
+    # intuition that one strong keyword is enough to wake a small lobe,
+    # even if the lobe has many other tokens.
+    denom = min(length(subject_expanded), length(mission_expanded))
+    return Float64(hits) / Float64(denom)
+end
+
+"""
+    _compute_muted_lobes(mission_text) -> (eligible, muted, eligible_node_ids, eligible_verbs)
+
+GRUG: Partition LOBE_REGISTRY into eligible (topical) and muted (off-topic)
+sets. A lobe is eligible ONLY if its (thesaurus-expanded) subject overlaps
+the (thesaurus-expanded) mission above LOBE_TOPICALITY_FLOOR.
+
+CRITICAL (v7.18 user directive): raw pattern-scan hits do NOT auto-unmute a
+lobe. If a cooking node's pattern happens to lexically match a physics
+mission, the cooking lobe stays muted — the node must cross a semantic
+bridge (dynamic triple, required_relation, /nodeAttach) to vote.
+
+Returns the union of node_ids inside eligible lobes and the union of
+required_relation verbs used by those nodes (needed for verb-bridge checks).
+"""
+function _compute_muted_lobes(mission_text::String)::Tuple{Set{String}, Set{String}, Set{String}, Set{String}}
+    eligible = Set{String}()
+    muted    = Set{String}()
+    eligible_node_ids = Set{String}()
+    eligible_verbs    = Set{String}()
+
+    if !(isdefined(@__MODULE__, :Lobe))
+        return (eligible, muted, eligible_node_ids, eligible_verbs)
+    end
+
+    # GRUG: Thesaurus-expand the mission once, up-front.
+    mission_expanded = try
+        Thesaurus.thesaurus_gate_filter(mission_text)
+    catch
+        Set(lowercase.(filter(!isempty, map(strip, split(mission_text)))))
+    end
+
+    all_lobe_ids = try
+        Lobe.get_lobe_ids()
+    catch
+        String[]
+    end
+
+    for lobe_id in all_lobe_ids
+        topic = try
+            rec = Lobe.get_lobe(lobe_id)
+            _compute_lobe_topicality(rec.subject, mission_expanded)
+        catch
+            0.0
+        end
+        if topic >= LOBE_TOPICALITY_FLOOR
+            push!(eligible, lobe_id)
+        else
+            push!(muted, lobe_id)
+        end
+    end
+
+    # GRUG: Collect node ids + required_relation verbs from eligible lobes.
+    for lobe_id in eligible
+        try
+            rec = Lobe.get_lobe(lobe_id)
+            for nid in rec.node_ids
+                push!(eligible_node_ids, nid)
+                node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
+                isnothing(node) && continue
+                for v in node.required_relations
+                    push!(eligible_verbs, lowercase(strip(v)))
+                end
+            end
+        catch
+            continue
+        end
+    end
+
+    return (eligible, muted, eligible_node_ids, eligible_verbs)
+end
+
+"""
+    _node_has_semantic_bridge(node, dyn_verbs, eligible_verbs, eligible_node_ids) -> (ok::Bool, reason::String)
+
+GRUG: A node in a muted lobe is bridged into voting if ANY of:
+  1. Its relational_patterns has a verb that also appears in the mission's
+     DYNAMIC relational triples (extract_dynamic_relational_triples output).
+  2. Its required_relations verb also appears on a node in an eligible lobe.
+  3. It is attached (ATTACHMENT_MAP) to a node in an eligible lobe, OR an
+     eligible-lobe node is attached to it. Either direction counts as a bridge.
+
+Returns (true, reason) if bridged, (false, "") otherwise.
+"""
+function _node_has_semantic_bridge(node,
+                                   dyn_verbs::Set{String},
+                                   eligible_verbs::Set{String},
+                                   eligible_node_ids::Set{String})::Tuple{Bool, String}
+    # --- Bridge 1: dynamic-triple verb overlap --------------------------------
+    for trip in node.relational_patterns
+        vlow = lowercase(strip(trip.relation))
+        if vlow in dyn_verbs
+            return (true, "dyn_triple:$(vlow)")
+        end
+    end
+
+    # --- Bridge 2: required_relation shared with eligible-lobe node -----------
+    for v in node.required_relations
+        vlow = lowercase(strip(v))
+        if vlow in eligible_verbs
+            return (true, "verb_bridge:$(vlow)")
+        end
+    end
+
+    # --- Bridge 3: attachment to/from eligible-lobe node ----------------------
+    # GRUG: Early-return from inside a `lock do ... end` closure only returns
+    # from the closure, not from _node_has_semantic_bridge. Collect the result
+    # into a local under the lock, then return AFTER the lock releases.
+    attach_result = try
+        lock(ATTACHMENT_LOCK) do
+            # This node attaches TO an eligible node?
+            if haskey(ATTACHMENT_MAP, node.id)
+                for att in ATTACHMENT_MAP[node.id]
+                    if att.node_id in eligible_node_ids
+                        return (true, "attach_out:$(att.node_id)")
+                    end
+                end
+            end
+            # An eligible node attaches TO this node?
+            for (target_id, atts) in ATTACHMENT_MAP
+                if target_id in eligible_node_ids
+                    for att in atts
+                        if att.node_id == node.id
+                            return (true, "attach_in:$(target_id)")
+                        end
+                    end
+                end
+            end
+            return (false, "")
+        end
+    catch
+        (false, "")
+    end
+    return attach_result
+end
+
+"""
+    apply_lobe_topicality_gate!(mission_text, expanded) -> Vector
+
+GRUG: v7.18 main entry point. Given the raw expanded vote pool, filter out
+muted-lobe nodes that have no semantic bridge, and discount bridged nodes to
+BRIDGED_NODE_CONF_WEIGHT * confidence. Populates the telemetry Refs so Main.jl
+can surface them in the scaffold debug block.
+"""
+function apply_lobe_topicality_gate!(mission_text::String,
+                                     expanded::Vector)::Vector
+    # GRUG: Reset telemetry at entry so repeated calls don't accumulate.
+    _LAST_MUTED_LOBES[]   = String[]
+    _LAST_BRIDGED_NODES[] = Tuple{String,String,String}[]
+
+    if !(isdefined(@__MODULE__, :Lobe)) || isempty(expanded)
+        return expanded
+    end
+
+    eligible, muted, eligible_node_ids, eligible_verbs =
+        _compute_muted_lobes(mission_text)
+
+    # GRUG: Record muted lobes for telemetry regardless of outcome.
+    _LAST_MUTED_LOBES[] = sort(collect(muted))
+
+    if isempty(muted)
+        return expanded  # Nothing to gate.
+    end
+
+    # GRUG: Extract dynamic relational triples from the mission (live).
+    # Mode 3 = high-res scan — catches compound subjects/objects and chains.
+    dyn_verbs = Set{String}()
+    try
+        dyn_trips = extract_dynamic_relational_triples(mission_text, 3)
+        for t in dyn_trips
+            push!(dyn_verbs, lowercase(strip(t.relation)))
+        end
+    catch e
+        @warn "[v7.18] extract_dynamic_relational_triples failed in gate (continuing without dyn bridge): $e"
+    end
+
+    gated = eltype(expanded)[]
+    bridged_accum = Tuple{String,String,String}[]
+
+    for entry in expanded
+        nid = entry[1]
+        lobe_id = Lobe.find_lobe_for_node(nid)
+
+        # GRUG: Node with no lobe (orphan) — keep it, no gate applies.
+        if isnothing(lobe_id)
+            push!(gated, entry)
+            continue
+        end
+
+        # GRUG: Node in eligible lobe — keep at full weight.
+        if lobe_id in eligible
+            push!(gated, entry)
+            continue
+        end
+
+        # GRUG: Node in muted lobe — check for semantic bridge.
+        node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
+        if isnothing(node)
+            continue  # vanished; skip silently
+        end
+
+        bridged, reason = _node_has_semantic_bridge(
+            node, dyn_verbs, eligible_verbs, eligible_node_ids
+        )
+        if bridged
+            # GRUG: Reinstate at half weight. entry is a tuple; rebuild with
+            # reduced confidence.
+            id_, conf_, antimatch_, u_trips_, n_trips_ = entry
+            discounted = (id_, conf_ * BRIDGED_NODE_CONF_WEIGHT,
+                          antimatch_, u_trips_, n_trips_)
+            push!(gated, discounted)
+            push!(bridged_accum, (nid, lobe_id, reason))
+        end
+        # else: muted + no bridge -> drop.
+    end
+
+    _LAST_BRIDGED_NODES[] = bridged_accum
+
+    # GRUG: Loud console trace so operator sees the gate working.
+    if !isempty(muted) || !isempty(bridged_accum)
+        println("[v7.18] 🔇 Lobe topicality gate: muted=$(length(muted)) eligible=$(length(eligible)) bridged=$(length(bridged_accum)) dropped=$(length(expanded) - length(gated))")
+    end
+
+    return gated
+end
+
 """
 attach_node!(target_id::String, attach_id::String, pattern::String)::String
 
@@ -2257,11 +2546,24 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         println("[ENGINE] 🔗  Attachment relay pass added $(length(relay_additions)) node(s) to expanded set.")
     end
 
+    # ── v7.18 FINAL PASS: Lobe Topicality Gate + Semantic-Bridge Exception ──
+    # GRUG: After all expansion passes, filter out muted-lobe nodes that have
+    # no semantic bridge, and discount bridged nodes to half weight.
+    # This is the engine-level fix for cross-domain leakage: if the user asks
+    # about physics, cooking nodes never get to vote unless they share a
+    # dynamic relational triple verb, a required_relation, or a /nodeAttach.
+    expanded = try
+        apply_lobe_topicality_gate!(input_text, expanded)
+    catch e
+        @warn "[v7.18] lobe topicality gate FAILED (continuing with unfiltered pool): $e"
+        expanded
+    end
+
     return expanded
 end
 
 # ==============================================================================
-# VOTE CASTING
+# VOTE CASTING  
 # ==============================================================================
 
 """
