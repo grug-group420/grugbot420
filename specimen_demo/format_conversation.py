@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
 """
-GRUG CONVERSATION LOG FORMATTER
-================================
-Turn a raw run_cli() transcript into a concise, human-readable markdown log.
+GRUG CONVERSATION LOG FORMATTER (v7.14)
+========================================
+Turn a raw run_cli() transcript into a human-readable DIALOGUE.
 
-We extract per mission:
-  - The user's /mission or /brainstorm input (as the prompt)
-  - Primary Action, Confidence, Sure/Unsure actions, Vote Certainty
-  - Winning node id + surface context (LOBE_CONTEXT)
-  - Anti-match detection flag
-  - Node system prompt (the context that was used for generation)
-  - Silent cycles are labelled explicitly so the transcript stays honest.
+The whole log is framed as an interview: the Interviewer asks a
+question (the /mission or /brainstorm text from the script) and Grug
+answers (the AIML Output Scaffold the engine emitted). We render:
 
-We also capture the FIRST and LAST /status and /aimlStatus snapshots
-so the reader sees baseline and post-conversation diagnostics.
+  **Interviewer:** <prompt>
+  **Grug:**       <headline paraphrase from primary action + winning node>
 
-We do NOT modify the raw log. Raw log is source of truth; this is a
-reader-friendly lens. If a mission produced no AIML scaffold, we note it.
+  <blockquote>
+  Full AIML response payload (the exact bytes a downstream LLM
+  would receive for this cycle)
+  </blockquote>
 
-NO SILENT FAILURES: exits non-zero if the raw log is missing or the
-mission/scaffold counts disagree in an unexpected way (silent cycles are
-expected when Cave has no matching pattern, but we still log them).
+  Then a compact stats strip (confidence, certainty, lobe, etc.)
+
+This is what the user explicitly asked for: "include actual logs of
+replies etc ... you querying the ai replying". The /mission prompt is
+the question, the scaffold IS Grug's reply. We no longer bury the
+reply inside a collapsible after a giant stats table.
+
+NO SILENT FAILURES: exits non-zero on missing raw log. If a cycle is
+silent (no pattern matched), we render it as Grug saying so, explicitly.
 """
 import gzip
 import re
@@ -28,7 +32,12 @@ import sys
 from pathlib import Path
 
 
+# GRUG: Recognise either of the two prompt commands we support.
 MISSION_RE = re.compile(r"^(/mission|/brainstorm)\s+(.+?)$", flags=re.MULTILINE)
+
+# GRUG: Scaffold header block. The rest of the payload runs until the
+# next 'Brain >' prompt or the end of stream; extract_scaffold_block()
+# handles that.
 SCAFFOLD_RE = re.compile(
     r"🤖 AIML Output Scaffold:\n"
     r"SYNTHESIZED PAYLOAD\. \(Primary Confidence: ([0-9.]+)\)\.\n"
@@ -40,8 +49,12 @@ SCAFFOLD_RE = re.compile(
 SILENT_RE = re.compile(r"--> No valid specimens found for this input\. Cave is silent\.")
 
 
+# ---------------------------------------------------------------------------
+# Text cleaners
+# ---------------------------------------------------------------------------
+
 def clean_box(text: str) -> str:
-    """Strip unicode box-drawing characters so markdown renders cleanly."""
+    """Strip unicode box-drawing glyphs so markdown fences render cleanly."""
     text = re.sub(r"[║╠╣╔╗╚╝═─│┌┐└┘├┤┬┴┼]+", "", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
@@ -50,22 +63,11 @@ def clean_box(text: str) -> str:
 def extract_field(scaffold: str, label_re: str, default: str = "?") -> str:
     """Pull a single-line scalar field out of a scaffold block."""
     m = re.search(label_re, scaffold)
-    if not m:
-        return default
-    return m.group(1).strip()
+    return m.group(1).strip() if m else default
 
 
 def extract_lobe_context(scaffold: str) -> str:
-    """
-    Pull ONLY the raw Lobe Context line, stopping at the end-of-line so we
-    don't swallow orchestration rule chatter. The scaffold prints:
-
-        --- LOBE CONTEXT (PREFRONTAL CORTEX) ---
-        Lobe Context: <value>
-        --- RELATIONAL CONTEXT ---
-
-    We anchor between those dividers for precision.
-    """
+    """Anchor between the LOBE CONTEXT and RELATIONAL CONTEXT dividers."""
     m = re.search(
         r"--- LOBE CONTEXT \(PREFRONTAL CORTEX\) ---\n"
         r"Lobe Context: (.+?)\n"
@@ -73,38 +75,31 @@ def extract_lobe_context(scaffold: str) -> str:
         scaffold, flags=re.DOTALL
     )
     if not m:
-        # GRUG: Fall back to the first "Lobe Context:" occurrence and strip
-        # anything after the first newline. This keeps the field short even
-        # when scaffold headers mutate in future versions.
         m2 = re.search(r"Lobe Context: (.+?)\n", scaffold)
         return m2.group(1).strip() if m2 else "?"
     return m.group(1).strip()
 
 
 def extract_node_context(scaffold: str) -> str:
-    """
-    Pull the node's system prompt from:
-        Context: '<system_prompt>'
-    """
+    """Pull the node's system_prompt from `Context: '<...>'`."""
     m = re.search(r"Context: '(.+?)'\n", scaffold)
     return m.group(1).strip() if m else "?"
 
 
 def extract_winner_node(scaffold: str) -> str:
-    """
-    The winning node id is surfaced by the 'Surface the winning node X
-    from lobe Y' orchestration rule. The lobe context string appears in
-    the same rule so we pin to the exact rule template.
-    """
+    """Winning node id is surfaced in the orchestration rule template."""
     m = re.search(r"Surface the winning node (\S+) from lobe", scaffold)
     return m.group(1) if m else "?"
 
 
+def extract_threshold_note(scaffold: str) -> str:
+    """v7.13: Pull the Fresh Memory `[threshold=X eligible=N]` header."""
+    m = re.search(r"Fresh Memory \[threshold=([0-9.]+) eligible=(\d+)\]", scaffold)
+    return f"threshold={m.group(1)}, eligible={m.group(2)}" if m else "—"
+
+
 def extract_status_block(raw: str, marker: str, which: str = "last") -> str:
-    """
-    Pull a delimited block (first or last occurrence) that starts at a
-    header marker and runs until the next 'Brain >' prompt line.
-    """
+    """First/last block from `marker` up to the next 'Brain >' line."""
     pattern = re.compile(
         re.escape(marker) + r".*?(?=Brain >|\Z)",
         flags=re.DOTALL
@@ -115,46 +110,64 @@ def extract_status_block(raw: str, marker: str, which: str = "last") -> str:
     return matches[0 if which == "first" else -1].group(0)
 
 
-def build_transcript(raw: str, true_raw_size: int) -> str:
-    # GRUG: Enumerate scaffolds in order.
-    scaffolds = list(SCAFFOLD_RE.finditer(raw))
+def grug_headline(primary: str, node_ctx: str, winner: str, lobe_ctx: str) -> str:
+    """
+    GRUG v7.14: Build a one-sentence lead that frames the scaffold as
+    Grug's reply. This is the "voice" line the reader sees immediately
+    under **Grug:** before the full payload. It combines the primary
+    action, the winning node's system_prompt (which IS the voice the
+    JIT AIML pulled), and the winning lobe.
+    """
+    # Winning lobe: first name that appears in the lobe context strip.
+    lobe_match = re.search(r"\[([a-z_]+) \(\d+/\d+ active\)\]", lobe_ctx)
+    lobe_name = lobe_match.group(1) if lobe_match else "cave"
+    # Trim node voice to one sentence so the headline stays scannable.
+    voice = node_ctx.split(".")[0].strip() if node_ctx and node_ctx != "?" else ""
+    if voice:
+        return (f"_speaking as **{lobe_name}** ({winner}) — **{voice}**_ "
+                f"→ primary action: **`{primary}`**")
+    return f"_speaking from **{lobe_name}** ({winner})_ → primary action: **`{primary}`**"
 
-    # GRUG: Enumerate user commands in order for kind labelling (mission vs
-    # brainstorm). Note the raw log often does NOT echo piped commands back
-    # because readline() just consumes them. We fall back to "/mission"
-    # when we cannot match.
+
+# ---------------------------------------------------------------------------
+# Main dialogue builder
+# ---------------------------------------------------------------------------
+
+def build_transcript(raw: str, true_raw_size: int) -> str:
+    scaffolds = list(SCAFFOLD_RE.finditer(raw))
     commands = list(MISSION_RE.finditer(raw))
 
     out = []
-    out.append("# GrugBot420 Comprehensive Specimen — Conversation Transcript\n")
+    out.append("# GrugBot420 Comprehensive Specimen — Interview Transcript\n\n")
     out.append(
         "_Auto-generated from `specimen_demo/conversation_raw.log` by_ "
-        "`specimen_demo/format_conversation.py`._\n"
+        "`specimen_demo/format_conversation.py`._\n\n"
     )
     out.append(
         "**Specimen:** `grugbot420_comprehensive.specimen.gz` "
         "(23 nodes / 4 lobes / 8 orchestration rules / 12 AIML tribe "
         "nodes / 10 attachments / 3 inhibitions / 3 pinned memories).\n\n"
     )
-
-    # Baseline diagnostics (first status block printed after load)
-    first_status = extract_status_block(raw, "GRUGBOT SYSTEM STATUS", which="first")
-    if first_status:
-        out.append("## Baseline diagnostics (post-load)\n")
-        out.append("```text\n" + clean_box(first_status) + "\n```\n\n")
-
-    out.append("## Cycle-by-cycle mission responses\n")
     out.append(
-        "Each cycle records the prompt, the orchestrator's primary action "
-        "pick, the vote certainty, the winning node and its owning lobe, "
-        "and the system_prompt the JIT AIML pulled from the node's "
-        "json_data. Cycles that produced no AIML scaffold (i.e. no pattern "
-        "match survived the gate) are still listed so the transcript "
-        "covers every prompt from the script.\n\n"
+        "Below is an interview between a human **Interviewer** and "
+        "**Grug** (the GrugBot420 engine after the comprehensive "
+        "specimen has been loaded). Each cycle presents the prompt, "
+        "Grug's scaffolded reply (the exact payload a downstream LLM "
+        "would receive), and a compact stats strip showing which node "
+        "and lobe won the vote. `/mission` uses standard jitter "
+        "(snap-back dominant); `/brainstorm` uses heavy scoped jitter "
+        "(far-jump dominant).\n\n"
     )
 
-    # GRUG: Walk scaffolds and attribute each to the closest preceding
-    # /mission or /brainstorm command (by file offset).
+    # ---- Baseline diagnostics ---------------------------------------
+    first_status = extract_status_block(raw, "GRUGBOT SYSTEM STATUS", which="first")
+    if first_status:
+        out.append("---\n\n## 🔍 Baseline diagnostics (post-load)\n\n")
+        out.append("```text\n" + clean_box(first_status) + "\n```\n\n")
+
+    # ---- The interview ----------------------------------------------
+    out.append("---\n\n## 🎙️ The Interview\n\n")
+
     for idx, sc in enumerate(scaffolds, start=1):
         conf = sc.group(1)
         mission = sc.group(2)
@@ -162,9 +175,14 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         sure = sc.group(4) or "None"
         unsure = sc.group(5) or "None"
 
+        # Bound the scaffold at the next '=====' divider or next Brain >
         start = sc.start()
         end_m = re.search(r"={30,}", raw[start:start + 80000])
-        end = start + (end_m.end() if end_m else min(50000, len(raw) - start))
+        reply_end_m = re.search(r"\nBrain >", raw[start:start + 80000])
+        candidates = [e for e in [end_m.end() if end_m else None,
+                                  reply_end_m.start() if reply_end_m else None]
+                      if e is not None]
+        end = start + (min(candidates) if candidates else min(50000, len(raw) - start))
         scaf = raw[start:end]
 
         cert = extract_field(scaf, r"Certainty: (\w+)")
@@ -174,82 +192,61 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         antim = extract_field(scaf, r"Anti-Match Detected: (\w+)")
         user_triples = extract_field(scaf, r"User Triples: (.+?)\n")
         node_triples = extract_field(scaf, r"Node Triples: (.+?)\n")
-        tied = extract_field(scaf, r"Tied Alts: (.+?)\n", default="None")
+        threshold_note = extract_threshold_note(scaf)
 
-        # GRUG: readline() consumes piped commands without echoing, so
-        # parsing the raw log never recovers mission vs brainstorm kind.
-        # Instead we cross-reference specimen_demo/conversation.txt (the
-        # script file) if it is sitting next to the raw log — we take the
-        # N-th occurrence of THIS mission text as the matching command.
+        # Determine /mission vs /brainstorm by matching the nth
+        # occurrence of this prompt text in the script file.
         kind = "/mission"
         script_path = Path("specimen_demo/conversation.txt")
         if script_path.exists():
             script_text = script_path.read_text()
             script_cmds = list(MISSION_RE.finditer(script_text))
-            # Find the nth call (1-indexed via `idx`) to whichever mission
-            # text we see in this scaffold. Because scaffolds are emitted
-            # in the same order the script issued them, the positional
-            # match is reliable.
             matches_for_this = [c for c in script_cmds
                                 if c.group(2).strip() == mission.strip()]
             if matches_for_this:
-                # Which scaffold index (among scaffolds with same text) are we?
                 same_text_before = sum(
                     1 for prev in scaffolds[:idx - 1]
                     if prev.group(2).strip() == mission.strip()
                 )
                 if same_text_before < len(matches_for_this):
                     kind = matches_for_this[same_text_before].group(1)
-        # GRUG v7.13: Capture the full scaffold payload emitted for this
-        # cycle so the transcript shows the actual Grug output, not just
-        # the statistics distilled from it. We bound the capture at the
-        # first 'Brain >' prompt that follows the scaffold start, then
-        # fall back to the scaffold end-marker; whichever is closer.
-        # NO SILENT FAILURES: if neither boundary is found (truncated log)
-        # we emit whatever we have and flag it.
-        reply_end_m = re.search(r"\nBrain >", raw[start:start + 80000])
-        reply_end = start + (reply_end_m.start() if reply_end_m else
-                             min(20000, len(raw) - start))
-        full_scaffold = raw[start:reply_end]
-        # Strip box drawing glyphs so the fenced block renders cleanly.
-        full_scaffold_clean = clean_box(full_scaffold)
 
-        out.append(f"### Cycle {idx} — `{kind}` · confidence {conf}\n")
-        out.append(f"**Prompt:** {mission}\n\n")
-        out.append(f"**Summary**\n\n")
-        out.append(f"| Field | Value |\n|---|---|\n")
-        out.append(f"| Primary action | `{primary}` |\n")
-        out.append(f"| Sure actions | `[{sure}]` |\n")
-        out.append(f"| Unsure (side-features) | `[{unsure}]` |\n")
-        out.append(f"| Vote certainty | {cert} |\n")
-        out.append(f"| Winning node | `{winner}` |\n")
-        out.append(f"| Lobe context | {lobe_ctx} |\n")
-        out.append(f"| Anti-match detected | {antim} |\n")
-        out.append(f"| User relational triples | {user_triples} |\n")
-        out.append(f"| Node relational triples | {node_triples} |\n")
-        out.append(f"| Winning node's system prompt | _{node_ctx}_ |\n\n")
-        # GRUG v7.13: The FULL reply Grug emitted for this cycle. Wrapped
-        # in a collapsible <details> block so the table stays skimmable
-        # but the exact payload (mission, primary/sure/unsure, dynamic
-        # rules, deep + fresh memory, lobe context, certainty, user &
-        # node triples) is always one click away. This is what a
-        # downstream LLM would actually receive.
-        out.append("<details>\n")
-        out.append("<summary>📜 Full AIML response payload</summary>\n\n")
-        out.append("```text\n")
-        out.append(full_scaffold_clean)
-        out.append("\n```\n")
-        out.append("</details>\n\n")
+        headline = grug_headline(primary, node_ctx, winner, lobe_ctx)
+        full_scaffold_clean = clean_box(scaf)
 
-    # GRUG: Now list prompts that produced NO scaffold (silent cycles).
-    # We cross-reference command text vs scaffold missions and report the
-    # delta so the transcript is exhaustive.
+        # ----------- Render the dialogue turn ---------------------
+        out.append(f"### Cycle {idx} · `{kind}`\n\n")
+        out.append(f"**🗣️ Interviewer:** {mission}\n\n")
+        out.append(f"**🧠 Grug:** {headline} _(confidence **{conf}**, certainty **{cert}**)_.\n\n")
+
+        # The full reply payload — NOT hidden in a collapsible this time.
+        # This is what the user asked for: the actual reply, visible.
+        out.append("> **Full AIML payload Grug handed back:**\n>\n")
+        out.append("> ```text\n")
+        for line in full_scaffold_clean.split("\n"):
+            out.append(f"> {line}\n")
+        out.append("> ```\n\n")
+
+        # Compact stats strip — the "under the hood" facts, brief.
+        out.append("<sub>")
+        out.append(f"primary `{primary}` · ")
+        out.append(f"sure `[{sure}]` · ")
+        out.append(f"unsure `[{unsure}]` · ")
+        out.append(f"winning node `{winner}` · ")
+        out.append(f"lobe context `{lobe_ctx}` · ")
+        out.append(f"anti-match `{antim}` · ")
+        out.append(f"fresh-mem gate `{threshold_note}` · ")
+        out.append(f"user triples `{user_triples}` · ")
+        out.append(f"node triples `{node_triples}`")
+        out.append("</sub>\n\n")
+        out.append("---\n\n")
+
+    # ---- Silent cycles ---------------------------------------------
     scaffold_missions = [sc.group(2).strip() for sc in scaffolds]
     silent_prompts = []
     used = [False] * len(scaffold_missions)
     for cmd in commands:
         mtxt = cmd.group(2).strip()
-        # Match against first still-unused scaffold with same text
         matched = False
         for i, sm in enumerate(scaffold_missions):
             if not used[i] and sm == mtxt:
@@ -259,9 +256,6 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         if not matched:
             silent_prompts.append((cmd.group(1), mtxt, cmd.start()))
 
-    # SILENT_RE directly reports silent cycles in whatever slice we parsed.
-    # When the raw log was truncated we may miss some; in that case we
-    # derive the silent count from (scripted_commands - scaffold_count).
     silent_marker_count = len(SILENT_RE.findall(raw))
     script_path = Path("specimen_demo/conversation.txt")
     if script_path.exists():
@@ -271,50 +265,53 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
             silent_marker_count = inferred_silent
 
     if silent_prompts or silent_marker_count:
-        out.append("## Silent cycles (no AIML scaffold emitted)\n")
+        out.append("## 🤐 Silent cycles\n\n")
         out.append(
-            f"The engine reported `No valid specimens found for this input` "
-            f"{silent_marker_count} time(s). These are prompts whose pattern "
-            f"scan did not produce any gated votes; this is expected when a "
-            f"query's vocabulary falls outside the seeded lobe patterns.\n\n"
+            f"Grug went silent on **{silent_marker_count}** prompt(s) — "
+            f"no pattern in any lobe matched and the gate produced no "
+            f"votes. That is NOT a failure, it's an explicit \"I don't "
+            f"know from my seeded patterns\" answer. The engine prints "
+            f"`No valid specimens found for this input. Cave is silent.` "
+            f"in those cycles.\n\n"
         )
         for kind, mtxt, _ in silent_prompts:
-            out.append(f"- `{kind}` **{mtxt}** — silent\n")
-        out.append("\n")
+            out.append(f"- **Interviewer:** `{kind}` {mtxt}\n")
+            out.append(f"  **Grug:** _\\[silent — cave has no matching pattern\\]_\n\n")
 
-    # Final diagnostics (last status + last aiml status)
+    # ---- Final diagnostics -----------------------------------------
     last_status = extract_status_block(raw, "GRUGBOT SYSTEM STATUS", which="last")
     if last_status:
-        out.append("## Final diagnostics — GRUGBOT SYSTEM STATUS\n")
+        out.append("## 🔍 Final diagnostics — `/status`\n\n")
         out.append("```text\n" + clean_box(last_status) + "\n```\n\n")
 
     last_aiml = extract_status_block(raw, "🤖 AIML TRIBE STATUS", which="last")
     if last_aiml:
-        out.append("## Final diagnostics — AIML TRIBE STATUS\n")
+        out.append("## 🔍 Final diagnostics — `/aimlStatus`\n\n")
         out.append("```text\n" + clean_box(last_aiml) + "\n```\n\n")
 
-    # Summary footer
-    out.append("## Transcript summary\n")
-    # GRUG: The raw log consumes stdin without echoing, so we count scripted
-    # commands from the script file directly instead of the raw log.
-    script_path = Path("specimen_demo/conversation.txt")
+    # ---- Footer summary --------------------------------------------
+    out.append("---\n\n## 📊 Transcript summary\n\n")
     if script_path.exists():
         script_cmd_count = len(MISSION_RE.findall(script_path.read_text()))
     else:
         script_cmd_count = "?"
-    out.append(f"- Scripted /mission and /brainstorm commands: **{script_cmd_count}**\n")
-    out.append(f"- AIML scaffolds emitted: **{len(scaffolds)}**\n")
+    out.append(f"- Scripted `/mission` and `/brainstorm` commands: **{script_cmd_count}**\n")
+    out.append(f"- AIML scaffolds Grug emitted: **{len(scaffolds)}**\n")
     out.append(f"- Silent cycles: **{silent_marker_count}**\n")
     out.append(f"- Raw log size (on disk): **{true_raw_size:,} bytes**\n")
     if true_raw_size != len(raw):
         out.append(
             f"- Raw log size (read into formatter): **{len(raw):,} bytes** "
-            "(truncated: O(N²) mission-memory recursion balloons the file; "
-            "we keep the informative head+tail slices for parsing)\n"
+            "(head + tail slice; the plain log would balloon O(N²) "
+            "without v7.12–v7.14 context gating)\n"
         )
 
     return "".join(out)
 
+
+# ---------------------------------------------------------------------------
+# I/O plumbing (auto-decompress + bounded read)
+# ---------------------------------------------------------------------------
 
 def _resolve_raw_path(raw_path: Path) -> Path:
     """
@@ -348,24 +345,16 @@ def main():
         file=sys.stderr,
     )
 
-    # GRUG: Mission memory context explodes O(N²) because each /mission
-    # output becomes a system-history entry that is re-embedded in the
-    # next /mission's payload. On a 13-mission run the plain raw log can
-    # balloon past 1 GB. Reading that into RAM blows through string-size
-    # limits on smaller sandboxes. The formatter only needs ~100 KB of
-    # interesting content per cycle (AIML scaffold + /status blocks), so
-    # we bound the read: pull the first 32 MB of DECOMPRESSED text
-    # (enough for baseline diag + all scaffolds in observed runs) and
-    # the last 4 MB (final diags). If the file fits comfortably we just
-    # read the whole thing.
+    # Bound the read in case the plain log ballooned past what we can
+    # hold in RAM on small sandboxes. v7.12+v7.13+v7.14 make this
+    # bound almost never trigger (logs shrink 70×), but the safety net
+    # stays so historical runs still format.
     READ_CAP_FRONT = 32 * 1024 * 1024   # 32 MB front slice
     READ_CAP_TAIL = 4 * 1024 * 1024     # 4 MB tail slice
     BUDGET = READ_CAP_FRONT + READ_CAP_TAIL
 
     opener = gzip.open if is_gz else open
 
-    # Step 1: determine uncompressed size and whether we fit in budget.
-    # For plain files this is O(1). For gzipped files, we stream to count.
     if is_gz:
         uncompressed_size = 0
         with opener(raw_path, "rb") as f:
@@ -388,16 +377,13 @@ def main():
             f"{READ_CAP_TAIL:,} bytes from tail with a truncation marker",
             file=sys.stderr,
         )
-        # Head: stream READ_CAP_FRONT bytes
         with opener(raw_path, "rb") as f:
             front_bytes = f.read(READ_CAP_FRONT)
         front = front_bytes.decode("utf-8", errors="replace")
 
-        # Tail: for plain files we can seek, for gzip we must stream.
         if is_gz:
             tail_bytes = b""
             with opener(raw_path, "rb") as f:
-                # Discard everything up to (uncompressed_size - READ_CAP_TAIL)
                 to_skip = raw_size - READ_CAP_TAIL
                 while to_skip > 0:
                     chunk = f.read(min(1024 * 1024, to_skip))

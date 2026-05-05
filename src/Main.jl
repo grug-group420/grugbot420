@@ -1760,7 +1760,34 @@ function process_mission(mission_text::String)
     end
 
     println("\n🤖 AIML Output Scaffold:\n$output")
-    add_message_to_history!("System", output, false)
+
+    # GRUG v7.14: Do NOT store the full scaffold verbatim in MESSAGE_HISTORY.
+    # The scaffold embeds the entire Fresh Memory block, so storing it
+    # causes each cycle's output to become next cycle's context and
+    # recurse forever — that is the O(N²) bloat that v7.12 context
+    # intensity fixed for log size but still corrupted output quality
+    # because the banner tails kept leaking forward. Instead store a
+    # single-line digest that captures the semantic essentials: user
+    # asked X → Grug answered with primary=Y on node=Z. That digest is
+    # still relevance-scorable against future prompts (lexical+triple
+    # overlap picks up the mission text) but carries no recursive
+    # scaffold embedding.
+    digest = try
+        if !isempty(contributing_votes)
+            win = contributing_votes[1]
+            "Mission \"$(mission_text)\" → primary=$(win.action) conf=$(round(win.confidence, digits=2)) node=$(win.node_id)"
+        else
+            # GRUG: Should never happen (we guarded on isempty(valid_specimens)
+            # well upstream) but be defensive. NO SILENT FAILURES — the
+            # string still captures the mission so a future cycle can
+            # score it.
+            "Mission \"$(mission_text)\" → [no contributing vote — silent cycle]"
+        end
+    catch e
+        @warn "[MAIN v7.14] Failed to build mission digest ($e); storing mission text only"
+        "Mission \"$(mission_text)\""
+    end
+    add_message_to_history!("System", digest, false)
 end
 
 # ==============================================================================
@@ -3600,7 +3627,16 @@ elseif !isnothing(m_right)
                 
                 output = ephemeral_aiml_orchestrator(String(mission_text), [override_vote])
                 println("\n🤖 AIML [Targeted Override]:\n$output")
-                add_message_to_history!("System", output, false)
+                # GRUG v7.14: Same digest policy as run_mission — store a
+                # compact one-liner, not the full scaffold, to stop
+                # Fresh Memory recursion.
+                digest = try
+                    "Explicit \"$(mission_text)\" → primary=$(override_vote.action) node=$(override_vote.node_id)"
+                catch e
+                    @warn "[MAIN v7.14] Failed to build explicit-override digest ($e); storing mission text only"
+                    "Explicit \"$(mission_text)\""
+                end
+                add_message_to_history!("System", digest, false)
                 
             elseif !isnothing(m_grow)
                 # GRUG: /grow - plant new nodes from JSON packet.
@@ -4056,7 +4092,10 @@ elseif !isnothing(m_right)
                 println("--> Grug freezing entire cave to specimen file...")
                 result_summary = save_specimen_to_file!(spec_path)
                 println("\n$result_summary")
-                add_message_to_history!("System", result_summary, false)
+                # GRUG v7.14: Store a one-line digest instead of the full
+                # multi-line banner. The banner was leaking into Fresh Memory
+                # and degrading subsequent mission context quality.
+                add_message_to_history!("System", "Specimen saved: $spec_path", false)
 
             elseif !isnothing(m_loadspecimen)
                 # GRUG: /loadSpecimen <filepath> — thaw a previously saved specimen file
@@ -4072,7 +4111,10 @@ elseif !isnothing(m_right)
                     println("--> Grug thawing specimen from file...")
                     result_summary = load_specimen_from_file!(spec_path)
                     println("\n$result_summary")
-                    add_message_to_history!("System", result_summary, false)
+                    # GRUG v7.14: One-line digest, not the full restore banner.
+                    # The banner was leaking into Fresh Memory and degrading
+                    # subsequent mission context quality.
+                    add_message_to_history!("System", "Specimen loaded: $spec_path", false)
                 end
 
             elseif !isnothing(m_login)
