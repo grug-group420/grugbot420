@@ -4,7 +4,7 @@ _Auto-generated from `specimen_demo/conversation_raw.log` by_ `specimen_demo/for
 
 **Specimen:** `grugbot420_comprehensive.specimen.gz` (23 nodes / 4 lobes / 8 orchestration rules / 12 AIML tribe nodes / 10 attachments / 3 inhibitions / 3 pinned memories).
 
-Below is an interview between a human **Interviewer** and **Grug** (the GrugBot420 engine after the comprehensive specimen has been loaded). AIML's job is to turn raw votes into a **conversational reply** — what a downstream LLM would speak. Statistics live behind a debug-telemetry separator, out of speech. `/mission` uses standard jitter (snap-back dominant); `/brainstorm` uses heavy scoped jitter (far-jump dominant).
+Below is an interview between a human **Interviewer** and **Grug** (the GrugBot420 engine after the comprehensive specimen has been loaded). AIML's job is to synthesize a **natural-language reply** from the node votes — the winning node's pattern becomes the claim, relational triples + sure companions become supporting clauses, and every word routes through the thesaurus / negative thesaurus / drop tables for variation. Statistics live behind a debug-telemetry separator, out of speech. `/mission` uses standard jitter (snap-back dominant); `/brainstorm` uses heavy scoped jitter (far-jump dominant).
 
 ---
 
@@ -52,20 +52,24 @@ GRUGBOT SYSTEM STATUS
 
 **🗣️ Interviewer:** explain how force relates to acceleration and mass
 
-**🧠 Grug** _(as **Fermentation microbiologist. Explain microbial flavor production and contamination risks.**)_:
+**🧠 Grug** _(as **Fermentation microbiologist**, from the **cooking** cave)_:
 
-> On "explain how force relates to acceleration and mass" — I'll lay it out plainly (and describe, explain, and explain if the situation calls for it). I'm not fully locked in — analyze is also on the table.
-> Shaping directives:
->   • Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
->   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
->   • Close with a short, actionable takeaway the reader can use.
+> Here is the picture: fermentation produces flavor through microbial action. A companion frame: timbre distinguishes instruments with identical pitch.
 
-<sub>verb `lay it out plainly` · primary `describe` · conf `0.55` · certainty `UNSURE` · sure `[describe, explain, explain]` · unsure `[analyze]` · winning node `node_11` · lobe `[cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=8` · user triples `None` · node triples `None`</sub>
+<sub>primary `explain` · conf `0.55` · certainty `UNSURE` · sure `[explain, analyze, analyze]` · unsure `[None]` · winning node `node_11` · lobe `[cooking (0/5 active)] | [music (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=8` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (7)</summary>
+
+- Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [cooking (0/5 active)] | [music (0/5 active)] frame — do not wander into unrelated domains.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+- Close with a short, actionable takeaway the reader can use.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -73,23 +77,21 @@ GRUGBOT SYSTEM STATUS
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'explain how force relates to acceleration and mass'
-Primary Action: describe  (conf=0.55, certainty=UNSURE)
-Sure Actions: [describe, explain, explain]
-Unsure Actions (Coinflip Side-Features): [analyze]
+Primary Action: explain  (conf=0.55, certainty=UNSURE)
+Sure Actions: [explain, analyze, analyze]
+Unsure Actions (Coinflip Side-Features): [None]
 Constraints: [None]
 Winning Node: node_11
-Lobe Context: [cooking (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]
+Lobe Context: [cooking (0/5 active)] | [music (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
 Tied Alternatives (not selected):
-  🪨 node_16 | action=explain | conf=0.55 | relations=None
-  🪨 node_4 | action=explain | conf=0.54 | relations=None
-Other Possibilities (strong but not winners):
-  🔸 node_5 | action=analyze | conf=0.5 | relations=None
+  🪨 node_16 | action=analyze | conf=0.55 | relations=None
+  🪨 node_14 | action=analyze | conf=0.54 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.8) | [System]: /nodeAttach: Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4) | Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4) (intensity=0.7)
+Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: Specimen loaded: grugbot420_comprehensive.specimen.gz (intensity=0.64)
 =========================================
 ```
 </details>
@@ -100,19 +102,24 @@ Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attache
 
 **🗣️ Interviewer:** explain how force relates to acceleration and mass
 
-**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
+**🧠 Grug** _(as **Melody analyst**, from the **ethics** cave)_:
 
-> On "explain how force relates to acceleration and mass" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [cooking (0/5 active)] | [ethics (0/5 active)] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
->   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+> Thinking it through: melody carries emotion through pitch motion.
 
-<sub>verb `lay it out plainly` · primary `explain` · conf `0.49` · certainty `SURE` · sure `[explain]` · unsure `[explain]` · winning node `node_8` · lobe `[cooking (0/5 active)] | [ethics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=10` · user triples `None` · node triples `None`</sub>
+<sub>primary `analyze` · conf `0.66` · certainty `SURE` · sure `[analyze]` · unsure `[explain]` · winning node `node_13` · lobe `[ethics (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.0, eligible=10` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (7)</summary>
+
+- Answer "explain how force relates to acceleration and mass" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [ethics (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)] frame — do not wander into unrelated domains.
+- If the claim leans on a cause-effect chain, state the cause first, then the effect.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- Close with a short, actionable takeaway the reader can use.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -120,20 +127,20 @@ Fresh Memory [threshold=0.0 eligible=8] (Recent): [System]: /nodeAttach: Attache
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'explain how force relates to acceleration and mass'
-Primary Action: explain  (conf=0.49, certainty=SURE)
-Sure Actions: [explain]
+Primary Action: analyze  (conf=0.66, certainty=SURE)
+Sure Actions: [analyze]
 Unsure Actions (Coinflip Side-Features): [explain]
 Constraints: [None]
-Winning Node: node_8
-Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)]
+Winning Node: node_13
+Lobe Context: [ethics (0/5 active)] | [music (0/5 active)] | [physics (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
 Other Possibilities (strong but not winners):
-  🔸 node_10 | action=explain | conf=0.25 | relations=None
+  🔸 node_16 | action=explain | conf=0.55 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attached 'node_4' to 'node_3' with pattern "force and acceleration" (base_conf=0.175, 1/4) | Attached 'node_5' to 'node_3' with pattern "mass and energy" (base_conf=0.05, 2/4) (intensity=0.62) | [System]: /nodeAttach: Attached 'node_6' to 'node_5' with pattern "wave and frequency pitch" (base_conf=0.05, 1/4) | Attached 'node_7' to 'node_5' with pattern "friction heat" (base_conf=0.05, 2/4) (intensity=0.47) | [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_11 (intensity=1.0) | [User]: explain how force relates to acceleration and mass (intensity=1.33)
+Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attached 'node_14' to 'node_13' with pattern "melody and harmony" (base_conf=0.175, 1/4) | Attached 'node_15' to 'node_13' with pattern "harmony chords" (base_conf=0.05, 2/4) (intensity=0.5) | [System]: /nodeAttach: Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4) | Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4) (intensity=0.47)
 =========================================
 ```
 </details>
@@ -144,18 +151,23 @@ Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attach
 
 **🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
-**🧠 Grug** _(as **Thermodynamics tutor. Explain energy dissipation and heat generation from friction.**)_:
+**🧠 Grug** _(as **Cold logical analysis engine active**, from the **cooking** cave)_:
 
-> On "explain how acid balances richness in a heavy dish" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
->   • Stay inside the [physics (0/5 active)] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
->   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+> Thinking it through: consider consider contend gauge. A companion frame: salt enhances flavor when applied in moderation.
 
-<sub>verb `lay it out plainly` · primary `explain` · conf `0.54` · certainty `SURE` · sure `[explain]` · unsure `[reason]` · winning node `node_6` · lobe `[physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `None`</sub>
+<sub>primary `reason` · conf `0.32` · certainty `UNSURE` · sure `[reason, acknowledge, reason, describe]` · unsure `[None]` · winning node `node_1` · lobe `[cooking (0/5 active)] | [ethics (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (6)</summary>
+
+- Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [cooking (0/5 active)] | [ethics (0/5 active)] | [physics (0/5 active)] frame — do not wander into unrelated domains.
+- If the claim leans on a cause-effect chain, state the cause first, then the effect.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -163,20 +175,22 @@ Fresh Memory [threshold=0.0 eligible=10] (Recent): [System]: /nodeAttach: Attach
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'explain how acid balances richness in a heavy dish'
-Primary Action: explain  (conf=0.54, certainty=SURE)
-Sure Actions: [explain]
-Unsure Actions (Coinflip Side-Features): [reason]
-Constraints: [None]
-Winning Node: node_6
-Lobe Context: [physics (0/5 active)]
+Primary Action: reason  (conf=0.32, certainty=UNSURE)
+Sure Actions: [reason, acknowledge, reason, describe]
+Unsure Actions (Coinflip Side-Features): [None]
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)] | [physics (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
-Other Possibilities (strong but not winners):
-  🔸 node_1 | action=reason | conf=0.33 | relations=None
+Tied Alternatives (not selected):
+  🪨 node_9 | action=acknowledge | conf=0.29 | relations=None
+  🪨 node_19 | action=reason | conf=0.28 | relations=None
+  🪨 node_5 | action=describe | conf=0.27 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: Mission "explain how force relates to acceleration and mass" → primary=describe conf=0.55 node=node_11 (intensity=0.73) | [User]: explain how force relates to acceleration and mass (intensity=0.97)
+Fresh Memory [threshold=0.38 eligible=6] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=1.27)
 =========================================
 ```
 </details>
@@ -187,17 +201,23 @@ Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: Mission "explain ho
 
 **🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
-**🧠 Grug** _(as **Flavor-balance chef. Explain how acidity cuts through fat and richness.**)_:
+**🧠 Grug** _(as **Flavor-balance chef**, from the **cooking** cave)_:
 
-> On "explain how acid balances richness in a heavy dish" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [cooking (0/5 active)] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+> Here is the picture: acid balances richness in heavy dishes.
 
-<sub>verb `lay it out plainly` · primary `explain` · conf `0.69` · certainty `SURE` · sure `[explain]` · unsure `[greet]` · winning node `node_10` · lobe `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+<sub>primary `explain` · conf `0.68` · certainty `SURE` · sure `[explain]` · unsure `[analyze]` · winning node `node_10` · lobe `[cooking (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (6)</summary>
+
+- Answer "explain how acid balances richness in a heavy dish" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [cooking (0/5 active)] | [physics (0/5 active)] frame — do not wander into unrelated domains.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -205,20 +225,20 @@ Fresh Memory [threshold=0.38 eligible=6] (Recent): [System]: Mission "explain ho
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'explain how acid balances richness in a heavy dish'
-Primary Action: explain  (conf=0.69, certainty=SURE)
+Primary Action: explain  (conf=0.68, certainty=SURE)
 Sure Actions: [explain]
-Unsure Actions (Coinflip Side-Features): [greet]
+Unsure Actions (Coinflip Side-Features): [analyze]
 Constraints: [None]
 Winning Node: node_10
-Lobe Context: [cooking (0/5 active)]
+Lobe Context: [cooking (0/5 active)] | [physics (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
 Other Possibilities (strong but not winners):
-  🔸 node_0 | action=greet | conf=0.33 | relations=None
+  🔸 node_5 | action=analyze | conf=0.28 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "explain how acid balances richness in a heavy dish" → primary=explain conf=0.54 node=node_6 (intensity=1.01)
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=1.53) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=reason conf=0.32 node=node_1 (intensity=1.13)
 =========================================
 ```
 </details>
@@ -229,17 +249,24 @@ Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "explain ho
 
 **🗣️ Interviewer:** describe how melody and harmony work together
 
-**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
+**🧠 Grug** _(as **Cold logical analysis engine active**)_:
 
-> On "describe how melody and harmony work together" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+> Thinking it through: think contemplate reason gauge.
 
-<sub>verb `lay it out plainly` · primary `explain` · conf `0.6` · certainty `SURE` · sure `[explain]` · unsure `[explain]` · winning node `node_8` · lobe `[cooking (0/5 active)] | [physics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `None` · node triples `None`</sub>
+<sub>primary `analyze` · conf `0.45` · certainty `SURE` · sure `[analyze]` · unsure `[None]` · winning node `node_1` · lobe `[Unassigned nodes - no lobe context]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (7)</summary>
+
+- Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [Unassigned nodes - no lobe context] frame — do not wander into unrelated domains.
+- If the claim leans on a cause-effect chain, state the cause first, then the effect.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- Close with a short, actionable takeaway the reader can use.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -247,20 +274,18 @@ Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "explain ho
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'describe how melody and harmony work together'
-Primary Action: explain  (conf=0.6, certainty=SURE)
-Sure Actions: [explain]
-Unsure Actions (Coinflip Side-Features): [explain]
-Constraints: [None]
-Winning Node: node_8
-Lobe Context: [cooking (0/5 active)] | [physics (0/5 active)]
+Primary Action: analyze  (conf=0.45, certainty=SURE)
+Sure Actions: [analyze]
+Unsure Actions (Coinflip Side-Features): [None]
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
-Other Possibilities (strong but not winners):
-  🔸 node_5 | action=explain | conf=0.27 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=0.95) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=explain conf=0.69 node=node_10 (intensity=0.7)
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=1.05) | [User]: explain how acid balances richness in a heavy dish (intensity=0.89) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=explain conf=0.68 node=node_10 (intensity=0.69)
 =========================================
 ```
 </details>
@@ -271,18 +296,24 @@ Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: explain how acid bala
 
 **🗣️ Interviewer:** describe how melody and harmony work together
 
-**🧠 Grug** _(as **Cooking science coach. Describe how heat drives ingredient transformation.**)_:
+**🧠 Grug** _(as **Cooking science coach**, from the **cooking** cave)_:
 
-> On "describe how melody and harmony work together" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [cooking (0/5 active)] frame — do not wander into unrelated domains.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
->   • Close with a short, actionable takeaway the reader can use.
+> Here is the picture: heat transforms raw ingredients into cooked sustenance.
 
-<sub>verb `lay it out plainly` · primary `describe` · conf `0.6` · certainty `SURE` · sure `[describe]` · unsure `[None]` · winning node `node_8` · lobe `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=10` · user triples `None` · node triples `None`</sub>
+<sub>primary `explain` · conf `0.61` · certainty `SURE` · sure `[explain]` · unsure `[describe]` · winning node `node_8` · lobe `[cooking (0/5 active)] | [music (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=10` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (7)</summary>
+
+- Answer "describe how melody and harmony work together" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- If the claim leans on a cause-effect chain, state the cause first, then the effect.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+- Close with a short, actionable takeaway the reader can use.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -290,18 +321,20 @@ Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: explain how acid bala
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'describe how melody and harmony work together'
-Primary Action: describe  (conf=0.6, certainty=SURE)
-Sure Actions: [describe]
-Unsure Actions (Coinflip Side-Features): [None]
+Primary Action: explain  (conf=0.61, certainty=SURE)
+Sure Actions: [explain]
+Unsure Actions (Coinflip Side-Features): [describe]
 Constraints: [None]
 Winning Node: node_8
-Lobe Context: [cooking (0/5 active)]
+Lobe Context: [cooking (0/5 active)] | [music (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_17 | action=describe | conf=0.33 | relations=None
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=10] (Recent): [User]: describe how melody and harmony work together (intensity=1.19)
+Fresh Memory [threshold=0.38 eligible=10] (Recent): [System]: Mission "explain how force relates to acceleration and mass" → primary=analyze conf=0.66 node=node_13 (intensity=0.38) | [System]: Mission "explain how acid balances richness in a heavy dish" → primary=reason conf=0.32 node=node_1 (intensity=0.58)
 =========================================
 ```
 </details>
@@ -312,20 +345,24 @@ Fresh Memory [threshold=0.38 eligible=10] (Recent): [User]: describe how melody 
 
 **🗣️ Interviewer:** reason about fairness when cases look similar but feel different
 
-**🧠 Grug** _(as **Highly polite greeting protocols active.**)_:
+**🧠 Grug** _(as **Highly polite greeting protocols active**)_:
 
-> On "reason about fairness when cases look similar but feel different" — I'll greet the question.
-> Shaping directives:
->   • Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [Unassigned nodes - no lobe context] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
->   • If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
->   • Close with a short, actionable takeaway the reader can use.
+> Hello — here is what matters: hello hi greeting mornin.
 
-<sub>verb `greet the question` · primary `smile` · conf `0.43` · certainty `SURE` · sure `[smile]` · unsure `[None]` · winning node `node_0` · lobe `[Unassigned nodes - no lobe context]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+<sub>primary `welcome` · conf `0.44` · certainty `SURE` · sure `[welcome]` · unsure `[None]` · winning node `node_0` · lobe `[Unassigned nodes - no lobe context]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=8` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (7)</summary>
+
+- Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
+- Ground the reply in a concrete example before stating any general principle.
+- Stay inside the [Unassigned nodes - no lobe context] frame — do not wander into unrelated domains.
+- If the claim leans on a cause-effect chain, state the cause first, then the effect.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -333,8 +370,8 @@ Fresh Memory [threshold=0.38 eligible=10] (Recent): [User]: describe how melody 
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'reason about fairness when cases look similar but feel different'
-Primary Action: smile  (conf=0.43, certainty=SURE)
-Sure Actions: [smile]
+Primary Action: welcome  (conf=0.44, certainty=SURE)
+Sure Actions: [welcome]
 Unsure Actions (Coinflip Side-Features): [None]
 Constraints: [dont frown, dont insult, dont be rude]
 Winning Node: node_0
@@ -344,7 +381,7 @@ Node Triples: None
 Anti-Match Detected: false
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness when cases look similar but feel different (intensity=1.31)
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [User]: explain how acid balances richness in a heavy dish (intensity=0.39) | [System]: Mission "describe how melody and harmony work together" → primary=analyze conf=0.45 node=node_1 (intensity=0.63) | [System]: Mission "describe how melody and harmony work together" → primary=explain conf=0.61 node=node_8 (intensity=0.64)
 =========================================
 ```
 </details>
@@ -355,18 +392,21 @@ Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness
 
 **🗣️ Interviewer:** reason about fairness when cases look similar but feel different
 
-**🧠 Grug** _(as **Flavor-balance chef. Explain how acidity cuts through fat and richness.**)_:
+**🧠 Grug** _(as **Flavor-balance chef**, from the **cooking** cave)_:
 
-> On "reason about fairness when cases look similar but feel different" — I'll lay it out plainly.
-> Shaping directives:
->   • Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
->   • Ground the reply in a concrete example before stating any general principle.
->   • Stay inside the [cooking (0/5 active)] | [ethics (0/5 active)] frame — do not wander into unrelated domains.
->   • If the claim leans on a cause-effect chain, state the cause first, then the effect.
->   • When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
->   • Speak with the persona in the system_prompt — do not break voice mid-reply.
+> Here is the picture: acid balances richness in heavy dishes.
 
-<sub>verb `lay it out plainly` · primary `describe` · conf `0.53` · certainty `SURE` · sure `[describe]` · unsure `[None]` · winning node `node_10` · lobe `[cooking (0/5 active)] | [ethics (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+<sub>primary `explain` · conf `0.54` · certainty `SURE` · sure `[explain]` · unsure `[None]` · winning node `node_10` · lobe `[cooking (0/5 active)]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `None`</sub>
+
+<details>
+<summary>🎯 Shaping directives (4)</summary>
+
+- Answer "reason about fairness when cases look similar but feel different" in one tight paragraph — no lists, no hedging ladders.
+- When the topic touches harm, consent, or fairness, include at least one mitigating consideration.
+- Speak with the persona in the system_prompt — do not break voice mid-reply.
+- If confidence is shaky, hedge once plainly ("this is roughly true when...") — never stack caveats.
+
+</details>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -374,18 +414,18 @@ Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness
 ```text
 --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
 Mission: 'reason about fairness when cases look similar but feel different'
-Primary Action: describe  (conf=0.53, certainty=SURE)
-Sure Actions: [describe]
+Primary Action: explain  (conf=0.54, certainty=SURE)
+Sure Actions: [explain]
 Unsure Actions (Coinflip Side-Features): [None]
 Constraints: [None]
 Winning Node: node_10
-Lobe Context: [cooking (0/5 active)] | [ethics (0/5 active)]
+Lobe Context: [cooking (0/5 active)]
 User Triples: None
 Node Triples: None
 Anti-Match Detected: false
 AIML Memory Bank:
 Deep Memory (Pinned): [User_Pinned]: Always cite the winning node id and lobe when giving a recommendation. | [User_Pinned]: Prefer concrete examples over abstract generalities for the first response. | [User_Pinned]: When answers involve harm or fairness, include at least one mitigating consideration.
-Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness when cases look similar but feel different (intensity=1.48) | [User]: reason about fairness when cases look similar but feel different (intensity=1.23)
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: reason about fairness when cases look similar but feel different (intensity=1.38) | [User]: reason about fairness when cases look similar but feel different (intensity=1.24)
 =========================================
 ```
 </details>
@@ -447,5 +487,5 @@ GRUGBOT SYSTEM STATUS
 - Scripted `/mission` and `/brainstorm` commands: **8**
 - AIML scaffolds Grug emitted: **8**
 - Silent cycles: **0**
-- Raw log size (on disk): **38,895 bytes**
-- Raw log size (read into formatter): **36,191 bytes** (head + tail slice; the plain log would balloon O(N²) without v7.12–v7.14 context gating)
+- Raw log size (on disk): **39,537 bytes**
+- Raw log size (read into formatter): **36,915 bytes** (head + tail slice; the plain log would balloon O(N²) without v7.12–v7.14 context gating)

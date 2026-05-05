@@ -1069,25 +1069,34 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     n_triples = isempty(primary_vote.node_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.node_triples], ", ")
 
     # =====================================================================
-    # GRUG v7.15: AIML ORCHESTRATES VOTES INTO CONVERSATIONAL OUTPUT.
+    # GRUG v7.16: AIML SYNTHESIZES VOTES INTO A NATURAL-LANGUAGE REPLY.
     # =====================================================================
-    # AIML's job is to turn raw vote data into a reply a human would want
-    # to read. Not "Primary Action: analyze. Sure Actions: [analyze, explain]"
-    # — that is orchestration telemetry, not speech.
+    # AIML's job is NOT to emit instructions ("Answer X in one tight
+    # paragraph") and it is NOT to emit statistics ("Primary Action:
+    # analyze. Sure Actions: [...]"). It is to ORCHESTRATE the votes
+    # (which carry the content) into a SPOKEN reply — the node patterns
+    # are the claims, the system_prompt is the voice, the relational
+    # triples are sub-claims, the primary action is the speech-act,
+    # and the thesaurus + inhibitions + rules are the synonymy menu.
     #
-    # The canonical return is the CONVERSATIONAL REPLY block. Stats live
-    # behind a --- DEBUG TELEMETRY --- separator so /status, the test
-    # harness, and the formatter can still inspect them, but downstream
-    # Fresh Memory ingestion and LLM consumers see the reply first.
+    # Pipeline per cycle:
+    #   1. Look up winning node → claim (pattern) + voice + drop_table
+    #   2. Pick skeleton from primary action family
+    #   3. Fill skeleton, routing every word through thesaurus swap →
+    #      inhibition check → drop_table check (honour both negative
+    #      thesaurus and per-node drop_table)
+    #   4. Weave relational triples as sub-clauses
+    #   5. Fold in sure companion patterns as supporting claims
+    #   6. Add hedge on UNSURE certainty only
+    #   7. Cite pinned memory if lexically topical
+    #   8. Tag with lobe frame
     #
-    # The reply is built in voice (system_prompt sets persona), uses the
-    # primary action as the verb, and folds any evaluated orchestration
-    # rules in as shaping directives rather than variable-dumps. No
-    # bracket-lists. No "I am entirely sure that I should: [X, Y]".
+    # Stats stay behind --- DEBUG TELEMETRY --- (v7.15 separator) so
+    # /status, tests, and operators can still see them, but the reply
+    # is the first and primary thing a downstream consumer reads.
     # =====================================================================
 
-    # GRUG: Small helper so we weave sure/unsure actions into natural
-    # prose. e.g. ["analyze","explain"] becomes "analyze and explain".
+    # GRUG: Prose-join for action lists that do surface in the reply.
     function _prose_join(items::Vector{String})::String
         if isempty(items);          return "" end
         if length(items) == 1;      return items[1] end
@@ -1095,56 +1104,305 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         return join(items[1:end-1], ", ") * ", and " * items[end]
     end
 
-    sure_actions_prose   = _prose_join([v.action for v in sure_votes])
-    unsure_actions_prose = _prose_join([v.action for v in unsure_votes])
+    # -------------------------------------------------------------------
+    # GRUG v7.16: _pick_synonym — given a word, return either a random
+    # synonym from Thesaurus.SYNONYM_SEED_MAP OR the original word,
+    # respecting:
+    #   (a) Negative thesaurus (InputQueue.is_inhibited) — NEVER emit
+    #   (b) Per-node drop_table — NEVER emit this node's forbidden words
+    #   (c) Required relations — if the original word is in the winning
+    #       node's required_relations, we MUST keep it (synonyms would
+    #       break the required-relation contract)
+    #
+    # NO SILENT FAILURES: if every candidate is inhibited AND the
+    # original word is also inhibited AND is required, we @warn and
+    # emit the original anyway (required > inhibited) so the reply
+    # still carries the seeded claim. This is the correct choice —
+    # silently dropping a required relation breaks the node's contract.
+    # -------------------------------------------------------------------
+    function _pick_synonym(word::String, drop_table::Vector{String},
+                            required_relations::Vector{String})::String
+        clean = lowercase(strip(word))
+        is_required = clean in required_relations
 
-    # Voice opener: pick a natural verb phrase for the primary action
-    # family. These are SHORT so the reply stays crisp.
-    verb_phrase = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
-        "greet the question"
-    elseif primary_vote.action in ["flee", "hide", "fight"]
-        "flag a concern"
-    elseif primary_vote.action in ["comfort", "support", "validate", "acknowledge", "reassure"]
-        "acknowledge what matters here"
-    elseif primary_vote.action in ["alert", "warn", "caution", "notify", "flag"]
-        "give a careful warning"
-    elseif primary_vote.action in ["explain", "clarify", "describe", "define", "elaborate"]
-        "lay it out plainly"
+        # Required-relation short-circuit: never swap, never inhibit.
+        if is_required
+            return word
+        end
+
+        # Candidate pool: original + all synonyms from BOTH registries.
+        #   (1) Thesaurus.SYNONYM_SEED_MAP — built-in canonical→synset
+        #       map (bidirectional). Rich hardcoded defaults like
+        #       "produce" → {trigger, induce, make, construct, ...}.
+        #   (2) SemanticVerbs._SYNONYM_MAP — runtime /addSynonym map,
+        #       stored alias→canonical. We scan BOTH directions:
+        #       if word is a canonical, collect its aliases; if word
+        #       is itself an alias, collect its canonical + siblings.
+        candidates = String[word]
+        if haskey(Thesaurus.SYNONYM_SEED_MAP, clean)
+            for syn in Thesaurus.SYNONYM_SEED_MAP[clean]
+                push!(candidates, syn)
+            end
+        end
+        # GRUG v7.16-FIX: also pull runtime /addSynonym entries.
+        try
+            sv_map = SemanticVerbs._SYNONYM_MAP  # alias => canonical
+            # Case A: word is a canonical. Collect aliases pointing to it.
+            for (alias, canon) in sv_map
+                if canon == clean && alias != clean
+                    push!(candidates, alias)
+                end
+            end
+            # Case B: word is itself an alias. Add its canonical, and
+            # every sibling alias of that canonical.
+            if haskey(sv_map, clean)
+                my_canon = sv_map[clean]
+                if my_canon != clean
+                    push!(candidates, my_canon)
+                end
+                for (alias, canon) in sv_map
+                    if canon == my_canon && alias != clean
+                        push!(candidates, alias)
+                    end
+                end
+            end
+        catch e
+            @warn "[MAIN v7.16 synthesis] Runtime synonym lookup failed ($e); continuing with seed-map only."
+        end
+        unique!(candidates)
+
+        # Filter out inhibited words (both negative-thesaurus and
+        # per-node drop_table).
+        allowed = filter(candidates) do c
+            c_clean = lowercase(strip(c))
+            if InputQueue.is_inhibited(String(c_clean))
+                return false
+            end
+            if c_clean in drop_table
+                return false
+            end
+            return true
+        end
+
+        if isempty(allowed)
+            # Every candidate is inhibited. Warn loudly — this is a
+            # seed-configuration smell (user inhibited the word AND
+            # all its synonyms). Emit the original so the reply does
+            # not lose content; operator can fix the inhibition set.
+            @warn "[MAIN v7.16 synthesis] Every synonym of '$word' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content."
+            return word
+        end
+
+        # Stochastic pick — this is the natural-variation engine.
+        # Two cycles on the same prompt roll different synonyms.
+        return rand(allowed)
+    end
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: _swap_words_in — route every whitespace-token of a
+    # sentence through _pick_synonym and rejoin. Preserves the original
+    # token's case via a simple heuristic: if the original starts with
+    # uppercase, capitalize the synonym.
+    # -------------------------------------------------------------------
+    function _swap_words_in(sentence::String, drop_table::Vector{String},
+                             required_relations::Vector{String})::String
+        # GRUG v7.16-FIX: Julia's `split` with a regex DOES NOT return
+        # the separators as tokens (unlike Python's re.split with a
+        # capturing group). So we split on whitespace, keep only the
+        # word tokens, route each through _pick_synonym, and rejoin
+        # with a single space. Multiple-space runs collapse to single
+        # spaces — acceptable for seeded patterns (they are already
+        # single-space-separated by convention).
+        tokens = split(sentence)  # splits on any whitespace, drops empties
+        out_tokens = String[]
+        for tok in tokens
+            # Strip trailing punctuation for the lookup but re-attach
+            # after. This lets "causes," still be recognised as "causes".
+            m = match(r"^([\w][\w'-]*)(.*)$", String(tok))
+            if m === nothing
+                push!(out_tokens, String(tok))
+                continue
+            end
+            core = String(m.captures[1])
+            tail = m.captures[2] === nothing ? "" : String(m.captures[2])
+            picked = _pick_synonym(core, drop_table, required_relations)
+            # Case match: if original core was capitalised, capitalise picked.
+            if !isempty(core) && isuppercase(first(core)) && !isempty(picked)
+                picked = uppercase(first(picked)) *
+                         (length(picked) > 1 ? picked[nextind(picked, 1):end] : "")
+            end
+            push!(out_tokens, picked * tail)
+        end
+        return join(out_tokens, " ")
+    end
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Look up the winning node so we can pull pattern,
+    # drop_table, relational_patterns, and required_relations directly.
+    # If the node vanished mid-cycle (shouldn't happen — cast_votes
+    # already locked it), we @error and fall back to a minimal reply
+    # using only the vote's public surface.
+    # -------------------------------------------------------------------
+    winning_node = lock(() -> get(NODE_MAP, primary_vote.node_id, nothing), NODE_LOCK)
+    node_pattern = ""
+    node_drop_table = String[]
+    node_required = String[]
+    node_triples_obj = RelationalTriple[]
+    if winning_node !== nothing
+        node_pattern     = winning_node.pattern
+        node_drop_table  = [lowercase(strip(w)) for w in winning_node.drop_table]
+        node_required    = [lowercase(strip(r)) for r in winning_node.required_relations]
+        node_triples_obj = winning_node.relational_patterns
     else
-        "reason it through"
+        @error "[MAIN v7.16 synthesis] winning node $(primary_vote.node_id) vanished between vote and synthesis — reply will be minimal."
     end
 
-    # GRUG: Build the conversational reply. Voice first (system_prompt),
-    # then the shaped action, then whatever orchestration rules survived
-    # their coinflip — but the rules are presented as SHAPING DIRECTIVES
-    # the downstream LLM should honour, NOT as stats to parrot.
-    reply_io = IOBuffer()
-    # Persona / voice header — downstream LLM uses this as system prompt.
-    println(reply_io, "[Voice: $system_prompt]")
-    # The question and the primary stance.
-    print(reply_io, "On \"$mission\" — I'll $verb_phrase")
-    if !isempty(sure_actions_prose) && sure_actions_prose != primary_vote.action
-        print(reply_io, " (and $sure_actions_prose if the situation calls for it)")
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Sentence skeletons keyed by primary action family.
+    # Each skeleton accepts two slots:
+    #   {CLAIM}   — the core claim (the winning node's pattern, with
+    #               every word routed through the synonym + inhibition
+    #               pipeline).
+    #   {SUPPORT} — zero or more supporting sentences (sure companion
+    #               patterns, relational triples, or empty).
+    # We keep 6 skeletons aligned with the 6 action families in
+    # COMMANDS so every vote resolves to a spoken shape.
+    # -------------------------------------------------------------------
+    skeleton = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
+        "Hello — here is what matters: {CLAIM}.{SUPPORT}"
+    elseif primary_vote.action in ["flee", "hide", "fight"]
+        "A concern worth raising: {CLAIM}.{SUPPORT}"
+    elseif primary_vote.action in ["comfort", "support", "validate", "acknowledge", "reassure"]
+        "To acknowledge what matters here: {CLAIM}.{SUPPORT}"
+    elseif primary_vote.action in ["alert", "warn", "caution", "notify", "flag"]
+        "A caution: {CLAIM}.{SUPPORT}"
+    elseif primary_vote.action in ["explain", "clarify", "describe", "define", "elaborate"]
+        "Here is the picture: {CLAIM}.{SUPPORT}"
+    else  # reason-family: reason, analyze, ponder, calculate
+        "Thinking it through: {CLAIM}.{SUPPORT}"
     end
-    print(reply_io, ".")
-    # Hedge clause: only if we have genuine unsure side-features AND
-    # the vote was tied. This keeps hedges honest, not noise.
-    if !isempty(unsure_votes) && vote_certainty == "UNSURE"
-        print(reply_io, " I'm not fully locked in — $unsure_actions_prose is also on the table.")
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Build the CLAIM. If the winning node has a pattern we
+    # use it (that IS the seeded answer). If not (shouldn't happen —
+    # /lobeGrow enforces pattern), we fall back to a generic frame
+    # around the mission so we never emit an empty reply.
+    # -------------------------------------------------------------------
+    claim_raw = isempty(node_pattern) ? "the mission \"$mission\" touches unseeded territory" : node_pattern
+    claim = _swap_words_in(String(claim_raw), node_drop_table, node_required)
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Build SUPPORT. Up to 2 sentences, drawn from:
+    #   (a) Relational triples from the winning node — "X relates to Y"
+    #   (b) Sure companion nodes' patterns — supporting claims
+    #   (c) On UNSURE certainty, an honest hedge from unsure side-features
+    # Each sentence also routes through _swap_words_in so inhibitions
+    # and per-node drop_tables apply uniformly.
+    # -------------------------------------------------------------------
+    support_pieces = String[]
+
+    # (a) Relational triple → sub-clause. Pick up to 1 triple to keep
+    # the reply tight. Prefer a triple whose relation is in required_relations.
+    if !isempty(node_triples_obj)
+        preferred = nothing
+        for t in node_triples_obj
+            if lowercase(strip(t.relation)) in node_required
+                preferred = t
+                break
+            end
+        end
+        t = preferred === nothing ? rand(node_triples_obj) : preferred
+        rel_swapped  = _pick_synonym(String(t.relation), node_drop_table, node_required)
+        subj_swapped = _swap_words_in(String(t.subject),  node_drop_table, node_required)
+        obj_swapped  = _swap_words_in(String(t.object),   node_drop_table, node_required)
+        push!(support_pieces, " The link is clear: $subj_swapped $rel_swapped $obj_swapped.")
     end
-    println(reply_io)
-    # Orchestration rules → shaping directives. We present them as
-    # bullet instructions the LLM should follow while generating, not
-    # as "here are the stats that fired". If no rules fired, we omit
-    # the block entirely — a silent rule board is not noise worth
-    # surfacing in the reply.
-    if !isempty(evaluated_rules)
-        println(reply_io, "Shaping directives:")
-        for r in evaluated_rules
-            println(reply_io, "  • $r")
+
+    # (b) Sure companion → supporting claim. Only if we have at least
+    # one tied alternative AND it has a pattern different from the
+    # primary. This keeps the reply from repeating itself.
+    if !isempty(tied_alternatives)
+        companion = tied_alternatives[1]
+        comp_node = lock(() -> get(NODE_MAP, companion.node_id, nothing), NODE_LOCK)
+        if comp_node !== nothing && !isempty(comp_node.pattern) &&
+           comp_node.pattern != node_pattern
+            comp_claim = _swap_words_in(String(comp_node.pattern),
+                                         node_drop_table, node_required)
+            push!(support_pieces, " A companion frame: $comp_claim.")
         end
     end
-    conversational_reply = String(take!(reply_io))
+
+    # (c) UNSURE hedge: honest about alternative frames still on the table.
+    if !isempty(unsure_votes) && vote_certainty == "UNSURE"
+        # Use a plain action list for the hedge, also routed through
+        # synonym-swap so inhibited action words are replaced.
+        unsure_actions = [_pick_synonym(String(v.action), node_drop_table, node_required)
+                          for v in unsure_votes]
+        unique!(unsure_actions)
+        hedge_prose = _prose_join(unsure_actions)
+        push!(support_pieces, " I am not fully locked in — $hedge_prose is also on the table.")
+    end
+
+    support = join(support_pieces, "")
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Assemble the core sentence from skeleton + claim +
+    # support, then wrap with voice (system_prompt) and lobe tag.
+    # -------------------------------------------------------------------
+    core_reply = replace(skeleton, "{CLAIM}" => claim, "{SUPPORT}" => support)
+
+    # Lobe tag: pull just the first active lobe name from lobe_str.
+    lobe_tag = ""
+    m_lobe = match(r"\[([a-z_]+) \(\d+/\d+ active\)\]", lobe_str)
+    if m_lobe !== nothing
+        lobe_tag = " (from the $(m_lobe.captures[1]) cave)"
+    end
+
+    # -------------------------------------------------------------------
+    # GRUG v7.16: Cite pinned memory only when it is LEXICALLY TOPICAL
+    # to the mission. Requires ≥1 shared non-stopword token between
+    # pinned text and mission. This prevents unrelated pinned rules
+    # from leaking into every reply (that was a v7.15 regression — the
+    # old rules dumped ALL pinned memory into every cycle's payload).
+    # -------------------------------------------------------------------
+    pinned_citation = ""
+    try
+        mission_tokens = Set(_tokenize_for_relevance(mission))
+        if !isempty(mission_tokens)
+            # Walk MESSAGE_HISTORY for pinned entries; pick the first
+            # topical one (pinned memory is small — linear scan fine).
+            lock(MESSAGE_LOCK) do
+                for m in MESSAGE_HISTORY
+                    if m.pinned
+                        pin_tokens = Set(_tokenize_for_relevance(m.text))
+                        if !isempty(intersect(mission_tokens, pin_tokens))
+                            pinned_citation = " Pinned note: $(m.text)"
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    catch e
+        @warn "[MAIN v7.16 synthesis] Pinned-memory topicality check failed ($e); skipping citation."
+    end
+
+    # Voice prefix: first sentence of the system_prompt is the persona tag.
+    voice_first = split(system_prompt, "."; limit=2)[1] |> strip
+    voice_prefix = isempty(voice_first) ? "" : "[$voice_first] "
+
+    # Shaping directives — v7.15 kept them as a separate bulleted block
+    # because they are tone/voice directives the downstream LLM
+    # consumer (if any) should still honour. We keep a COMPACT form
+    # (no bullets, inline) so the reply stays a single paragraph.
+    # Directives only surface when they add shaping value — empty list
+    # means the reply is its own sole authority.
+    directive_suffix = ""
+    if !isempty(evaluated_rules)
+        directive_suffix = " [Directives: " * join(evaluated_rules, "; ") * "]"
+    end
+
+    conversational_reply = "$voice_prefix$core_reply$pinned_citation$lobe_tag$directive_suffix"
 
     # GRUG: Wait little bit so cpu fire not burn down hut.
     sleep(0.3)

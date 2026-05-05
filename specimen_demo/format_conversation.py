@@ -1,30 +1,39 @@
 #!/usr/bin/env python3
 """
-GRUG CONVERSATION LOG FORMATTER (v7.14)
+GRUG CONVERSATION LOG FORMATTER (v7.16)
 ========================================
 Turn a raw run_cli() transcript into a human-readable DIALOGUE.
 
-The whole log is framed as an interview: the Interviewer asks a
-question (the /mission or /brainstorm text from the script) and Grug
-answers (the AIML Output Scaffold the engine emitted). We render:
+v7.16 scaffold shape (single reply line, then telemetry block):
 
-  **Interviewer:** <prompt>
-  **Grug:**       <headline paraphrase from primary action + winning node>
+  🤖 AIML Output Scaffold:
+  [Voice Text] Skeleton: claim. Support. (from the X cave) [Directives: a; b; c]
+  --- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+  Mission: '...'
+  Primary Action: X  (conf=Y, certainty=Z)
+  Sure Actions: [...]
+  Unsure Actions (Coinflip Side-Features): [...]
+  Constraints: [...]
+  Winning Node: node_X
+  Lobe Context: ...
+  ...
+  =========================================
 
-  <blockquote>
-  Full AIML response payload (the exact bytes a downstream LLM
-  would receive for this cycle)
-  </blockquote>
+We render each cycle as:
 
-  Then a compact stats strip (confidence, certainty, lobe, etc.)
+  ### Cycle N · /mission
+  **🗣️ Interviewer:** <mission text>
+  **🧠 Grug** _(as **<voice>**, from the **<cave>** cave)_:
 
-This is what the user explicitly asked for: "include actual logs of
-replies etc ... you querying the ai replying". The /mission prompt is
-the question, the scaffold IS Grug's reply. We no longer bury the
-reply inside a collapsible after a giant stats table.
+  > <natural-language reply — claim + support, no directives, no cave tag>
 
-NO SILENT FAILURES: exits non-zero on missing raw log. If a cycle is
-silent (no pattern matched), we render it as Grug saying so, explicitly.
+  <sub>compact stats strip</sub>
+
+  <details>collapsed directives</details>
+  <details>collapsed full telemetry</details>
+
+NO SILENT FAILURES: exits non-zero on missing raw log. Cycles that
+match no scaffold are rendered as explicit "cave is silent" dialogue.
 """
 import gzip
 import re
@@ -35,18 +44,21 @@ from pathlib import Path
 # GRUG: Recognise either of the two prompt commands we support.
 MISSION_RE = re.compile(r"^(/mission|/brainstorm)\s+(.+?)$", flags=re.MULTILINE)
 
-# GRUG v7.15: Scaffold now LEADS with a conversational reply and puts
-# stats behind a --- DEBUG TELEMETRY --- separator. The regex picks up
-# the scaffold start + voice + opener + mission, and we fish out the
-# stats from the telemetry block separately.
+# GRUG v7.16: Scaffold emits ONE reply line after the header.
+#   [Voice prefix] <synthesized reply text>
+# Followed immediately by the DEBUG TELEMETRY separator. We capture:
+#   group(1) = voice text inside the leading brackets
+#   group(2) = the remainder of the reply line (claim + support +
+#              optional "(from the X cave)" + "[Directives: ...]")
 SCAFFOLD_RE = re.compile(
     r"🤖 AIML Output Scaffold:\n"
-    r"\[Voice: (.+?)\]\n"
-    r"On \"(.+?)\" — I'll (.+?)\.\n"
+    r"\[([^\]]+)\]\s*(.+?)\n"
+    r"--- DEBUG TELEMETRY",
+    flags=re.DOTALL,
 )
-# Extract the stats we need from the debug telemetry block that follows
-# the scaffold header. The telemetry block is bounded by the separator
-# line and the next '=====' divider.
+
+# Pull the stats block bounded by the telemetry separator and the
+# '=====' divider that closes every scaffold.
 TELEMETRY_RE = re.compile(
     r"--- DEBUG TELEMETRY \(orchestration internals, not for speech\) ---\n"
     r"Mission: '(.+?)'\n"
@@ -54,9 +66,36 @@ TELEMETRY_RE = re.compile(
     r"Sure Actions: \[(.*?)\]\n"
     r"Unsure Actions \(Coinflip Side-Features\): \[(.*?)\]\n"
     r".*?Winning Node: (\S+)\n",
-    flags=re.DOTALL
+    flags=re.DOTALL,
 )
 SILENT_RE = re.compile(r"--> No valid specimens found for this input\. Cave is silent\.")
+
+# Split a v7.16 reply line into (clean_reply, cave_tag, directives_list).
+CAVE_RE = re.compile(r"\s*\(from the ([a-z_]+) cave\)\s*")
+DIRECTIVES_RE = re.compile(r"\s*\[Directives:\s*(.+?)\s*\]\s*$", flags=re.DOTALL)
+
+
+def split_reply(raw_reply: str):
+    """Strip structural tags off the v7.16 reply text.
+
+    Returns (speech, cave, directives) where:
+      speech     = the conversational sentence(s) (claim + support)
+      cave       = the winning lobe name (e.g. "cooking") or "" if
+                   the scaffold didn't surface one (unassigned nodes)
+      directives = list of shaping directives, one per entry
+    """
+    text = raw_reply.strip()
+    directives = []
+    m = DIRECTIVES_RE.search(text)
+    if m:
+        directives = [d.strip() for d in m.group(1).split(";") if d.strip()]
+        text = text[:m.start()].rstrip()
+    cave = ""
+    m = CAVE_RE.search(text)
+    if m:
+        cave = m.group(1)
+        text = (text[:m.start()] + text[m.end():]).strip()
+    return text, cave, directives
 
 
 # ---------------------------------------------------------------------------
@@ -70,41 +109,21 @@ def clean_box(text: str) -> str:
     return text.strip()
 
 
-def extract_field(scaffold: str, label_re: str, default: str = "?") -> str:
-    """Pull a single-line scalar field out of a scaffold block."""
-    m = re.search(label_re, scaffold)
+def extract_field(block: str, label_re: str, default: str = "?") -> str:
+    """Pull a single-line scalar field out of a telemetry block."""
+    m = re.search(label_re, block)
     return m.group(1).strip() if m else default
 
 
-def extract_lobe_context(scaffold: str) -> str:
-    """Anchor between the LOBE CONTEXT and RELATIONAL CONTEXT dividers."""
-    m = re.search(
-        r"--- LOBE CONTEXT \(PREFRONTAL CORTEX\) ---\n"
-        r"Lobe Context: (.+?)\n"
-        r"--- RELATIONAL CONTEXT ---",
-        scaffold, flags=re.DOTALL
-    )
-    if not m:
-        m2 = re.search(r"Lobe Context: (.+?)\n", scaffold)
-        return m2.group(1).strip() if m2 else "?"
-    return m.group(1).strip()
-
-
-def extract_node_context(scaffold: str) -> str:
-    """Pull the node's system_prompt from `Context: '<...>'`."""
-    m = re.search(r"Context: '(.+?)'\n", scaffold)
+def extract_lobe_context(block: str) -> str:
+    """Pull the `Lobe Context: ...` line from telemetry."""
+    m = re.search(r"Lobe Context: (.+?)\n", block)
     return m.group(1).strip() if m else "?"
 
 
-def extract_winner_node(scaffold: str) -> str:
-    """Winning node id is surfaced in the orchestration rule template."""
-    m = re.search(r"Surface the winning node (\S+) from lobe", scaffold)
-    return m.group(1) if m else "?"
-
-
-def extract_threshold_note(scaffold: str) -> str:
+def extract_threshold_note(block: str) -> str:
     """v7.13: Pull the Fresh Memory `[threshold=X eligible=N]` header."""
-    m = re.search(r"Fresh Memory \[threshold=([0-9.]+) eligible=(\d+)\]", scaffold)
+    m = re.search(r"Fresh Memory \[threshold=([0-9.]+) eligible=(\d+)\]", block)
     return f"threshold={m.group(1)}, eligible={m.group(2)}" if m else "—"
 
 
@@ -120,42 +139,9 @@ def extract_status_block(raw: str, marker: str, which: str = "last") -> str:
     return matches[0 if which == "first" else -1].group(0)
 
 
-def grug_headline(primary: str, node_ctx: str, winner: str, lobe_ctx: str) -> str:
-    """
-    GRUG v7.14: Build a one-sentence lead that frames the scaffold as
-    Grug's reply. This is the "voice" line the reader sees immediately
-    under **Grug:** before the full payload. It combines the primary
-    action, the winning node's system_prompt (which IS the voice the
-    JIT AIML pulled), and the winning lobe.
-    """
-    # Winning lobe: first name that appears in the lobe context strip.
-    lobe_match = re.search(r"\[([a-z_]+) \(\d+/\d+ active\)\]", lobe_ctx)
-    lobe_name = lobe_match.group(1) if lobe_match else "cave"
-    # Trim node voice to one sentence so the headline stays scannable.
-    voice = node_ctx.split(".")[0].strip() if node_ctx and node_ctx != "?" else ""
-    if voice:
-        return (f"_speaking as **{lobe_name}** ({winner}) — **{voice}**_ "
-                f"→ primary action: **`{primary}`**")
-    return f"_speaking from **{lobe_name}** ({winner})_ → primary action: **`{primary}`**"
-
-
 # ---------------------------------------------------------------------------
 # Main dialogue builder
 # ---------------------------------------------------------------------------
-
-def _split_reply_and_telemetry(scaf: str):
-    """
-    GRUG v7.15: Scaffold is `reply || --- DEBUG TELEMETRY --- || stats`.
-    Return (reply_block, telemetry_block). If the separator is missing
-    (truncated/malformed), return the whole scaf as reply and empty
-    telemetry so we never silently drop a cycle.
-    """
-    sep = "--- DEBUG TELEMETRY (orchestration internals, not for speech) ---"
-    if sep in scaf:
-        reply_part, tele_part = scaf.split(sep, 1)
-        return reply_part.rstrip(), sep + "\n" + tele_part.strip()
-    return scaf.rstrip(), ""
-
 
 def build_transcript(raw: str, true_raw_size: int) -> str:
     scaffolds = list(SCAFFOLD_RE.finditer(raw))
@@ -175,12 +161,15 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
     out.append(
         "Below is an interview between a human **Interviewer** and "
         "**Grug** (the GrugBot420 engine after the comprehensive "
-        "specimen has been loaded). AIML's job is to turn raw votes "
-        "into a **conversational reply** — what a downstream LLM "
-        "would speak. Statistics live behind a debug-telemetry "
-        "separator, out of speech. `/mission` uses standard jitter "
-        "(snap-back dominant); `/brainstorm` uses heavy scoped jitter "
-        "(far-jump dominant).\n\n"
+        "specimen has been loaded). AIML's job is to synthesize a "
+        "**natural-language reply** from the node votes — the winning "
+        "node's pattern becomes the claim, relational triples + sure "
+        "companions become supporting clauses, and every word routes "
+        "through the thesaurus / negative thesaurus / drop tables for "
+        "variation. Statistics live behind a debug-telemetry separator, "
+        "out of speech. `/mission` uses standard jitter (snap-back "
+        "dominant); `/brainstorm` uses heavy scoped jitter (far-jump "
+        "dominant).\n\n"
     )
 
     # ---- Baseline diagnostics ---------------------------------------
@@ -193,26 +182,27 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
     out.append("---\n\n## 🎙️ The Interview\n\n")
 
     for idx, sc in enumerate(scaffolds, start=1):
-        voice = sc.group(1)
-        mission = sc.group(2)
-        verb_phrase = sc.group(3)
+        voice = sc.group(1).strip()
+        reply_raw = sc.group(2).strip()
+        speech, cave, directives = split_reply(reply_raw)
 
-        # Bound the scaffold at the next '=====' divider or next Brain >
+        # Telemetry block runs from the scaffold's start to the next
+        # '=====' divider that closes the scaffold.
         start = sc.start()
         end_m = re.search(r"={30,}", raw[start:start + 80000])
-        reply_end_m = re.search(r"\nBrain >", raw[start:start + 80000])
-        candidates = [e for e in [end_m.end() if end_m else None,
-                                  reply_end_m.start() if reply_end_m else None]
-                      if e is not None]
-        end = start + (min(candidates) if candidates else min(50000, len(raw) - start))
+        end = start + (end_m.end() if end_m else min(50000, len(raw) - start))
         scaf = raw[start:end]
 
-        # v7.15: split reply from telemetry
-        reply_block, tele_block = _split_reply_and_telemetry(scaf)
+        # Find telemetry portion (everything from DEBUG TELEMETRY onward).
+        sep = "--- DEBUG TELEMETRY (orchestration internals, not for speech) ---"
+        tele_block = ""
+        if sep in scaf:
+            tele_block = sep + scaf.split(sep, 1)[1]
 
-        # Pull stats from the telemetry block (may be empty on malformed)
+        # Pull stats from the telemetry block
         tele_match = TELEMETRY_RE.search(tele_block) if tele_block else None
         if tele_match:
+            mission = tele_match.group(1)
             primary = tele_match.group(2)
             conf    = tele_match.group(3)
             cert    = tele_match.group(4)
@@ -220,6 +210,7 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
             unsure  = tele_match.group(6) or "None"
             winner  = tele_match.group(7)
         else:
+            mission = "?"
             primary, conf, cert = "?", "?", "?"
             sure, unsure, winner = "None", "None", "?"
 
@@ -239,38 +230,33 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
             matches_for_this = [c for c in script_cmds
                                 if c.group(2).strip() == mission.strip()]
             if matches_for_this:
-                same_text_before = sum(
-                    1 for prev in scaffolds[:idx - 1]
-                    if prev.group(2).strip() == mission.strip()
-                )
+                same_text_before = 0
+                for prev in scaffolds[:idx - 1]:
+                    prev_chunk = raw[prev.start():prev.start() + 80000]
+                    prev_tele = TELEMETRY_RE.search(prev_chunk)
+                    prev_mission = prev_tele.group(1) if prev_tele else ""
+                    if prev_mission.strip() == mission.strip():
+                        same_text_before += 1
                 if same_text_before < len(matches_for_this):
                     kind = matches_for_this[same_text_before].group(1)
-
-        # Trim verb_phrase to the first clause for the stats strip
-        # (the full verb may include hedges like "... I'm not fully
-        # locked in — analyze is also on the table"). The reply block
-        # still shows the whole thing; this is just the compact tag.
-        verb_short = verb_phrase.split(".")[0].split("(")[0].strip()
-        if len(verb_short) > 60:
-            verb_short = verb_short[:57] + "..."
 
         # ----------- Render the dialogue turn ---------------------
         out.append(f"### Cycle {idx} · `{kind}`\n\n")
         out.append(f"**🗣️ Interviewer:** {mission}\n\n")
-        out.append(f"**🧠 Grug** _(as **{voice}**)_:\n\n")
+        voice_line = f"**🧠 Grug** _(as **{voice}**"
+        if cave:
+            voice_line += f", from the **{cave}** cave"
+        voice_line += ")_:\n\n"
+        out.append(voice_line)
 
-        # Pure reply — strip the AIML scaffold header and the Voice tag
-        # (we already surfaced voice in the "as X" line above).
-        reply_clean = clean_box(reply_block)
-        reply_clean = re.sub(r"^🤖 AIML Output Scaffold:\s*\n", "", reply_clean)
-        reply_clean = re.sub(r"^\[Voice: .+?\]\s*\n", "", reply_clean)
-        for line in reply_clean.split("\n"):
+        # Pure reply — claim + support, no directives, no cave tag.
+        speech_clean = clean_box(speech)
+        for line in speech_clean.split("\n"):
             out.append(f"> {line}\n" if line else ">\n")
         out.append("\n")
 
         # Compact stats strip under the reply.
         out.append("<sub>")
-        out.append(f"verb `{verb_short}` · ")
         out.append(f"primary `{primary}` · ")
         out.append(f"conf `{conf}` · ")
         out.append(f"certainty `{cert}` · ")
@@ -284,6 +270,14 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         out.append(f"node triples `{node_triples}`")
         out.append("</sub>\n\n")
 
+        # Shaping directives — collapsed list.
+        if directives:
+            out.append("<details>\n")
+            out.append(f"<summary>🎯 Shaping directives ({len(directives)})</summary>\n\n")
+            for d in directives:
+                out.append(f"- {d}\n")
+            out.append("\n</details>\n\n")
+
         # Debug telemetry — collapsed, available but not in-your-face.
         if tele_block:
             out.append("<details>\n")
@@ -295,7 +289,13 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
         out.append("---\n\n")
 
     # ---- Silent cycles ---------------------------------------------
-    scaffold_missions = [sc.group(2).strip() for sc in scaffolds]
+    scaffold_missions = []
+    for sc in scaffolds:
+        start = sc.start()
+        chunk = raw[start:start + 80000]
+        m = TELEMETRY_RE.search(chunk)
+        scaffold_missions.append(m.group(1).strip() if m else "")
+
     silent_prompts = []
     used = [False] * len(scaffold_missions)
     for cmd in commands:
@@ -367,11 +367,7 @@ def build_transcript(raw: str, true_raw_size: int) -> str:
 # ---------------------------------------------------------------------------
 
 def _resolve_raw_path(raw_path: Path) -> Path:
-    """
-    Accept either the plain or gzipped raw log. The conversation driver
-    may delete the plain file after compressing it, so we auto-fall-back
-    to ``<path>.gz`` when the plain file is missing.
-    """
+    """Accept either the plain or gzipped raw log; auto-fall-back to .gz."""
     if raw_path.exists():
         return raw_path
     gz_path = raw_path.with_suffix(raw_path.suffix + ".gz")
@@ -398,12 +394,8 @@ def main():
         file=sys.stderr,
     )
 
-    # Bound the read in case the plain log ballooned past what we can
-    # hold in RAM on small sandboxes. v7.12+v7.13+v7.14 make this
-    # bound almost never trigger (logs shrink 70×), but the safety net
-    # stays so historical runs still format.
-    READ_CAP_FRONT = 32 * 1024 * 1024   # 32 MB front slice
-    READ_CAP_TAIL = 4 * 1024 * 1024     # 4 MB tail slice
+    READ_CAP_FRONT = 32 * 1024 * 1024
+    READ_CAP_TAIL = 4 * 1024 * 1024
     BUDGET = READ_CAP_FRONT + READ_CAP_TAIL
 
     opener = gzip.open if is_gz else open
