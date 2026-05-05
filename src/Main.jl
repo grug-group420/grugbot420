@@ -124,6 +124,85 @@ const CONTEXT_ELIGIBLE_MIN       = 5      # Prefer ≥5 unpinned messages above 
 const CONTEXT_ELIGIBLE_MAX       = 10     # Prefer ≤10; tightens threshold otherwise
 const CONTEXT_THRESHOLD_STEPS    = 12     # Binary-search budget (log₂ of CAP resolution)
 
+# GRUG v7.17: Chunked Fresh Memory scan. When MESSAGE_HISTORY holds up
+# to MAX_HISTORY (10,000) messages we do NOT scan the whole vector in
+# one tight loop — we batch the scan into CONTEXT_SCAN_CHUNK-sized
+# slices so:
+#   * each pass checks an early-exit condition between chunks (e.g. the
+#     threshold binary-search aborts a step as soon as the survivor
+#     count exceeds CONTEXT_ELIGIBLE_MAX, no need to count the rest).
+#   * we never hold a whole-history allocation in one go — the
+#     unpinned materialisation appends chunk-by-chunk.
+#   * CPU time per cycle is bounded by chunks_actually_scanned *
+#     CONTEXT_SCAN_CHUNK rather than total_msgs, which is the
+#     difference between "hits the target band in 1 chunk" and
+#     "drags 10k messages through every cycle".
+# Keeping this tunable lets operators dial scan granularity per deploy;
+# 1000 is a solid default (fits in L1/L2 cache, ~8 KB of Float64s).
+const CONTEXT_SCAN_CHUNK         = 1000   # Scan MESSAGE_HISTORY in 1k batches
+
+# GRUG v7.17: Per-chunk DONE checkpoint counter. Every chunked scan
+# site calls `_chunk_done!(label)` after each CONTEXT_SCAN_CHUNK-sized
+# batch finishes — this yields the scheduler (so other Tasks on the
+# same thread get a slot), increments a per-label counter (so tests
+# and operators can verify "scan emitted N chunks for a 10k cave"),
+# and emits a debug log entry gated behind CONTEXT_CHUNK_DEBUG.
+#
+# Contract: the scan does NOT move to its next 1k batch until
+# _chunk_done! has run. That is the "submits DONE for everything to
+# continue, then resume" semantics — the batch is published as a
+# checkpoint before the next one begins, instead of the whole 10k
+# scan running as one uninterruptible CPU burst.
+const CONTEXT_CHUNK_DEBUG = Ref(false)           # operator toggle, /status-surfaceable
+const CONTEXT_CHUNK_COUNTERS = Dict{String, Int}()  # label → chunks-done-since-start
+const CONTEXT_CHUNK_LOCK = ReentrantLock()
+
+function _chunk_done!(label::String)
+    # 1) Record that this batch finished so tests and /status can see
+    #    how many chunks a given scan site has emitted. Kept under a
+    #    lock because MESSAGE_HISTORY scans may run from different
+    #    Tasks (CLI + chatter + phagy) and we do not want torn reads.
+    lock(CONTEXT_CHUNK_LOCK) do
+        CONTEXT_CHUNK_COUNTERS[label] = get(CONTEXT_CHUNK_COUNTERS, label, 0) + 1
+    end
+    # 2) Optional debug trace.
+    if CONTEXT_CHUNK_DEBUG[]
+        @debug "[v7.17] chunk DONE" label=label count=CONTEXT_CHUNK_COUNTERS[label]
+    end
+    # 3) Cooperative yield — this is the "let everything continue"
+    #    part of the contract. The scheduler gets a chance to run
+    #    any waiting Task (CLI read, phagy pass, etc.) before we
+    #    start the next 1k batch. Without this, a 10k scan is one
+    #    uninterruptible unit even though we chunked it internally.
+    yield()
+    return nothing
+end
+
+"""
+    reset_chunk_counters!()
+
+GRUG v7.17: Zero every chunk-DONE counter. Tests call this before
+running a scan so they can count exactly how many chunks fired for
+the scan under test.
+"""
+function reset_chunk_counters!()
+    lock(CONTEXT_CHUNK_LOCK) do
+        empty!(CONTEXT_CHUNK_COUNTERS)
+    end
+end
+
+"""
+    get_chunk_counter(label)
+
+GRUG v7.17: Read-only access to the per-label chunk-DONE counter.
+Returns 0 if no chunk has ever been published for this label.
+"""
+function get_chunk_counter(label::String)::Int
+    lock(CONTEXT_CHUNK_LOCK) do
+        return get(CONTEXT_CHUNK_COUNTERS, label, 0)
+    end
+end
+
 mutable struct ChatMessage
     id::Int
     role::String
@@ -645,15 +724,31 @@ function refresh_message_intensities!(user_input::String)
         RelationalTriple[]
     end
 
+    # GRUG v7.17: Chunked walk through MESSAGE_HISTORY. Holding the
+    # lock for one tight 10k-long loop would starve any other writer
+    # for the duration — chunking the scan lets us keep the lock held
+    # per batch but gives Julia's scheduler explicit yield points
+    # between batches (yield() call below). Correctness is identical
+    # because every ChatMessage is mutable and referenced by pointer;
+    # chunk boundaries don't affect which messages get updated.
     lock(MESSAGE_HISTORY_LOCK) do
-        for m in MESSAGE_HISTORY
-            relevance = score_message_relevance(m, user_tokens, user_triples)
-            # Snap-back toward relevance
-            snapped = m.intensity + CONTEXT_SNAP_ALPHA * (relevance - m.intensity)
-            # Zero-mean jitter (reuses the engine's RelationalJitter so
-            # /brainstorm scope automatically amplifies the nudge)
-            nudged = RelationalJitter.jitter_value(snapped)
-            m.intensity = clamp_intensity(nudged)
+        total_n = length(MESSAGE_HISTORY)
+        chunk_start = 1
+        while chunk_start <= total_n
+            chunk_end = min(chunk_start + CONTEXT_SCAN_CHUNK - 1, total_n)
+            @inbounds for i in chunk_start:chunk_end
+                m = MESSAGE_HISTORY[i]
+                relevance = score_message_relevance(m, user_tokens, user_triples)
+                # Snap-back toward relevance
+                snapped = m.intensity + CONTEXT_SNAP_ALPHA * (relevance - m.intensity)
+                # Zero-mean jitter (reuses the engine's RelationalJitter so
+                # /brainstorm scope automatically amplifies the nudge)
+                nudged = RelationalJitter.jitter_value(snapped)
+                m.intensity = clamp_intensity(nudged)
+            end
+            chunk_start = chunk_end + 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("refresh_intensities")
         end
     end
 end
@@ -678,13 +773,30 @@ function apply_last_selected_feedback!(delta::Float64)
     end
     isempty(selected_ids) && return 0
 
+    # GRUG v7.17: Chunked scan with early-exit. selected_ids is a Set
+    # so membership is O(1), but we can still finish the pass early:
+    # once bumped == length(selected_ids), every id has been found and
+    # the rest of MESSAGE_HISTORY is guaranteed to be a miss. On a 10k
+    # cave with a typical 3-8 selected ids, this aborts after the
+    # first chunk that contains them rather than walking 10k items.
     bumped = 0
+    target_hits = length(selected_ids)
     lock(MESSAGE_HISTORY_LOCK) do
-        for m in MESSAGE_HISTORY
-            if m.id in selected_ids
-                m.intensity = clamp_intensity(m.intensity + delta)
-                bumped += 1
+        total_n = length(MESSAGE_HISTORY)
+        chunk_start = 1
+        while chunk_start <= total_n && bumped < target_hits
+            chunk_end = min(chunk_start + CONTEXT_SCAN_CHUNK - 1, total_n)
+            @inbounds for i in chunk_start:chunk_end
+                m = MESSAGE_HISTORY[i]
+                if m.id in selected_ids
+                    m.intensity = clamp_intensity(m.intensity + delta)
+                    bumped += 1
+                    bumped >= target_hits && break
+                end
             end
+            chunk_start = chunk_end + 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("feedback_scan")
         end
     end
     return bumped
@@ -725,16 +837,45 @@ function auto_tune_intensity_threshold(unpinned::Vector{ChatMessage})::Tuple{Flo
     best_threshold = lo
     best_count = n
 
+    # GRUG v7.17: Chunked scan — each binary-search step walks `unpinned`
+    # in CONTEXT_SCAN_CHUNK-sized batches and short-circuits as soon as
+    # the running survivor count clears CONTEXT_ELIGIBLE_MAX (we only
+    # need to know "too many" for the lo-raise branch; we don't need
+    # the exact overflow count). The "too few" branch still needs the
+    # full count, so those chunks run to completion for that step —
+    # but only when the threshold is already high enough that survivors
+    # are scarce, which is the cheap case anyway.
+    #
+    # Net effect: the expensive overshoot cases (threshold too low, most
+    # messages survive) abort after ~CONTEXT_ELIGIBLE_MAX+1 hits rather
+    # than scanning all 10k. That is the whole point of chunking.
     for _ in 1:CONTEXT_THRESHOLD_STEPS
         mid = (lo + hi) / 2
         count = 0
-        for m in unpinned
-            m.intensity > mid && (count += 1)
+        overflow = false
+        chunk_start = 1
+        while chunk_start <= n
+            chunk_end = min(chunk_start + CONTEXT_SCAN_CHUNK - 1, n)
+            @inbounds for i in chunk_start:chunk_end
+                unpinned[i].intensity > mid && (count += 1)
+            end
+            # Between chunks: if we already know this midpoint produces
+            # more survivors than the max, no need to keep counting.
+            if count > CONTEXT_ELIGIBLE_MAX
+                overflow = true
+                # GRUG v7.17: emit DONE even on early-exit so the
+                # counter reflects work actually performed.
+                _chunk_done!("threshold_scan")
+                break
+            end
+            chunk_start = chunk_end + 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("threshold_scan")
         end
         best_threshold = mid
         best_count = count
 
-        if count > CONTEXT_ELIGIBLE_MAX
+        if overflow || count > CONTEXT_ELIGIBLE_MAX
             # Too many survivors → raise threshold.
             lo = mid
         elseif count < CONTEXT_ELIGIBLE_MIN
@@ -786,11 +927,23 @@ function extract_aiml_memory_context()::String
 
     try
         # 1. Pinned — always surface, newest-first order preserved.
-        for m in MESSAGE_HISTORY
-            if m.pinned
-                push!(pinned_msgs, "[$(m.role)]: $(m.text)")
-                push!(selected_ids, m.id)
+        # GRUG v7.17: Chunked scan so a 10k cave doesn't tie up one tight
+        # loop. Pinned lists are typically tiny (<< total), so this
+        # finishes in a handful of chunks in practice.
+        total_n = length(MESSAGE_HISTORY)
+        chunk_start = 1
+        while chunk_start <= total_n
+            chunk_end = min(chunk_start + CONTEXT_SCAN_CHUNK - 1, total_n)
+            @inbounds for i in chunk_start:chunk_end
+                m = MESSAGE_HISTORY[i]
+                if m.pinned
+                    push!(pinned_msgs, "[$(m.role)]: $(m.text)")
+                    push!(selected_ids, m.id)
+                end
             end
+            chunk_start = chunk_end + 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("pinned_scan")
         end
 
         # 2. Unpinned — threshold-gate THEN intensity-biased coinflip.
@@ -798,23 +951,52 @@ function extract_aiml_memory_context()::String
         # than ~CONTEXT_ELIGIBLE_MAX candidates even if the cave holds
         # 10k messages. That keeps the coinflip pool tight and the
         # selection work bounded by CONTEXT_ELIGIBLE_MAX, not N.
-        unpinned = [m for m in MESSAGE_HISTORY if !m.pinned]
+        #
+        # GRUG v7.17: Materialise the unpinned slice in chunks rather
+        # than with one giant comprehension. Same final vector, but the
+        # allocation grows in 1k bumps instead of one N-sized burst —
+        # easier on the GC when MESSAGE_HISTORY is near its 10k cap.
+        unpinned = ChatMessage[]
+        sizehint!(unpinned, total_n)  # upper bound, shrinks if pinned present
+        chunk_start = 1
+        while chunk_start <= total_n
+            chunk_end = min(chunk_start + CONTEXT_SCAN_CHUNK - 1, total_n)
+            @inbounds for i in chunk_start:chunk_end
+                m = MESSAGE_HISTORY[i]
+                m.pinned || push!(unpinned, m)
+            end
+            chunk_start = chunk_end + 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("unpinned_materialize")
+        end
         threshold, eligible_count = auto_tune_intensity_threshold(unpinned)
 
         # Eligible survivors — only those strictly above threshold.
         # Walk newest-first so recent messages get first coinflip dibs
-        # when the Fresh Memory cap bites.
+        # when the Fresh Memory cap bites. This loop already short-
+        # circuits at MAX_FRESH_CONTEXT, so it never touches more than
+        # a bounded tail of the unpinned vector in practice — the
+        # chunk framing below is just for telemetry and to make the
+        # early-exit explicit at chunk boundaries.
         chosen = ChatMessage[]
-        for i in length(unpinned):-1:1
-            length(chosen) >= MAX_FRESH_CONTEXT && break
-            m = unpinned[i]
-            m.intensity > threshold || continue   # threshold gate
-            p = clamp(m.intensity / CONTEXT_INTENSITY_CAP,
-                      CONTEXT_COIN_P_FLOOR, CONTEXT_COIN_P_CEIL)
-            if rand() < p
-                push!(chosen, m)
-                push!(selected_ids, m.id)
+        unpinned_n = length(unpinned)
+        i = unpinned_n
+        while i >= 1 && length(chosen) < MAX_FRESH_CONTEXT
+            chunk_lo = max(1, i - CONTEXT_SCAN_CHUNK + 1)
+            @inbounds for j in i:-1:chunk_lo
+                length(chosen) >= MAX_FRESH_CONTEXT && break
+                m = unpinned[j]
+                m.intensity > threshold || continue   # threshold gate
+                p = clamp(m.intensity / CONTEXT_INTENSITY_CAP,
+                          CONTEXT_COIN_P_FLOOR, CONTEXT_COIN_P_CEIL)
+                if rand() < p
+                    push!(chosen, m)
+                    push!(selected_ids, m.id)
+                end
             end
+            i = chunk_lo - 1
+            # GRUG v7.17: publish DONE for this batch before advancing.
+            _chunk_done!("coinflip_scan")
         end
         # Restore chronological order for human readability.
         reverse!(chosen)

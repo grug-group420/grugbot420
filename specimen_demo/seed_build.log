@@ -299,29 +299,29 @@ Brain > [ENGINE] 🔗  Node 'node_19' attached to target 'node_18' with pattern 
    → Attached 'node_19' to 'node_18' with pattern "fairness and consent" (base_conf=0.193, 1/4)
    → Attached 'node_20' to 'node_18' with pattern "harm scrutiny" (base_conf=0.383, 2/4)
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_explain' in lobe 'physics' with strength 5.011864162865564
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_explain' in lobe 'physics' with strength 5.039178772917024
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_analyze' in lobe 'physics' with strength 5.06851503623126
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_analyze' in lobe 'physics' with strength 4.985532799091521
 
-Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_warn' in lobe 'physics' with strength 4.943120489606323
+Brain > ✅  /aimlAdd: Created AIML node 'phys_exec_warn' in lobe 'physics' with strength 4.893683310105227
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_advise' in lobe 'cooking' with strength 4.90513485476274
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_advise' in lobe 'cooking' with strength 4.998486777307823
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_warn' in lobe 'cooking' with strength 4.987852212816998
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_warn' in lobe 'cooking' with strength 4.939877426315604
 
-Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_explain' in lobe 'cooking' with strength 5.1497071030504005
+Brain > ✅  /aimlAdd: Created AIML node 'cook_exec_explain' in lobe 'cooking' with strength 5.009998285592884
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_analyze' in lobe 'music' with strength 5.06676367394799
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_analyze' in lobe 'music' with strength 4.958977230889288
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_describe' in lobe 'music' with strength 5.108732610348102
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_describe' in lobe 'music' with strength 5.011704820059485
 
-Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_define' in lobe 'music' with strength 5.01301156055837
+Brain > ✅  /aimlAdd: Created AIML node 'mus_exec_define' in lobe 'music' with strength 4.9807499272445455
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_reason' in lobe 'ethics' with strength 5.063603993729709
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_reason' in lobe 'ethics' with strength 5.108496104282255
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_acknowledge' in lobe 'ethics' with strength 5.1263778913257045
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_acknowledge' in lobe 'ethics' with strength 4.945526482684739
 
-Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_warn' in lobe 'ethics' with strength 5.04097971506119
+Brain > ✅  /aimlAdd: Created AIML node 'eth_exec_warn' in lobe 'ethics' with strength 4.937396918697867
 
 Brain > ⚙️ Rule tied to tree: [Answer "{MISSION}" in one tight paragraph — no lists, no hedging ladders.] (fire_prob=1.0)
 
@@ -475,9 +475,9 @@ Brain > --> Grug freezing entire cave to specimen file...
 ║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
 ╠══════════════════════════════════════════════════════════════╣
   📁  File             : grugbot420_comprehensive.specimen.gz
-  📦  JSON size        : 97420 bytes
-  🗜️   Compressed size  : 15367 bytes (84.2% smaller)
-  ⏱️   Time             : 0.44s
+  📦  JSON size        : 97424 bytes
+  🗜️   Compressed size  : 15366 bytes (84.2% smaller)
+  ⏱️   Time             : 0.45s
   ─────────────────────────────────────────────
   🌱  Nodes            : 23
   🧠  Lobes            : 4

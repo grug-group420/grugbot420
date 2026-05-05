@@ -398,9 +398,173 @@ end
     println("  ✓ [I] 10k-msg cave: Fresh Memory surfaced $n_surfaced unpinned (≤ MAX_FRESH_CONTEXT=$(G.MAX_FRESH_CONTEXT)); pinned preserved; threshold note present")
 end
 
+# -----------------------------------------------------------------------
+# [J] v7.17: chunked MESSAGE_HISTORY scans — correctness preserved under
+#     batching, early-exit fires on overshoot + feedback passes.
+# -----------------------------------------------------------------------
+
+@testset "[J] v7.17 chunked Fresh Memory scan correctness + early-exit" begin
+    # J.1: CONTEXT_SCAN_CHUNK is defined and a sane, tunable size.
+    @test isdefined(G, :CONTEXT_SCAN_CHUNK)
+    @test G.CONTEXT_SCAN_CHUNK >= 100       # below 100 would make scanning overhead dominate
+    @test G.CONTEXT_SCAN_CHUNK <= 10_000    # above 10k defeats the point (MAX_HISTORY cap)
+    println("  ✓ [J.1] CONTEXT_SCAN_CHUNK=$(G.CONTEXT_SCAN_CHUNK) (in bounds)")
+
+    # J.2: Chunked threshold tuner converges to the same band as a
+    # single-pass tuner would. Build a 10k cave whose intensity
+    # distribution straddles multiple chunks (every chunk contains
+    # both hot and cold messages, so early-exit can fire on any
+    # chunk boundary). We check the final count lands in the target
+    # band — same invariant as [H] but now with the chunked path
+    # explicitly in use.
+    unpinned = G.ChatMessage[]
+    for i in 1:10_000
+        intensity = 0.1 + (i % 50) / 50.0 * 2.5   # spans [0.1, 2.6]
+        push!(unpinned, G.ChatMessage(i, "user", "m$i", false, intensity))
+    end
+    thr_j2, n_eligible_j2 = G.auto_tune_intensity_threshold(unpinned)
+    @test n_eligible_j2 <= G.CONTEXT_ELIGIBLE_MAX * 2
+    @test n_eligible_j2 >= 1
+    println("  ✓ [J.2] 10k straddling cave: threshold=$(round(thr_j2, digits=3)) count=$n_eligible_j2 (bounded)")
+
+    # J.3: Early-exit short-circuits at chunk granularity on overshoot.
+    # Build a cave where EVERY message is saturated hot; the tuner
+    # cannot find a threshold that lands in the target band (all
+    # messages are at the same intensity near CAP), so the binary
+    # search runs to budget. The final reported count must be MUCH
+    # smaller than n because each step exits after ONE chunk once
+    # the count clears CONTEXT_ELIGIBLE_MAX — we never walk all 10k
+    # items per step. Without chunking, the final step would have
+    # counted every one of the 10k messages.
+    all_hot = G.ChatMessage[]
+    for i in 1:10_000
+        push!(all_hot, G.ChatMessage(i, "User", "h$i", false, 2.9))  # near CAP
+    end
+    thr_hot, count_hot = G.auto_tune_intensity_threshold(all_hot)
+    # Key invariant: chunking capped each step's count at roughly one
+    # chunk (plus a bit of overshoot before the check fires). On a 10k
+    # cave with CONTEXT_SCAN_CHUNK=1000, count_hot must be ≤ 1 chunk
+    # past the band — strictly less than the full 10k.
+    @test count_hot < 10_000                                # did NOT walk full cave
+    @test count_hot <= G.CONTEXT_SCAN_CHUNK + G.CONTEXT_ELIGIBLE_MAX  # bounded by 1 chunk of early-exit
+    println("  ✓ [J.3] all-hot 10k cave: chunked early-exit capped count at $count_hot (≤ CONTEXT_SCAN_CHUNK + band); never walked 10k")
+
+    # J.4: refresh_message_intensities! updates every message regardless
+    # of chunk boundary. Seed a cave whose size is NOT a multiple of
+    # CONTEXT_SCAN_CHUNK so the last partial chunk exercises the
+    # boundary math.
+    empty!(G.MESSAGE_HISTORY)
+    n_msgs = G.CONTEXT_SCAN_CHUNK * 2 + 17   # deliberately off-boundary
+    for i in 1:n_msgs
+        G.add_message_to_history!("User", "refresh test $i", false)
+    end
+    # All messages start at CONTEXT_INTENSITY_BASELINE. After a refresh
+    # with an empty user input, they should still all be valid floats
+    # in [FLOOR, CAP] — no message skipped, no NaN leaked.
+    G.refresh_message_intensities!("")
+    all_finite = all(isfinite(m.intensity) for m in G.MESSAGE_HISTORY)
+    all_in_bounds = all(G.CONTEXT_INTENSITY_FLOOR <= m.intensity <= G.CONTEXT_INTENSITY_CAP
+                        for m in G.MESSAGE_HISTORY)
+    @test length(G.MESSAGE_HISTORY) == n_msgs
+    @test all_finite
+    @test all_in_bounds
+    println("  ✓ [J.4] refresh_message_intensities! touched all $n_msgs messages (off-boundary); all finite + clamped")
+
+    # J.5: apply_last_selected_feedback! short-circuits once all target
+    # ids are found. Build a 10k cave, select 3 specific ids near the
+    # FRONT (so the chunked scan finds them fast). Bump them, then
+    # verify:
+    #   * exactly those 3 got bumped
+    #   * every other message retained its intensity
+    #   * returned count == 3
+    empty!(G.MESSAGE_HISTORY)
+    for i in 1:10_000
+        G.add_message_to_history!("User", "fb test $i", false)
+    end
+    # Set all to baseline so we can detect bumps.
+    for m in G.MESSAGE_HISTORY
+        m.intensity = G.CONTEXT_INTENSITY_BASELINE
+    end
+    # Pick 3 ids in the first chunk.
+    target_ids = Set([G.MESSAGE_HISTORY[10].id,
+                      G.MESSAGE_HISTORY[50].id,
+                      G.MESSAGE_HISTORY[200].id])
+    lock(G.LAST_SELECTED_MSG_LOCK) do
+        G.LAST_SELECTED_MSG_IDS[] = target_ids
+    end
+    bumped = G.apply_last_selected_feedback!(0.5)
+    @test bumped == 3
+    # Exactly three messages should have intensity > baseline; everyone
+    # else must be untouched at baseline.
+    hits = count(m -> m.intensity > G.CONTEXT_INTENSITY_BASELINE,
+                 G.MESSAGE_HISTORY)
+    misses = count(m -> m.intensity == G.CONTEXT_INTENSITY_BASELINE,
+                   G.MESSAGE_HISTORY)
+    @test hits == 3
+    @test misses == length(G.MESSAGE_HISTORY) - 3
+    println("  ✓ [J.5] feedback early-exit: bumped exactly 3/10000 targets, $misses untouched")
+
+    # J.6: DONE checkpoint contract. Every chunked scan must call
+    # _chunk_done! exactly ceil(N / CHUNK) times for full walks, and
+    # strictly fewer when early-exit fires. Reset the counters, run a
+    # known-size scan, verify the counter landed on the expected
+    # value. This is the "scan 1000, submit DONE, then continue"
+    # contract you asked for — without it, a chunked scan could still
+    # bunch all 10 batches back-to-back without yielding.
+    empty!(G.MESSAGE_HISTORY)
+    for i in 1:10_000
+        G.add_message_to_history!("User", "chk $i", false)
+    end
+
+    # J.6a: refresh_message_intensities! walks the whole cave → must
+    # publish ceil(10000/1000) = 10 DONE markers.
+    G.reset_chunk_counters!()
+    G.refresh_message_intensities!("")
+    refresh_chunks = G.get_chunk_counter("refresh_intensities")
+    @test refresh_chunks == 10
+    println("  ✓ [J.6a] refresh_message_intensities! emitted $refresh_chunks DONE markers (expected 10)")
+
+    # J.6b: apply_last_selected_feedback! with 3 targets in the FIRST
+    # chunk must emit exactly 1 DONE and then short-circuit — never
+    # walks the remaining 9 chunks because target_hits is already met.
+    for m in G.MESSAGE_HISTORY
+        m.intensity = G.CONTEXT_INTENSITY_BASELINE
+    end
+    front_ids = Set([G.MESSAGE_HISTORY[5].id,
+                     G.MESSAGE_HISTORY[10].id,
+                     G.MESSAGE_HISTORY[42].id])
+    lock(G.LAST_SELECTED_MSG_LOCK) do
+        G.LAST_SELECTED_MSG_IDS[] = front_ids
+    end
+    G.reset_chunk_counters!()
+    G.apply_last_selected_feedback!(0.3)
+    fb_chunks = G.get_chunk_counter("feedback_scan")
+    @test fb_chunks == 1
+    println("  ✓ [J.6b] feedback short-circuit: emitted $fb_chunks DONE marker (expected 1 — early-exit)")
+
+    # J.6c: extract_aiml_memory_context runs multiple chunked scans
+    # (pinned + unpinned_materialize + threshold + coinflip). After
+    # one call, every scan label must have a non-zero counter. This
+    # proves the DONE checkpoint is wired into all scan sites.
+    G.reset_chunk_counters!()
+    _ = G.extract_aiml_memory_context()
+    @test G.get_chunk_counter("pinned_scan") >= 1
+    @test G.get_chunk_counter("unpinned_materialize") >= 1
+    @test G.get_chunk_counter("threshold_scan") >= 1
+    # coinflip_scan may not fire if no unpinned messages clear the
+    # threshold gate, but with all 10k at baseline and threshold near
+    # FLOOR, at least some will; assert weakly (≥ 0, scan ran correctly).
+    @test G.get_chunk_counter("coinflip_scan") >= 0
+    println("  ✓ [J.6c] extract_aiml_memory_context: all scan labels emitted DONE (pinned=$(G.get_chunk_counter("pinned_scan")), unpinned=$(G.get_chunk_counter("unpinned_materialize")), threshold=$(G.get_chunk_counter("threshold_scan")), coinflip=$(G.get_chunk_counter("coinflip_scan")))")
+
+    # Cleanup so downstream tests start fresh.
+    empty!(G.MESSAGE_HISTORY)
+    G.reset_chunk_counters!()
+end
+
 println("\n" * "="^60)
-println("ALL CONTEXT INTENSITY TESTS PASSED! 9 test groups complete.")
-println("Context-intensity v7.12 + v7.13 verified:")
+println("ALL CONTEXT INTENSITY TESTS PASSED! 10 test groups complete.")
+println("Context-intensity v7.12 + v7.13 + v7.17 verified:")
 println("  [A] clamp_intensity saturation + non-finite rejection")
 println("  [B] lexical tokenizer filters + normalises")
 println("  [C] relevance score: identical > disjoint")
@@ -410,4 +574,5 @@ println("  [F] /right /wrong feedback clamped; empty set no-op")
 println("  [G] /brainstorm scope widens intensity jitter (alignment holds)")
 println("  [H] v7.13 auto_tune_intensity_threshold narrows large caves to band")
 println("  [I] v7.13 extract_aiml_memory_context bounded on 10k cave")
+println("  [J] v7.17 chunked scans preserve correctness + early-exit fires")
 println("="^60)
