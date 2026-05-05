@@ -530,6 +530,73 @@ function hopfield_record!(input_hash::UInt64, node_ids::Vector{String})
 end
 
 # ==============================================================================
+# v7.20 — PER-NODE NONJITTER TAG
+# ==============================================================================
+# GRUG: Some rocks must stay still. Jitter good for most rocks (snap-back breath
+# keeps system alive and adaptive), but anchor rocks, calibration rocks, and
+# canonical-form rocks get broken if they wiggle. So grug give those rocks a tag.
+# If node carries NONJITTER tag in its required_relations, jitter systems skip it.
+#
+# Storage: tag lives as the string "NONJITTER" inside node.required_relations.
+# This means:
+#   - No struct change needed.
+#   - Tag survives specimen save/restore for free (required_relations already serialized).
+#   - Node creation kwarg `required_relations=["NONJITTER"]` just works.
+#   - Runtime tag add/remove is a plain Vector{String} push/filter operation.
+#
+# Honoring: helpers that apply bounded-snap-back jitter check is_nonjitter(node)
+# and skip the jitter call when the tag is present. The tag is orthogonal to the
+# global _JITTER_ENABLED toggle in RelationalJitter — a NONJITTER node is silent
+# even when global jitter is on.
+# ==============================================================================
+
+const NONJITTER_TAG = "NONJITTER"
+
+"""
+    is_nonjitter(node::Node)::Bool
+
+GRUG: Rock carry NONJITTER tag? If yes, jitter systems must leave rock alone.
+Pure check, no mutation, no allocation. Safe to call from hot paths.
+"""
+function is_nonjitter(node::Node)::Bool
+    # GRUG: required_relations is a plain Vector{String}. `in` is O(n) but
+    # required_relations is almost always small (≤ 4 entries), so this is
+    # effectively constant-time. No lock needed — node.required_relations
+    # is a direct field read and this function is nominally called from the
+    # same thread that holds a reference to the node.
+    return NONJITTER_TAG in node.required_relations
+end
+
+"""
+    set_nonjitter!(node::Node)
+
+GRUG: Tag rock as NONJITTER. Idempotent — calling twice leaves the vector
+with exactly one tag, not two. NO SILENT FAILURE: if node is nothing, caller
+gets a MethodError from Julia's dispatch, not a quiet no-op.
+"""
+function set_nonjitter!(node::Node)
+    if !is_nonjitter(node)
+        push!(node.required_relations, NONJITTER_TAG)
+    end
+    return node
+end
+
+"""
+    clear_nonjitter!(node::Node)
+
+GRUG: Remove NONJITTER tag from rock. If rock did not carry the tag, this is
+a no-op — but NOT a silent failure, because the function contract is
+"after this call, the tag is absent", which is true either way. Returns the
+node for chaining.
+"""
+function clear_nonjitter!(node::Node)
+    if is_nonjitter(node)
+        filter!(r -> r != NONJITTER_TAG, node.required_relations)
+    end
+    return node
+end
+
+# ==============================================================================
 # STRENGTH & GRAVE MANAGEMENT
 # ==============================================================================
 
@@ -1926,11 +1993,21 @@ elements). Medium and high-res tiers don't need this — they already scan every
 index exhaustively, so order sensitivity is minimal at longer pattern lengths.
 
 ERRORS: propagates PatternNotFoundError if both directions miss. NO SILENT FAILURES.
+
+v7.20 NONJITTER KWARG:
+  When `nonjitter=true`, the end-confidence snap-back jitter applied to the fused
+  coherence output is skipped. This is the per-node opt-out: the caller in
+  scan_and_expand passes `nonjitter=is_nonjitter(node)` so that anchor / calibration /
+  canonical-form nodes receive bit-stable confidence scores. Per-window jitter
+  inside the underlying cheap_scan calls is unaffected — that is a substrate-level
+  behavior of the scanner and remains in effect for both forward and reverse passes.
+  The NONJITTER tag silences only the post-fusion bounded micro-variance.
 """
 function _bidirectional_cheap_scan(
     target::Vector{Float64},
     pattern::Vector{Float64};
-    threshold::Real = 0.3
+    threshold::Real = 0.3,
+    nonjitter::Bool = false
 )::Tuple{Int, Float64}
     if isempty(target)
         # GRUG: Empty target is a scanner crash waiting to happen. Scream now!
@@ -2002,10 +2079,24 @@ function _bidirectional_cheap_scan(
     # a spike (pure average) or a zero (hard drop).
     smoothed_conf = big_number_small_number_coherence(forward_conf, reverse_conf)
 
+    # GRUG v7.20: END-CONFIDENCE SNAP-BACK JITTER.
+    # The per-window slight_jitter inside cheap_scan fuzzes each window's score
+    # BEFORE fusion. That's substrate-level hardware-variance modelling. Here we
+    # add a second, bounded micro-jitter on the fused coherence — the snap-back
+    # breath at the decision boundary. This prevents rigid lock-in on identical
+    # re-scans and keeps the system biologically plausible.
+    #
+    # NONJITTER opt-out: if the caller passed nonjitter=true (wired from
+    # is_nonjitter(node) at scan_and_expand), we skip this jitter entirely so
+    # the output is bit-stable for that node. Global _JITTER_ENABLED in
+    # RelationalJitter is not consulted here — that switch governs relational
+    # weight jitter, not confidence fusion.
+    final_conf = nonjitter ? smoothed_conf : slight_jitter(smoothed_conf)
+
     # GRUG: Return best alignment index (forward preferred; reverse is orientation-flipped
     # so its index doesn't map back to the original signal cleanly).
     best_idx = forward_ok ? forward_idx : 1
-    return (best_idx, smoothed_conf)
+    return (best_idx, final_conf)
 end
 
 # ==============================================================================
@@ -2296,7 +2387,14 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
 
             if effective_mode == 1
                 # GRUG: BIDIRECTIONAL CHEAP SCAN — simple patterns (≤3 signal elements)
-                _, token_conf = _bidirectional_cheap_scan(target_signal, node.signal; threshold=0.3)
+                # v7.20: pass per-node NONJITTER opt-out so anchor / calibration /
+                # canonical-form nodes return bit-stable confidence. Tag lives in
+                # node.required_relations (see is_nonjitter / set_nonjitter! above).
+                _, token_conf = _bidirectional_cheap_scan(
+                    target_signal, node.signal;
+                    threshold=0.3,
+                    nonjitter=is_nonjitter(node)
+                )
             elseif effective_mode == 2
                 _, token_conf = medium_scan(target_signal, node.signal; threshold=0.4)
             else

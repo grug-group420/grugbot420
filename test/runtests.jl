@@ -36,6 +36,7 @@ const ALL_TESTS = [
     "test_context_intensity.jl",
     "test_lobe_topicality_gate.jl",
     "test_big_number_small_number_coherence.jl",
+    "test_nonjitter_tag.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

@@ -3,6 +3,7 @@ module PatternScanner
 export cheap_scan, medium_scan, high_res_scan
 export PatternScanError, PatternNotFoundError
 export big_number_small_number_coherence
+export slight_jitter
 
 # GRUG: Bring magic random bones for math (jitter).
 using Random

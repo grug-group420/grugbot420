@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.19</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.20</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.19</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.20</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -238,6 +238,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#chunked-scans">15.17 Chunked MESSAGE_HISTORY Scans with DONE Checkpoints</a> <span class="new-badge">v7.17</span></li>
         <li><a href="#lobe-topicality">15.18 Lobe Topicality Gate + Semantic-Bridge Exception</a> <span class="new-badge">v7.18</span></li>
         <li><a href="#bnsnc-coherence">15.19 Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</a> <span class="new-badge">v7.19</span></li>
+        <li><a href="#nonjitter-tag">15.20 Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</a> <span class="new-badge">v7.20</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -2261,6 +2262,130 @@ miss is unchanged.</p>
 &asymp;2m47s. The fusion itself is O(1) in all inputs &mdash; identical cost profile to the average it replaced.</p>
 
 <!-- ================================================================ -->
+<h2 id="nonjitter-tag">15.20 Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter <span class="new-badge">v7.20</span></h2>
+
+<div class="grug-box">
+    <p>Most rocks SHOULD wiggle. Wiggle keep brain alive, stop brain from locking into one shape forever.
+    But SOME rocks must NOT wiggle. Anchor rock. Calibration rock. "This word always means this exact thing"
+    rock. Those rocks grug give a tag: <code>NONJITTER</code>. Tag say: leave me alone, I stand still.
+    Everyone else keep breathing.</p>
+</div>
+
+<h3>Problem</h3>
+
+<p>Before v7.20 the final fused confidence returned by <code>_bidirectional_cheap_scan</code> was
+whatever <code>big_number_small_number_coherence</code> produced &mdash; deterministic given the same
+forward and reverse scores. Rigid determinism at the decision boundary creates two pathologies:</p>
+
+<ol>
+    <li><strong>Identical re-scans lock in identical votes.</strong> Two back-to-back scans of the same
+    input against the same node produce bit-equal confidences, which encourages the downstream
+    voting system to treat them as redundant &mdash; losing an opportunity for the organic
+    tie-breaking that biological systems use at the margin.</li>
+    <li><strong>Decision thresholds become cliffs.</strong> A node scoring 0.2999 and a node scoring
+    0.3001 are treated as categorically different by a threshold of 0.3, even though they are
+    essentially the same measurement. Without micro-variance, there is no gradient across the
+    cliff for the consensus layer to smooth over.</li>
+</ol>
+
+<p>The fix is a <strong>bounded snap-back jitter</strong> applied to the fused confidence
+(<code>slight_jitter</code> from the PatternScanner module), which adds uniform noise in
+<code>[-jitter_magnitude, +jitter_magnitude]</code> clamped to <code>[-1.0, 1.0]</code>. The magnitude
+is itself a function of how close to 1.0 the confidence already is, so high-confidence scores
+wiggle LESS than mid-confidence scores &mdash; a bullseye stays closer to a bullseye.</p>
+
+<h3>Why "snap-back"?</h3>
+
+<p>The jitter is bounded and symmetric (uniform, not normal). Unlike a random walk, which drifts,
+a bounded-uniform perturbation always returns in expectation to the unjittered value. Repeated
+scans produce a cloud of confidences CENTERED on the true fused coherence &mdash; the signal is
+preserved, only the exact landing point jitters. This is the "snap-back breath" of the system:
+inhale, exhale, never leave the chest cavity.</p>
+
+<h3>The NONJITTER opt-out</h3>
+
+<p>Some nodes MUST produce bit-stable confidences. Examples:</p>
+
+<ul>
+    <li><strong>Canonical-form anchors.</strong> A node representing the exact string "error" in
+    a programming-language lobe must score the same every time it encounters "error" &mdash; the
+    downstream AIML pipeline may key off that score for routing decisions.</li>
+    <li><strong>Calibration nodes.</strong> Nodes used as reference points for threshold tuning
+    would have their calibration curves smeared by even bounded jitter, making the tuning process
+    unstable across runs.</li>
+    <li><strong>Boot-time seed nodes.</strong> Nodes created by the initial stochastic-emotion
+    growth that need to survive specimen round-trips with EXACTLY preserved scoring semantics.</li>
+</ul>
+
+<p>These nodes carry the tag <code>"NONJITTER"</code> in their <code>required_relations</code>
+vector. When the scanner processes such a node, the post-fusion jitter is skipped and the fused
+coherence is returned as-is.</p>
+
+<h3>Design: tag, not field</h3>
+
+<p>NONJITTER is implemented as a <em>string in the existing</em> <code>required_relations::Vector{String}</code>
+field of the <code>Node</code> struct. This was an explicit design choice with concrete payoffs:</p>
+
+<ul>
+    <li><strong>Zero struct churn.</strong> No new field, no serialization migration, no specimen
+    version bump. Existing saved specimens load unchanged, and new specimens carry the tag
+    automatically because <code>required_relations</code> is already persisted.</li>
+    <li><strong>Unified namespace.</strong> Relational rules and behavioral flags share the same
+    bag. Future flags (e.g. <code>NOTVOTE</code>, <code>PINNED</code>, <code>HIDDEN</code>) can
+    follow the same pattern without further schema changes.</li>
+    <li><strong>Idempotent API.</strong> <code>set_nonjitter!(node)</code> called twice leaves
+    exactly one tag. <code>clear_nonjitter!(node)</code> on an untagged node is a safe no-op,
+    NOT an error &mdash; the function's contract is "after this call, tag is absent", which is
+    true either way.</li>
+    <li><strong>Fast check on hot path.</strong> <code>is_nonjitter(node)</code> is an O(n)
+    membership check on a typically &le;4-element vector &mdash; effectively constant time,
+    no lock, no allocation. Benchmarked at >1M calls/second.</li>
+</ul>
+
+<h3>Wiring</h3>
+
+<p>In <code>scan_and_expand</code>, the bidirectional cheap-scan call threads the tag through:</p>
+
+<pre><code>_, token_conf = _bidirectional_cheap_scan(
+    target_signal, node.signal;
+    threshold=0.3,
+    nonjitter=is_nonjitter(node)
+)</code></pre>
+
+<p>Inside <code>_bidirectional_cheap_scan</code>, after fusion:</p>
+
+<pre><code>smoothed_conf = big_number_small_number_coherence(forward_conf, reverse_conf)
+final_conf = nonjitter ? smoothed_conf : slight_jitter(smoothed_conf)</code></pre>
+
+<p>The kwarg defaults to <code>false</code>, preserving backward compatibility &mdash; callers that
+existed before v7.20 continue to get the default (jittered) behavior without code changes.</p>
+
+<h3>What NONJITTER does <em>not</em> silence</h3>
+
+<p>The tag governs ONLY the post-fusion micro-jitter on the final confidence. It does NOT affect:</p>
+
+<ul>
+    <li><strong>Per-window jitter inside <code>cheap_scan</code>.</strong> That is substrate-level
+    hardware-variance modelling. It runs inside both the forward and the reverse passes regardless
+    of NONJITTER, because the scanner's window-by-window similarity math depends on it for
+    non-degenerate matching behavior.</li>
+    <li><strong>Relational-weight jitter in the <code>RelationalJitter</code> module.</strong> That
+    is controlled by the global <code>_JITTER_ENABLED</code> flag and is orthogonal to node-level
+    tags. A NONJITTER node with relational weights will still have those weights jittered by the
+    global system if jitter is enabled.</li>
+    <li><strong>Fusion math itself.</strong> <code>big_number_small_number_coherence</code> is
+    deterministic and always runs. NONJITTER silences only the noise layer on top.</li>
+</ul>
+
+<h3>Test coverage</h3>
+
+<p><code>test_nonjitter_tag.jl</code> ships 10 test groups covering tag invariants, idempotence,
+tagged/untagged clear safety, round-trip preservation, bit-stable confidence under
+<code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default
+behavior, fusion-math integrity, coexistence with other rules in <code>required_relations</code>,
+and hot-path performance (>1M <code>is_nonjitter</code> calls/second). All assertions green.</p>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -2816,14 +2941,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.19)</h3>
+<h3>Test Suite Status (v7.20)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>22</td></tr>
-    <tr><td>Total test files on disk</td><td>27</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 23 / 23 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~167 s on 8-core Linux</td></tr>
-    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity)</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>23</td></tr>
+    <tr><td>Total test files on disk</td><td>28</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 24 / 24 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~170 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity); <code>test_nonjitter_tag.jl</code> (10 subgroups / 36 sub-assertions covering v7.20 &mdash; tag invariants, idempotent set/clear, untagged-clear safety, full round-trip, bit-stable confidence under <code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default, fusion-math integrity, coexistence with other <code>required_relations</code> rules, and >1M <code>is_nonjitter</code> calls/second on hot path)</td></tr>
 </table>
 
 <div class="tip">
@@ -2835,6 +2960,47 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.20 &mdash; Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</h3>
+    <ul>
+        <li><strong>End-confidence snap-back jitter.</strong> The fused coherence returned by
+        <code>_bidirectional_cheap_scan</code> now passes through <code>slight_jitter</code> before
+        return, adding bounded uniform micro-variance (clamped to <code>[-1.0, 1.0]</code>). This
+        prevents rigid lock-in on identical re-scans and creates a gradient across previously-cliff-
+        like decision thresholds. The jitter is symmetric and bounded, so repeated scans cloud
+        around the true fused coherence rather than drifting away from it.</li>
+        <li><strong>Per-node NONJITTER opt-out.</strong> Nodes that must return bit-stable confidences
+        (canonical-form anchors, calibration nodes, boot-time seed nodes) can carry the string tag
+        <code>"NONJITTER"</code> in their existing <code>required_relations::Vector{String}</code>
+        field. When the scanner sees the tag, it skips the post-fusion jitter. No struct change, no
+        serialization migration &mdash; the tag persists in existing specimen format for free.</li>
+        <li><strong>Helper API</strong>: <code>is_nonjitter(node)</code> (Bool predicate),
+        <code>set_nonjitter!(node)</code> (idempotent add &mdash; two calls leave exactly one tag),
+        <code>clear_nonjitter!(node)</code> (safe on untagged nodes, not an error). All exported
+        from <code>GrugBot420</code>. The constant <code>NONJITTER_TAG = "NONJITTER"</code> is
+        pinned as part of the public API.</li>
+        <li><strong>Wiring</strong>: <code>_bidirectional_cheap_scan</code> gains a
+        <code>nonjitter::Bool = false</code> kwarg; <code>scan_and_expand</code> threads
+        <code>nonjitter=is_nonjitter(node)</code> through at the call site. The default preserves
+        pre-v7.20 behavior (jitter on), so all existing callers keep working without modification.</li>
+        <li><strong>Scope clarity</strong>: NONJITTER silences ONLY the post-fusion micro-jitter
+        on the final confidence. It does NOT silence the per-window jitter inside <code>cheap_scan</code>
+        (a substrate-level behavior of the scanner itself), and it is orthogonal to the global
+        <code>_JITTER_ENABLED</code> flag in the <code>RelationalJitter</code> module (which
+        governs relational-weight jitter, a different concern). Fusion math in
+        <code>big_number_small_number_coherence</code> is deterministic and always runs.</li>
+        <li><strong>Hot-path performance</strong>: <code>is_nonjitter</code> is a no-lock,
+        no-allocation membership check on a typically &le;4-element vector. Benchmarked at >1M
+        calls/second in the test suite to guarantee this remains cheap even if called on every
+        cheap-scan iteration.</li>
+        <li><strong>Tests</strong>: new <code>test_nonjitter_tag.jl</code> (10 groups, 36 sub-assertions)
+        covers tag invariants, idempotent set/clear, untagged-clear safety, full round-trip,
+        bit-stable confidence with <code>nonjitter=true</code>, variance with <code>nonjitter=false</code>,
+        backward-compatible default, fusion-math preservation, coexistence with other
+        <code>required_relations</code> rules, and hot-path performance.</li>
+        <li><strong>Documentation</strong>: whitepaper gains &sect;15.20 coverage; version bumped
+        to v7.20 across header, title, TOC, test-suite table, and changelog.</li>
+    </ul>
 
     <h3>v7.19 &mdash; Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</h3>
     <ul>
