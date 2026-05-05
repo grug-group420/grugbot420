@@ -36,12 +36,14 @@ using Base.Threads: ReentrantLock
 
 export JITTER_RATIO_DEFAULT, HARD_REQ_MISS_SENTINEL
 export JITTER_COIN_RATIO_DEFAULT, JITTER_COIN_FLOOR, JITTER_COIN_CEILING
-export JitterConfig, JitterError
+export JITTER_BRAINSTORM_RATIO, JITTER_BRAINSTORM_COIN_RATIO
+export JitterConfig, JitterError, JitterScopeError
 export jitter_value, jitter_score, jitter_weight
 export jitter_strength, jitter_delta, jitter_coin_threshold
 export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
 export set_jitter_coin_ratio!, get_jitter_coin_ratio
+export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
 
 # ==============================================================================
 # ERROR TYPE — GRUG hate silent failures
@@ -60,6 +62,22 @@ end
 
 function Base.showerror(io::IO, e::JitterError)
     print(io, "JitterError: $(e.message) (context=$(e.context))")
+end
+
+# GRUG: Separate error type for scope-policy violations (nested brainstorm,
+# unbalanced enter/exit, etc.). Distinct from JitterError so callers can
+# special-case scope misuse without touching NaN/Inf handling.
+struct JitterScopeError <: Exception
+    message::String
+    context::String
+end
+
+function throw_jitter_scope_error(msg::String, ctx::String = "unknown")
+    throw(JitterScopeError(msg, ctx))
+end
+
+function Base.showerror(io::IO, e::JitterScopeError)
+    print(io, "JitterScopeError: $(e.message) (context=$(e.context))")
 end
 
 # ==============================================================================
@@ -124,6 +142,40 @@ const JITTER_COIN_RATIO_MAX = 0.10
 # Bernoulli parameter to stay interior to (0, 1).
 const JITTER_COIN_FLOOR    = 0.01
 const JITTER_COIN_CEILING  = 0.99
+
+# ==============================================================================
+# BRAINSTORM MODE — GRUG take bigger jumps, then snap back
+# ==============================================================================
+# ACADEMIC: "Brainstorm" is a scoped policy override that temporarily raises
+# both the value-jitter ratio and the coin-threshold ratio to their
+# "far-jump" settings for the duration of a single scope (typically one
+# mission). Outside the scope the ratios are bit-exact restored to whatever
+# they were before scope entry. The intuition is simulated-annealing-lite:
+# a short burst of higher variance lets the engine escape a local minimum
+# it would otherwise stay trapped in under the default small-nudge ratio.
+#
+# Constraints on the defaults:
+#   (a) Both brainstorm ratios MUST stay within the permanent hard caps
+#       (JITTER_RATIO_MAX = 0.10, JITTER_COIN_RATIO_MAX = 0.10) so that
+#       any code path that validates against the caps still sees a legal
+#       value during the scope.
+#   (b) The coin brainstorm ratio kept well below 0.5 so even a full
+#       negative swing cannot drag the 50/50 gate across the 0/1 boundary
+#       (the floor/ceiling clamp would catch it anyway, but we want the
+#       clamp to be a safety net, not the normal operating point).
+#   (c) Proportional brainstorm ratio kept below 0.10 so sign preservation
+#       on deltas still holds mathematically (|δ| < ratio·|x| < |x|).
+
+# GRUG: Far-jump value-jitter ratio. 8% means a bullseye of 5.0 gets shaken
+# into [4.6, 5.4] — wide enough to occasionally let a weaker neighbor at
+# 4.5 actually beat it on a single activation, but still under the 10%
+# hard cap so no validator explodes mid-scope.
+const JITTER_BRAINSTORM_RATIO = 0.08
+
+# GRUG: Far-jump coin-threshold ratio. 5 percentage points means a 0.5
+# gate fluctuates in [0.45, 0.55] per activation — enough swing to break
+# the 50/50 lockstep firmly, still well inside the [0.01, 0.99] interior.
+const JITTER_BRAINSTORM_COIN_RATIO = 0.05
 
 # ==============================================================================
 # CONFIG — GRUG keep toggles tight and thread-safe
@@ -438,6 +490,138 @@ struct JitterConfig
             throw_jitter_error("config ratio $ratio out of [0.0, $JITTER_RATIO_MAX]", "JitterConfig")
         end
         new(ratio, enabled)
+    end
+end
+
+# ==============================================================================
+# BRAINSTORM SCOPE — GRUG scoped heavy-jitter policy override
+# ==============================================================================
+# GRUG: Brainstorm state uses a depth counter instead of a bare Bool so that
+# a future change to support nested-but-coalesced scopes is a one-line edit.
+# Today we REFUSE nested scopes and throw JitterScopeError on the second
+# entry — that's the safe default because nested ratio restoration would
+# otherwise have to track the push/pop history in full. If the need for
+# nesting arises, switch "depth != 0" to "push saved ratios onto a stack".
+const _BRAINSTORM_DEPTH = Ref{Int}(0)
+
+"""
+    is_brainstorm_active() -> Bool
+
+Returns `true` if execution is currently inside a `with_brainstorm_jitter`
+scope (including the body of the caller's function).
+"""
+is_brainstorm_active()::Bool = _BRAINSTORM_DEPTH[] > 0
+
+"""
+    get_brainstorm_depth() -> Int
+
+Returns the current brainstorm nesting depth. 0 means inactive. The public
+API refuses depths > 1 today; this accessor exists primarily for
+diagnostics and for tests that assert clean enter/exit symmetry.
+"""
+get_brainstorm_depth()::Int = _BRAINSTORM_DEPTH[]
+
+"""
+    with_brainstorm_jitter(f;
+                           ratio = JITTER_BRAINSTORM_RATIO,
+                           coin_ratio = JITTER_BRAINSTORM_COIN_RATIO) -> Any
+
+Execute `f()` with the value-jitter and coin-threshold ratios temporarily
+raised to `ratio` and `coin_ratio`. On exit — whether `f` returns normally
+or throws — the previous ratios are restored exactly. This is the
+"far jump, then snap back" primitive: a scoped policy override that widens
+the per-activation nudge window for the duration of one mission so the
+engine can escape a local minimum it would otherwise stay stuck in.
+
+Invariants enforced:
+- Nested calls throw `JitterScopeError` with context `"with_brainstorm_jitter"`.
+  Nesting would require stacking saved ratios; we refuse rather than
+  silently take the outermost setting.
+- Ratio arguments are validated against the permanent hard caps
+  (`JITTER_RATIO_MAX` and `JITTER_COIN_RATIO_MAX`). Out-of-range, NaN, or
+  Inf values throw `JitterError` (same type as `set_jitter_ratio!`) —
+  no silent clamp.
+- If `f` throws, the saved ratios are restored AND the exception rethrows.
+  The `try/finally` block guarantees bit-exact restoration of both the
+  ratios and the depth counter regardless of exit path.
+- The global `enable_jitter!` / `disable_jitter!` toggle is orthogonal to
+  brainstorm scope — if jitter is globally disabled, brainstorm still
+  returns identity from every `jitter_*` primitive. Brainstorm only
+  controls the *magnitude* when jitter is enabled; it does not force
+  jitter on.
+
+Returns whatever `f()` returns.
+
+Example:
+
+    with_brainstorm_jitter() do
+        process_mission(user_prompt)
+    end
+"""
+function with_brainstorm_jitter(
+    f;
+    ratio::Float64 = JITTER_BRAINSTORM_RATIO,
+    coin_ratio::Float64 = JITTER_BRAINSTORM_COIN_RATIO,
+)
+    # GRUG: Validate ratios BEFORE touching any state. If they're bad, we
+    # throw without having mutated anything — caller can retry with sane
+    # values without worrying about leaked state.
+    if isnan(ratio) || isinf(ratio)
+        throw_jitter_error("brainstorm ratio NaN/Inf", "with_brainstorm_jitter")
+    end
+    if ratio < 0.0 || ratio > JITTER_RATIO_MAX
+        throw_jitter_error(
+            "brainstorm ratio $ratio out of [0.0, $JITTER_RATIO_MAX]",
+            "with_brainstorm_jitter",
+        )
+    end
+    if isnan(coin_ratio) || isinf(coin_ratio)
+        throw_jitter_error("brainstorm coin_ratio NaN/Inf", "with_brainstorm_jitter")
+    end
+    if coin_ratio < 0.0 || coin_ratio > JITTER_COIN_RATIO_MAX
+        throw_jitter_error(
+            "brainstorm coin_ratio $coin_ratio out of [0.0, $JITTER_COIN_RATIO_MAX]",
+            "with_brainstorm_jitter",
+        )
+    end
+
+    # GRUG: Enter-scope critical section. Depth check + ratio save + ratio
+    # push must be atomic relative to other scope attempts, otherwise two
+    # concurrent missions could both see depth==0, both push, and the
+    # second's finally block would restore wrong saved ratios.
+    saved_ratio::Float64       = 0.0
+    saved_coin_ratio::Float64  = 0.0
+    lock(_CONFIG_LOCK) do
+        if _BRAINSTORM_DEPTH[] != 0
+            # GRUG: Nested scope. Refuse loudly — silent coalescing would
+            # mean an inner scope's "restore" undoes an outer scope's
+            # heavy ratios, which is a correctness bug masquerading as
+            # a convenience feature.
+            throw_jitter_scope_error(
+                "nested with_brainstorm_jitter is not supported (current depth=$(_BRAINSTORM_DEPTH[]))",
+                "with_brainstorm_jitter",
+            )
+        end
+        saved_ratio       = _JITTER_RATIO[]
+        saved_coin_ratio  = _JITTER_COIN_RATIO[]
+        _JITTER_RATIO[]      = ratio
+        _JITTER_COIN_RATIO[] = coin_ratio
+        _BRAINSTORM_DEPTH[]  = 1
+    end
+
+    # GRUG: Try/finally guarantees exit-scope runs on every exit path:
+    # normal return, exception, or early return inside f.
+    try
+        return f()
+    finally
+        lock(_CONFIG_LOCK) do
+            # GRUG: Restore ratios first, THEN drop depth. Ordering matters
+            # only if somebody mid-teardown tried to enter a new scope,
+            # but the lock serializes that anyway.
+            _JITTER_RATIO[]      = saved_ratio
+            _JITTER_COIN_RATIO[] = saved_coin_ratio
+            _BRAINSTORM_DEPTH[]  = 0
+        end
     end
 end
 

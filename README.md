@@ -592,12 +592,13 @@ This means a complex input never gets basic-quality relational output without a 
 
 ---
 
-## Per-Activation Jitter (`RelationalJitter`) — v7.9 (relational) + v7.10 (AIML)
+## Per-Activation Jitter (`RelationalJitter`) — v7.9 (relational) + v7.10 (AIML) + v7.11 (/brainstorm)
 
 Bullseye values across the engine used to be deterministic constants. Now they get a tiny zero-mean nudge at activation time — exact ties between competing nodes break naturally, quiet neighbors occasionally win a coinflip they'd otherwise always lose, and sibling AIML nodes stop marching in lockstep on 50/50 gates.
 
 - **v7.9** applied per-activation jitter to the relational dialectics match-score components (`weight`, exact-match `+2.0`, partial-match `+1.0`, orthogonal `+0.5`, final-dampener `+0.1`).
 - **v7.10** extends the same treatment to the AIML executive layer: initial node strength, every strength delta, and the three 50/50 coin gates (`record_fire!`, `apply_aiml_right!`, `apply_aiml_wrong!`).
+- **v7.11** adds the **`/brainstorm <text>`** command and the `with_brainstorm_jitter(f)` scope primitive: a simulated-annealing-lite "far jump, then snap back" override that temporarily raises the value-jitter ratio from 3% to 8% and the coin-threshold ratio from ±1pp to ±5pp for the duration of one mission, then restores bit-exact on every exit path (including exceptions). Useful when the engine is stuck in a local minimum and needs heavier variance to escape.
 
 ### The Idea
 
@@ -676,6 +677,49 @@ All bad inputs (`NaN`, `Inf`, out-of-range ratio) throw `JitterError`. The error
 
 `test/test_aiml_jitter.jl` — 8 test groups covering: initial-strength jitter (window + zero-mean + near-cap / near-floor / exact-zero behaviour), strength-delta jitter (sign preservation + mean snap-back), coin-threshold jitter at all three AIML call sites (long-run rate stays ~50% across thousands of trials), honest-net-loss contract preservation under jitter (zero violations across 1000 penalty trials), `disable_jitter!` identity contract across every AIML path, and error propagation (NaN/Inf/out-of-range inputs raise `JitterError`, no silent clamping).
 
+`test/test_brainstorm_jitter.jl` — 8 test groups covering: normal enter/exit with ratio swap, exception propagation with state restore, nested-scope refusal via `JitterScopeError`, custom-ratio handling, invalid-ratio rejection before state mutation, orthogonality with `disable_jitter!`, empirical widening of the jitter window (>1.8× factor inside scope vs outside), and lifecycle correctness of `is_brainstorm_active` / `get_brainstorm_depth` across re-entry.
+
+### `/brainstorm <text>` — Scoped Heavy-Jitter (v7.11)
+
+Use `/brainstorm <prompt>` instead of `/mission <prompt>` when you want the engine to take bigger jumps before settling. The command runs the exact same mission pipeline but wraps it in `with_brainstorm_jitter()` so every jitter-wired code path (relational dialectics, AIML strength updates, AIML coin gates) sees a wider entropy window for that one mission. On exit — whether the mission completed normally or threw — the ratios snap back to their defaults.
+
+**Ratios used inside the scope:**
+
+| Setting | Default | Brainstorm | Hard cap |
+|---|---|---|---|
+| Value-jitter ratio | 0.03 (±3%·\|x\|) | 0.08 (±8%·\|x\|) | 0.10 |
+| Coin-threshold ratio | 0.01 (±1pp) | 0.05 (±5pp) | 0.10 |
+
+Both brainstorm ratios stay within the permanent hard caps, so every validator in the system still sees a legal value during the scope. The coin-threshold ratio is kept well below 0.5 so even a full negative swing cannot drag the gate across the `[0, 1]` boundary — the floor/ceiling clamp inside `jitter_coin_threshold` is a safety net, not the normal operating point.
+
+**API:**
+
+```julia
+using GrugBot420
+
+# Wrap any callable in a brainstorm scope
+result = GrugBot420.RelationalJitter.with_brainstorm_jitter() do
+    process_mission("your tricky prompt here")
+end
+
+# Custom ratios (still validated against the hard caps)
+GrugBot420.RelationalJitter.with_brainstorm_jitter(ratio = 0.05, coin_ratio = 0.02) do
+    process_mission("your tricky prompt here")
+end
+
+# Check scope state
+GrugBot420.RelationalJitter.is_brainstorm_active()   # Bool
+GrugBot420.RelationalJitter.get_brainstorm_depth()   # Int (0 = inactive, 1 = active)
+```
+
+**Invariants:**
+
+- Nested `with_brainstorm_jitter` calls throw `JitterScopeError` — no silent coalescing of overlapping scopes.
+- Invalid ratios (NaN, Inf, negative, or above the hard cap) throw `JitterError` **before** any state mutation. The caller can safely retry with sane values without worrying about leaked state.
+- A `try/finally` guarantees the saved ratios are restored bit-exact regardless of exit path. If `f` throws, the scope still unwinds cleanly and rethrows.
+- Brainstorm is **orthogonal** to the global `enable_jitter!` / `disable_jitter!` toggle. If jitter is globally disabled, brainstorm still returns identity from every `jitter_*` primitive — brainstorm controls magnitude, the enable flag controls on/off.
+- Entering and exiting brainstorm scope is thread-safe (`_CONFIG_LOCK`-protected), so a stray async task cannot interleave into a half-set state.
+
 ### Disabling for Deterministic Tests
 
 ```julia
@@ -711,7 +755,7 @@ enable_jitter!()
 | `src/FullLobeScanner.jl` | Full-lobe scanning system: bounded activation (max 1,000 active nodes), phase-gated scan pipeline (INIT→GATHER→ACTIVATE→CONTINUE→DONE), pattern + semantic matches, multithreaded candidate gathering. AIML gated until DONE signal. |
 | `src/AIMLNodeSystem.jl` | Per-lobe AIML node tribes: isolated AIML node populations per lobe, configurable population caps (default node_cap ÷ 3), grave-exclusion cap accounting, cycle-aware reinforcement, full save/load serialization. v7.10 routes initial strength, every strength delta, and the three 50/50 reward/penalty coin gates through `RelationalJitter` for per-activation entropy. |
 | `src/VoteOrchestrator.jl` | Parallel vote orchestrator (v7.8): unique non-colliding Task dispatch, atomic `FireCounter` with hard 1000-slot cap across ALL fire types, `parallel_fire_batches` (batch size 64), `TaskTimeoutError` + `dispatch_task_with_timeout` for deadline-bounded sub-processes, `DoneSignal` channels, strength-biased vote coinflip with top-tier / sub-top windows. No silent failures — timeouts rethrow distinguishable errors. |
-| `src/RelationalJitter.jl` | Per-activation zero-mean nudge on scored values and coin thresholds. v7.9: proportional jitter on `[-ε·\|x\|, +ε·\|x\|]` with `ε = 0.03` default for relational match-score components (bullseye preserved in expectation, exact ties break naturally). v7.10: additive `±ρ` nudge on probability thresholds with `ρ = 0.01` default, clamped to `[0.01, 0.99]` interior so gates never degenerate to always-yes or always-no. Consumed by engine dialectics and AIMLNodeSystem. Sentinel (`-9999.0`) and zero pass through untouched; `NaN`/`Inf`/out-of-range inputs throw `JitterError`; global toggle for deterministic tests. |
+| `src/RelationalJitter.jl` | Per-activation zero-mean nudge on scored values and coin thresholds. v7.9: proportional jitter on `[-ε·\|x\|, +ε·\|x\|]` with `ε = 0.03` default for relational match-score components (bullseye preserved in expectation, exact ties break naturally). v7.10: additive `±ρ` nudge on probability thresholds with `ρ = 0.01` default, clamped to `[0.01, 0.99]` interior so gates never degenerate to always-yes or always-no. Consumed by engine dialectics and AIMLNodeSystem. v7.11: `with_brainstorm_jitter(f)` scope primitive raises both ratios to their far-jump settings (`0.08` / `0.05`) for one call, `try/finally` restores bit-exact on any exit path, nested scopes throw `JitterScopeError`. Sentinel (`-9999.0`) and zero pass through untouched; `NaN`/`Inf`/out-of-range inputs throw `JitterError`; global toggle for deterministic tests. |
 | `grugbot_whitepaper.html` | Full technical documentation and architecture reference. |
 
 ---

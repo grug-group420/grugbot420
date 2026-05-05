@@ -1022,6 +1022,10 @@ const HELP_MSG = """
 ╠══════════════════════════════════════════════════════════════╣
 ║  CORE                                                        ║
 ║  /mission <text>            Send input to the AI engine      ║
+║  /brainstorm <text>         Like /mission but with heavy     ║
+║                             scoped jitter (far-jump before   ║
+║                             snap back) to escape local       ║
+║                             minima for one mission           ║
 ║  /wrong                     Penalize last contributors    ║
 ║  /aimlRight                 Reward AIML contributors     ║
  │  /right                     Reward last contributors         │
@@ -2859,6 +2863,11 @@ function run_cli()
         try
             # GRUG: Parse all known commands via regex
             m_mission     = match(r"^/mission\s+(.+)"s,  line)
+            # GRUG: /brainstorm — process mission under heavier scoped jitter.
+            # Same capture shape as /mission (one text blob) because the body
+            # is fed straight into process_mission; the only difference is the
+            # with_brainstorm_jitter scope wrapper around the call.
+            m_brainstorm  = match(r"^/brainstorm\s+(.+)"s, line)
             m_wrong       = match(r"^/wrong\s*$",         line)
             # GRUG: AIML node tribe feedback commands
             m_right       = match(r"^/right\s*$",          line)
@@ -2921,6 +2930,41 @@ function run_cli()
                 # GRUG: /mission - main input command. Handles text AND image binary.
                 mission_text = String(m_mission.captures[1])
                 process_mission(mission_text)
+
+            elseif !isnothing(m_brainstorm)
+                # GRUG: /brainstorm <text> - process one mission under heavy scoped
+                # jitter to escape local minima. Temporarily raises the value-jitter
+                # ratio (0.03 -> JITTER_BRAINSTORM_RATIO = 0.08) and the
+                # coin-threshold ratio (0.01 -> JITTER_BRAINSTORM_COIN_RATIO = 0.05)
+                # for the duration of this one call, then snaps back on exit
+                # (including exceptional exits). See RelationalJitter.jl §brainstorm.
+                mission_text = String(m_brainstorm.captures[1])
+
+                # GRUG: Match /mission's hard empty-input rule. process_mission
+                # throws on empty text anyway, but we want the scope wrapper to
+                # not enter at all on bad input — keeps the restored state check
+                # trivially correct on the error path.
+                if isempty(strip(mission_text))
+                    println("⚠  /brainstorm: empty prompt; refusing to enter brainstorm scope.")
+                else
+                    # GRUG: Refuse nested brainstorm at the CLI level too so the
+                    # operator sees a friendlier message than the raw JitterScopeError
+                    # that would come up from inside the module. We still let the
+                    # module throw if a programmatic caller somehow gets past this.
+                    if RelationalJitter.is_brainstorm_active()
+                        println("⚠  /brainstorm: another brainstorm scope is already active; refusing to nest.")
+                    else
+                        println("🎲 /brainstorm: entering heavy-jitter scope (ratio=$(RelationalJitter.JITTER_BRAINSTORM_RATIO), coin_ratio=$(RelationalJitter.JITTER_BRAINSTORM_COIN_RATIO)) for one mission.")
+                        # GRUG: Scope wrapper restores ratios on every exit path.
+                        # Errors inside process_mission propagate out; the try/finally
+                        # inside with_brainstorm_jitter guarantees state is restored
+                        # before the throw bubbles up to the outer CLI try-block.
+                        RelationalJitter.with_brainstorm_jitter() do
+                            process_mission(mission_text)
+                        end
+                        println("🎲 /brainstorm: scope closed; jitter ratios snapped back to defaults.")
+                    end
+                end
 
             elseif !isnothing(m_wrong)
                 # GRUG: /wrong - user says last response was wrong.

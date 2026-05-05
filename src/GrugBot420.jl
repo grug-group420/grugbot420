@@ -149,16 +149,19 @@ export apply_aiml_right!, apply_aiml_wrong!
 export aiml_phagy_sweep!, get_aiml_status_summary
 
 # GRUG: RelationalJitter exports — per-activation zero-mean nudge on match scores
-# and AIML strength/delta/coin-threshold values. Nested module is still reachable
-# as GrugBot420.RelationalJitter; these re-exports surface the common primitives
+# and AIML strength/delta/coin-threshold values, plus the /brainstorm scoped
+# heavy-jitter override. Nested module is still reachable as
+# GrugBot420.RelationalJitter; these re-exports surface the common primitives
 # directly on the package namespace.
-export JitterError, JitterConfig
+export JitterError, JitterScopeError, JitterConfig
 export JITTER_RATIO_DEFAULT, HARD_REQ_MISS_SENTINEL
 export JITTER_COIN_RATIO_DEFAULT, JITTER_COIN_FLOOR, JITTER_COIN_CEILING
+export JITTER_BRAINSTORM_RATIO, JITTER_BRAINSTORM_COIN_RATIO
 export jitter_value, jitter_score, jitter_weight
 export jitter_strength, jitter_delta, jitter_coin_threshold
 export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
 export set_jitter_coin_ratio!, get_jitter_coin_ratio
+export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
 
 end # module GrugBot420

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.10</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.11</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.10</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.11</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -230,6 +230,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#relational-strict">15.9 Strict Relational-Triple Coupling</a> <span class="new-badge">v7.8</span></li>
         <li><a href="#relational-jitter">15.10 Per-Activation Relational Jitter</a> <span class="new-badge">v7.9</span></li>
         <li><a href="#aiml-jitter">15.11 AIML Activation Jitter: Strength, Delta, and Coin Gates</a> <span class="new-badge">v7.10</span></li>
+        <li><a href="#brainstorm-scope">15.12 /brainstorm: Scoped Heavy-Jitter Override</a> <span class="new-badge">v7.11</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -1632,6 +1633,219 @@ Values that carry semantic contracts rather than numeric targets are deliberatel
 
 <!-- ================================================================ -->
 <!-- ================================================================ -->
+<h2 id="brainstorm-scope">15.12 /brainstorm: Scoped Heavy-Jitter Override <span class="new-badge">v7.11</span></h2>
+
+<p>
+Versions 7.9 and 7.10 established a small, always-on per-activation nudge (3% of value, ±1
+percentage-point of probability) that breaks exact ties and prevents sibling lockstep without
+measurably disturbing long-run semantics. Version 7.11 adds a complementary mechanism for the
+situation where the engine is clearly stuck &mdash; the same top vote wins five cycles in a
+row, or an AIML tribe has settled into a single-pattern rut &mdash; and needs a bigger shove to
+explore alternatives. The <code>/brainstorm <text></code> CLI command and its underlying
+<code>with_brainstorm_jitter(f)</code> scope primitive do exactly that: temporarily widen the
+jitter window for the duration of one mission, then restore the default ratios bit-exact on
+exit.
+</p>
+
+<div class="grug-box">
+    <p>Grug small-nudge rock every throw, rock still hit bullseye. Good for texture, bad when
+    rock always STUCK at same bullseye and other rocks never win. When Grug want to think harder
+    about hard problem: Grug grab <em>different</em> slingshot for ONE throw &mdash; slingshot
+    that throw wider. Rock goes farther from bullseye, maybe lands different pile, maybe find new
+    path. Then Grug puts slingshot back. Next throw: normal. No permanent change. Just brainstorm
+    burst then snap back.</p>
+</div>
+
+<h3>The Shape: Simulated-Annealing-Lite</h3>
+
+<p>
+Brainstorm is not true simulated annealing &mdash; there's no cooling schedule, no acceptance
+criterion, no meta-loop that decides when to widen. The primitive is stripped down to the single
+useful bit: a <em>scoped</em> override. Inside the scope, both the proportional value-jitter
+ratio and the additive coin-threshold ratio jump to their "far-jump" settings. Outside the
+scope, everything is exactly as v7.9/v7.10 left it.
+</p>
+
+<table>
+    <tr><th>Setting</th><th>Default (v7.9/v7.10)</th><th>Brainstorm (v7.11)</th><th>Hard cap</th></tr>
+    <tr><td>Value-jitter ratio</td><td>0.03 (&plusmn;3%&middot;|x|)</td><td>0.08 (&plusmn;8%&middot;|x|)</td><td>0.10</td></tr>
+    <tr><td>Coin-threshold ratio</td><td>0.01 (&plusmn;1pp)</td><td>0.05 (&plusmn;5pp)</td><td>0.10</td></tr>
+</table>
+
+<p>
+Both brainstorm settings stay strictly below the permanent hard caps, so every validator in
+<code>set_jitter_ratio!</code> and <code>set_jitter_coin_ratio!</code> continues to accept the
+in-scope values. Sign preservation on deltas still holds (ratio < 1), so the honest-net-loss
+contract of &sect;15.11 continues to hold inside a brainstorm scope without further guarding.
+</p>
+
+<h3>The API: Lexically Scoped, Exception-Safe</h3>
+
+<p>
+<code>with_brainstorm_jitter(f; ratio, coin_ratio)</code> is the only public entry point. It
+takes a zero-argument callable <code>f</code>, temporarily replaces the two ratios, invokes
+<code>f()</code>, and restores the ratios on every exit path. The implementation is the
+obvious <code>try/finally</code>:
+</p>
+
+<pre>    function with_brainstorm_jitter(f; ratio = 0.08, coin_ratio = 0.05)
+        validate_ratios(ratio, coin_ratio)  # throws before state mutation
+        saved_r, saved_c = atomic_push_ratios(ratio, coin_ratio)
+        try
+            return f()
+        finally
+            atomic_restore_ratios(saved_r, saved_c)
+        end
+    end
+</pre>
+
+<p>
+The critical design points:
+</p>
+
+<ul>
+    <li><strong>Validation before mutation.</strong> NaN, Inf, negative, or over-cap ratios
+        throw <code>JitterError</code> <em>before</em> any state change. A rejected call leaves
+        the system bit-exact identical to its pre-call state, so the caller can retry without
+        leaked state.</li>
+    <li><strong>Atomic push/restore.</strong> Both the ratio read and ratio write happen under
+        <code>_CONFIG_LOCK</code>, so two concurrent tasks cannot both see <code>depth == 0</code>,
+        both push, and have one's restore undo the other's push. The lock serializes scope
+        entry and exit globally.</li>
+    <li><strong>Finally-block restore.</strong> Whether <code>f</code> returns normally,
+        throws, or does an early return, the finally block restores the saved ratios. The
+        scope cannot leak.</li>
+    <li><strong>Nested scopes refused loudly.</strong> The scope uses a depth counter
+        (<code>_BRAINSTORM_DEPTH</code>); entering when depth is non-zero throws
+        <code>JitterScopeError</code>. The alternative &mdash; silently taking the outermost
+        (or innermost) ratios &mdash; would be a correctness bug disguised as a convenience,
+        so we refuse it. If nested scopes become useful later, the fix is one line: swap the
+        refusal for a stack of saved ratios.</li>
+    <li><strong>Orthogonal to global enable toggle.</strong> Brainstorm controls
+        <em>magnitude</em>; <code>disable_jitter!()</code> controls <em>on/off</em>. Entering a
+        brainstorm scope while jitter is globally disabled leaves every <code>jitter_*</code>
+        primitive an identity function &mdash; the raised ratios are present in state but never
+        applied. Scope exit does not re-enable the global toggle.</li>
+</ul>
+
+<h3>CLI Surface</h3>
+
+<p>
+The <code>/brainstorm <text></code> command in <code>src/Main.jl</code> is a thin shell
+around the scope primitive. It has the same capture shape as <code>/mission</code> (one text
+blob) and feeds the captured text straight into <code>process_mission</code>, but wraps the
+call in <code>with_brainstorm_jitter()</code>:
+</p>
+
+<pre>    elseif !isnothing(m_brainstorm)
+        mission_text = String(m_brainstorm.captures[1])
+        if isempty(strip(mission_text))
+            println("&#9888;  /brainstorm: empty prompt; refusing to enter brainstorm scope.")
+        elseif RelationalJitter.is_brainstorm_active()
+            println("&#9888;  /brainstorm: another brainstorm scope is already active; refusing to nest.")
+        else
+            RelationalJitter.with_brainstorm_jitter() do
+                process_mission(mission_text)
+            end
+        end
+    end
+</pre>
+
+<p>
+Two CLI-level guards in addition to the module-level ones: empty/whitespace-only prompts are
+rejected <em>before</em> scope entry (so the scope never opens for a no-op), and an already-active
+scope is refused with a friendly message rather than the raw <code>JitterScopeError</code>. The
+module-level refusal remains the correctness guarantee &mdash; the CLI guard is UX.
+</p>
+
+<h3>Where the Entropy Goes</h3>
+
+<p>
+Because every bullseye value in v7.9 (relational dialectics) and v7.10 (AIML strength / delta /
+coin gates) routes through <code>RelationalJitter</code>, a brainstorm scope automatically
+widens every one of them without any per-call-site wiring. Specifically, during a brainstorm
+mission:
+</p>
+
+<ul>
+    <li>Each relational match-score contribution (<code>+2.0&middot;w</code>, <code>+1.0&middot;w</code>,
+        <code>+0.5&middot;w</code>, the <code>&times;0.1</code> final dampener) gets &plusmn;8%
+        instead of &plusmn;3%. Previously-unbreakable ties in the 0.5&ndash;1.0 score range now
+        swap winners roughly 15&ndash;20% of the time instead of 5%.</li>
+    <li>Each AIML initial-strength seed and every strength delta gets &plusmn;8% instead of
+        &plusmn;3%. The 50/50 bias in sibling reward/penalty shifts to a noticeably less
+        symmetric distribution per cycle.</li>
+    <li>All three AIML 50/50 coin gates (<code>record_fire!</code>, <code>apply_aiml_right!</code>,
+        <code>apply_aiml_wrong!</code>) use a threshold of <code>0.5 &plusmn; 5pp</code> instead
+        of <code>0.5 &plusmn; 1pp</code>. Long-run 50/50 is still preserved by the zero-mean
+        property, but single-cycle divergence between sibling contributors is substantially
+        larger.</li>
+</ul>
+
+<h3>Invariants Still Held</h3>
+
+<ul>
+    <li><strong>Sentinel pass-through</strong>: the hard-requirement-miss value (<code>-9999.0</code>)
+        is returned exactly unchanged, regardless of ratio. Verified in the v7.9 test suite;
+        the brainstorm path does not go near the sentinel logic.</li>
+    <li><strong>Sign preservation on deltas</strong>: because the brainstorm ratio (0.08) is
+        still less than 1, <code>|&delta;| < |x|</code> so a positive delta stays positive
+        and a negative delta stays negative. The AIML honest-net-loss contract is preserved.</li>
+    <li><strong>Strength clamp</strong>: the post-jitter <code>clamp(strength, FLOOR, CAP)</code>
+        in <code>_apply_strength_delta!</code> still fires, so brainstorm cannot push a node
+        out of its legal range.</li>
+    <li><strong>Coin-threshold interior clamp</strong>: <code>jitter_coin_threshold</code>
+        still clamps to <code>[0.01, 0.99]</code> even under brainstorm ratio, so no single
+        freak draw can turn a 50/50 gate into a degenerate always-yes or always-no gate.</li>
+    <li><strong>No concurrent scope corruption</strong>: the depth counter plus the config
+        lock prevent two tasks from entering scope at the same time. The first wins; the
+        second throws <code>JitterScopeError</code>.</li>
+</ul>
+
+<h3>Test Coverage</h3>
+
+<p>
+<code>test/test_brainstorm_jitter.jl</code> covers 8 groups:
+</p>
+
+<ol>
+    <li><strong>[A]</strong> Normal enter/exit contract: pre-scope state, inside-scope state,
+        return value pass-through, post-scope bit-exact restore.</li>
+    <li><strong>[B]</strong> Exception inside scope: the exception rethrows unchanged, the
+        finally block still restores state bit-exact.</li>
+    <li><strong>[C]</strong> Nested scope: inner entry throws <code>JitterScopeError</code>;
+        outer scope state unaffected; outer exits cleanly.</li>
+    <li><strong>[D]</strong> Custom ratios: caller-supplied <code>ratio</code> / <code>coin_ratio</code>
+        honored inside, restored on exit.</li>
+    <li><strong>[E]</strong> Invalid ratios: NaN, Inf, negative, over-cap all raise
+        <code>JitterError</code> with state unchanged (pre-mutation validation).</li>
+    <li><strong>[F]</strong> Orthogonality with global toggle: brainstorm + disabled jitter =
+        identity from every <code>jitter_*</code> primitive; scope exit does not re-enable.</li>
+    <li><strong>[G]</strong> Empirical window widening: over 4,000 samples on a seed value of
+        5.0, outside-scope max <code>|&delta;|</code> pins at the 0.15 theoretical cap, inside-scope
+        max <code>|&delta;|</code> pins at the 0.40 theoretical cap &mdash; a 2.67&times; widening
+        factor (test threshold is a conservative 1.8&times;).</li>
+    <li><strong>[H]</strong> Lifecycle: <code>is_brainstorm_active()</code> and
+        <code>get_brainstorm_depth()</code> correct across enter, exit, re-enter (after clean
+        exit), and re-enter (after exceptional exit).</li>
+</ol>
+
+<div class="academic-box">
+    <strong>Design Rationale:</strong> The small constant jitter of v7.9/v7.10 is sized to be
+    invisible to long-run semantics while still breaking exact ties. That is the right
+    default &mdash; larger values would distort expected scores enough to matter. But some
+    problems are local-minimum problems: the engine is not misbehaving, it is just trapped in
+    a basin of attraction that consistently picks the same answer. For these, what's needed is
+    not a larger <em>default</em> but a larger <em>burst</em>. A scoped override gives exactly
+    that: the operator says "take a bigger swing on this one," the engine widens variance for
+    one mission, and the long-run dynamics are unaffected because the override is scoped, not
+    permanent. This is a one-bit addition to the operator's control surface &mdash; same
+    command syntax as <code>/mission</code>, different variance regime &mdash; that preserves
+    every invariant of the underlying jitter framework.
+</div>
+
+<!-- ================================================================ -->
+<!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
 <div class="grug-box">
@@ -2124,9 +2338,9 @@ The signal is not in the wire. Only the computation is. And the computation was 
     <tr><td><code>Main.jl</code></td><td>3,917</td><td>CLI loop, command routing, AIML orchestrator, prefrontal cortex, specimen persistence, admin system</td></tr>
 </table>
 
-<h3>Test Files (19 in runner, 22 total on disk)</h3>
+<h3>Test Files (20 in runner, 23 total on disk)</h3>
 <p>
-<code>test/runtests.jl</code> runs 19 test files as isolated Julia subprocesses &mdash; each test file
+<code>test/runtests.jl</code> runs 20 test files as isolated Julia subprocesses &mdash; each test file
 <code>include()</code>s <code>src/</code> modules directly, so running them in the same process
 would cause module-redefinition errors. Non-zero subprocess exit = test failure; no silent swallow.
 </p>
@@ -2151,6 +2365,7 @@ would cause module-redefinition errors. Non-zero subprocess exit = test failure;
     <tr><td><code>test_relational_strict.jl</code> <span class="new-badge">v7.8</span></td><td>Strict relational-triple coupling: <code>screen_input_complexity</code> bands, basic vs. dynamic extractor routing, hard-fail on dynamic failure at scan_mode ≥ 3</td></tr>
     <tr><td><code>test_relational_jitter.jl</code> <span class="new-badge">v7.9</span></td><td>Per-activation relational jitter: magnitude bound, zero-mean convergence over 20k samples, NaN/Inf error handling, toggle, ratio setter, thread safety, <code>JitterConfig</code>, integration with <code>evaluate_relational_dialectics</code> (snap-back within 1% over 3k runs), sentinel preservation (500/500 exact), antimatch robustness (1000/1000 flag preserved), deterministic mode when disabled &mdash; 14 groups, all green</td></tr>
     <tr><td><code>test_aiml_jitter.jl</code> <span class="new-badge">v7.10</span></td><td>Per-activation AIML jitter: initial-strength window + zero-mean (600 nodes), strength-delta sign preservation + mean snap-back, <code>record_fire!</code> / <code>apply_aiml_right!</code> / <code>apply_aiml_wrong!</code> coin gates all within &plusmn;0.05 of 50% long-run (thousands of trials each), honest-net-loss contract preservation under jitter (0 violations across 1000 trials), <code>disable_jitter!</code> identity contract across the AIML layer, NaN/Inf/out-of-range propagate as <code>JitterError</code> &mdash; 8 groups, all green</td></tr>
+    <tr><td><code>test_brainstorm_jitter.jl</code> <span class="new-badge">v7.11</span></td><td>Scoped heavy-jitter primitive <code>with_brainstorm_jitter</code>: normal enter/exit with ratio swap, exception propagation with finally-block state restore, nested-scope refusal via <code>JitterScopeError</code>, custom-ratio handling, pre-mutation validation of NaN/Inf/out-of-range inputs, orthogonality with global <code>disable_jitter!</code>, empirical window widening from 0.15 to 0.40 over 4k samples (2.67&times; factor), and lifecycle correctness of <code>is_brainstorm_active</code> / <code>get_brainstorm_depth</code> across re-entry after both clean and exceptional exits &mdash; 8 groups, all green</td></tr>
 </table>
 
 <h4>Additional test files on disk (not in runner)</h4>
@@ -2165,13 +2380,14 @@ would cause module-redefinition errors. Non-zero subprocess exit = test failure;
 <h2 id="testing">20. Test Suite</h2>
 
 <h3>Running Tests</h3>
-<pre><code># Run the full suite (19 isolated subprocesses)
+<pre><code># Run the full suite (20 isolated subprocesses)
 julia --project=. test/runtests.jl
 
 # Or run a single test file directly
 julia --project=. test/test_vote_orchestrator.jl
 julia --project=. test/test_relational_strict.jl
 julia --project=. test/test_aiml_jitter.jl
+julia --project=. test/test_brainstorm_jitter.jl
 julia --project=. test/test_smoke.jl</code></pre>
 
 <p>
@@ -2180,12 +2396,12 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.10)</h3>
+<h3>Test Suite Status (v7.11)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>19</td></tr>
-    <tr><td>Total test files on disk</td><td>22</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 19 / 19 passing</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>20</td></tr>
+    <tr><td>Total test files on disk</td><td>23</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 20 / 20 passing</td></tr>
     <tr><td>Full suite wall-clock</td><td>~95 s on 8-core Linux</td></tr>
 </table>
 
@@ -2198,6 +2414,17 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+    <h3>v7.11 — /brainstorm Scoped Heavy-Jitter Override</h3>
+    <ul>
+        <li><strong>New CLI command</strong> <code>/brainstorm <text></code> in <code>src/Main.jl</code>: same capture shape and pipeline as <code>/mission</code>, but wraps <code>process_mission</code> in a <code>with_brainstorm_jitter()</code> scope so every jitter-wired code path (relational dialectics + AIML strength/delta/coin gates) sees a wider entropy window for that one mission. Two CLI-level guards: empty/whitespace-only prompts are rejected before scope entry, and an already-active scope is refused with a friendly message.</li>
+        <li><strong>New primitive</strong> <code>with_brainstorm_jitter(f; ratio, coin_ratio)</code> in <code>src/RelationalJitter.jl</code>: temporarily raises the value-jitter ratio to 0.08 (from 0.03 default) and the coin-threshold ratio to 0.05 (from 0.01 default) for the duration of a single scope. <code>try/finally</code> guarantees bit-exact restoration on every exit path (normal, exceptional, early-return). Both brainstorm settings stay strictly below the permanent hard caps so every ratio validator in the system still accepts the in-scope values; sign preservation on deltas still holds so the honest-net-loss contract continues to hold inside a brainstorm scope.</li>
+        <li><strong>New constants</strong>: <code>JITTER_BRAINSTORM_RATIO = 0.08</code>, <code>JITTER_BRAINSTORM_COIN_RATIO = 0.05</code>. Both exported at package level.</li>
+        <li><strong>New error type</strong> <code>JitterScopeError</code>, distinct from <code>JitterError</code>, carries message + context. Thrown on nested <code>with_brainstorm_jitter</code> entry (nesting would require stacking saved ratios; we refuse rather than silently coalesce). Pre-mutation validation of invalid ratios (NaN / Inf / negative / over-cap) still raises <code>JitterError</code> as in v7.9/v7.10 setters.</li>
+        <li><strong>State accessors</strong>: <code>is_brainstorm_active()</code> and <code>get_brainstorm_depth()</code> for diagnostics and test assertions. Scope state uses a depth counter in <code>Ref{Int}</code> under <code>_CONFIG_LOCK</code> so enter/exit is atomic relative to concurrent task entries.</li>
+        <li><strong>Orthogonal to global toggle</strong>: <code>enable_jitter!</code> / <code>disable_jitter!</code> remain the on/off switch; brainstorm controls magnitude only. Entering a brainstorm scope while jitter is globally disabled leaves every <code>jitter_*</code> primitive an identity function; scope exit does not re-enable the global toggle.</li>
+        <li><strong>Test suite</strong>: <code>test/test_brainstorm_jitter.jl</code> added with 8 groups &mdash; normal enter/exit, exception propagation with state restore, nested-scope refusal, custom ratios, pre-mutation rejection of invalid ratios, orthogonality with <code>disable_jitter!</code>, empirical window widening (0.15 &rarr; 0.40, a 2.67&times; factor over 4,000 samples), and lifecycle correctness across re-entry after both clean and exceptional exits. <strong>20 / 20 passing</strong>.</li>
+        <li><strong>Documentation</strong>: README.md gains a "/brainstorm Scoped Heavy-Jitter" subsection with API examples; whitepaper gains &sect;15.12; version bumped to v7.11 across the board.</li>
+    </ul>
     <h3>v7.10 — AIML Activation Jitter (Strength, Delta, Coin Gates)</h3>
     <ul>
         <li><strong>RelationalJitter extended</strong> with AIML-specific primitives: <code>jitter_strength(s)</code> and <code>jitter_delta(d)</code> (proportional wrappers around <code>jitter_value</code> carrying intent at the AIML call sites) and <code>jitter_coin_threshold(p; ratio)</code>, an additive <code>&plusmn;&rho;</code> nudge on probability thresholds clamped to <code>[JITTER_COIN_FLOOR, JITTER_COIN_CEILING] = [0.01, 0.99]</code>. The clamp guarantees that no single freak draw can silently turn a 50/50 gate into a degenerate always-yes or always-no gate.</li>
