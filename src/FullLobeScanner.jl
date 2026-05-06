@@ -385,7 +385,14 @@ end
 #       Uses multithreading for speed. Static chunking.
 
 function gather_candidates!(scanner::LobeScanner, node_features::Dict{String, Vector{Float64}}; 
-                            threshold::Float64 = DEFAULT_CANDIDATE_THRESHOLD)
+                            threshold::Float64 = DEFAULT_CANDIDATE_THRESHOLD,
+                            nonjitter_ids::Set{String} = Set{String}())
+    # GRUG v7.21: nonjitter_ids is the set of node ids tagged NONJITTER at the
+    # engine layer. FullLobeScanner is its own module and does not see Node
+    # objects — it only sees node_features by id. So the caller (engine-layer
+    # orchestrator) is responsible for harvesting the tag from NODE_MAP and
+    # passing the id set in. If empty (default), every node gets jittered as
+    # before — this preserves backward compatibility.
     _require_not_done!(scanner)
     _require_query_features!(scanner.query_features)
     
@@ -422,8 +429,14 @@ function gather_candidates!(scanner::LobeScanner, node_features::Dict{String, Ve
             
             # GRUG: Compute similarity score
             score = _compute_similarity(query, features)
-            score = slight_jitter(score)  # GRUG: Add natural variation
-            
+            # GRUG v7.21: NONJITTER honor — if this node_id is tagged NONJITTER
+            # at the engine layer, skip the candidate-gathering score jitter
+            # so its gate is bit-stable across runs. Set membership check is
+            # O(1); empty default set means no-op for legacy callers.
+            if !(node_id in nonjitter_ids)
+                score = slight_jitter(score)  # GRUG: Add natural variation
+            end
+
             if score >= threshold
                 push!(thread_candidates[t], node_id)
                 push!(thread_scores[t], score)
@@ -455,7 +468,10 @@ end
 #       Create matches for confident activations.
 
 function activate_candidates!(scanner::LobeScanner, node_features::Dict{String, Vector{Float64}};
-                              confident_threshold::Float64 = CONFIDENT_THRESHOLD)
+                              confident_threshold::Float64 = CONFIDENT_THRESHOLD,
+                              nonjitter_ids::Set{String} = Set{String}())
+    # GRUG v7.21: see note on gather_candidates! — same plumbing, same
+    # semantics. Default empty set = full backward compatibility.
     _require_not_done!(scanner)
     _require_phase!(scanner, PHASE_ACTIVATE)
     
@@ -477,8 +493,11 @@ function activate_candidates!(scanner::LobeScanner, node_features::Dict{String, 
         
         features = node_features[node_id]
         similarity = _compute_similarity(query, features)
-        confidence = slight_jitter(abs(similarity))
-        
+        # GRUG v7.21: NONJITTER honor — activation confidence is bit-stable
+        # for tagged nodes. abs(similarity) is already in [0, 1], so skipping
+        # slight_jitter is safe (no clamp-edge surprises).
+        confidence = (node_id in nonjitter_ids) ? abs(similarity) : slight_jitter(abs(similarity))
+
         # GRUG: Activate the node
         activate_node!(scanner.active_set, node_id, confidence)
         activated_count += 1

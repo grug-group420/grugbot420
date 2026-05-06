@@ -327,9 +327,25 @@ function evaluate_relational_dialectics(
     match_score = 0.0
     orthogonal_penalty = 0.0
 
+    # GRUG v7.21: Check NONJITTER tag ONCE up front. The tag lives in
+    # required_relations (see src/engine.jl §"PER-NODE NONJITTER TAG"), so
+    # we already have it in hand — no extra field, no extra lookup, no lock.
+    # If set, every RelationalJitter.jitter_* call below collapses into the
+    # identity function so the node returns bit-stable relational scores.
+    # NOTE: we do NOT check required_relations against user_rels for the
+    # NONJITTER tag — it's a behavioral flag, not a required semantic relation,
+    # so the user never needs to "supply" it. The hard-requirement loop below
+    # already scans required_relations for user-rel membership; we MUST make
+    # sure the NONJITTER string is not treated as a missing semantic relation.
+    # Implementation: skip the tag inside the membership check.
+    nonjitter = NONJITTER_TAG in required_relations
+
     if !isempty(required_relations)
         user_rels = Set([t.relation for t in user_triples])
         for req in required_relations
+            # GRUG v7.21: NONJITTER is a behavioral tag, not a semantic relation.
+            # Do not treat it as a missing requirement if the user didn't supply it.
+            req == NONJITTER_TAG && continue
             if !(req in user_rels)
                 # GRUG FIX 2.7: Sentinel Value for hard requirement miss!
                 return (-9999.0, false) 
@@ -342,21 +358,29 @@ function evaluate_relational_dialectics(
     # symmetric so repeated activations snap back to the deterministic
     # match score in expectation; any single activation just sees a nudge
     # that can tip exact ties toward weaker neighbors. See RelationalJitter.jl.
+    #
+    # v7.21 NONJITTER HONOR: if the incoming required_relations carries the
+    # NONJITTER tag, every jitter_* call becomes identity. We pre-select the
+    # callable once instead of branching inside the hot double-loop so the
+    # branch-predictor sees a single stable pattern per activation.
+    jitter_w = nonjitter ? identity : RelationalJitter.jitter_weight
+    jitter_s = nonjitter ? identity : RelationalJitter.jitter_score
+
     for ut in user_triples
         for nt in node_triples
             # GRUG: Weight itself gets the first nudge — same bullseye every
             # activation otherwise. jitter_weight is the sign-preserving wrapper.
-            weight = RelationalJitter.jitter_weight(get(relation_weights, ut.relation, 1.0))
+            weight = jitter_w(get(relation_weights, ut.relation, 1.0))
             if ut.relation == nt.relation
                 if ut.subject == nt.object && ut.object == nt.subject
-                    match_score -= RelationalJitter.jitter_score(2.0 * weight)
+                    match_score -= jitter_s(2.0 * weight)
                     is_antimatch = true
                 elseif ut.subject == nt.subject && ut.object == nt.object
-                    match_score += RelationalJitter.jitter_score(2.0 * weight)
+                    match_score += jitter_s(2.0 * weight)
                 elseif ut.subject == nt.subject || ut.object == nt.object
-                    match_score += RelationalJitter.jitter_score(1.0 * weight)
+                    match_score += jitter_s(1.0 * weight)
                 else
-                    orthogonal_penalty += RelationalJitter.jitter_score(0.5 * weight)
+                    orthogonal_penalty += jitter_s(0.5 * weight)
                 end
             end
         end
@@ -367,8 +391,9 @@ function evaluate_relational_dialectics(
     # penalty multiplier aren't deterministic constants. Sentinel (-9999.0)
     # and true zero are handled internally by jitter_value and pass through
     # untouched — the hard-requirement-miss contract is preserved.
+    # v7.21: NONJITTER collapses this final jitter to identity as well.
     if match_score > 0
-        final_score = max(0.1, match_score - RelationalJitter.jitter_score(orthogonal_penalty * 0.1))
+        final_score = max(0.1, match_score - jitter_s(orthogonal_penalty * 0.1))
     else
         final_score = match_score - orthogonal_penalty
     end
@@ -594,6 +619,48 @@ function clear_nonjitter!(node::Node)
         filter!(r -> r != NONJITTER_TAG, node.required_relations)
     end
     return node
+end
+
+"""
+    collect_nonjitter_ids()::Set{String}
+
+GRUG v7.21: Walk NODE_MAP under lock and return the Set of ids whose node
+carries the NONJITTER tag. This is the bridge between the engine-layer tag
+store (each Node's required_relations) and subsystems that only speak in
+node ids — notably FullLobeScanner, which operates on a
+`Dict{String, Vector{Float64}}` of features and has no access to Node
+objects.
+
+Typical usage at an orchestrator call site:
+
+    nj_ids = collect_nonjitter_ids()
+    gather_candidates!(scanner, features; nonjitter_ids=nj_ids)
+    activate_candidates!(scanner, features; nonjitter_ids=nj_ids)
+
+RETURNS: a fresh Set{String} (never nothing). Empty set if no nodes carry
+the tag. Always safe to pass directly to FullLobeScanner.
+
+PERFORMANCE: O(N) over NODE_MAP, where N is the total node count. Call
+once per mission (not per candidate) and cache the result for the duration
+of the scan — the tag set is stable across a single scan because NONJITTER
+is not mutated from inside the scan hot path.
+
+NO SILENT FAILURES: a missing NODE_MAP or corrupted required_relations
+would surface as a normal Julia error from the iteration, not a quiet empty
+set.
+"""
+function collect_nonjitter_ids()::Set{String}
+    ids = Set{String}()
+    lock(NODE_LOCK) do
+        for (id, node) in NODE_MAP
+            # GRUG: is_nonjitter is cheap (≤4-element membership). Whole walk
+            # is O(N * avg_rels) ≈ O(N) with tiny constant.
+            if is_nonjitter(node)
+                push!(ids, id)
+            end
+        end
+    end
+    return ids
 end
 
 # ==============================================================================
@@ -1379,7 +1446,13 @@ function fire_attachments!(target_id::String, active_count::Int, active_cap::Int
             # GRUG: Add small stochastic jitter (sigma=RELAY_CONF_JITTER_SIGMA).
             # Synaptic relay is biologically noisy — same node shouldn't fire with
             # identical confidence every cycle. Nudges vote pool diversity.
-            jitter = randn() * RELAY_CONF_JITTER_SIGMA
+            #
+            # GRUG v7.21 NONJITTER HONOR: if the attached node carries the
+            # NONJITTER tag, suppress the synaptic relay jitter so its voted
+            # confidence is exactly att.base_confidence (floored at 0.1). This
+            # is the system-wide promise of the tag: wherever a node-scoped
+            # jitter happens, a NONJITTER-tagged node skips it.
+            jitter = is_nonjitter(attach_node_ref) ? 0.0 : randn() * RELAY_CONF_JITTER_SIGMA
             confidence = max(0.1, att.base_confidence + jitter)
 
             # GRUG: Return the connector pattern so generative knows WHY this relay fired.

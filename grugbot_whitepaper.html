@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.20</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.21</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.20</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.21</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -239,6 +239,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#lobe-topicality">15.18 Lobe Topicality Gate + Semantic-Bridge Exception</a> <span class="new-badge">v7.18</span></li>
         <li><a href="#bnsnc-coherence">15.19 Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</a> <span class="new-badge">v7.19</span></li>
         <li><a href="#nonjitter-tag">15.20 Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</a> <span class="new-badge">v7.20</span></li>
+        <li><a href="#nonjitter-systemwide">15.21 System-Wide NONJITTER Honor (relational dialectics, attachment relay, full-lobe scanner)</a> <span class="new-badge">v7.21</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -2386,6 +2387,180 @@ behavior, fusion-math integrity, coexistence with other rules in <code>required_
 and hot-path performance (>1M <code>is_nonjitter</code> calls/second). All assertions green.</p>
 
 <!-- ================================================================ -->
+<h2 id="nonjitter-systemwide">15.21 System-Wide NONJITTER Honor <span class="new-badge">v7.21</span></h2>
+
+<div class="grug-box">
+    <p>v7.20 gave grug the NONJITTER tag. But tag only worked in ONE place &mdash; post-fusion
+    jitter inside <code>_bidirectional_cheap_scan</code>. If tagged rock went through relational
+    scoring, or attachment relay, or full-lobe scanner, jitter still hit it. That is a lie.
+    If rock has NONJITTER tag, rock should NEVER wiggle, anywhere. v7.21 makes the tag mean
+    what it says: honored EVERYWHERE a node-scoped jitter touches the system.</p>
+</div>
+
+<h3>Problem</h3>
+
+<p>The v7.20 NONJITTER implementation gated exactly one call site &mdash; <code>slight_jitter</code>
+on the fused coherence output of <code>_bidirectional_cheap_scan</code>. But GrugBot applies
+node-scoped jitter in at least three other places:</p>
+
+<ol>
+    <li><strong><code>evaluate_relational_dialectics</code></strong> (engine.jl) &mdash;
+    per-triple <code>jitter_weight</code> and <code>jitter_score</code> from
+    <code>RelationalJitter</code>, plus a final orthogonal-penalty dampener jitter.</li>
+    <li><strong><code>fire_attachments!</code> relay</strong> (engine.jl) &mdash; Gaussian
+    synaptic-noise jitter (<code>randn() * RELAY_CONF_JITTER_SIGMA</code>) added on top of
+    each attached node's pre-baked base confidence at fire time.</li>
+    <li><strong><code>FullLobeScanner.gather_candidates!</code> / <code>activate_candidates!</code></strong>
+    (FullLobeScanner.jl) &mdash; <code>slight_jitter</code> applied to similarity scores during
+    candidate gathering and activation confidence during the activation pass.</li>
+</ol>
+
+<p>A tagged node was honest about its intent at the cheap-scan layer, then lied about it
+everywhere else &mdash; it still ended up with jittered relational scores, jittered relay
+confidences, and jittered activation energies. That defeats the purpose of the tag for
+canonical-form anchors, calibration nodes, and seed nodes.</p>
+
+<h3>Fix: gate all three sites, share the tag through one primitive</h3>
+
+<p>Two different plumbing strategies, chosen per call site:</p>
+
+<p><strong>Strategy A &mdash; function-level flag where the node is already in scope.</strong>
+<code>evaluate_relational_dialectics</code> already receives the node's
+<code>required_relations</code> vector as an argument (it uses it for the hard-requirement check).
+So we check once up front &mdash; <code>nonjitter = NONJITTER_TAG in required_relations</code>
+&mdash; and pre-select an identity pass-through (<code>jitter_w = nonjitter ? identity :
+RelationalJitter.jitter_weight</code>) instead of branching inside the hot double-loop. The
+same trick is used in <code>fire_attachments!</code> where <code>attach_node_ref</code> is
+already fetched from <code>NODE_MAP</code>: we query <code>is_nonjitter(attach_node_ref)</code>
+and zero out the Gaussian draw if tagged.</p>
+
+<p><strong>Strategy B &mdash; id-set plumbing where the scanner doesn't see Node objects.</strong>
+<code>FullLobeScanner</code> is a standalone module that operates on a
+<code>Dict{String, Vector{Float64}}</code> of features and never touches <code>NODE_MAP</code>.
+Adding a Node dependency there would entangle subsystems that are intentionally decoupled.
+Instead, <code>gather_candidates!</code> and <code>activate_candidates!</code> each gain an
+optional kwarg <code>nonjitter_ids::Set{String} = Set{String}()</code>. The caller supplies
+the precomputed tag set; the scanner does an O(1) membership check per candidate and skips
+<code>slight_jitter</code> when the id is in the set. Default empty set = zero overhead for
+callers who don't opt in = full backward compatibility.</p>
+
+<h3>The bridge: <code>collect_nonjitter_ids()</code></h3>
+
+<p>To cheaply fill the kwarg, v7.21 adds the engine-level helper:</p>
+
+<pre><code>function collect_nonjitter_ids()::Set{String}
+    ids = Set{String}()
+    lock(NODE_LOCK) do
+        for (id, node) in NODE_MAP
+            if is_nonjitter(node)
+                push!(ids, id)
+            end
+        end
+    end
+    return ids
+end</code></pre>
+
+<p>Orchestrator call site pattern:</p>
+
+<pre><code>nj_ids = collect_nonjitter_ids()
+gather_candidates!(scanner, features; nonjitter_ids=nj_ids)
+activate_candidates!(scanner, features; nonjitter_ids=nj_ids)</code></pre>
+
+<p>The helper is O(N) over <code>NODE_MAP</code> with a tiny constant (each
+<code>is_nonjitter</code> check is &le;4-element membership). Call once per mission and reuse
+the set for the duration of the scan &mdash; the NONJITTER tag is stable across a single scan
+because nothing inside the scan hot path mutates it.</p>
+
+<h3>One semantic gotcha: NONJITTER is not a required relation</h3>
+
+<p>The hard-requirement check in <code>evaluate_relational_dialectics</code> walks
+<code>required_relations</code> and returns the <code>-9999.0</code> sentinel if the user's
+input doesn't supply a matching relation. Before v7.21 this loop treated EVERY string in the
+vector as a semantic relation to check against user triples. But <code>"NONJITTER"</code> is a
+behavioral flag, not a semantic relation &mdash; the user will never supply an input triple with
+relation <code>"NONJITTER"</code>, so a naive implementation would turn the tag into an
+always-fire requirement miss and silently drop every tagged node from voting.</p>
+
+<p>The fix is a one-line guard in the loop: <code>req == NONJITTER_TAG && continue</code>.
+The tag is skipped for requirement checks, honored for jitter gating, and everyone else
+(existing semantic relations) is unaffected.</p>
+
+<h3>Scope table</h3>
+
+<table>
+    <tr>
+        <th>Call site</th>
+        <th>Jitter primitive</th>
+        <th>v7.20 status</th>
+        <th>v7.21 status</th>
+    </tr>
+    <tr>
+        <td><code>_bidirectional_cheap_scan</code> end-confidence</td>
+        <td><code>slight_jitter</code></td>
+        <td>Gated via <code>nonjitter</code> kwarg</td>
+        <td>Unchanged</td>
+    </tr>
+    <tr>
+        <td><code>evaluate_relational_dialectics</code> per-triple score/weight</td>
+        <td><code>RelationalJitter.jitter_weight</code> / <code>jitter_score</code></td>
+        <td>NOT gated</td>
+        <td><strong>Gated via <code>required_relations</code> check</strong></td>
+    </tr>
+    <tr>
+        <td><code>fire_attachments!</code> synaptic relay</td>
+        <td><code>randn() * RELAY_CONF_JITTER_SIGMA</code></td>
+        <td>NOT gated</td>
+        <td><strong>Gated via <code>is_nonjitter(attach_node_ref)</code></strong></td>
+    </tr>
+    <tr>
+        <td><code>FullLobeScanner.gather_candidates!</code> candidate score</td>
+        <td><code>slight_jitter</code> (module-local)</td>
+        <td>NOT gated</td>
+        <td><strong>Gated via <code>nonjitter_ids::Set{String}</code> kwarg</strong></td>
+    </tr>
+    <tr>
+        <td><code>FullLobeScanner.activate_candidates!</code> activation confidence</td>
+        <td><code>slight_jitter</code> (module-local)</td>
+        <td>NOT gated</td>
+        <td><strong>Gated via <code>nonjitter_ids::Set{String}</code> kwarg</strong></td>
+    </tr>
+    <tr>
+        <td><code>evaluate_window</code> per-window hardware variance</td>
+        <td><code>slight_jitter</code></td>
+        <td colspan="2">Explicitly OUT OF SCOPE &mdash; substrate-level scanner noise, not a node decision</td>
+    </tr>
+    <tr>
+        <td><code>refresh_message_intensities!</code> ChatMessage intensity</td>
+        <td><code>RelationalJitter.jitter_value</code></td>
+        <td colspan="2">Explicitly OUT OF SCOPE &mdash; operates on messages, not Nodes</td>
+    </tr>
+    <tr>
+        <td><code>apply_sdf_jitter</code> raw image input</td>
+        <td>bounded per-element noise</td>
+        <td colspan="2">Explicitly OUT OF SCOPE &mdash; input preprocessing, before any node dispatch</td>
+    </tr>
+</table>
+
+<h3>Test coverage (v7.21 additions)</h3>
+
+<p><code>test_nonjitter_tag.jl</code> grows from 10 groups / 36 sub-assertions to
+<strong>13 groups / 52 sub-assertions</strong>. New coverage:</p>
+
+<ul>
+    <li><strong>evaluate_relational_dialectics honors NONJITTER</strong>: 50-call bit-stability
+    sweep with the tag present, variance sweep with the tag absent, proof that NONJITTER does
+    NOT trip the missing-requirement sentinel, and coexistence with real required relations
+    (real requirements still fire when the user omits them).</li>
+    <li><strong>collect_nonjitter_ids walks NODE_MAP correctly</strong>: insert three fresh
+    nodes, tag two, verify the returned set equals exactly those two (relative to the baseline
+    set of already-tagged boot-time nodes).</li>
+    <li><strong>FullLobeScanner honors nonjitter_ids kwarg</strong>: 20-seed run with one
+    tagged id and one untagged id &mdash; tagged node yields exactly one unique confidence
+    across all runs; untagged node yields multiple; legacy path with the kwarg omitted leaves
+    both jittered.</li>
+</ul>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -2941,14 +3116,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.20)</h3>
+<h3>Test Suite Status (v7.21)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
     <tr><td>Tests in <code>runtests.jl</code> runner</td><td>23</td></tr>
     <tr><td>Total test files on disk</td><td>28</td></tr>
     <tr><td>Current result</td><td style="color:#00ff88;">✅ 24 / 24 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~170 s on 8-core Linux</td></tr>
-    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity); <code>test_nonjitter_tag.jl</code> (10 subgroups / 36 sub-assertions covering v7.20 &mdash; tag invariants, idempotent set/clear, untagged-clear safety, full round-trip, bit-stable confidence under <code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default, fusion-math integrity, coexistence with other <code>required_relations</code> rules, and >1M <code>is_nonjitter</code> calls/second on hot path)</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~220 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity); <code>test_nonjitter_tag.jl</code> (13 subgroups / 52 sub-assertions covering v7.20 & v7.21 &mdash; tag invariants, idempotent set/clear, untagged-clear safety, full round-trip, bit-stable confidence under <code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default, fusion-math integrity, coexistence with other <code>required_relations</code> rules, >1M <code>is_nonjitter</code> calls/second on hot path, plus v7.21 system-wide honor across <code>evaluate_relational_dialectics</code> / <code>collect_nonjitter_ids</code> / <code>FullLobeScanner</code>)</td></tr>
 </table>
 
 <div class="tip">
@@ -2960,6 +3135,54 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.21 &mdash; System-Wide NONJITTER Honor</h3>
+    <ul>
+        <li><strong>Extends the NONJITTER tag from v7.20 to honor it everywhere a node-scoped
+        jitter call happens system-wide.</strong> v7.20 gated exactly one call site; v7.21 gates
+        every node-scoped jitter path.</li>
+        <li><strong><code>evaluate_relational_dialectics</code> (engine.jl)</strong>: checks
+        <code>NONJITTER_TAG in required_relations</code> once up front, pre-selects either the
+        real <code>RelationalJitter.jitter_weight</code>/<code>jitter_score</code> or
+        <code>identity</code> for use in the per-triple scoring double-loop. Tagged nodes
+        receive bit-stable relational scores across repeated scoring; untagged nodes unchanged.</li>
+        <li><strong><code>evaluate_relational_dialectics</code> requirement-check fix</strong>:
+        the hard-requirement loop now skips <code>NONJITTER_TAG</code> via
+        <code>req == NONJITTER_TAG && continue</code> so the behavioral flag is never
+        mistaken for a missing semantic relation (which would silently drop every tagged node
+        from voting).</li>
+        <li><strong><code>fire_attachments!</code> synaptic relay (engine.jl)</strong>: the
+        Gaussian <code>randn() * RELAY_CONF_JITTER_SIGMA</code> jitter applied on top of
+        <code>att.base_confidence</code> is zeroed out when
+        <code>is_nonjitter(attach_node_ref)</code> is true. Tagged attached nodes relay with
+        exactly their pre-baked base confidence (floored at 0.1).</li>
+        <li><strong><code>FullLobeScanner.gather_candidates!</code> / <code>activate_candidates!</code></strong>:
+        both gain an optional <code>nonjitter_ids::Set{String} = Set{String}()</code> kwarg.
+        When a candidate node_id is in the set, module-local <code>slight_jitter</code> is
+        skipped at candidate-gathering and activation-confidence sites. Default empty set
+        preserves backward compatibility for every existing caller.</li>
+        <li><strong>Bridge helper <code>collect_nonjitter_ids()::Set{String}</code></strong>:
+        walks <code>NODE_MAP</code> under <code>NODE_LOCK</code> and returns the ids whose
+        node carries the NONJITTER tag. Exported from <code>GrugBot420</code>. Intended to be
+        called once per mission and reused for the duration of a scan.</li>
+        <li><strong>Out-of-scope sites documented explicitly</strong>: per-window jitter in
+        <code>evaluate_window</code>, ChatMessage intensity jitter in
+        <code>refresh_message_intensities!</code>, and raw-input jitter in
+        <code>apply_sdf_jitter</code> are NOT affected by NONJITTER because they are
+        substrate-level / non-node concerns. The whitepaper scope table (&sect;15.21) enumerates
+        all eight jitter sites and their v7.20/v7.21 gate status.</li>
+        <li><strong>Tests</strong>: <code>test_nonjitter_tag.jl</code> grows from 10 groups /
+        36 sub-assertions to 13 groups / 52 sub-assertions. New coverage for
+        <code>evaluate_relational_dialectics</code> honor (bit-stability sweep, variance sweep,
+        sentinel non-trigger, coexistence with real required relations),
+        <code>collect_nonjitter_ids</code> correctness (insert / tag / verify relative-diff),
+        and <code>FullLobeScanner</code> honor (20-seed tagged-vs-untagged confidence comparison).</li>
+        <li><strong>Backward compatibility</strong>: every new kwarg defaults to a no-op empty
+        set or <code>false</code>; every new helper is additive; no existing struct fields
+        change; no specimen migration required.</li>
+        <li><strong>Documentation</strong>: whitepaper gains &sect;15.21 with scope table,
+        version bumped to v7.21 across header, title, TOC, test-suite table, and changelog.</li>
+    </ul>
 
     <h3>v7.20 &mdash; Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</h3>
     <ul>

@@ -257,6 +257,186 @@ end
     @test is_nonjitter(node) == true
 end
 
+@testset "v7.21 — evaluate_relational_dialectics honors NONJITTER" begin
+    # GRUG: Build two identical triple sets with matching relations. Score the
+    # same inputs 50 times — with NONJITTER in required_relations, the score
+    # must be bit-identical every time. Without the tag, repeated scoring
+    # produces variance.
+    RelationalTriple = getfield(GrugBot420, :RelationalTriple)
+    evaluate_relational_dialectics = getfield(GrugBot420, :evaluate_relational_dialectics)
+
+    user_triples = [RelationalTriple("cat", "chases", "mouse")]
+    node_triples = [RelationalTriple("cat", "chases", "mouse")]
+    relation_weights = Dict("chases" => 1.0)
+
+    # Case A: NONJITTER absent — repeated calls can vary (jitter is on)
+    req_plain = String[]
+    scores_plain = Float64[]
+    for _ in 1:50
+        s, _ = evaluate_relational_dialectics(user_triples, node_triples, req_plain, relation_weights)
+        push!(scores_plain, s)
+    end
+    # GRUG: At least two distinct values = jitter is working.
+    @test length(unique(scores_plain)) >= 2
+
+    # Case B: NONJITTER present — repeated calls must all equal
+    req_nj = [NONJITTER_TAG]
+    scores_nj = Float64[]
+    for _ in 1:50
+        s, _ = evaluate_relational_dialectics(user_triples, node_triples, req_nj, relation_weights)
+        push!(scores_nj, s)
+    end
+    # GRUG: All 50 must be bit-equal — identity pass-through everywhere.
+    @test length(unique(scores_nj)) == 1
+    @test all(s -> s === scores_nj[1], scores_nj)
+
+    # Case C: NONJITTER MUST NOT be treated as a missing semantic relation.
+    # Even though user_triples has no relation called "NONJITTER", the function
+    # must NOT return the -9999.0 sentinel.
+    s_nj, _ = evaluate_relational_dialectics(user_triples, node_triples, req_nj, relation_weights)
+    @test s_nj != -9999.0
+    @test s_nj > 0.0   # real match, not sentinel
+
+    # Case D: NONJITTER coexists with a real required relation. If the user
+    # DOESN'T supply the real relation, the sentinel fires (tag is ignored
+    # for the requirement check); if they DO, we get a real score and the
+    # tag suppresses jitter.
+    req_mixed = [NONJITTER_TAG, "chases"]
+    s_ok, _ = evaluate_relational_dialectics(user_triples, node_triples, req_mixed, relation_weights)
+    @test s_ok != -9999.0
+    @test s_ok > 0.0
+
+    # User doesn't have the required "needs" relation — sentinel fires
+    req_missing = [NONJITTER_TAG, "needs"]
+    s_missing, _ = evaluate_relational_dialectics(user_triples, node_triples, req_missing, relation_weights)
+    @test s_missing == -9999.0
+end
+
+@testset "v7.21 — collect_nonjitter_ids walks NODE_MAP correctly" begin
+    # GRUG: Snapshot the current NODE_MAP nonjitter set (boot-time seeds may
+    # already have some if future work tags them). We build a few new test
+    # nodes, tag some, leave others, and verify the set returned by
+    # collect_nonjitter_ids matches exactly the ones we tagged (relative
+    # to the baseline).
+    NODE_MAP = getfield(GrugBot420, :NODE_MAP)
+    NODE_LOCK = getfield(GrugBot420, :NODE_LOCK)
+
+    baseline = collect_nonjitter_ids()
+
+    # Create 3 fresh nodes and insert them into NODE_MAP directly.
+    a = make_bare_node("nj_map_a_$(rand(1:10_000_000))")
+    b = make_bare_node("nj_map_b_$(rand(1:10_000_000))")
+    c = make_bare_node("nj_map_c_$(rand(1:10_000_000))")
+
+    lock(NODE_LOCK) do
+        NODE_MAP[a.id] = a
+        NODE_MAP[b.id] = b
+        NODE_MAP[c.id] = c
+    end
+
+    try
+        # Tag only a and c.
+        set_nonjitter!(a)
+        set_nonjitter!(c)
+
+        got = collect_nonjitter_ids()
+
+        # a and c must appear, b must not.
+        @test a.id in got
+        @test c.id in got
+        @test !(b.id in got)
+
+        # Exactly the two newly tagged ids have been added vs baseline.
+        diff = setdiff(got, baseline)
+        @test diff == Set([a.id, c.id])
+    finally
+        # Cleanup to avoid test pollution.
+        lock(NODE_LOCK) do
+            delete!(NODE_MAP, a.id)
+            delete!(NODE_MAP, b.id)
+            delete!(NODE_MAP, c.id)
+        end
+    end
+end
+
+@testset "v7.21 — FullLobeScanner honors nonjitter_ids kwarg" begin
+    # GRUG: activate_candidates! takes a node_features dict and an optional
+    # nonjitter_ids::Set{String}. Tagged ids should produce bit-stable
+    # confidence (abs(similarity) pass-through); untagged ids get jittered.
+    # FullLobeScanner is a submodule of GrugBot420 — reach its public names
+    # via explicit qualified access so the test does not depend on which
+    # names happen to be auto-imported into Main.
+    LobeScanner = GrugBot420.FullLobeScanner.LobeScanner
+    set_query! = GrugBot420.FullLobeScanner.set_query!
+    gather_candidates! = GrugBot420.FullLobeScanner.gather_candidates!
+    activate_candidates! = GrugBot420.FullLobeScanner.activate_candidates!
+
+    # Build minimal features: 3 nodes with identical feature vectors so
+    # similarity is identical. Only difference is the tag set we pass.
+    features = Dict{String, Vector{Float64}}(
+        "tagged_node"   => Float64[1.0, 0.0, 0.0, 1.0],
+        "untagged_node" => Float64[1.0, 0.0, 0.0, 1.0],
+    )
+    query_vec = Float64[1.0, 0.0, 0.0, 1.0]
+
+    # Run 20 scans with nonjitter_ids = {"tagged_node"}. Collect confidences
+    # for both nodes across runs. Tagged node must be bit-stable; untagged
+    # node should show variance.
+    tagged_confs   = Float64[]
+    untagged_confs = Float64[]
+
+    for seed in 1:20
+        Random.seed!(seed)
+        scanner = LobeScanner("test_lobe", 1)
+        set_query!(scanner, query_vec)
+        gather_candidates!(
+            scanner, features;
+            threshold=0.0,
+            nonjitter_ids=Set(["tagged_node"])
+        )
+        activate_candidates!(
+            scanner, features;
+            confident_threshold=0.0,
+            nonjitter_ids=Set(["tagged_node"])
+        )
+
+        # Find the confidences for each node from the active set
+        for (node_id, conf) in scanner.active_set.activations
+            if node_id == "tagged_node"
+                push!(tagged_confs, conf)
+            elseif node_id == "untagged_node"
+                push!(untagged_confs, conf)
+            end
+        end
+    end
+
+    # GRUG: tagged_node must yield exactly one unique confidence across all seeds
+    @test length(unique(tagged_confs)) == 1
+
+    # GRUG: untagged_node should show variance (at least 2 distinct values)
+    # across 20 differently-seeded runs.
+    @test length(unique(untagged_confs)) >= 2
+
+    # GRUG: backward compat — empty nonjitter_ids means both nodes get jittered.
+    legacy_confs_a = Float64[]
+    legacy_confs_b = Float64[]
+    for seed in 1:20
+        Random.seed!(seed + 1000)
+        scanner = LobeScanner("test_lobe", 1)
+        set_query!(scanner, query_vec)
+        gather_candidates!(scanner, features; threshold=0.0)
+        activate_candidates!(scanner, features; confident_threshold=0.0)
+
+        for (node_id, conf) in scanner.active_set.activations
+            node_id == "tagged_node"   && push!(legacy_confs_a, conf)
+            node_id == "untagged_node" && push!(legacy_confs_b, conf)
+        end
+    end
+    # Both should vary when the kwarg is omitted (default empty set = no-op).
+    @test length(unique(legacy_confs_a)) >= 2
+    @test length(unique(legacy_confs_b)) >= 2
+end
+
 @testset "Performance — is_nonjitter is cheap" begin
     # GRUG: is_nonjitter is called on every cheap-scan hot path. It MUST be
     # fast. We don't benchmark exact cycles (machine-dependent), but we assert
