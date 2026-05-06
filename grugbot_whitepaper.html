@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.21</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.22</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,7 +189,7 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.21</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.22</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
@@ -240,6 +240,7 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#bnsnc-coherence">15.19 Big-Number / Small-Number Coherence (bidirectional cheap-scan fusion)</a> <span class="new-badge">v7.19</span></li>
         <li><a href="#nonjitter-tag">15.20 Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</a> <span class="new-badge">v7.20</span></li>
         <li><a href="#nonjitter-systemwide">15.21 System-Wide NONJITTER Honor (relational dialectics, attachment relay, full-lobe scanner)</a> <span class="new-badge">v7.21</span></li>
+        <li><a href="#strength-solidify">15.22 Strength-Driven Solidification (auto-NONJITTER at threshold)</a> <span class="new-badge">v7.22</span></li>
         <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
@@ -2561,6 +2562,159 @@ The tag is skipped for requirement checks, honored for jitter gating, and everyo
 </ul>
 
 <!-- ================================================================ -->
+<h2 id="strength-solidify">15.22 Strength-Driven Solidification <span class="new-badge">v7.22</span></h2>
+
+<div class="grug-box">
+    <p>Grug rocks that prove themselves stop wiggling. Simple rule: if strength climbs high
+    enough, the rock gets the NONJITTER tag automatically. If strength drops, tag comes off
+    automatically. Rock is always honest about whether it is solid right now. No ceremony,
+    no manual bookkeeping, no frozen-in-amber stale values &mdash; just strength says solid,
+    tag says solid.</p>
+</div>
+
+<h3>The rule</h3>
+
+<p>One line of policy:</p>
+
+<table>
+    <tr><th>Condition</th><th>Effect</th></tr>
+    <tr>
+        <td><code>node.strength &ge; STRENGTH_SOLIDIFY_THRESHOLD</code></td>
+        <td>NONJITTER tag applied (node is <em>solidified</em>)</td>
+    </tr>
+    <tr>
+        <td><code>node.strength < STRENGTH_SOLIDIFY_THRESHOLD</code></td>
+        <td>NONJITTER tag removed (node is <em>jittering</em>)</td>
+    </tr>
+</table>
+
+<p>The threshold constant ships at <code>STRENGTH_SOLIDIFY_THRESHOLD = 9.0</code>, which is
+90% of <code>STRENGTH_CAP = 10.0</code>. A node must be at the top 10% of the strength band
+to qualify as a solid anchor.</p>
+
+<h3>Lifecycle</h3>
+
+<ol>
+    <li><strong>Node starts jittering.</strong> Fresh nodes spawn with
+    <code>strength = 1.0</code> by default. Below threshold, NONJITTER is off, all
+    node-scoped jitter sites (v7.21) produce bounded micro-variance on confidence, relational
+    scores, attachment relay, and full-lobe scanner candidate/activation energy.</li>
+
+    <li><strong>Node earns strength</strong> via <code>bump_strength!</code>
+    (<code>/right</code> feedback, successful fires, coinflip wins on use). When the bump
+    pushes <code>node.strength</code> across the threshold, the post-hook
+    <code>check_solidify_threshold!</code> automatically applies NONJITTER. The engine logs:
+    <br><code>[ENGINE] &#x1F48E; Node $(id) solidified (strength=9.0 &ge; 9.0) &mdash; NONJITTER tag applied.</code></li>
+
+    <li><strong>Node answers bit-stable</strong> until its strength changes. Because all
+    node-scoped jitter sites honor NONJITTER system-wide (v7.21), a solidified node's
+    confidence and relational scoring are deterministic for the same input.</li>
+
+    <li><strong>Node loses strength</strong> via <code>penalize_strength!</code>
+    (<code>/wrong</code> feedback, coinflip losses). When the penalty drops
+    <code>node.strength</code> below threshold, the post-hook automatically removes NONJITTER.
+    The engine logs:
+    <br><code>[ENGINE] &#x1F4A7; Node $(id) softened (strength=7.0 < 9.0) &mdash; NONJITTER tag removed, jitter resumed.</code></li>
+
+    <li><strong>Node can re-solidify.</strong> If strength climbs back above the threshold
+    later, the tag comes back on. No frozen state carries across &mdash; confidence is always
+    computed fresh from the current query against the current pattern. Solidification only
+    suppresses jitter; it does not cache or freeze the computation inputs.</li>
+</ol>
+
+<h3>Why no frozen confidence (and an earlier false start)</h3>
+
+<p>An earlier sketch of this feature tried to freeze the node's last-computed confidence value
+at solidify time, replaying that stored value on subsequent scans instead of recomputing. That
+turned out to be wrong-shaped: confidence is a <em>per-query</em> output &mdash; it depends on
+what the user just typed, matched against the node's pattern. Freezing the confidence would
+make the solidified node return the same answer for COMPLETELY DIFFERENT queries, which
+collapses responsiveness.</p>
+
+<p>The right mental model: NONJITTER makes a solid node return the <em>same answer for the
+same query</em>. It does not make the node return the same answer for every query. Confidence
+computation remains fully alive; only the micro-jitter noise layer on top of it is suppressed.</p>
+
+<h3>Hooks</h3>
+
+<p>The v7.22 wiring is intentionally minimal &mdash; two single-line additions at the tail of
+the existing strength-change functions:</p>
+
+<pre><code>function bump_strength!(node::Node)
+    if rand() < 0.5
+        lock(NODE_LOCK) do
+            node.strength = min(node.strength + 1.0, STRENGTH_CAP)
+        end
+        check_solidify_threshold!(node)   # v7.22 post-hook
+    end
+end
+
+function penalize_strength!(node::Node)
+    if rand() < 0.5
+        lock(NODE_LOCK) do
+            node.strength = max(node.strength - 1.0, STRENGTH_FLOOR)
+            if node.strength &le; STRENGTH_FLOOR && !node.is_grave
+                node.is_grave    = true
+                node.grave_reason = "STRENGTH_ZERO"
+            end
+        end
+        check_solidify_threshold!(node)   # v7.22 post-hook
+    end
+end</code></pre>
+
+<p><code>check_solidify_threshold!(node)</code> is idempotent &mdash; it applies or removes
+the tag only when the current state disagrees with the strength threshold, so calling it
+repeatedly (as happens across many bumps in a row) is cheap and never produces duplicate tags
+or churn.</p>
+
+<h3>Contract with manual tagging</h3>
+
+<p>Users may still call <code>set_nonjitter!(node)</code> manually to force the NONJITTER tag
+on a node regardless of strength &mdash; useful for calibration or reserved anchor nodes that
+must never jitter even at low strength. However, the next time
+<code>check_solidify_threshold!</code> runs (i.e. the next time the node's strength changes),
+v7.22 will overwrite the manual tag to reflect the strength rule.</p>
+
+<p>If you want a permanently tagged node that is immune to the v7.22 automation, do NOT route
+strength-change commands at it (e.g. keep it out of the voting population so
+<code>bump_strength!</code> / <code>penalize_strength!</code> are never called on it). The
+simpler alternative: keep the node's strength above the threshold by whatever means you prefer,
+and v7.22 will keep the tag on for you.</p>
+
+<h3>Universality</h3>
+
+<p>v7.22 is universal across all node types. Every <code>Node</code> carries the
+<code>strength::Float64</code> field (image nodes, text nodes, AIML-seeded nodes, attached
+nodes, boot-time seeds). Every strength change goes through <code>bump_strength!</code> or
+<code>penalize_strength!</code>. Therefore every node is eligible for auto-solidification on
+the same rule. No node type is special-cased.</p>
+
+<h3>Test coverage</h3>
+
+<p><code>test_strength_solidify.jl</code> ships 11 test groups / 44 sub-assertions:</p>
+
+<ul>
+    <li>Constant is pinned at 9.0 (below cap, above zero) so silent drift is impossible.</li>
+    <li><code>check_solidify_threshold!</code> applies the tag when
+    <code>strength &ge; threshold</code> and removes it when <code>strength < threshold</code>.</li>
+    <li>Boundary behavior: <code>strength == threshold</code> is solid;
+    <code>prevfloat(threshold)</code> is not.</li>
+    <li>Idempotent under 100 repeated calls &mdash; exactly one copy of the tag, no
+    duplicates.</li>
+    <li>Full lifecycle: up &rarr; down &rarr; up re-solidifies correctly.</li>
+    <li>Tag coexists with other <code>required_relations</code> entries (e.g.
+    <code>"CAUSES"</code>, <code>"REQUIRES"</code>) &mdash; v7.22 only touches the NONJITTER
+    string.</li>
+    <li><code>bump_strength!</code> auto-triggers solidify when its coinflipped bump crosses
+    the threshold (loop of 200 covers the coinflip probability tail).</li>
+    <li><code>penalize_strength!</code> auto-triggers desolidify when its coinflipped penalty
+    crosses the threshold downward.</li>
+    <li>Grave nodes (<code>strength = 0</code>) are consistent with "not solidified".</li>
+    <li><code>is_solidified</code> is an alias for <code>is_nonjitter</code> &mdash; manual
+    tags count as solidified until the next strength-change event overrides.</li>
+</ul>
+
+<!-- ================================================================ -->
 <!-- ================================================================ -->
 <h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
 
@@ -3116,14 +3270,14 @@ failure. There is <strong>no silent swallowing</strong> of per-file failures —
 fails the parent <code>@testset</code>.
 </p>
 
-<h3>Test Suite Status (v7.21)</h3>
+<h3>Test Suite Status (v7.22)</h3>
 <table>
     <tr><th>Metric</th><th>Value</th></tr>
-    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>23</td></tr>
-    <tr><td>Total test files on disk</td><td>28</td></tr>
-    <tr><td>Current result</td><td style="color:#00ff88;">✅ 24 / 24 passing</td></tr>
-    <tr><td>Full suite wall-clock</td><td>~220 s on 8-core Linux</td></tr>
-    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity); <code>test_nonjitter_tag.jl</code> (13 subgroups / 52 sub-assertions covering v7.20 & v7.21 &mdash; tag invariants, idempotent set/clear, untagged-clear safety, full round-trip, bit-stable confidence under <code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default, fusion-math integrity, coexistence with other <code>required_relations</code> rules, >1M <code>is_nonjitter</code> calls/second on hot path, plus v7.21 system-wide honor across <code>evaluate_relational_dialectics</code> / <code>collect_nonjitter_ids</code> / <code>FullLobeScanner</code>)</td></tr>
+    <tr><td>Tests in <code>runtests.jl</code> runner</td><td>24</td></tr>
+    <tr><td>Total test files on disk</td><td>29</td></tr>
+    <tr><td>Current result</td><td style="color:#00ff88;">✅ 25 / 25 passing</td></tr>
+    <tr><td>Full suite wall-clock</td><td>~230 s on 8-core Linux</td></tr>
+    <tr><td>New since v7.11</td><td><code>test_context_intensity.jl</code> (groups [A]&ndash;[J], 10 subgroups covering v7.12 / v7.13 / v7.17 &mdash; intensity clamp, lexical tokenizer, relevance score, snap-back + jitter, pinned-always / unpinned-biased surfacing, <code>/right</code> &middot; <code>/wrong</code> feedback, <code>/brainstorm</code> alignment, auto-tune threshold, 10k-cave bounding, and chunked-scan correctness + DONE checkpoints); <code>test_lobe_topicality_gate.jl</code> (groups [A]&ndash;[F], 6 subgroups covering v7.18 &mdash; topicality score, end-to-end muting, <code>required_relations</code> verb bridge, confidence discount, <code>/nodeAttach</code> bridge, and per-mission telemetry reset); <code>test_big_number_small_number_coherence.jl</code> (groups [A]&ndash;[H], 74 sub-assertions covering v7.19 &mdash; strong/tiny behavior, catastrophic-cancellation immunity, coherence &ne; arithmetic mean on asymmetric inputs, negative-confidence symmetry, zero/sub-epsilon collapse, NaN/Inf rejection, output range guarantees, and monotonicity/commutativity/reflexivity); <code>test_nonjitter_tag.jl</code> (13 subgroups / 52 sub-assertions covering v7.20 & v7.21 &mdash; tag invariants, idempotent set/clear, untagged-clear safety, full round-trip, bit-stable confidence under <code>nonjitter=true</code>, variance under <code>nonjitter=false</code>, backward-compatible default, fusion-math integrity, coexistence with other <code>required_relations</code> rules, >1M <code>is_nonjitter</code> calls/second on hot path, plus v7.21 system-wide honor across <code>evaluate_relational_dialectics</code> / <code>collect_nonjitter_ids</code> / <code>FullLobeScanner</code>); <code>test_strength_solidify.jl</code> (11 subgroups / 44 sub-assertions covering v7.22 &mdash; pinned threshold constant, threshold-up/threshold-down tag transitions, boundary behavior, idempotence under repeated calls, full up-down-up lifecycle, coexistence with semantic rules in <code>required_relations</code>, <code>bump_strength!</code>/<code>penalize_strength!</code> auto-trigger, grave-node consistency, and <code>is_solidified</code>/<code>is_nonjitter</code> aliasing)</td></tr>
 </table>
 
 <div class="tip">
@@ -3135,6 +3289,59 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v7.22 &mdash; Strength-Driven Solidification</h3>
+    <ul>
+        <li><strong>Auto-NONJITTER at a strength threshold.</strong> Every node now
+        auto-solidifies when <code>strength &ge; STRENGTH_SOLIDIFY_THRESHOLD</code> (9.0, or
+        90% of cap) and auto-desolidifies when strength drops below. The feature rides on
+        the v7.21 system-wide NONJITTER honor, so "solid" means "bit-stable across every
+        node-scoped jitter site in the engine" without any new plumbing.</li>
+        <li><strong>New constant</strong>:
+        <code>STRENGTH_SOLIDIFY_THRESHOLD = 9.0</code>, exported.</li>
+        <li><strong>New helpers</strong>:
+        <code>is_solidified(node)::Bool</code> (alias for <code>is_nonjitter</code>),
+        <code>check_solidify_threshold!(node)</code> (idempotent tag sync against strength).
+        Both exported.</li>
+        <li><strong>Hook sites</strong>: two single-line additions at the tail of
+        <code>bump_strength!</code> and <code>penalize_strength!</code> &mdash; each now
+        calls <code>check_solidify_threshold!(node)</code> after updating the strength.
+        No other call sites change; no struct fields added.</li>
+        <li><strong>No frozen state</strong>: an earlier design attempted to cache the
+        last-computed confidence at solidify time and replay it on subsequent scans. That
+        was wrong-shaped &mdash; confidence is a per-query output and freezing it would
+        make solidified nodes return the same answer for DIFFERENT queries. The shipped
+        v7.22 has no cache: NONJITTER silences micro-jitter on computed outputs, while
+        the computation itself stays fully responsive to the current input. Whitepaper
+        &sect;15.22 documents this explicitly under "Why no frozen confidence".</li>
+        <li><strong>Universal across node types</strong>: every <code>Node</code> carries
+        the same <code>strength::Float64</code> field, and every strength change goes
+        through the same two functions, so v7.22 applies uniformly to text nodes, image
+        nodes, AIML-seeded nodes, attached nodes, and boot-time seeds. No type-specific
+        branching.</li>
+        <li><strong>Lifecycle symmetry</strong>: solidify and desolidify are both visible
+        via <code>println</code> log lines
+        (<code>&#x1F48E; Node $(id) solidified ...</code> and
+        <code>&#x1F4A7; Node $(id) softened ...</code>) so operators can watch nodes
+        crystallize and soften in real time.</li>
+        <li><strong>Backward compatibility</strong>: zero struct churn, zero specimen
+        migration, every new helper is additive. Nodes that have never received a
+        strength bump or penalty behave identically to pre-v7.22.</li>
+        <li><strong>Manual tagging contract</strong>: users may still call
+        <code>set_nonjitter!(node)</code> directly. v7.22's automation will however
+        overwrite the manual tag on the next strength-change event if strength disagrees
+        with the threshold. Fully documented in &sect;15.22 "Contract with manual tagging".</li>
+        <li><strong>Tests</strong>: new <code>test_strength_solidify.jl</code> (11 groups /
+        44 sub-assertions) covering threshold pinning, up/down transitions, boundary cases,
+        idempotence, full lifecycle, tag coexistence with other required_relations,
+        auto-trigger via <code>bump_strength!</code> / <code>penalize_strength!</code>,
+        grave-node consistency, and <code>is_solidified</code>/<code>is_nonjitter</code>
+        aliasing.</li>
+        <li><strong>Documentation</strong>: whitepaper gains &sect;15.22 with rule table,
+        lifecycle walk-through, hook code excerpts, contract notes, and test coverage.
+        Version bumped to v7.22 across header, title, TOC, test-suite table, and
+        changelog.</li>
+    </ul>
 
     <h3>v7.21 &mdash; System-Wide NONJITTER Honor</h3>
     <ul>

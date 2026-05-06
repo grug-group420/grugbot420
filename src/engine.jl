@@ -664,6 +664,88 @@ function collect_nonjitter_ids()::Set{String}
 end
 
 # ==============================================================================
+# v7.22 — STRENGTH-DRIVEN SOLIDIFICATION
+# ==============================================================================
+# GRUG: Nodes that prove themselves stop wiggling. Simple rule:
+#
+#   strength >= STRENGTH_SOLIDIFY_THRESHOLD   ->  NONJITTER tag ON
+#   strength <  STRENGTH_SOLIDIFY_THRESHOLD   ->  NONJITTER tag OFF
+#
+# The tag is the ONLY effect. All the heavy lifting for "what does NONJITTER
+# do" already happened in v7.21 — every node-scoped jitter site honors the
+# tag system-wide. v7.22 just automates the tag, system-wide, for all node
+# types based on strength.
+#
+# Lifecycle:
+#   - Node earns strength (bump_strength! via /right, fire-success, etc.)
+#     Crosses threshold upward -> auto-solidify (NONJITTER on, logged 💎)
+#   - Node loses strength (penalize_strength! via /wrong, etc.)
+#     Crosses threshold downward -> auto-desolidify (NONJITTER off, logged 💧)
+#   - Node climbs back up later -> re-solidifies. No frozen state — confidence
+#     is always computed fresh from pattern scan, same as any other node.
+#     NONJITTER only silences jitter; it does not freeze computation inputs.
+#
+# Why no frozen confidence? Confidence is a scan-time output derived from
+# the user input against the node's pattern/triples. Freezing it would make
+# the node return the same answer for DIFFERENT queries, which is wrong —
+# the node should always reflect the current query. NONJITTER gives us
+# repeatable, bit-stable answers for the SAME query without breaking
+# responsiveness to different queries.
+# ==============================================================================
+
+const STRENGTH_SOLIDIFY_THRESHOLD = 9.0       # GRUG: 90% of STRENGTH_CAP
+
+"""
+    is_solidified(node::Node)::Bool
+
+GRUG: Is this rock solid? A node is solidified iff it carries the NONJITTER
+tag. v7.22 makes that tag a pure function of strength; callers that want
+the strength predicate directly should use
+`node.strength >= STRENGTH_SOLIDIFY_THRESHOLD`.
+
+Kept separate from is_nonjitter so that future manual tag uses (e.g. a
+calibration node that is tagged regardless of strength) still answer TRUE
+to is_solidified — solidified just means "locked from jitter", regardless
+of how the lock got there.
+"""
+function is_solidified(node::Node)::Bool
+    return is_nonjitter(node)
+end
+
+"""
+    check_solidify_threshold!(node::Node)
+
+GRUG: Called after any strength change. Keeps the NONJITTER tag in sync
+with the strength threshold:
+
+  - strength >= threshold AND not tagged -> apply tag (solidify)
+  - strength <  threshold AND tagged     -> remove tag (desolidify)
+
+Both transitions log a line so we can see nodes crystallize and soften in
+real time. No-op if already in the correct state.
+
+NOTE: This function does NOT lock NODE_LOCK itself. Callers already hold
+the lock (see bump_strength! and penalize_strength!); calling from outside
+a lock is also safe because we only touch the node's required_relations
+via the set/clear helpers, which are O(1) and don't race on unrelated
+fields.
+"""
+function check_solidify_threshold!(node::Node)
+    if node.strength >= STRENGTH_SOLIDIFY_THRESHOLD
+        if !is_nonjitter(node)
+            set_nonjitter!(node)
+            println("[ENGINE] 💎 Node $(node.id) solidified (strength=$(round(node.strength, digits=2)) ≥ $(STRENGTH_SOLIDIFY_THRESHOLD)) — NONJITTER tag applied.")
+        end
+    else
+        if is_nonjitter(node)
+            clear_nonjitter!(node)
+            println("[ENGINE] 💧 Node $(node.id) softened (strength=$(round(node.strength, digits=2)) < $(STRENGTH_SOLIDIFY_THRESHOLD)) — NONJITTER tag removed, jitter resumed.")
+        end
+    end
+    return node
+end
+
+# ==============================================================================
 # STRENGTH & GRAVE MANAGEMENT
 # ==============================================================================
 
@@ -679,6 +761,11 @@ function bump_strength!(node::Node)
         lock(NODE_LOCK) do
             node.strength = min(node.strength + 1.0, STRENGTH_CAP)
         end
+        # GRUG v7.22: if the bump just pushed strength across the
+        # SOLIDIFY threshold, auto-apply the NONJITTER tag. Node starts
+        # answering bit-stable for the same query from now on. If the
+        # node was already solid, this is a no-op.
+        check_solidify_threshold!(node)
     end
 end
 
@@ -699,6 +786,13 @@ function penalize_strength!(node::Node)
                 println("[ENGINE] ⚰  Node $(node.id) marked GRAVE (strength -> 0).")
             end
         end
+        # GRUG v7.22: if the penalty just dropped strength below the
+        # SOLIDIFY threshold, auto-remove the NONJITTER tag. Node resumes
+        # jittering. If strength climbs back above the threshold later
+        # (via future bump_strength! calls), the tag is automatically
+        # re-applied. No frozen state to carry — confidence is always
+        # computed fresh from pattern scan.
+        check_solidify_threshold!(node)
     end
 end
 
