@@ -131,6 +131,59 @@ end
 end
 
 # ==============================================================================
+# [7b] CHATTER WINDOW --- tail-remainder: at end of lobe list, return ONLY
+#      what's left; next cycle (after advance) picks fresh from the front.
+#      SPEC (user v7.15.1): "if it doesnt have enough slots to use just use
+#      the remaining ids in the lobe list."
+# ==============================================================================
+@testset "chatter window: tail-remainder (no mid-window wrap)" begin
+    reset_registry!()
+    # GRUG: 10 groups total, we'll exercise a window that bumps into the tail.
+    for i in 1:10
+        register_node_in_group!("tail_grp_$i", "tail_node_$i")
+    end
+
+    # Jump cursor to position 8 (so only 3 slots remain to end: 8,9,10).
+    advance_chatter_cursor!(7)  # mod1(1+7,10) = 8
+
+    # Ask for a window of 5 --- only 3 are left. EXPECT: tail-remainder of 3,
+    # NOT 3-at-tail + 2-wrapped-from-front.
+    ids_tail = next_chatter_window_ids(; window_size = 5)
+    @test ids_tail == ["tail_grp_8", "tail_grp_9", "tail_grp_10"]
+    @test length(ids_tail) == 3
+
+    # Advance by the count actually returned --- cursor wraps to 1.
+    advance_chatter_cursor!(length(ids_tail))    # mod1(8+3,10) = 1
+
+    # Next window starts fresh from the front with full requested size.
+    ids_fresh = next_chatter_window_ids(; window_size = 5)
+    @test ids_fresh == ["tail_grp_1", "tail_grp_2", "tail_grp_3",
+                        "tail_grp_4", "tail_grp_5"]
+end
+
+# ==============================================================================
+# [7c] CHATTER WINDOW --- tail-remainder edge: cursor at exact last slot
+# ==============================================================================
+@testset "chatter window: cursor at exact last slot returns singleton" begin
+    reset_registry!()
+    for i in 1:4
+        register_node_in_group!("edge_grp_$i", "edge_node_$i")
+    end
+
+    # Move cursor to position 4 (the final slot).
+    advance_chatter_cursor!(3)   # mod1(1+3,4) = 4
+
+    ids = next_chatter_window_ids(; window_size = 10)
+    @test ids == ["edge_grp_4"]
+    @test length(ids) == 1
+
+    # Advance by 1 --- wraps to 1.
+    advance_chatter_cursor!(1)   # mod1(4+1,4) = 1
+    ids2 = next_chatter_window_ids(; window_size = 2)
+    @test ids2 == ["edge_grp_1", "edge_grp_2"]
+end
+
+# ==============================================================================
 # [8] DISK ROUND-TRIP --- compressed JSON preserves all state
 # ==============================================================================
 @testset "disk round-trip: save + load compressed" begin

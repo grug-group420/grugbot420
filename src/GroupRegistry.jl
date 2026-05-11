@@ -345,19 +345,32 @@ end
 node_partners(node_id::String) = partners_for_node(node_id)
 
 # ==============================================================================
-# CHATTER WINDOW CURSOR --- walks the group id list FIFO, wraps at the end
+# CHATTER WINDOW CURSOR --- walks the group id list FIFO, STOPS at the end
+# ==============================================================================
+# GRUG: when cursor near tail of lobe list, window shrinks to whatever is left.
+# no mid-window wrap. caller's next advance_chatter_cursor! will wrap cursor to
+# 1, and the FOLLOWING call picks up a fresh full-size window from the front.
+# this matches the user spec: "if it doesnt have enough slots to use, just use
+# the remaining ids in the lobe list."
 # ==============================================================================
 
 """
     next_chatter_window_ids(; window_size, rng)::Vector{String}
 
-GRUG: Peek at the next chatter window --- the next `window_size` group ids
-starting at the cursor, wrapping around if needed. Does NOT advance the cursor
-(that's a separate call so the caller can chatter first, then commit).
+GRUG: Peek at the next chatter window --- the group ids starting at the cursor,
+up to `window_size` entries. Does NOT advance the cursor (separate call so
+the caller can chatter first, then commit).
 
 window_size defaults to a random draw in [CHATTER_WINDOW_MIN, CHATTER_WINDOW_MAX];
-tests inject explicit sizes via the kwarg. If there are fewer groups than
-window_size, returns every id once (no artificial inflation).
+tests inject explicit sizes via the kwarg.
+
+TAIL-SHRINK SEMANTICS (v7.15.1):
+  * If fewer than `window_size` ids remain from cursor to end of list, returns
+    ONLY the tail remnant (no mid-window wrap back to the front). The caller's
+    subsequent advance_chatter_cursor! then wraps the cursor to position 1, so
+    the NEXT call gets a fresh full window from the front.
+  * If the entire registry has fewer groups than window_size, returns every id
+    once (no artificial inflation).
 """
 function next_chatter_window_ids(;
     window_size::Int = rand(Random.GLOBAL_RNG,
@@ -371,16 +384,23 @@ function next_chatter_window_ids(;
         n = length(_REGISTRY.group_id_order)
         n == 0 && return String[]
 
-        take_n = min(window_size, n)
-        out = Vector{String}(undef, take_n)
-        idx = _REGISTRY.cursor
+        # GRUG: clamp cursor defensively. if somehow past end (shouldn't happen
+        # because advance! uses mod1, but belt-and-suspenders), snap to 1.
+        start_idx = _REGISTRY.cursor
+        if start_idx < 1 || start_idx > n
+            start_idx = 1
+        end
 
-        for i in 1:take_n
-            if idx > n
-                idx = 1       # GRUG: wrap back to the front
-            end
-            out[i] = _REGISTRY.group_id_order[idx]
-            idx += 1
+        # GRUG: slots remaining from cursor to end of list.
+        slots_remaining = n - start_idx + 1
+
+        # GRUG: tail-shrink --- take min of (requested window, slots left).
+        # no wrap. if cursor was near end, window is smaller this time.
+        take_n = min(window_size, slots_remaining)
+
+        out = Vector{String}(undef, take_n)
+        @inbounds for i in 1:take_n
+            out[i] = _REGISTRY.group_id_order[start_idx + i - 1]
         end
         return out
     end
