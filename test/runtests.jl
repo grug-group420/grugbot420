@@ -38,6 +38,16 @@ const ALL_TESTS = [
     "test_big_number_small_number_coherence.jl",
     "test_nonjitter_tag.jl",
     "test_strength_solidify.jl",
+    # GRUG v7.15 additions --- sequential lobe orchestration, group registry,
+    # crystalize, vote-swap chatter, dynamic action-tone, strong-low-conf
+    # jitter override, and the phagy group organizer.
+    "test_lobe_orchestrator.jl",
+    "test_group_registry.jl",
+    "test_crystalize_tag.jl",
+    "test_chatter_vote_swap.jl",
+    "test_dynamic_action_tone.jl",
+    "test_jitter_strong_low_conf_override.jl",
+    "test_phagy_group_organizer.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

@@ -625,4 +625,89 @@ function with_brainstorm_jitter(
     end
 end
 
+# ==============================================================================
+# v7.15 --- STRONG-NODE-LOW-CONFIDENCE NONJITTER OVERRIDE
+# ==============================================================================
+# GRUG: NONJITTER tag normally silences jitter on a node's end-confidence.
+# Update spec v7.15 says: "if a strong node has a low confidence for a vote
+# NONJITTER does not apply it will still jitter". Reason: a strong node
+# that scored LOW this cycle is an outlier that deserves natural tie-breaking,
+# otherwise it stays stuck at its deterministic-low score forever and can't
+# randomly reclaim the floor. Jitter is injected precisely to break those
+# deterministic locks.
+#
+# The override is a pure predicate --- no global state touched. Callers
+# consult `strong_low_conf_override` and if true, skip the NONJITTER check
+# and apply normal jitter. This keeps the override explicit at every call
+# site (no surprising behavior from a distance).
+# ==============================================================================
+
+# GRUG: A node is "strong" when its strength is at or above this floor
+# (same as the auto-crystalizer promote floor --- strong is strong).
+const NONJITTER_OVERRIDE_STRENGTH_FLOOR = 7.5
+
+# GRUG: A vote is "low confidence" when it's below this ceiling. 0.35 matches
+# the LobeOrchestrator multi-lobe-threshold floor: below this, the vote is
+# weak enough that letting natural jitter move it a tick either way is
+# strictly helpful.
+const NONJITTER_OVERRIDE_CONF_CEIL = 0.35
+
+"""
+    strong_low_conf_override(strength::Float64, confidence::Float64)::Bool
+
+GRUG: True iff the (strength, confidence) pair is in the "strong node cast
+a low-confidence vote" corner. When this predicate returns true, calling
+code MUST apply jitter even if the node carries the NONJITTER tag.
+
+Throws on non-finite inputs --- silent NaN propagation into a sign-sensitive
+downstream would be a correctness bug.
+"""
+function strong_low_conf_override(strength::Float64, confidence::Float64)::Bool
+    if isnan(strength)   || isinf(strength)
+        throw_jitter_error("strength is non-finite ($strength)",
+                           "strong_low_conf_override")
+    end
+    if isnan(confidence) || isinf(confidence)
+        throw_jitter_error("confidence is non-finite ($confidence)",
+                           "strong_low_conf_override")
+    end
+    return (strength   >= NONJITTER_OVERRIDE_STRENGTH_FLOOR) &&
+           (confidence <  NONJITTER_OVERRIDE_CONF_CEIL)
+end
+
+"""
+    jitter_score_with_override(score::Float64;
+                               strength::Float64,
+                               nonjitter::Bool,
+                               confidence::Float64)::Float64
+
+GRUG: One-call helper that callers use in place of the
+    `(nonjitter ? identity : jitter_score)(score)` idiom used elsewhere
+in the engine. It accepts the node's strength and its cycle confidence,
+applies the v7.15 override rule, and returns the appropriate value:
+
+  - nonjitter == false  -> always jitter (unchanged)
+  - nonjitter == true
+      + strong_low_conf_override(strength, confidence) -> jitter anyway
+      + otherwise                                       -> identity (unchanged)
+
+This keeps the full rule in ONE PLACE so engine.jl and any future caller
+can't drift.
+"""
+function jitter_score_with_override(
+    score::Float64;
+    strength::Float64,
+    nonjitter::Bool,
+    confidence::Float64,
+)::Float64
+    if !nonjitter
+        return jitter_score(score)
+    end
+    # GRUG: tagged NONJITTER but strong-low-conf override trumps the tag.
+    if strong_low_conf_override(strength, confidence)
+        return jitter_score(score)
+    end
+    return score
+end
+
 end # module RelationalJitter

@@ -79,6 +79,42 @@ using .FullLobeScanner
 include("RelationalJitter.jl")
 using .RelationalJitter
 
+# GRUG v7.15: Lobe orchestrator --- sequential + curved-average + multi-lobe
+# async floor selection + cross-talk 1000-cap gate. Must load BEFORE engine.jl
+# so engine and Main can use summarize_lobe_votes / compute_orchestration_plan.
+include("LobeOrchestrator.jl")
+using .LobeOrchestrator
+
+# GRUG v7.15: Group registry --- 8-16 partner random cap, chatter windowing
+# cursor, compressed JSON disk persistence. Must load BEFORE ChatterVoteSwap
+# (which consumes group ids) and BEFORE PhagyMode extensions.
+include("GroupRegistry.jl")
+using .GroupRegistry
+
+# GRUG v7.15: Crystalize tag --- user + auto crystalizer. Must load BEFORE
+# engine.jl (attachment fire path respects crystalize) and BEFORE PhagyMode
+# (maintenance pass revokes auto-crystalization).
+include("CrystalizeTag.jl")
+using .CrystalizeTag
+
+# GRUG v7.15: Chatter vote-swap engine --- replaces pattern-copy chatter with
+# vote-copy chatter. Loaded after RelationalJitter + GroupRegistry since it
+# uses their primitives. Coexists with the classic ChatterMode above; callers
+# pick the path they want.
+include("ChatterVoteSwap.jl")
+using .ChatterVoteSwap
+
+# GRUG v7.15: Dynamic action-tone predictor --- gated by semantic complexity.
+# Thin wrapper over ActionTonePredictor; loaded here so engine.jl can choose
+# the dynamic path when screen_input_complexity clears COMPLEXITY_FLOOR.
+include("DynamicActionTonePredictor.jl")
+using .DynamicActionTonePredictor
+
+# GRUG v7.15: Phagy group organizer automaton --- idle-time cleanup of the
+# GroupRegistry. Loaded here so the phagy scheduler (and tests) can reach it.
+include("PhagyGroupOrganizer.jl")
+using .PhagyGroupOrganizer
+
 # GRUG: AIML node tribes - lobe-specific executive node populations.
 # Must load BEFORE Main.jl so command handlers can reach the API. Ordering
 # matters: Lobe must already exist so AIML knows what parent cap to read
@@ -165,5 +201,48 @@ export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
 export set_jitter_coin_ratio!, get_jitter_coin_ratio
 export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
+export strong_low_conf_override, jitter_score_with_override
+export NONJITTER_OVERRIDE_STRENGTH_FLOOR, NONJITTER_OVERRIDE_CONF_CEIL
+
+# GRUG v7.15: LobeOrchestrator exports --- sequential + curved-average floor
+export LobeOrchestratorError, LobeVoteSummary, OrchestrationPlan, FloorWinner
+export summarize_lobe_votes, compute_orchestration_plan
+export MULTI_LOBE_THRESHOLD, MIN_WINNING_VOTES, WINNING_VOTE_CONF
+export PER_LOBE_FIRE_CAP, CROSS_TALK_ACTIVE_CAP, TOP_WINDOW
+export CrossTalkGate, new_cross_talk_gate
+export try_claim_cross_talk!, release_cross_talk!, reserved_cross_talk_slots
+
+# GRUG v7.15: GroupRegistry exports --- chatter groups, disk persistence
+export GroupRegistryError, NodeGroup, GroupRegistryState
+export register_node_in_group!, remove_node_from_group!, grave_node_in_group!
+export get_group, list_group_ids, group_count, node_partners, partners_for_node
+export next_chatter_window_ids, advance_chatter_cursor!
+export save_registry_compressed, load_registry_compressed
+export PARTNER_CAP_MIN, PARTNER_CAP_MAX, CHATTER_WINDOW_MIN, CHATTER_WINDOW_MAX
+export assign_partner_cap, mark_unlinkable!, clear_unlinkable_if_has_grave!
+export is_unlinkable, reset_registry!
+
+# GRUG v7.15: CrystalizeTag exports --- user + auto crystalizer
+export CrystalizeError
+export crystalize!, uncrystalize!, is_crystalized, list_crystalized
+export mark_user_crystalized!, mark_auto_crystalized!, is_auto_crystalized
+export clear_all_crystalized!, crystalized_count
+export should_auto_crystalize
+export AUTO_STRENGTH_FLOOR, AUTO_SEMANTIC_FLOOR, AUTO_STRENGTH_RELEASE_FLOOR
+
+# GRUG v7.15: ChatterVoteSwap exports --- vote-copy chatter with 1hr cooldown
+export ChatterVoteSwapError, VoteSwapEvent, VoteSwapStats
+export run_vote_swap_round!, should_swap_vote
+export can_chatter_now, record_chatter_time!, clear_chatter_cooldowns!
+export CHATTER_COOLDOWN_SECONDS, SEMANTIC_INTENSITY_CAP, WEIGHT_JITTER_RATIO
+export DONATED_BARE_WEIGHT_PROB, DONATED_BARE_WEIGHT
+
+# GRUG v7.15: DynamicActionTonePredictor exports --- complexity-gated dynamic path
+export DynamicPredictionError
+export predict_action_tone_dynamic, compute_semantic_complexity
+export should_use_dynamic_path, COMPLEXITY_FLOOR
+
+# GRUG v7.15: PhagyGroupOrganizer exports --- idle-time GroupRegistry cleanup
+export GroupOrganizerStats, run_group_organizer!
 
 end # module GrugBot420
