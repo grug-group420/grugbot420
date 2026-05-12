@@ -29,6 +29,10 @@ module PhagyMode
 using Random
 
 export run_phagy!, PhagyStats, get_phagy_log, PhagyError, run_memory_forensics!, fuzzy_memory_forensics!, metric_memory_forensics!
+# GRUG v7.15: Pluggable 7th automaton (GroupRegistry organizer). Installed
+# post-load by GrugBot420.jl via register_group_organizer!; nothing inside
+# PhagyMode imports the downstream module, avoiding a circular include.
+export register_group_organizer!, has_group_organizer, GROUP_ORGANIZER_NAME
 
 # ==============================================================================
 # ERROR TYPE - GRUG: NO SILENT FAILURES
@@ -1166,6 +1170,80 @@ end
 
 
 # ==============================================================================
+# v7.15 --- PLUGGABLE 7TH AUTOMATON (GROUP_ORGANIZER)
+# ==============================================================================
+# GRUG: PhagyGroupOrganizer lives in a downstream module (loaded AFTER PhagyMode
+# because it depends on GroupRegistry, which depends on RelationalJitter). To
+# avoid a circular include without reordering half the package, we expose a
+# callback slot here that GrugBot420.jl fills in after every module is loaded.
+#
+# CONTRACT: the registered callable takes no arguments and returns a PhagyStats.
+# If not registered, the phagy roll stays at 1..6 --- the organizer simply
+# never fires, which is fine because no groups will have been registered in
+# a build where the downstream module is missing.
+# NO SILENT FAILURE: if registration is attempted with the wrong signature,
+# we throw eagerly; if the callback throws at run time, the error surfaces
+# through run_phagy!'s existing rethrow path --- no swallowing.
+# ==============================================================================
+
+const GROUP_ORGANIZER_NAME = "GROUP_ORGANIZER"
+
+# GRUG: Ref-wrapped function slot. Nothing means "not wired".
+const _GROUP_ORGANIZER_FN = Ref{Union{Nothing, Function}}(nothing)
+const _GROUP_ORGANIZER_LOCK = ReentrantLock()
+
+"""
+    register_group_organizer!(fn)
+
+GRUG: Install the 7th phagy automaton. `fn` must be a zero-arg callable
+returning a PhagyStats. Called by GrugBot420.jl once all downstream modules
+are loaded. Re-registration is allowed (last write wins) so tests can swap
+the function.
+
+NO SILENT FAILURE: passing nothing or a non-callable throws PhagyError
+with a specific context message rather than a generic MethodError --- makes
+misuse obvious.
+"""
+function register_group_organizer!(fn)
+    # GRUG: no silent failure --- null or non-callable arguments are an
+    # explicit PhagyError, not a mysterious MethodError deep in the guts.
+    fn === nothing && throw(PhagyError(
+        "!!! FATAL: register_group_organizer! requires a non-nothing callable; got nothing !!!"))
+    # GRUG: accept anything with method table entry for `()`. The check below
+    # is loose on purpose --- closures, function objects, and callable structs
+    # all pass. We only reject `nothing` and truly-un-callable values.
+    applicable(fn) || throw(PhagyError(
+        "!!! FATAL: register_group_organizer! argument is not zero-arg callable: $(typeof(fn)) !!!"))
+    lock(_GROUP_ORGANIZER_LOCK) do
+        _GROUP_ORGANIZER_FN[] = fn
+    end
+    @debug "[PHAGY:REGISTER] ✅ GROUP_ORGANIZER automaton wired."
+    return nothing
+end
+
+"""
+    has_group_organizer()::Bool
+
+GRUG: True if the 7th automaton has been wired. Used by run_phagy! to know
+whether to roll 1..7 or stay at 1..6.
+"""
+function has_group_organizer()::Bool
+    return lock(_GROUP_ORGANIZER_LOCK) do
+        _GROUP_ORGANIZER_FN[] !== nothing
+    end
+end
+
+# GRUG: Internal fetch for run_phagy!. Returns nothing if not wired. Holds the
+# lock only long enough to snapshot the reference --- callback itself runs
+# OUTSIDE the lock so the organizer is free to take its own locks.
+function _get_group_organizer()
+    return lock(_GROUP_ORGANIZER_LOCK) do
+        _GROUP_ORGANIZER_FN[]
+    end
+end
+
+
+# ==============================================================================
 # PHAGY DISPATCHER - ONE AUTOMATON PER CYCLE
 # ==============================================================================
 
@@ -1174,17 +1252,23 @@ run_phagy!(node_map, node_lock, hopfield_cache, cache_lock, rules, rules_lock;
            message_history=nothing, history_lock=nothing)::PhagyStats
 
 GRUG: Main phagy entry point. Randomly selects ONE automaton to run this cycle.
-Selection is weighted equally (1/6 each) - no automaton gets priority over others.
-Available automata (1-6):
+Selection is weighted equally (1/N each, where N = 6 or 7) - no automaton gets
+priority over others.
+Available automata (1-6, plus optional 7 if registered):
   1. ORPHAN_PRUNER
   2. STRENGTH_DECAYER
   3. GRAVE_RECYCLER
   4. DROP_TABLE_COMPACT (CACHE_VALIDATOR disabled - Hopfield obsolete for lobe-based architecture)
   5. RULE_PRUNER
   6. MEMORY_FORENSICS (requires message_history and history_lock kwargs)
+  7. GROUP_ORGANIZER  (v7.15; requires register_group_organizer! to have been called)
 
 MEMORY_FORENSICS context: If message_history/history_lock not provided and automaton 6 is rolled,
 re-rolls to 1-5. Forensics needs memory access - no silent skip.
+
+GROUP_ORGANIZER context: If the 7th automaton is not registered, the roll stays
+at 1..6 --- the organizer simply never fires. If registered but it throws at
+run time, the error surfaces through the existing rethrow path (no swallowing).
 
 HOPFIELD CACHE NOTE: CACHE_VALIDATOR (formerly automaton 4) is DISABLED. Hopfield caching
 was used prior to lobe-based architecture. Modern system uses 1000-node active cap biological
@@ -1217,17 +1301,25 @@ function run_phagy!(
         throw(PhagyError("!!! FATAL: run_phagy! got invalid rules_lock! !!!"))
     end
 
-    # GRUG: Roll the automaton selector (1-6, uniform)
-    automaton_roll = rand(1:6)
+    # GRUG v7.15: Roll the automaton selector. Range is 1..7 when the
+    # GROUP_ORGANIZER is wired (register_group_organizer! was called at load
+    # time), otherwise 1..6 (legacy). Snapshot the hook ONCE up front so the
+    # roll range stays stable for this call even if another thread registers
+    # or swaps the hook mid-cycle.
+    organizer_fn  = _get_group_organizer()
+    max_automaton = organizer_fn === nothing ? 6 : 7
+    automaton_roll = rand(1:max_automaton)
 
     # GRUG: If automaton 6 (MEMORY_FORENSICS) is rolled but message_history/history_lock not provided,
     # re-roll to 1-5. Forensics needs memory access — no silent skip.
+    # GRUG v7.15: Excludes automaton 7 from the re-roll pool; organizer has no
+    # message-history dependency so we re-roll back into [1,5] specifically.
     if automaton_roll == 6 && (isnothing(message_history) || isnothing(history_lock))
         println("[PHAGY] 🦠  Rolled MEMORY_FORENSICS but no message_history provided. Re-rolling 1-5.")
         automaton_roll = rand(1:5)
     end
 
-    println("[PHAGY] 🦠  Phagy cycle starting. Automaton roll: $automaton_roll/6")
+    println("[PHAGY] 🦠  Phagy cycle starting. Automaton roll: $automaton_roll/$max_automaton")
 
     stats = try
         if automaton_roll == 1
@@ -1243,9 +1335,21 @@ function run_phagy!(
             prune_dormant_rules!(rules, rules_lock)
         elseif automaton_roll == 6
             run_memory_forensics!(node_map, node_lock, message_history, history_lock)
+        elseif automaton_roll == 7
+            # GRUG v7.15: GROUP_ORGANIZER --- pluggable downstream automaton.
+            # organizer_fn was snapshotted above; it cannot be nothing here
+            # because max_automaton would have been 6.
+            if organizer_fn === nothing
+                # GRUG: belt-and-suspenders. Should be unreachable given the
+                # max_automaton gate above but protects against race-y hook
+                # swaps in future code.
+                throw(PhagyError(
+                    "!!! FATAL: automaton 7 rolled but GROUP_ORGANIZER not wired !!!"))
+            end
+            organizer_fn()
         else
-            # GRUG: Should be unreachable. If rand(1:6) returns something else, cave is haunted.
-            throw(PhagyError("!!! FATAL: automaton_roll=$automaton_roll is out of range [1,6]! !!!"))
+            # GRUG: Should be unreachable. If rand(1:max) returns something else, cave is haunted.
+            throw(PhagyError("!!! FATAL: automaton_roll=$automaton_roll is out of range [1,$max_automaton]! !!!"))
         end
     catch e
         # GRUG: Automaton failure is NOT silent. Surface it immediately.

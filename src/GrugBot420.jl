@@ -115,6 +115,47 @@ using .DynamicActionTonePredictor
 include("PhagyGroupOrganizer.jl")
 using .PhagyGroupOrganizer
 
+# ==============================================================================
+# v7.15 PHAGY AUTOMATON 7 REGISTRATION
+# ==============================================================================
+# GRUG: Wire PhagyGroupOrganizer into PhagyMode as the 7th automaton. This runs
+# at package load time (after every module is included), converting the
+# downstream GroupOrganizerStats into the PhagyStats record PhagyMode expects.
+# NO SILENT FAILURE: if the organizer throws, the error propagates to
+# run_phagy!'s rethrow block --- callers see the trace.
+# NO CIRCULAR DEPENDENCY: PhagyMode doesn't import PhagyGroupOrganizer; it just
+# stores the callback reference, so the load order stays clean.
+# ==============================================================================
+let
+    # GRUG: Adapter closure --- zero-arg, returns PhagyMode.PhagyStats.
+    organizer_adapter = function ()
+        t_start = time()
+        stats   = PhagyGroupOrganizer.run_group_organizer!()
+        elapsed_ms = (time() - t_start) * 1000.0
+
+        items_changed = stats.unlinkable_cleared + stats.groups_pruned +
+                        (stats.cursor_reset ? 1 : 0)
+        notes = string(
+            "unlinkable_cleared=", stats.unlinkable_cleared,
+            " groups_pruned=",     stats.groups_pruned,
+            " cursor_reset=",      stats.cursor_reset,
+        )
+        # GRUG: items_processed == items_changed for this automaton --- it
+        # only touches what it decides to mutate, no separate "examined"
+        # population. Keeps the PhagyStats shape honest rather than padding
+        # with a fake scan count.
+        return PhagyMode.PhagyStats(
+            PhagyMode.GROUP_ORGANIZER_NAME,
+            items_changed,
+            items_changed,
+            elapsed_ms,
+            notes,
+        )
+    end
+
+    PhagyMode.register_group_organizer!(organizer_adapter)
+end
+
 # GRUG: AIML node tribes - lobe-specific executive node populations.
 # Must load BEFORE Main.jl so command handlers can reach the API. Ordering
 # matters: Lobe must already exist so AIML knows what parent cap to read
@@ -215,6 +256,7 @@ export try_claim_cross_talk!, release_cross_talk!, reserved_cross_talk_slots
 # GRUG v7.15: GroupRegistry exports --- chatter groups, disk persistence
 export GroupRegistryError, NodeGroup, GroupRegistryState
 export register_node_in_group!, remove_node_from_group!, grave_node_in_group!
+export grave_node_everywhere!
 export get_group, list_group_ids, group_count, node_partners, partners_for_node
 export next_chatter_window_ids, advance_chatter_cursor!
 export save_registry_compressed, load_registry_compressed

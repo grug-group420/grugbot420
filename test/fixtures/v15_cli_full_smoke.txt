@@ -1,0 +1,15 @@
+/grow ephemeralSimpleTestEngineNode | initial_stength=5.0
+/groupRegister grp_demo_1 node_0
+/groupStatus
+/crystalize node_0
+/crystalizeList
+/crystalizeAuto node_0
+/uncrystalize node_0
+/crystalizeList
+/groupWindow 10
+/chatterSwap 10
+/groupOrganize
+/phagy
+/groupGrave node_0
+/groupStatus
+/quit

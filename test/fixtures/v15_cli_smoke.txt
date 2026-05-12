@@ -1,0 +1,4 @@
+/groupStatus
+/crystalizeList
+/help
+/quit

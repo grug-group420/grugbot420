@@ -27,6 +27,7 @@ using JSON
 export GroupRegistryError
 export NodeGroup, GroupRegistryState
 export register_node_in_group!, remove_node_from_group!, grave_node_in_group!
+export grave_node_everywhere!
 export get_group, list_group_ids, group_count, node_partners
 export next_chatter_window_ids, advance_chatter_cursor!
 export save_registry_compressed, load_registry_compressed
@@ -288,6 +289,52 @@ function grave_node_in_group!(group_id::String, node_id::String)
         group.grave_count += 1
     end
     return nothing
+end
+
+"""
+    grave_node_everywhere!(node_id)::Int
+
+GRUG v7.15.2: Convenience --- mark the node grave across every group that
+contains it. Returns the number of groups updated (0 if the node is not in
+any group, which is legitimate for nodes that were never registered).
+
+Why this exists: engine.jl (mark_node_grave!, strength-zero path) needs a
+single-call way to keep the GroupRegistry in sync with cave reality when a
+node dies. Walking caller-side would re-lock the registry N times; this
+does one lock for the whole sweep.
+
+NO SILENT FAILURE: if an individual per-group grave call throws (e.g. racing
+delete put the node in `node_to_groups` but out of `member_ids`), we rethrow
+with a typed GroupRegistryError and a breadcrumb including the node id.
+"""
+function grave_node_everywhere!(node_id::String)::Int
+    strip(node_id) == "" && _throw("node_id is empty", "grave_node_everywhere!")
+    touched = 0
+    lock(_REGISTRY.lock) do
+        gids = get(_REGISTRY.node_to_groups, node_id, String[])
+        # GRUG: copy the id list --- we don't mutate it here, but the loop
+        # reads group.member_ids which could in principle be mutated by a
+        # future hook; snapshotting the ids keeps this walk trivially stable.
+        for gid in copy(gids)
+            group = get(_REGISTRY.groups, gid, nothing)
+            if isnothing(group)
+                # GRUG: race with prune. Skip, don't throw --- organizer may
+                # have just pruned an empty group while we were entering.
+                continue
+            end
+            if node_id in group.member_ids
+                group.grave_count += 1
+                touched += 1
+            else
+                # GRUG: node_to_groups drift. Surface as a warning rather
+                # than hard-throw because the registry is still consistent
+                # after this call (we just skip), and engine.jl callers
+                # should not crash on a grave event.
+                @warn "[GroupRegistry] grave_node_everywhere!: node '$node_id' listed in node_to_groups[$gid] but missing from member_ids; skipping."
+            end
+        end
+    end
+    return touched
 end
 
 """

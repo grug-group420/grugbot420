@@ -73,6 +73,90 @@ if !isdefined(@__MODULE__, :ImmuneSystem)
     using .ImmuneSystem
 end
 
+# ==============================================================================
+# GRUG v7.15 MODULES --- guarded standalone includes
+# ==============================================================================
+# When Main.jl runs as a standalone script (julia src/Main.jl), the GrugBot420
+# package wrapper is NOT in scope, so every v7.15 module must be included here
+# too. When loaded as part of the package, the `isdefined` guards skip these
+# --- the package already pulled them in via GrugBot420.jl.
+#
+# ORDERING MATTERS: RelationalJitter is a dependency of ChatterVoteSwap. Other
+# v7.15 modules have no intra-group dependencies so their order is free.
+# ==============================================================================
+
+# GRUG v7.15: RelationalJitter dependency comes first --- several modules below
+# use its jitter primitives. PhagyMode and AIMLNodeSystem also rely on it in
+# the full package.
+if !isdefined(@__MODULE__, :RelationalJitter)
+    include("RelationalJitter.jl")
+    using .RelationalJitter
+end
+
+# GRUG v7.15: PhagyMode (7-automaton dispatcher). Guarded include.
+if !isdefined(@__MODULE__, :PhagyMode)
+    include("PhagyMode.jl")
+    using .PhagyMode
+end
+
+# GRUG v7.15: LobeOrchestrator.
+if !isdefined(@__MODULE__, :LobeOrchestrator)
+    include("LobeOrchestrator.jl")
+    using .LobeOrchestrator
+end
+
+# GRUG v7.15: GroupRegistry.
+if !isdefined(@__MODULE__, :GroupRegistry)
+    include("GroupRegistry.jl")
+    using .GroupRegistry
+end
+
+# GRUG v7.15: CrystalizeTag.
+if !isdefined(@__MODULE__, :CrystalizeTag)
+    include("CrystalizeTag.jl")
+    using .CrystalizeTag
+end
+
+# GRUG v7.15: ChatterVoteSwap (depends on RelationalJitter + GroupRegistry).
+if !isdefined(@__MODULE__, :ChatterVoteSwap)
+    include("ChatterVoteSwap.jl")
+    using .ChatterVoteSwap
+end
+
+# GRUG v7.15: DynamicActionTonePredictor.
+if !isdefined(@__MODULE__, :DynamicActionTonePredictor)
+    include("DynamicActionTonePredictor.jl")
+    using .DynamicActionTonePredictor
+end
+
+# GRUG v7.15: PhagyGroupOrganizer (depends on GroupRegistry).
+if !isdefined(@__MODULE__, :PhagyGroupOrganizer)
+    include("PhagyGroupOrganizer.jl")
+    using .PhagyGroupOrganizer
+end
+
+# GRUG v7.15.2: Wire the 7th phagy automaton if not already wired.
+# In package mode GrugBot420.jl already did this; we only re-register here
+# in standalone mode (has_group_organizer returns false).
+if !PhagyMode.has_group_organizer()
+    let
+        organizer_adapter = function ()
+            t_start = time()
+            s = PhagyGroupOrganizer.run_group_organizer!()
+            elapsed_ms = (time() - t_start) * 1000.0
+            items_changed = s.unlinkable_cleared + s.groups_pruned +
+                            (s.cursor_reset ? 1 : 0)
+            notes = string("unlinkable_cleared=", s.unlinkable_cleared,
+                           " groups_pruned=",     s.groups_pruned,
+                           " cursor_reset=",      s.cursor_reset)
+            return PhagyMode.PhagyStats(
+                PhagyMode.GROUP_ORGANIZER_NAME,
+                items_changed, items_changed, elapsed_ms, notes)
+        end
+        PhagyMode.register_group_organizer!(organizer_adapter)
+    end
+end
+
 using Base64: base64decode
 using SHA: sha256
 using JSON
@@ -1989,6 +2073,25 @@ const HELP_MSG = """
 ║  /writeSave <filepath> <json> Append JSON to save file       ║
 ║    Requires admin login. Validates JSON before writing.     ║
 ║    Use for runtime modifications to saved specimen data.    ║
+║                                                              ║
+║  v7.15 --- GROUPS, CRYSTALIZE, CHATTER-SWAP, PHAGY            ║
+║  /groupStatus                Show group registry state       ║
+║  /groupRegister <gid> <nid>  Add node to a group             ║
+║  /groupGrave <nid>           Sync grave to every group       ║
+║  /groupWindow [size]         Peek next chatter window ids    ║
+║  /crystalize <nid>           Freeze node (no jitter, no      ║
+║                              decay, no phagy pruning)        ║
+║  /uncrystalize <nid>         Release a user-crystalized node ║
+║  /crystalizeList             Show crystalized nodes          ║
+║  /crystalizeAuto <nid>       Check auto-crystalize rule for  ║
+║                              a node (strength + confidence)  ║
+║  /chatterSwap [win]          Run one vote-swap chatter round ║
+║                              over the next window            ║
+║  /phagy                      Force one phagy cycle now       ║
+║                              (rolls 1..7 incl. group org.)   ║
+║  /groupOrganize              Run group organizer directly    ║
+║  /groupSnapshot <path>       Save registry to gzipped JSON   ║
+║  /groupRestore <path>        Load registry from gzipped JSON ║
 ║                                                              ║
 ║  /help                      Show this scroll                ║
 ║  /quit (or /exit)           Close cave and exit CLI loop    ║
@@ -3916,6 +4019,25 @@ function run_cli()
             m_imgnodeattach = match(r"^/imgnodeAttach\s+(.+)"s,                          line)
             m_imgnodedetach = match(r"^/imgnodeDetach\s+(\S+)\s+(\S+)\s*$",              line)
             m_attachments  = match(r"^/attachments\s*$",                                 line)
+            # ==========================================================
+            # GRUG v7.15 --- group registry, crystalize, chatter-swap,
+            # phagy force, group organizer, snapshot/restore.
+            # All follow the same regex discipline as the rest of the
+            # dispatcher: explicit pattern, trimmed args, no silent skips.
+            # ==========================================================
+            m_groupstatus   = match(r"^/groupStatus\s*$",                                 line)
+            m_groupregister = match(r"^/groupRegister\s+(\S+)\s+(\S+)\s*$",               line)
+            m_groupgrave    = match(r"^/groupGrave\s+(\S+)\s*$",                          line)
+            m_groupwindow   = match(r"^/groupWindow(?:\s+(\d+))?\s*$",                    line)
+            m_crystalize    = match(r"^/crystalize\s+(\S+)\s*$",                          line)
+            m_uncrystalize  = match(r"^/uncrystalize\s+(\S+)\s*$",                        line)
+            m_crystalist    = match(r"^/crystalizeList\s*$",                              line)
+            m_crystalauto   = match(r"^/crystalizeAuto\s+(\S+)\s*$",                      line)
+            m_chatterswap   = match(r"^/chatterSwap(?:\s+(\d+))?\s*$",                    line)
+            m_phagyforce    = match(r"^/phagy\s*$",                                       line)
+            m_grouporganize = match(r"^/groupOrganize\s*$",                               line)
+            m_groupsnap     = match(r"^/groupSnapshot\s+(\S+)\s*$",                       line)
+            m_grouprestore  = match(r"^/groupRestore\s+(\S+)\s*$",                        line)
             m_help         = match(r"^/help\s*$",                                       line)
             
             if !isnothing(m_help)
@@ -4849,6 +4971,340 @@ elseif !isnothing(m_right)
                 # GRUG: /attachments — show all current node attachments
                 summary = get_attachment_summary()
                 println(summary)
+
+            # ======================================================================
+            # GRUG v7.15 --- GROUP REGISTRY / CRYSTALIZE / CHATTER-SWAP / PHAGY
+            # Each handler is defensive: typed-error catch + user-facing message
+            # + non-zero exit path that never silently swallows failure.
+            # ======================================================================
+            elseif !isnothing(m_groupstatus)
+                # GRUG: /groupStatus --- summary of the GroupRegistry.
+                try
+                    n_groups  = GroupRegistry.group_count()
+                    gids      = GroupRegistry.list_group_ids()
+                    # GRUG: count total members + total graves + unlinkable groups
+                    total_members = 0
+                    total_graves  = 0
+                    n_unlinkable  = 0
+                    for gid in gids
+                        g = GroupRegistry.get_group(gid)
+                        isnothing(g) && continue
+                        total_members += length(g.member_ids)
+                        total_graves  += g.grave_count
+                        g.is_unlinkable && (n_unlinkable += 1)
+                    end
+                    println("""
+┌── GROUP REGISTRY STATUS ─────────────────────────────────────
+│  Groups        : $n_groups
+│  Members total : $total_members
+│  Graves total  : $total_graves
+│  Unlinkable    : $n_unlinkable
+│  Window range  : [$(GroupRegistry.CHATTER_WINDOW_MIN),$(GroupRegistry.CHATTER_WINDOW_MAX)]
+│  Partner cap   : [$(GroupRegistry.PARTNER_CAP_MIN),$(GroupRegistry.PARTNER_CAP_MAX)]
+└──────────────────────────────────────────────────────────────""")
+                    if n_groups > 0 && n_groups <= 20
+                        println("  Group IDs: ", join(gids, ", "))
+                    elseif n_groups > 20
+                        println("  Group IDs (first 20): ", join(gids[1:20], ", "), "  ...")
+                    end
+                catch e
+                    println("!!! /groupStatus failed: $e !!!")
+                    rethrow(e)
+                end
+
+            elseif !isnothing(m_groupregister)
+                # GRUG: /groupRegister <group_id> <node_id>
+                gid = String(strip(m_groupregister.captures[1]))
+                nid = String(strip(m_groupregister.captures[2]))
+                try
+                    lock(NODE_LOCK) do
+                        haskey(NODE_MAP, nid) || error(
+                            "Node '$nid' does not exist in NODE_MAP. Create it with /grow first.")
+                    end
+                    GroupRegistry.register_node_in_group!(gid, nid)
+                    g = GroupRegistry.get_group(gid)
+                    n_members = isnothing(g) ? 0 : length(g.member_ids)
+                    println("🗂  /groupRegister: '$nid' → '$gid' (now $n_members member(s)).")
+                    add_message_to_history!("System", "/groupRegister $gid $nid", false)
+                catch e
+                    println("!!! /groupRegister failed: $e !!!")
+                end
+
+            elseif !isnothing(m_groupgrave)
+                # GRUG: /groupGrave <node_id> --- sync grave across every group
+                nid = String(strip(m_groupgrave.captures[1]))
+                try
+                    touched = GroupRegistry.grave_node_everywhere!(nid)
+                    if touched == 0
+                        println("🪦  /groupGrave: '$nid' is not in any group. No-op.")
+                    else
+                        println("🪦  /groupGrave: '$nid' marked grave in $touched group(s).")
+                    end
+                    add_message_to_history!("System", "/groupGrave $nid touched=$touched", false)
+                catch e
+                    println("!!! /groupGrave failed: $e !!!")
+                end
+
+            elseif !isnothing(m_groupwindow)
+                # GRUG: /groupWindow [size] --- peek at the next chatter window.
+                # Does NOT advance the cursor.
+                size_str = m_groupwindow.captures[1]
+                try
+                    ids = if isnothing(size_str)
+                        GroupRegistry.next_chatter_window_ids()
+                    else
+                        sz = parse(Int, size_str)
+                        sz > 0 || error("window size must be positive (got $sz)")
+                        GroupRegistry.next_chatter_window_ids(; window_size = sz)
+                    end
+                    if isempty(ids)
+                        println("🪟  /groupWindow: registry is empty, no groups to peek.")
+                    else
+                        println("🪟  /groupWindow: $(length(ids)) id(s):")
+                        preview = ids[1:min(20, length(ids))]
+                        println("    ", join(preview, ", "), length(ids) > 20 ? "  ..." : "")
+                    end
+                catch e
+                    println("!!! /groupWindow failed: $e !!!")
+                end
+
+            elseif !isnothing(m_crystalize)
+                # GRUG: /crystalize <node_id> --- user-crystalize. Node will be
+                # skipped by jitter, strength decay, and phagy pruning.
+                nid = String(strip(m_crystalize.captures[1]))
+                try
+                    lock(NODE_LOCK) do
+                        haskey(NODE_MAP, nid) || error("Node '$nid' does not exist.")
+                    end
+                    CrystalizeTag.mark_user_crystalized!(nid)
+                    println("💎 /crystalize: '$nid' crystalized by user. Frozen against jitter + decay + phagy.")
+                    add_message_to_history!("System", "/crystalize $nid", false)
+                catch e
+                    println("!!! /crystalize failed: $e !!!")
+                end
+
+            elseif !isnothing(m_uncrystalize)
+                # GRUG: /uncrystalize <node_id> --- release user-crystalize.
+                # Does NOT release auto-crystalization (those are strength-gated).
+                nid = String(strip(m_uncrystalize.captures[1]))
+                try
+                    was = CrystalizeTag.is_crystalized(nid)
+                    CrystalizeTag.uncrystalize!(nid)
+                    if was
+                        println("💧 /uncrystalize: '$nid' released. Jitter + decay + phagy resume.")
+                    else
+                        println("💧 /uncrystalize: '$nid' was not crystalized. No-op.")
+                    end
+                    add_message_to_history!("System", "/uncrystalize $nid", false)
+                catch e
+                    println("!!! /uncrystalize failed: $e !!!")
+                end
+
+            elseif !isnothing(m_crystalist)
+                # GRUG: /crystalizeList --- show all crystalized node ids.
+                try
+                    ids = CrystalizeTag.list_crystalized()
+                    n   = CrystalizeTag.crystalized_count()
+                    if n == 0
+                        println("💎 /crystalizeList: no crystalized nodes.")
+                    else
+                        println("💎 /crystalizeList: $n node(s) crystalized.")
+                        preview = ids[1:min(50, n)]
+                        println("    ", join(preview, ", "), n > 50 ? "  ..." : "")
+                    end
+                catch e
+                    println("!!! /crystalizeList failed: $e !!!")
+                end
+
+            elseif !isnothing(m_crystalauto)
+                # GRUG: /crystalizeAuto <node_id> --- evaluate the auto-crystalize
+                # decision given the node's current strength + a scan-derived
+                # confidence. Confidence is computed from a self-match against
+                # the node's own pattern (upper-bound proxy).
+                nid = String(strip(m_crystalauto.captures[1]))
+                try
+                    node = lock(NODE_LOCK) do
+                        get(NODE_MAP, nid, nothing)
+                    end
+                    isnothing(node) && error("Node '$nid' does not exist.")
+                    # GRUG: Confidence proxy --- if node is already solidified
+                    # (strength >= SOLIDIFY threshold), treat its semantic
+                    # confidence as 1.0. Otherwise 0.5 (neutral). The real
+                    # dynamic-path check would use a live pattern scan.
+                    conf = node.strength >= STRENGTH_SOLIDIFY_THRESHOLD ? 1.0 : 0.5
+                    decide = CrystalizeTag.should_auto_crystalize(node.strength, conf)
+                    if decide
+                        CrystalizeTag.mark_auto_crystalized!(nid)
+                        println("💎 /crystalizeAuto: '$nid' auto-crystalized (strength=$(round(node.strength, digits=2)) ≥ $(CrystalizeTag.AUTO_STRENGTH_FLOOR), conf=$conf ≥ $(CrystalizeTag.AUTO_SEMANTIC_FLOOR)).")
+                    else
+                        println("💎 /crystalizeAuto: '$nid' does NOT meet auto-crystalize thresholds (strength=$(round(node.strength, digits=2)), conf=$conf).")
+                    end
+                    add_message_to_history!("System", "/crystalizeAuto $nid decide=$decide", false)
+                catch e
+                    println("!!! /crystalizeAuto failed: $e !!!")
+                end
+
+            elseif !isnothing(m_chatterswap)
+                # GRUG: /chatterSwap [size] --- run one vote-swap chatter round
+                # over the next chatter window. Commits cursor on success.
+                size_str = m_chatterswap.captures[1]
+                try
+                    gids = if isnothing(size_str)
+                        GroupRegistry.next_chatter_window_ids()
+                    else
+                        sz = parse(Int, size_str)
+                        sz > 0 || error("window size must be positive (got $sz)")
+                        GroupRegistry.next_chatter_window_ids(; window_size = sz)
+                    end
+                    if isempty(gids)
+                        println("🗣  /chatterSwap: registry empty. No groups to chatter over.")
+                    else
+                        # GRUG: Adapters over ChatterVoteSwap's contract. All
+                        # node reads go through NODE_LOCK to stay consistent
+                        # under concurrent engine activity. Semantic intensity
+                        # uses a simple token-overlap Jaccard as a cheap proxy.
+                        # Operators wanting the full SemanticVerbs path can
+                        # call run_vote_swap_round! programmatically with a
+                        # richer intensity function.
+
+                        get_node_fn = function (nid::String)
+                            lock(NODE_LOCK) do
+                                n = get(NODE_MAP, nid, nothing)
+                                if isnothing(n)
+                                    return (exists = false, strength = 0.0,
+                                            action = "", weight = 0.0,
+                                            is_weak = false)
+                                end
+                                # GRUG: treat graves as non-existent for swap.
+                                if n.is_grave
+                                    return (exists = false, strength = 0.0,
+                                            action = "", weight = 0.0,
+                                            is_weak = false)
+                                end
+                                # GRUG: weak = strength below solidify threshold
+                                # (the same floor we use for NONJITTER bump).
+                                # Only weak nodes accept donated votes.
+                                is_weak = n.strength < STRENGTH_SOLIDIFY_THRESHOLD
+                                return (exists   = true,
+                                        strength = n.strength,
+                                        action   = n.action_packet,
+                                        weight   = 1.0,
+                                        is_weak  = is_weak)
+                            end
+                        end
+
+                        get_intensity_fn = function (sender_id::String, receiver_id::String)
+                            # GRUG: cheap Jaccard over pattern tokens. Never
+                            # touches the thesaurus/verbs subsystems so /chatterSwap
+                            # runs fast even on large specimens.
+                            snd = lock(NODE_LOCK) do
+                                n = get(NODE_MAP, sender_id, nothing)
+                                isnothing(n) ? "" : n.pattern
+                            end
+                            rcv = lock(NODE_LOCK) do
+                                n = get(NODE_MAP, receiver_id, nothing)
+                                isnothing(n) ? "" : n.pattern
+                            end
+                            (isempty(snd) || isempty(rcv)) && return 0.0
+                            s1 = Set(split(lowercase(snd)))
+                            s2 = Set(split(lowercase(rcv)))
+                            inter = length(intersect(s1, s2))
+                            uni   = length(union(s1, s2))
+                            uni == 0 ? 0.0 : Float64(inter / uni)
+                        end
+
+                        apply_swap_fn = function (event)
+                            # GRUG: CLI /chatterSwap is diagnostic --- we log
+                            # the event but do NOT mutate the receiver's action
+                            # packet. Operators wanting real mutation call the
+                            # engine-level ChatterVoteSwap API directly with
+                            # their own apply_swap!.
+                            println("    🔁 $(event.group_id): $(event.sender_id) ─donate→ $(event.receiver_id)  action='$(event.donated_action)'  w=$(round(event.donated_weight, digits=3))  intensity=$(round(event.semantic_intensity, digits=3))")
+                            ChatterVoteSwap.record_chatter_time!(event.receiver_id)
+                            return true
+                        end
+
+                        group_members_fn = function (gid::String)
+                            g = GroupRegistry.get_group(gid)
+                            isnothing(g) ? String[] : copy(g.member_ids)
+                        end
+
+                        println("🗣  /chatterSwap: running vote-swap over $(length(gids)) group(s)...")
+                        stats = ChatterVoteSwap.run_vote_swap_round!(
+                            gids, get_node_fn, get_intensity_fn,
+                            apply_swap_fn, group_members_fn,
+                        )
+                        println("🗣  /chatterSwap: rounds=$(stats.rounds_run)  attempted=$(stats.swaps_attempted)  accepted=$(stats.swaps_accepted)")
+                        println("    rejected: cooldown=$(stats.rejected_cooldown) not_weak=$(stats.rejected_not_weak) semantic=$(stats.rejected_semantic)")
+                        # GRUG: Commit cursor by exactly the number of ids the
+                        # window returned --- matches tail-shrink semantics.
+                        GroupRegistry.advance_chatter_cursor!(length(gids))
+                    end
+                    add_message_to_history!("System", "/chatterSwap window=$(length(gids))", false)
+                catch e
+                    println("!!! /chatterSwap failed: $e !!!")
+                    Base.show_backtrace(stdout, catch_backtrace())
+                end
+
+            elseif !isnothing(m_phagyforce)
+                # GRUG: /phagy --- force one phagy cycle immediately (1..7 roll).
+                # Same semantics as the idle path but manually triggered.
+                try
+                    rules_snapshot = Vector{Any}()
+                    # GRUG: hopfield cache is a legacy dep; pass empty dict + lock.
+                    phagy_hop      = Dict{String, Any}()
+                    phagy_hop_lock = ReentrantLock()
+                    phagy_rules_lock = ReentrantLock()
+                    stats = PhagyMode.run_phagy!(
+                        NODE_MAP, NODE_LOCK,
+                        phagy_hop, phagy_hop_lock,
+                        rules_snapshot, phagy_rules_lock;
+                        message_history = MESSAGE_HISTORY,
+                        history_lock    = MESSAGE_HISTORY_LOCK,
+                    )
+                    println("🦠 /phagy: $(stats.automaton) ran. changed=$(stats.items_changed) time=$(round(stats.cycle_time_ms, digits=2))ms")
+                    println("         notes: $(stats.notes)")
+                    add_message_to_history!("System", "/phagy $(stats.automaton) changed=$(stats.items_changed)", false)
+                catch e
+                    println("!!! /phagy failed: $e !!!")
+                    Base.show_backtrace(stdout, catch_backtrace())
+                end
+
+            elseif !isnothing(m_grouporganize)
+                # GRUG: /groupOrganize --- run the 7th automaton directly,
+                # bypassing the phagy roll. Useful for targeted group cleanup.
+                try
+                    stats = PhagyGroupOrganizer.run_group_organizer!()
+                    println("🧹 /groupOrganize: unlinkable_cleared=$(stats.unlinkable_cleared) groups_pruned=$(stats.groups_pruned) cursor_reset=$(stats.cursor_reset)")
+                    add_message_to_history!("System", "/groupOrganize cleared=$(stats.unlinkable_cleared) pruned=$(stats.groups_pruned)", false)
+                catch e
+                    println("!!! /groupOrganize failed: $e !!!")
+                end
+
+            elseif !isnothing(m_groupsnap)
+                # GRUG: /groupSnapshot <path> --- save the registry to disk.
+                path = String(strip(m_groupsnap.captures[1]))
+                try
+                    written = GroupRegistry.save_registry_compressed(path)
+                    println("💾 /groupSnapshot: wrote '$written'.")
+                    add_message_to_history!("System", "/groupSnapshot $written", false)
+                catch e
+                    println("!!! /groupSnapshot failed: $e !!!")
+                end
+
+            elseif !isnothing(m_grouprestore)
+                # GRUG: /groupRestore <path> --- load the registry from disk.
+                # Replaces the in-memory registry wholesale; caller should
+                # ensure no chatter round is mid-flight.
+                path = String(strip(m_grouprestore.captures[1]))
+                try
+                    GroupRegistry.load_registry_compressed(path)
+                    n = GroupRegistry.group_count()
+                    println("📥 /groupRestore: loaded $n group(s) from '$path'.")
+                    add_message_to_history!("System", "/groupRestore $path groups=$n", false)
+                catch e
+                    println("!!! /groupRestore failed: $e !!!")
+                end
 
             else
                 error("!!! FATAL: Grug command bad format. Use /help to see all valid commands. !!!")

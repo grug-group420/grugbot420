@@ -778,14 +778,27 @@ At 0.0, node is marked grave (negative reinforcement during generative phase).
 function penalize_strength!(node::Node)
     # GRUG: Coinflip. Losers get penalized. Winners escape unscathed this round.
     if rand() < 0.5
+        # GRUG v7.15.2: Capture whether this penalty tipped the node into
+        # grave territory so we can sync GroupRegistry OUTSIDE the NODE_LOCK
+        # hold. Re-entering the registry lock from inside NODE_LOCK would
+        # work (no circular lock order in this call site today) but we
+        # prefer to keep lock hold-times minimal.
+        became_grave = false
         lock(NODE_LOCK) do
             node.strength = max(node.strength - 1.0, STRENGTH_FLOOR)
             if node.strength <= STRENGTH_FLOOR && !node.is_grave
                 node.is_grave    = true
                 node.grave_reason = "STRENGTH_ZERO"
+                became_grave = true
                 println("[ENGINE] ⚰  Node $(node.id) marked GRAVE (strength -> 0).")
             end
         end
+
+        # GRUG v7.15.2: After releasing NODE_LOCK, push the grave event into
+        # the GroupRegistry so partner-bookkeeping catches up. Skip entirely
+        # if this penalty didn't flip the grave bit --- no double-counting.
+        became_grave && _sync_grave_to_group_registry(node.id, "penalize_strength!")
+
         # GRUG v7.22: if the penalty just dropped strength below the
         # SOLIDIFY threshold, auto-remove the NONJITTER tag. Node resumes
         # jittering. If strength climbs back above the threshold later
@@ -794,6 +807,48 @@ function penalize_strength!(node::Node)
         # computed fresh from pattern scan.
         check_solidify_threshold!(node)
     end
+end
+
+"""
+    _sync_grave_to_group_registry(node_id::String, caller::String)
+
+GRUG v7.15.2: Shared helper for grave → GroupRegistry propagation.
+
+engine.jl is `include`d two ways:
+  1. Via `GrugBot420.jl` → `using .GroupRegistry` is in scope → sync works.
+  2. Directly by a few standalone tests (test_smoke.jl, etc.) → GroupRegistry
+     is NOT in scope → we must skip cleanly, not throw.
+
+The `isdefined(@__MODULE__, :GroupRegistry)` check lets us do both:
+  - Package-mode callers get the sync.
+  - Standalone-mode callers skip the sync silently (those tests don't
+    exercise group semantics at all).
+
+NO SILENT FAILURE INSIDE THE CALL: once we know GroupRegistry is reachable,
+we catch GroupRegistry.GroupRegistryError and surface it as a @warn (non-
+fatal --- the node IS graved, registry drift is a bookkeeping issue, not a
+correctness issue for the engine). Any other exception rethrows untouched.
+"""
+function _sync_grave_to_group_registry(node_id::String, caller::String)
+    # GRUG: guard on module visibility. In the standalone-include path this
+    # short-circuits before we touch the missing symbol.
+    if !isdefined(@__MODULE__, :GroupRegistry)
+        @debug "[ENGINE] GroupRegistry not loaded in this module context; grave sync skipped for $node_id ($caller)."
+        return nothing
+    end
+    try
+        touched = GroupRegistry.grave_node_everywhere!(node_id)
+        if touched > 0
+            println("[ENGINE] 🪦  Synced grave to GroupRegistry ($touched group(s)).")
+        end
+    catch e
+        if e isa GroupRegistry.GroupRegistryError
+            @warn "[ENGINE] $caller GroupRegistry sync threw (non-fatal, continuing): $(e.msg)"
+        else
+            rethrow(e)
+        end
+    end
+    return nothing
 end
 
 """
@@ -811,6 +866,25 @@ function mark_node_grave!(node::Node, reason::String)
         node.grave_reason = reason
     end
     println("[ENGINE] ⚰  Node $(node.id) marked GRAVE: [$reason].")
+
+    # GRUG v7.15.2: Keep the GroupRegistry in sync. If the node belongs to any
+    # groups, increment their grave_count so chatter-window callers and the
+    # PhagyGroupOrganizer automaton can react (e.g. clear is_unlinkable).
+    # grave_node_everywhere! is a no-op when the node was never registered.
+    #
+    # NO CIRCULAR DEP: engine.jl is `include`d both by GrugBot420.jl (where
+    # GroupRegistry is in scope) AND by some standalone tests that
+    # `include("../src/engine.jl")` directly without the package wrapper. In
+    # the standalone case GroupRegistry is simply not defined, so we guard
+    # with `isdefined(@__MODULE__, :GroupRegistry)` --- a true skip here is
+    # fine (those tests don't exercise group semantics) and keeps the package
+    # tests + standalone tests both green.
+    #
+    # NO SILENT FAILURE: a typed GroupRegistryError means registry state is
+    # corrupt, not a benign skip --- we log it loudly as a warning so the
+    # operator sees the drift, but we don't crash the grave flow. Other
+    # exception types rethrow unchanged.
+    _sync_grave_to_group_registry(node.id, "mark_node_grave!")
 end
 
 # ==============================================================================

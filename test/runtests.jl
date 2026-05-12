@@ -48,6 +48,13 @@ const ALL_TESTS = [
     "test_dynamic_action_tone.jl",
     "test_jitter_strong_low_conf_override.jl",
     "test_phagy_group_organizer.jl",
+    # GRUG v7.15.2 wiring tests --- phagy 7th-automaton plug hook,
+    # GroupRegistry grave_node_everywhere! single-call sync, end-to-end
+    # CLI verb integration suite, and CLI stdin smoke test.
+    "test_phagy_automaton_7_wiring.jl",
+    "test_group_registry_grave_everywhere.jl",
+    "test_v15_cli_verbs.jl",
+    "test_v15_cli_stdin_smoke.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
