@@ -456,7 +456,7 @@ function immune_scan!(input_text::String, node_count::Int; is_critical::Bool=tru
     end
 
     if node_count < 0
-        error("!!! FATAL: immune_scan! got negative node_count=$node_count! !!!")
+        error("!!! FATAL: immune_scan! got negative node_count=$(node_count)! !!!")
     end
 
     # GRUG: Step 0 — Maturity gate
@@ -749,7 +749,7 @@ function aiml_immune_scan!(input_text::String, aiml_node_count::Int; is_critical
     end
 
     if aiml_node_count < 0
-        error("!!! FATAL: aiml_immune_scan! got negative aiml_node_count=$aiml_node_count! !!!")
+        error("!!! FATAL: aiml_immune_scan! got negative aiml_node_count=$(aiml_node_count)! !!!")
     end
 
     # GRUG: AIML maturity gate - uses AIML node count, not total node count

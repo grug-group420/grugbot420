@@ -685,7 +685,7 @@ decides which one runs.
 function should_trigger_idle(last_input_time::Float64)::Bool
     if last_input_time <= 0.0
         throw(ChatterError(
-            "!!! FATAL: should_trigger_idle got invalid last_input_time: $last_input_time! !!!"
+            "!!! FATAL: should_trigger_idle got invalid last_input_time: $(last_input_time)! !!!"
         ))
     end
     elapsed = time() - last_input_time

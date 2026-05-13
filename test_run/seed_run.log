@@ -1,0 +1,519 @@
+[ Info: [SEMANTIC] ✅  New relation class added: 'explain'
+[ Info: [SEMANTIC] ✅  New relation class added: 'describe'
+[ Info: [SEMANTIC] ✅  New relation class added: 'reflect'
+[ Info: [SEMANTIC] ✅  New relation class added: 'empathize'
+[ Info: [SEMANTIC] ✅  Verb 'elaborate' added to class 'explain'
+[ Info: [SEMANTIC] ✅  Verb 'clarify' added to class 'explain'
+[ Info: [SEMANTIC] ✅  Verb 'recount' added to class 'describe'
+[ Info: [SEMANTIC] ✅  Verb 'narrate' added to class 'describe'
+[ Info: [SEMANTIC] ✅  Verb 'consider' added to class 'reflect'
+[ Info: [SEMANTIC] ✅  Verb 'ponder' added to class 'reflect'
+[ Info: [SEMANTIC] ✅  Verb 'relate' added to class 'empathize'
+[ Info: [SEMANTIC] ✅  Verb 'understand' added to class 'empathize'
+[ Info: [SEMANTIC] ✅  Verb 'explain' added to class 'explain'
+[ Info: [SEMANTIC] ✅  Verb 'describe' added to class 'describe'
+[ Info: [SEMANTIC] ✅  Verb 'reflect' added to class 'reflect'
+[ Info: [SEMANTIC] ✅  Verb 'empathize' added to class 'empathize'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'expound' -> 'explain'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'portray' -> 'describe'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'contemplate' -> 'reflect'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'sympathize' -> 'empathize'
+Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...
+System Online. Grug waiting at cave entrance for instructions.
+Primary  : /mission <input>                    (text or image binary)
+Feedback : /wrong                              (penalize last response voters)
+Explicit : /explicit <cmd> [<node_id>] <input>
+Grow     : /grow <single_line_json_packet>
+Rules    : /addRule <rule text> [prob=0.0-1.0]
+           Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+Memory   : /pin <text>
+Nodes    : /nodes                              (show node map status)
+Status   : /status                             (show chatter + system status)
+Arousal  : /arousal <0.0-1.0>                 (set eye system arousal level)
+Verbs    : /addVerb <verb> <class>             (add verb to relation class)
+         : /addRelationClass <name>            (create new verb class bucket)
+         : /addSynonym <canonical> <alias>     (normalize alias->canonical)
+         : /listVerbs                          (show all verb classes + synonyms)
+Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
+         : /connectLobes <id_a> <id_b>         (connect two lobes)
+         : /lobeGrow <lobe_id> <json_packet>   (grow node into specific lobe)
+         : /lobes                              (list all lobes + node counts)
+         : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
+         : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
+Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
+         : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
+NegThes  : /negativeThesaurus add|remove|list|check|flush
+Attach   : /nodeAttach <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <target> <id>         (detach image node from target)
+         : /attachments                         (show all node attachments)
+Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
+         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Help     : /help                               (full command reference)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  SPECIMEN SEEDING GUIDE (read before /grow)                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Automatic neighbor latching is SUPPRESSED below 1000 nodes.   ║
+║  Below that threshold, YOU control topology via drop_table.     ║
+║                                                                  ║
+║  For a coherent specimen from the start:                        ║
+║  1. Seed ORTHOGONAL archetypes first - distinct semantic poles. ║
+║     Don't plant 50 near-identical nodes up front.               ║
+║  2. Use required_relations as semantic GATES from day one.      ║
+║     Nodes that demand specific verbs won't fire on noise.       ║
+║  3. Name action_packets deliberately - distinct action families ║
+║     give the superposition orchestrator something to work with. ║
+║  4. Wire drop_tables manually for known co-activation pairs.    ║
+║     Don't rely on the latch system to discover semantics.       ║
+║  5. Your first ~100 nodes are the specimen's DNA.               ║
+║     The engine enforces structure at scale (1000+ nodes).       ║
+║     You enforce MEANING at the start.                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Brain > 🧠 Lobe 'science' created for subject: 'scientific concepts and the natural laws'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'technology' created for subject: 'computers software hardware networks and engineering'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'philosophy' created for subject: 'meaning ethics logic and existence'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'nature' created for subject: 'plants animals weather and ecosystems'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'daily_life' created for subject: 'food sleep work home and routine'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'emotions' created for subject: 'feelings moods and social bonds'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🔗 Lobes 'science' ↔ 'technology' connected.
+
+Brain > 🔗 Lobes 'philosophy' ↔ 'nature' connected.
+
+Brain > 🔗 Lobes 'daily_life' ↔ 'emotions' connected.
+
+Brain > 🔗 Lobes 'science' ↔ 'philosophy' connected.
+
+Brain > 🔗 Lobes 'nature' ↔ 'daily_life' connected.
+
+Brain > 🌱 Node 'node_3' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_4' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_5' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_6' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_7' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_8' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_9' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_10' grown into lobe 'science'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_11' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_12' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_13' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_14' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_15' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_16' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_17' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_18' grown into lobe 'technology'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_19' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_20' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_21' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_22' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_23' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_24' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_25' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_26' grown into lobe 'philosophy'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_27' grown into lobe 'nature'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_28' grown into lobe 'nature'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_29' grown into lobe 'nature'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_30' grown into lobe 'nature'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_31' grown into lobe 'nature'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_32' grown into lobe 'nature'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_33' grown into lobe 'nature'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_34' grown into lobe 'nature'. json_fields=3 drop_links=5
+
+Brain > 🌱 Node 'node_35' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_36' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_37' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_38' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_39' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_40' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_41' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_42' grown into lobe 'daily_life'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_43' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_44' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_45' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_46' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_47' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_48' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_49' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🌱 Node 'node_50' grown into lobe 'emotions'. json_fields=2 drop_links=5
+
+Brain > 🗂  Relation class 'explain' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'describe' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'reflect' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'empathize' created. Use /addVerb to populate.
+
+Brain > 🔧 Verb 'elaborate' added to class 'explain'. Active immediately.
+
+Brain > 🔧 Verb 'clarify' added to class 'explain'. Active immediately.
+
+Brain > 🔧 Verb 'recount' added to class 'describe'. Active immediately.
+
+Brain > 🔧 Verb 'narrate' added to class 'describe'. Active immediately.
+
+Brain > 🔧 Verb 'consider' added to class 'reflect'. Active immediately.
+
+Brain > 🔧 Verb 'ponder' added to class 'reflect'. Active immediately.
+
+Brain > 🔧 Verb 'relate' added to class 'empathize'. Active immediately.
+
+Brain > 🔧 Verb 'understand' added to class 'empathize'. Active immediately.
+
+Brain > 🔧 Verb 'explain' added to class 'explain'. Active immediately.
+
+Brain > 🔧 Verb 'describe' added to class 'describe'. Active immediately.
+
+Brain > 🔧 Verb 'reflect' added to class 'reflect'. Active immediately.
+
+Brain > 🔧 Verb 'empathize' added to class 'empathize'. Active immediately.
+
+Brain > 📖 Synonym registered: 'expound' → 'explain'. Normalization active.
+
+Brain > 📖 Synonym registered: 'portray' → 'describe'. Normalization active.
+
+Brain > 📖 Synonym registered: 'contemplate' → 'reflect'. Normalization active.
+
+Brain > 📖 Synonym registered: 'sympathize' → 'empathize'. Normalization active.
+
+Brain > ⚙️ Rule tied to tree: [When {MISSION} activates, favor {PRIMARY_ACTION} but keep {SURE_ACTIONS} ready.] (fire_prob=1.0)
+
+Brain > ⚙️ Rule tied to tree: [Confidence level {CONFIDENCE} shapes the tone of {PRIMARY_ACTION}.] (fire_prob=0.9)
+
+Brain > ⚙️ Rule tied to tree: [If {VOTE_CERTAINTY} is UNSURE, mention {TIED_ALTERNATIVES} as options.] (fire_prob=0.85)
+
+Brain > ⚙️ Rule tied to tree: [Anchor answer in {LOBE_CONTEXT} when lobes fire together.] (fire_prob=0.8)
+
+Brain > ⚙️ Rule tied to tree: [Pull from {MEMORY} only when mission asks about past.] (fire_prob=0.7)
+
+Brain > ⚙️ Rule tied to tree: [Node {NODE_ID} is the primary voice; let {ALL_ACTIONS} support it.] (fire_prob=0.6)
+
+Brain > ⚙️ Rule tied to tree: [Unsure votes go into {UNSURE_ACTIONS} for soft hedging.] (fire_prob=0.5)
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 🚫 Inhibition registered: 'spam'  reason: generic inbox pollution word
+   NegativeThesaurus size: 1 / 256
+
+Brain > 🚫 Inhibition registered: 'clickbait'  reason: shallow attention hook
+   NegativeThesaurus size: 2 / 256
+
+Brain > 🚫 Inhibition registered: 'propaganda'  reason: manipulative one-sided framing
+   NegativeThesaurus size: 3 / 256
+
+Brain > 
+🔍 THESAURUS COMPARISON
+  Input 1  : "water"  → seeds: beverage, drink, fluid, liquid
+  Input 2  : "fire"
+  Type     : word-word
+  ─────────────────────────────
+  Overall  : 0.0%  [NEGLIGIBLE]
+  Semantic : 0.0%
+  Context  : 50.0%
+  Assoc    : 0.0%
+  Confid.  : 90.0%
+
+
+Brain > 
+🔍 THESAURUS COMPARISON
+  Input 1  : "knowledge"  → seeds: awareness, cognition, insight, understanding
+  Input 2  : "wisdom"  → seeds: awareness, cognition, insight, knowledge
+  Type     : word-word
+  ─────────────────────────────
+  Overall  : 95.0%  [IDENTICAL]
+  Semantic : 95.0%
+  Context  : 50.0%
+  Assoc    : 0.0%
+  Confid.  : 90.0%
+
+
+Brain > [ENGINE] 🔗  Node 'node_4' attached to target 'node_3' with pattern "atoms and gravity both act across space" (base_conf=0.127, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_4' to 'node_3' with pattern "atoms and gravity both act across space" (base_conf=0.127, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_6' attached to target 'node_5' with pattern "dna mutation drives evolution" (base_conf=0.05, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_6' to 'node_5' with pattern "dna mutation drives evolution" (base_conf=0.05, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_8' attached to target 'node_7' with pattern "energy and light are both electromagneti" (base_conf=0.133, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_8' to 'node_7' with pattern "energy and light are both electromagneti" (base_conf=0.133, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_12' attached to target 'node_11' with pattern "computers run neural networks" (base_conf=0.272, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_12' to 'node_11' with pattern "computers run neural networks" (base_conf=0.272, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_14' attached to target 'node_13' with pattern "internet carries encrypted packets" (base_conf=0.05, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_14' to 'node_13' with pattern "internet carries encrypted packets" (base_conf=0.05, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_20' attached to target 'node_19' with pattern "meaning shapes ethics" (base_conf=0.15, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_20' to 'node_19' with pattern "meaning shapes ethics" (base_conf=0.15, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_24' attached to target 'node_23' with pattern "simulation theory fails basic logic" (base_conf=0.272, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_24' to 'node_23' with pattern "simulation theory fails basic logic" (base_conf=0.272, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_28' attached to target 'node_27' with pattern "trees line rivers in the forest" (base_conf=0.217, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_28' to 'node_27' with pattern "trees line rivers in the forest" (base_conf=0.217, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_32' attached to target 'node_31' with pattern "fungi help tides of life continue" (base_conf=0.127, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_32' to 'node_31' with pattern "fungi help tides of life continue" (base_conf=0.127, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_36' attached to target 'node_35' with pattern "sleep and food both restore energy" (base_conf=0.323, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_36' to 'node_35' with pattern "sleep and food both restore energy" (base_conf=0.323, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_44' attached to target 'node_43' with pattern "joy and fear are both warnings from the " (base_conf=0.281, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_44' to 'node_43' with pattern "joy and fear are both warnings from the " (base_conf=0.281, 1/4)
+
+Brain > [ENGINE] 🔗  Node 'node_48' attached to target 'node_47' with pattern "love grows calm between two people" (base_conf=0.232, 1/4 slots used).
+🔗 /nodeAttach complete:
+   → Attached 'node_48' to 'node_47' with pattern "love grows calm between two people" (base_conf=0.232, 1/4)
+
+Brain > 🗂  /groupRegister: 'node_3' → 'core_science' (now 1 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_4' → 'core_science' (now 2 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_5' → 'core_science' (now 3 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_8' → 'core_science' (now 4 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_11' → 'core_tech' (now 1 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_12' → 'core_tech' (now 2 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_13' → 'core_tech' (now 3 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_19' → 'core_phil' (now 1 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_22' → 'core_phil' (now 2 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_24' → 'core_phil' (now 3 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_25' → 'core_phil' (now 4 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_26' → 'core_phil' (now 5 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_35' → 'core_life' (now 1 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_36' → 'core_life' (now 2 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_43' → 'core_emotion' (now 1 member(s)).
+
+Brain > 🗂  /groupRegister: 'node_48' → 'core_emotion' (now 2 member(s)).
+
+Brain > 💎 /crystalize: 'node_22' crystalized by user. Frozen against jitter + decay + phagy.
+
+Brain > 💎 /crystalize: 'node_25' crystalized by user. Frozen against jitter + decay + phagy.
+
+Brain > 💎 /crystalize: 'node_26' crystalized by user. Frozen against jitter + decay + phagy.
+
+Brain > 💎 /crystalize: 'node_48' crystalized by user. Frozen against jitter + decay + phagy.
+
+Brain > ✅  /aimlAdd: Created AIML node 'sci_greeter' in lobe 'science' with strength 4.9766005534055155
+
+Brain > ✅  /aimlAdd: Created AIML node 'tech_greeter' in lobe 'technology' with strength 5.090719332933522
+
+Brain > ✅  /aimlAdd: Created AIML node 'phil_greeter' in lobe 'philosophy' with strength 5.115254964984653
+
+Brain > ✅  /aimlAdd: Created AIML node 'nat_greeter' in lobe 'nature' with strength 4.958006618287497
+
+Brain > ✅  /aimlAdd: Created AIML node 'life_greeter' in lobe 'daily_life' with strength 4.886868082633478
+
+Brain > ✅  /aimlAdd: Created AIML node 'emo_greeter' in lobe 'emotions' with strength 5.017443326249563
+
+Brain > --> Grug freezing entire cave to specimen file...
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : test_run/grug_seeded.specimen.gz
+  📦  JSON size        : 163355 bytes
+  🗜️   Compressed size  : 25445 bytes (84.4% smaller)
+  ⏱️   Time             : 0.39s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 51
+  🧠  Lobes            : 6
+  📋  Lobe tables      : 6
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 7
+  💬  Messages         : 39
+  🔧  Verb classes     : 7
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 3
+  🔗  Attachments      : 12
+  🔮  Trajectory entries : 0
+  🕐  Temporal coherence : 0
+  ⏳  Morph cooldowns    : 0
+  🤖  AIML nodes       : 6
+  👁   Arousal          : 0.3
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > ╔══════════════════════════════════════════════════╗
+║              GRUGBOT SYSTEM STATUS               ║
+╠══════════════════════════════════════════════════╣
+║  ENGINE                                          ║
+  Nodes in cave   : 51
+  Hopfield cache  : 0 entries
+  Memory messages : 40
+  Est. memory use : ~70 KB
+  Trajectory buf  : 0 entries
+  Temporal coher  : 0 entries
+  Morph cooldowns : 0 active
+  Current arousal : 0.3
+  Last input ago  : 0.0s
+║  LOBES                                           ║
+  Lobes registered: 6
+  Nodes in lobes  : 48
+  Top lobe (fires): emotions (0 fires)
+║  BRAINSTEM                                       ║
+  Dispatches run  : 0
+  Last winner     : none
+  Propagations    : 0
+  Is dispatching  : false
+║  CHATTER                                         ║
+  Chatter running : false
+  Input queue     : 0 pending
+  Sessions run    : 0
+║  AIML NODE TRIBES                                ║
+=== AIML NODE TRIBES (cycle=0) ===
+  daily_life | pop=1/6666 | live=1 | grave=0
+  emotions | pop=1/6666 | live=1 | grave=0
+  nature | pop=1/6666 | live=1 | grave=0
+  philosophy | pop=1/6666 | live=1 | grave=0
+  science | pop=1/6666 | live=1 | grave=0
+  technology | pop=1/6666 | live=1 | grave=0
+╚══════════════════════════════════════════════════╝
+
+Brain > === LOBE REGISTRY (6 lobes, 48 nodes indexed) ===
+  daily_life | subject='food sleep work home and routine' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[emotions,nature] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  emotions | subject='feelings moods and social bonds' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  nature | subject='plants animals weather and ecosystems' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life,philosophy] | tbl[nodes=8 json=19 drop=40 hopf=0]
+  philosophy | subject='meaning ethics logic and existence' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[nature,science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  science | subject='scientific concepts and the natural laws' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[philosophy,technology] | tbl[nodes=8 json=24 drop=40 hopf=0]
+  technology | subject='computers software hardware networks and engineering' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+
+Brain > ┌── GROUP REGISTRY STATUS ─────────────────────────────────────
+│  Groups        : 5
+│  Members total : 16
+│  Graves total  : 0
+│  Unlinkable    : 0
+│  Window range  : [100,400]
+│  Partner cap   : [8,16]
+└──────────────────────────────────────────────────────────────
+  Group IDs: core_science, core_tech, core_phil, core_life, core_emotion
+
+Brain > 💎 /crystalizeList: 4 node(s) crystalized.
+    node_22, node_25, node_26, node_48
+
+Brain > === SEMANTIC VERB REGISTRY ===
+  [causal]: causes, contradicts, hits, increases, makes, reduces, routes
+  [describe]: describe, narrate, recount
+  [empathize]: empathize, relate, understand
+  [explain]: clarify, elaborate, explain
+  [reflect]: consider, ponder, reflect
+  [spatial]: are, connects, is, was, were
+  [temporal]: chasing, follows, precedes
+  --- Synonyms ---
+    contemplate → reflect
+    expound → explain
+    portray → describe
+    sympathize → empathize
+
+Brain > === ATTACHMENT MAP (12 targets with attachments) ===
+  🎯 node_11 (1/4 attached):
+      🔗 node_12 [ALIVE str=1.0] | base_conf=0.272 | connector="computers run neural networks"
+  🎯 node_13 (1/4 attached):
+      🔗 node_14 [ALIVE str=1.0] | base_conf=0.05 | connector="internet carries encrypted packets"
+  🎯 node_19 (1/4 attached):
+      🔗 node_20 [ALIVE str=1.0] | base_conf=0.15 | connector="meaning shapes ethics"
+  🎯 node_23 (1/4 attached):
+      🔗 node_24 [ALIVE str=1.0] | base_conf=0.272 | connector="simulation theory fails basic logic"
+  🎯 node_27 (1/4 attached):
+      🔗 node_28 [ALIVE str=1.0] | base_conf=0.217 | connector="trees line rivers in the forest"
+  🎯 node_3 (1/4 attached):
+      🔗 node_4 [ALIVE str=1.0] | base_conf=0.127 | connector="atoms and gravity both act across s"
+  🎯 node_31 (1/4 attached):
+      🔗 node_32 [ALIVE str=1.0] | base_conf=0.127 | connector="fungi help tides of life continue"
+  🎯 node_35 (1/4 attached):
+      🔗 node_36 [ALIVE str=1.0] | base_conf=0.323 | connector="sleep and food both restore energy"
+  🎯 node_43 (1/4 attached):
+      🔗 node_44 [ALIVE str=1.0] | base_conf=0.281 | connector="joy and fear are both warnings from"
+  🎯 node_47 (1/4 attached):
+      🔗 node_48 [ALIVE str=1.0] | base_conf=0.232 | connector="love grows calm between two people"
+  🎯 node_5 (1/4 attached):
+      🔗 node_6 [ALIVE str=1.0] | base_conf=0.05 | connector="dna mutation drives evolution"
+  🎯 node_7 (1/4 attached):
+      🔗 node_8 [ALIVE str=1.0] | base_conf=0.133 | connector="energy and light are both electroma"
+
+Brain > [GRUG] 👋 /quit received. Cave closes. Goodbye.

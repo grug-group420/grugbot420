@@ -691,7 +691,7 @@ function sdf_to_signal(params::SDFParams; max_samples::Int=256)::Vector{Float64}
     end
     if max_samples <= 0
         throw(ImageSDFError(
-            "!!! FATAL: sdf_to_signal max_samples must be > 0, got $max_samples! !!!"
+            "!!! FATAL: sdf_to_signal max_samples must be > 0, got $(max_samples)! !!!"
         ))
     end
 

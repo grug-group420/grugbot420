@@ -9,9 +9,20 @@
 module Lobe
 
 # GRUG: Load LobeTable before anything else. Lobe needs table ops at creation time.
+# GRUG: CRITICAL --- if the parent scope (GrugBot420 package or Main) already
+# loaded LobeTable, we MUST reuse it. Re-including here creates a second module
+# instance with its own LOBE_TABLE_REGISTRY, so create_lobe! registers a table
+# that no one else can see, and every downstream /lobeGrow explodes with
+# "No table found for lobe 'X'". NO SILENT FAILURE: we look up the parent copy
+# explicitly and only fall back to include when there is no parent copy.
 if !isdefined(@__MODULE__, :LobeTable)
-    include("LobeTable.jl")
-    using .LobeTable
+    parent_mod = parentmodule(@__MODULE__)
+    if (parent_mod !== @__MODULE__) && isdefined(parent_mod, :LobeTable)
+        const LobeTable = getfield(parent_mod, :LobeTable)
+    else
+        include("LobeTable.jl")
+        using .LobeTable
+    end
 end
 
 # ============================================================================

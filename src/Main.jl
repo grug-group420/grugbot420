@@ -46,10 +46,20 @@ if !isdefined(@__MODULE__, :Lobe)
 end
 
 # GRUG: Bring the LobeTable hash storage system into the cave!
-# GRUG: Guard against double-include if LobeTable already loaded by caller.
+# GRUG: CRITICAL --- Lobe.jl already includes LobeTable as its own submodule,
+# and Lobe.create_lobe! writes into THAT submodule's LOBE_TABLE_REGISTRY. If we
+# re-include LobeTable.jl here we end up with TWO separate module instances
+# and two separate registries, and every /lobeGrow fails with
+# "No table found for lobe 'X'. Call create_lobe_table! first." even though
+# /newLobe just registered it in the sibling copy. So we reuse whatever the
+# Lobe module already loaded. NO SILENT FAILURE: if Lobe did not bring it in,
+# we throw instead of quietly including a second copy.
 if !isdefined(@__MODULE__, :LobeTable)
-    include("LobeTable.jl")
-    using .LobeTable
+    if isdefined(Lobe, :LobeTable)
+        const LobeTable = Lobe.LobeTable
+    else
+        error("!!! FATAL: LobeTable not reachable via Lobe submodule --- cannot wire storage backend! !!!")
+    end
 end
 
 # GRUG: Bring the BrainStem winner-take-all dispatcher into the cave!
@@ -1637,7 +1647,14 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         if !isempty(mission_tokens)
             # Walk MESSAGE_HISTORY for pinned entries; pick the first
             # topical one (pinned memory is small — linear scan fine).
-            lock(MESSAGE_LOCK) do
+            # Walk MESSAGE_HISTORY for pinned entries; pick the first
+            # topical one (pinned memory is small --- linear scan fine).
+            # GRUG v7.16 fix: the real lock is MESSAGE_HISTORY_LOCK
+            # (declared around line 317). The previous MESSAGE_LOCK name was
+            # a typo that raised UndefVarError on every synthesis call ---
+            # the catch-and-warn below swallowed it, silently killing
+            # pinned-memory citations. NO SILENT FAIL.
+            lock(MESSAGE_HISTORY_LOCK) do
                 for m in MESSAGE_HISTORY
                     if m.pinned
                         pin_tokens = Set(_tokenize_for_relevance(m.text))
@@ -1874,7 +1891,7 @@ function maybe_convert_image_input(input_text::String)::Tuple{Bool, Vector{Float
         end
 
         if isempty(raw_bytes)
-            error("!!! FATAL: Image decode produced empty byte array for format $fmt! !!!")
+            error("!!! FATAL: Image decode produced empty byte array for format $(fmt)! !!!")
         end
 
         # GRUG: Estimate dimensions from byte count (assume square grayscale as fallback).
@@ -4857,7 +4874,12 @@ elseif !isnothing(m_right)
 
                 n_pairs = length(pair_tokens) ÷ 2
                 if n_pairs > MAX_ATTACHMENTS
-                    error("!!! FATAL: /nodeAttach trying to attach $n_pairs nodes at once, but max is $MAX_ATTACHMENTS! !!!")
+                    # GRUG: Wrap MAX_ATTACHMENTS in $(...) --- bare $NAME! reads
+                    # as identifier "NAME!" and blows up with UndefVarError the
+                    # moment this error path is hit. NO SILENT FAILURE: the
+                    # error is already loud, but it must describe the cap, not
+                    # die in the string interpolator.
+                    error("!!! FATAL: /nodeAttach trying to attach $n_pairs nodes at once, but max is $(MAX_ATTACHMENTS)! !!!")
                 end
 
                 results = String[]

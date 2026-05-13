@@ -930,7 +930,7 @@ end
 
 function record_response_time!(node::Node, elapsed_seconds::Float64)
     if elapsed_seconds < 0.0
-        error("!!! FATAL: record_response_time! got negative elapsed time: $elapsed_seconds! !!!")
+        error("!!! FATAL: record_response_time! got negative elapsed time: $(elapsed_seconds)! !!!")
     end
 
     lock(NODE_LOCK) do

@@ -1,0 +1,143 @@
+/newLobe science scientific concepts and the natural laws
+/newLobe technology computers software hardware networks and engineering
+/newLobe philosophy meaning ethics logic and existence
+/newLobe nature plants animals weather and ecosystems
+/newLobe daily_life food sleep work home and routine
+/newLobe emotions feelings moods and social bonds
+/connectLobes science technology
+/connectLobes philosophy nature
+/connectLobes daily_life emotions
+/connectLobes science philosophy
+/connectLobes nature daily_life
+/lobeGrow science {"pattern": "gravity pulls objects toward earth mass attracts mass", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "physics", "branch": "mechanics", "system_prompt": "Lobe seed node about gravity pulls objects toward earth mass attracts mass."}, "drop_table": ["mass", "force", "attraction", "newton", "einstein"]}
+/lobeGrow science {"pattern": "atoms combine into molecules through chemical bonds", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "chemistry", "scale": "atomic", "system_prompt": "Lobe seed node about atoms combine into molecules through chemical bonds."}, "drop_table": ["atom", "molecule", "bond", "electron", "proton"]}
+/lobeGrow science {"pattern": "dna stores genetic code inside every living cell", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "biology", "scale": "molecular", "system_prompt": "Lobe seed node about dna stores genetic code inside every living cell."}, "drop_table": ["dna", "gene", "cell", "code", "life"]}
+/lobeGrow science {"pattern": "quantum particles behave as both wave and particle", "action_packet": "explain[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"domain": "physics", "branch": "quantum", "system_prompt": "Lobe seed node about quantum particles behave as both wave and particle."}, "drop_table": ["quantum", "wave", "particle", "superposition", "uncertainty"]}
+/lobeGrow science {"pattern": "stars fuse hydrogen into helium and shine light", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "astronomy", "object": "star", "system_prompt": "Lobe seed node about stars fuse hydrogen into helium and shine light."}, "drop_table": ["star", "fusion", "hydrogen", "helium", "light"]}
+/lobeGrow science {"pattern": "evolution selects traits that survive and reproduce", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "biology", "theory": "evolution", "system_prompt": "Lobe seed node about evolution selects traits that survive and reproduce."}, "drop_table": ["evolution", "selection", "species", "darwin", "fitness"]}
+/lobeGrow science {"pattern": "energy cannot be created or destroyed only transformed", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "physics", "branch": "thermodynamics", "system_prompt": "Lobe seed node about energy cannot be created or destroyed only transformed."}, "drop_table": ["energy", "conservation", "thermodynamics", "heat", "work"]}
+/lobeGrow science {"pattern": "light travels as electromagnetic waves at fixed speed", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "physics", "branch": "optics", "system_prompt": "Lobe seed node about light travels as electromagnetic waves at fixed speed."}, "drop_table": ["light", "wave", "electromagnetic", "photon", "speed"]}
+/lobeGrow technology {"pattern": "computers process information using binary logic gates", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "hardware", "system_prompt": "Lobe seed node about computers process information using binary logic gates."}, "drop_table": ["computer", "binary", "logic", "gate", "cpu"]}
+/lobeGrow technology {"pattern": "neural networks learn patterns from training data", "action_packet": "explain[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"domain": "ai", "system_prompt": "Lobe seed node about neural networks learn patterns from training data."}, "drop_table": ["neural", "network", "learn", "training", "pattern"]}
+/lobeGrow technology {"pattern": "the internet connects computers across the whole world", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "networking", "system_prompt": "Lobe seed node about the internet connects computers across the whole world."}, "drop_table": ["internet", "network", "protocol", "packet", "router"]}
+/lobeGrow technology {"pattern": "code is written in programming languages for machines", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "software", "system_prompt": "Lobe seed node about code is written in programming languages for machines."}, "drop_table": ["code", "language", "program", "compile", "syntax"]}
+/lobeGrow technology {"pattern": "encryption scrambles data using mathematical keys", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "security", "system_prompt": "Lobe seed node about encryption scrambles data using mathematical keys."}, "drop_table": ["encrypt", "key", "cipher", "hash", "security"]}
+/lobeGrow technology {"pattern": "databases store queryable rows of structured data", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "data", "system_prompt": "Lobe seed node about databases store queryable rows of structured data."}, "drop_table": ["database", "query", "row", "table", "sql"]}
+/lobeGrow technology {"pattern": "robots use sensors and motors to act in the world", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "robotics", "system_prompt": "Lobe seed node about robots use sensors and motors to act in the world."}, "drop_table": ["robot", "sensor", "motor", "actuator", "control"]}
+/lobeGrow technology {"pattern": "graphics cards render pixels using parallel math", "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1", "data": {"domain": "graphics", "system_prompt": "Lobe seed node about graphics cards render pixels using parallel math."}, "drop_table": ["gpu", "render", "pixel", "parallel", "shader"]}
+/lobeGrow philosophy {"pattern": "meaning comes from what we choose and what we do", "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1", "data": {"school": "existentialism", "system_prompt": "Lobe seed node about meaning comes from what we choose and what we do."}, "drop_table": ["meaning", "choice", "action", "purpose", "freedom"]}
+/lobeGrow philosophy {"pattern": "ethics asks what actions are right or wrong", "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1", "data": {"branch": "ethics", "system_prompt": "Lobe seed node about ethics asks what actions are right or wrong."}, "drop_table": ["ethics", "moral", "right", "wrong", "virtue"]}
+/lobeGrow philosophy {"pattern": "knowledge requires justified true belief", "action_packet": "ponder[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"branch": "epistemology", "system_prompt": "Lobe seed node about knowledge requires justified true belief."}, "drop_table": ["knowledge", "belief", "truth", "justify", "evidence"]}
+/lobeGrow philosophy {"pattern": "consciousness may be fundamental not derived", "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1", "data": {"branch": "mind", "system_prompt": "Lobe seed node about consciousness may be fundamental not derived."}, "drop_table": ["consciousness", "mind", "qualia", "experience", "awareness"]}
+/lobeGrow philosophy {"pattern": "logic chains premises into valid conclusions", "action_packet": "ponder[dont ignore]^2 | analyze[dont ignore]^1", "data": {"branch": "logic", "system_prompt": "Lobe seed node about logic chains premises into valid conclusions."}, "drop_table": ["logic", "premise", "conclusion", "valid", "sound"]}
+/lobeGrow philosophy {"pattern": "simulation theory confuses map with territory", "action_packet": "ponder[dont ignore]^3 | analyze[dont ignore]^2 | caution[dont ignore]^1", "data": {"stance": "skeptical", "system_prompt": "Lobe seed node about simulation theory confuses map with territory."}, "drop_table": ["simulation", "map", "territory", "proof", "unfalsifiable"]}
+/lobeGrow philosophy {"pattern": "biology cannot be guardrailed only evolved", "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1", "data": {"stance": "anti-metric", "system_prompt": "Lobe seed node about biology cannot be guardrailed only evolved."}, "drop_table": ["biology", "guardrail", "evolution", "imperfection", "adaptation"]}
+/lobeGrow philosophy {"pattern": "every AI paradigm describes one biological mechanism", "action_packet": "ponder[dont ignore]^2 | reason[dont ignore]^1", "data": {"stance": "unified", "system_prompt": "Lobe seed node about every AI paradigm describes one biological mechanism."}, "drop_table": ["paradigm", "mechanism", "unified", "bio-analog", "coexist"]}
+/lobeGrow nature {"pattern": "trees breathe carbon and grow tall in forests", "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1", "data": {"kingdom": "plantae", "system_prompt": "Lobe seed node about trees breathe carbon and grow tall in forests."}, "drop_table": ["tree", "forest", "carbon", "oxygen", "photosynthesis"]}
+/lobeGrow nature {"pattern": "rivers flow from mountains down to the sea", "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1", "data": {"feature": "water", "system_prompt": "Lobe seed node about rivers flow from mountains down to the sea."}, "drop_table": ["river", "mountain", "sea", "flow", "watershed"]}
+/lobeGrow nature {"pattern": "birds build nests and sing at sunrise", "action_packet": "describe[dont ignore]^1", "data": {"kingdom": "animalia", "class": "aves", "system_prompt": "Lobe seed node about birds build nests and sing at sunrise."}, "drop_table": ["bird", "nest", "song", "feather", "flight"]}
+/lobeGrow nature {"pattern": "weather patterns shift with the seasons", "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1", "data": {"domain": "atmosphere", "system_prompt": "Lobe seed node about weather patterns shift with the seasons."}, "drop_table": ["weather", "season", "rain", "wind", "climate"]}
+/lobeGrow nature {"pattern": "mushrooms connect forests through fungal networks", "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1", "data": {"kingdom": "fungi", "system_prompt": "Lobe seed node about mushrooms connect forests through fungal networks."}, "drop_table": ["mushroom", "fungus", "mycelium", "network", "symbiosis"]}
+/lobeGrow nature {"pattern": "ocean tides rise and fall by lunar pull", "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1", "data": {"feature": "ocean", "system_prompt": "Lobe seed node about ocean tides rise and fall by lunar pull."}, "drop_table": ["ocean", "tide", "moon", "gravity", "wave"]}
+/lobeGrow nature {"pattern": "bees pollinate flowers and make honey", "action_packet": "describe[dont ignore]^1", "data": {"kingdom": "animalia", "order": "hymenoptera", "system_prompt": "Lobe seed node about bees pollinate flowers and make honey."}, "drop_table": ["bee", "flower", "pollen", "honey", "hive"]}
+/lobeGrow nature {"pattern": "wolves hunt in coordinated family packs", "action_packet": "describe[dont ignore]^1", "data": {"kingdom": "animalia", "class": "mammalia", "system_prompt": "Lobe seed node about wolves hunt in coordinated family packs."}, "drop_table": ["wolf", "pack", "hunt", "family", "predator"]}
+/lobeGrow daily_life {"pattern": "sleep restores mind and body every night", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"domain": "health", "system_prompt": "Lobe seed node about sleep restores mind and body every night."}, "drop_table": ["sleep", "rest", "night", "dream", "recovery"]}
+/lobeGrow daily_life {"pattern": "food gives energy and tastes good when fresh", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"domain": "nutrition", "system_prompt": "Lobe seed node about food gives energy and tastes good when fresh."}, "drop_table": ["food", "meal", "energy", "taste", "fresh"]}
+/lobeGrow daily_life {"pattern": "coffee wakes the brain with caffeine in the morning", "action_packet": "describe[dont ignore]^1", "data": {"drink": "coffee", "system_prompt": "Lobe seed node about coffee wakes the brain with caffeine in the morning."}, "drop_table": ["coffee", "caffeine", "morning", "wake", "brew"]}
+/lobeGrow daily_life {"pattern": "walking outside clears the head and feels good", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"activity": "walking", "system_prompt": "Lobe seed node about walking outside clears the head and feels good."}, "drop_table": ["walk", "outside", "exercise", "fresh", "clear"]}
+/lobeGrow daily_life {"pattern": "work is where most hours of the week go", "action_packet": "describe[dont ignore]^1", "data": {"domain": "work", "system_prompt": "Lobe seed node about work is where most hours of the week go."}, "drop_table": ["work", "job", "hours", "career", "task"]}
+/lobeGrow daily_life {"pattern": "cooking at home is cheaper and often healthier", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"activity": "cooking", "system_prompt": "Lobe seed node about cooking at home is cheaper and often healthier."}, "drop_table": ["cook", "home", "cheap", "healthy", "kitchen"]}
+/lobeGrow daily_life {"pattern": "reading books grows the mind slowly", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"activity": "reading", "system_prompt": "Lobe seed node about reading books grows the mind slowly."}, "drop_table": ["read", "book", "mind", "grow", "slow"]}
+/lobeGrow daily_life {"pattern": "music makes tasks feel lighter and time fly", "action_packet": "describe[dont ignore]^1", "data": {"activity": "music", "system_prompt": "Lobe seed node about music makes tasks feel lighter and time fly."}, "drop_table": ["music", "song", "rhythm", "mood", "flow"]}
+/lobeGrow emotions {"pattern": "joy rises when good things happen to friends", "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1", "data": {"valence": "positive", "system_prompt": "Lobe seed node about joy rises when good things happen to friends."}, "drop_table": ["joy", "happy", "friend", "smile", "celebrate"]}
+/lobeGrow emotions {"pattern": "fear warns the body of danger nearby", "action_packet": "describe[dont ignore]^2 | warn[dont ignore]^1", "data": {"valence": "negative", "system_prompt": "Lobe seed node about fear warns the body of danger nearby."}, "drop_table": ["fear", "danger", "alarm", "flee", "freeze"]}
+/lobeGrow emotions {"pattern": "anger burns when boundaries are crossed", "action_packet": "describe[dont ignore]^1", "data": {"valence": "negative", "system_prompt": "Lobe seed node about anger burns when boundaries are crossed."}, "drop_table": ["anger", "rage", "boundary", "injustice", "fire"]}
+/lobeGrow emotions {"pattern": "sadness asks the heart to slow and rest", "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1", "data": {"valence": "negative", "system_prompt": "Lobe seed node about sadness asks the heart to slow and rest."}, "drop_table": ["sad", "grief", "loss", "quiet", "slow"]}
+/lobeGrow emotions {"pattern": "curiosity pulls the mind toward new things", "action_packet": "describe[dont ignore]^2 | support[dont ignore]^1", "data": {"valence": "positive", "system_prompt": "Lobe seed node about curiosity pulls the mind toward new things."}, "drop_table": ["curious", "new", "explore", "question", "wonder"]}
+/lobeGrow emotions {"pattern": "love binds people across years and distance", "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1", "data": {"valence": "positive", "system_prompt": "Lobe seed node about love binds people across years and distance."}, "drop_table": ["love", "bond", "family", "friend", "distance"]}
+/lobeGrow emotions {"pattern": "calm comes from breath and slow attention", "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1", "data": {"valence": "neutral", "system_prompt": "Lobe seed node about calm comes from breath and slow attention."}, "drop_table": ["calm", "breath", "attention", "peace", "slow"]}
+/lobeGrow emotions {"pattern": "trust grows slow and breaks fast", "action_packet": "describe[dont ignore]^1", "data": {"valence": "positive", "system_prompt": "Lobe seed node about trust grows slow and breaks fast."}, "drop_table": ["trust", "slow", "break", "faith", "betray"]}
+/addRelationClass explain
+/addRelationClass describe
+/addRelationClass reflect
+/addRelationClass empathize
+/addVerb elaborate explain
+/addVerb clarify explain
+/addVerb recount describe
+/addVerb narrate describe
+/addVerb consider reflect
+/addVerb ponder reflect
+/addVerb relate empathize
+/addVerb understand empathize
+/addVerb explain explain
+/addVerb describe describe
+/addVerb reflect reflect
+/addVerb empathize empathize
+/addSynonym explain expound
+/addSynonym describe portray
+/addSynonym reflect contemplate
+/addSynonym empathize sympathize
+/addRule When {MISSION} activates, favor {PRIMARY_ACTION} but keep {SURE_ACTIONS} ready. [prob=1.0]
+/addRule Confidence level {CONFIDENCE} shapes the tone of {PRIMARY_ACTION}. [prob=0.9]
+/addRule If {VOTE_CERTAINTY} is UNSURE, mention {TIED_ALTERNATIVES} as options. [prob=0.85]
+/addRule Anchor answer in {LOBE_CONTEXT} when lobes fire together. [prob=0.8]
+/addRule Pull from {MEMORY} only when mission asks about past. [prob=0.7]
+/addRule Node {NODE_ID} is the primary voice; let {ALL_ACTIONS} support it. [prob=0.6]
+/addRule Unsure votes go into {UNSURE_ACTIONS} for soft hedging. [prob=0.5]
+/pin grug believes biology cannot be guardrailed only evolved
+/pin transformers are one organ not the whole body of intelligence
+/pin stochastic resonance is the ubiquitous jitter with snap back
+/pin llms should be architects not oracles generating structure not answers
+/pin every ai camp discovered one biological mechanism and they all belong together
+/pin simulation theory is unfalsifiable and confuses map with territory
+/negativeThesaurus add spam --reason generic inbox pollution word
+/negativeThesaurus add clickbait --reason shallow attention hook
+/negativeThesaurus add propaganda --reason manipulative one-sided framing
+/thesaurus water | fire
+/thesaurus knowledge | wisdom
+/nodeAttach node_3 node_4 "atoms and gravity both act across space"
+/nodeAttach node_5 node_6 "dna mutation drives evolution"
+/nodeAttach node_7 node_8 "energy and light are both electromagnetic"
+/nodeAttach node_11 node_12 "computers run neural networks"
+/nodeAttach node_13 node_14 "internet carries encrypted packets"
+/nodeAttach node_19 node_20 "meaning shapes ethics"
+/nodeAttach node_23 node_24 "simulation theory fails basic logic"
+/nodeAttach node_27 node_28 "trees line rivers in the forest"
+/nodeAttach node_31 node_32 "fungi help tides of life continue"
+/nodeAttach node_35 node_36 "sleep and food both restore energy"
+/nodeAttach node_43 node_44 "joy and fear are both warnings from the body"
+/nodeAttach node_47 node_48 "love grows calm between two people"
+/groupRegister core_science node_3
+/groupRegister core_science node_4
+/groupRegister core_science node_5
+/groupRegister core_science node_8
+/groupRegister core_tech node_11
+/groupRegister core_tech node_12
+/groupRegister core_tech node_13
+/groupRegister core_phil node_19
+/groupRegister core_phil node_22
+/groupRegister core_phil node_24
+/groupRegister core_phil node_25
+/groupRegister core_phil node_26
+/groupRegister core_life node_35
+/groupRegister core_life node_36
+/groupRegister core_emotion node_43
+/groupRegister core_emotion node_48
+/crystalize node_22
+/crystalize node_25
+/crystalize node_26
+/crystalize node_48
+/aimlAdd science sci_greeter HELLO you asked about {MISSION} in science lobe. My primary action is {PRIMARY_ACTION} with confidence {CONFIDENCE}.
+/aimlAdd technology tech_greeter In the tech lobe {MISSION} triggers {PRIMARY_ACTION}. Tied alternatives {TIED_ALTERNATIVES}.
+/aimlAdd philosophy phil_greeter Philosophy lobe heard {MISSION}. I {PRIMARY_ACTION} drawing on {LOBE_CONTEXT}.
+/aimlAdd nature nat_greeter In nature {MISSION} is answered by {PRIMARY_ACTION}. Memory says {MEMORY}.
+/aimlAdd daily_life life_greeter Daily life lobe on {MISSION}: {PRIMARY_ACTION}. All actions {ALL_ACTIONS}.
+/aimlAdd emotions emo_greeter Emotion lobe feels {MISSION}. Tone {PRIMARY_ACTION}. Vote certainty {VOTE_CERTAINTY}.
+/saveSpecimen test_run/grug_seeded.specimen.gz
+/status
+/lobes
+/groupStatus
+/crystalizeList
+/listVerbs
+/attachments
+/quit

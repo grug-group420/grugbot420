@@ -1493,7 +1493,7 @@ function restart_worker!(pool::ImmunePool, worker_id::Int, immune_module)
     old_worker = pool.workers[worker_id]
 
     if old_worker.alive[]
-        error("!!! FATAL: restart_worker! called on still-alive worker #$worker_id! Kill it first. !!!")
+        error("!!! FATAL: restart_worker! called on still-alive worker #$(worker_id)! Kill it first. !!!")
     end
 
     # GRUG: Close old inbox, create new worker

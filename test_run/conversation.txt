@@ -1,0 +1,31 @@
+/loadSpecimen test_run/grug_seeded.specimen.gz
+/lobes
+/mission tell me about gravity and how it works
+/mission what are atoms made of
+/mission explain how dna stores genetic information
+/mission how do neural networks learn from data
+/mission what does encryption protect
+/mission is simulation theory a real proof of anything
+/mission what does it mean for biology to be guardrailed
+/mission why do bees make honey
+/mission how do tides move the ocean
+/mission what restores the body after a long day
+/mission why does coffee wake me up in the morning
+/mission what is joy and when does it come
+/mission when does fear warn us of danger
+/mission how is trust built between two people
+/mission what is consciousness really
+/mission how does evolution select traits
+/mission explain why light travels as an electromagnetic wave
+/right
+/mission the sun is a giant fusion engine right
+/wrong
+/brainstorm give me a weird connection between dna and the internet
+/status
+/lobes
+/nodes
+/groupStatus
+/crystalizeList
+/attachments
+/listVerbs
+/quit
