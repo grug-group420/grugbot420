@@ -95,7 +95,41 @@ const AIML_SUPPORT_RELATION_FLOOR = 2
 
 # GRUG: How close to max confidence to be "top". Votes within this window of
 # the max confidence are the "top tier" and ALWAYS picked. No coinflip.
+#
+# GRUG v7.16.3: This constant is RE-SCOPED -- it no longer decides which
+# votes enter the top band (that's now `AIML_TOP_LOCKIN_FLOOR` below). Instead,
+# this window is used ONLY by the tie-break step inside the orchestrator:
+# among all top-tier lock-ins, votes within this confidence-window of the
+# argmax-primary count as "tied alternatives" (drives UNSURE certainty in
+# the AIML payload). Votes in the top tier but outside the window are
+# still primary-strength claims, they just aren't "tied" with the primary.
 const AIML_TOP_TIER_WINDOW = 0.05
+
+# GRUG v7.16.3: ABSOLUTE TOP-TIER LOCK-IN FLOOR.
+# Replaces the old "within 0.05 of max" relative gate. A vote enters TOP tier
+# when its COMBINED SCORE (confidence + semantic_weight * linkage_to_peers)
+# meets or exceeds this floor. Simple questions: only high-confidence votes
+# lock in, just like before. Complex questions: multiple strong peers can all
+# lock in together, because the linkage bonus lifts borderline-confidence
+# votes that are semantically tied to the cluster. See Main.jl
+# `_combined_lockin_score` for the exact formula.
+const AIML_TOP_LOCKIN_FLOOR = 0.50
+
+# GRUG v7.16.3: SEMANTIC WEIGHT for the combined lock-in score.
+# combined = confidence + AIML_SEMANTIC_WEIGHT * normalized_linkage_field
+# A weight of 0.15 means the semantic linkage axis can contribute up to 0.15
+# toward crossing the lock-in floor. Tunable; 0.15 was chosen so a quiet
+# well-linked vote (conf ~0.35, linkage 1.0) just crosses at 0.50, while
+# confidence alone at 0.50 always locks regardless of linkage.
+const AIML_SEMANTIC_WEIGHT = 0.15
+
+# GRUG v7.16.3: NORMALIZATION DIVISOR for relation_score linkage.
+# Max possible raw relation_score is roughly 12 (see Main.jl relation_score
+# docstring: group+3 + attach+3 + same-lobe+2 + triples+2 + action-class+1 +
+# pattern-class+1 = 12). We divide the measured max-linkage by this to get
+# a normalized value in [0.0, 1.0] before weighting. If the scoring axes are
+# ever extended, BUMP THIS so the weighting stays calibrated.
+const AIML_RELATION_SCORE_MAX = 12
 
 # GRUG: Coinflip base + strength bonus for sub-top votes within threshold.
 # Mirrors engine.jl strength_biased_scan_coinflip formula so behavior is consistent.
@@ -761,6 +795,7 @@ export VoteOrchestratorError, TaskTimeoutError
 export ACTIVE_FIRE_CAP, FIRE_BATCH_SIZE
 export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW, AIML_SUPPORT_FLOOR
 export AIML_SUPPORT_RELATION_FLOOR
+export AIML_TOP_LOCKIN_FLOOR, AIML_SEMANTIC_WEIGHT, AIML_RELATION_SCORE_MAX
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
 export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
 

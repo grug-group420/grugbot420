@@ -1358,6 +1358,225 @@ function relation_score(primary::Vote, primary_node::Node,
     return (score = score, reasons = reasons)
 end
 
+# =========================================================================
+# GRUG v7.16.3: ABSOLUTE LOCK-IN FLOOR WITH SEMANTIC WEIGHTING
+# =========================================================================
+# Old behavior (v7.16.0-v7.16.2): top tier = votes within AIML_TOP_TIER_WINDOW
+# (0.05) of the max confidence. Problem: on complex questions, 5+ genuinely
+# strong votes at 0.80/0.75/0.72/0.70/0.68 got artificially capped -- only
+# the first 2 joined top, the rest got pushed into support or hedge despite
+# being primary-strength claims.
+#
+# New behavior: top tier = votes whose COMBINED SCORE meets an absolute
+# floor (AIML_TOP_LOCKIN_FLOOR, 0.50). Combined score weighs BOTH confidence
+# AND semantic linkage to the other strong peers:
+#
+#   combined = confidence + AIML_SEMANTIC_WEIGHT * (max_linkage / AIML_RELATION_SCORE_MAX)
+#
+# This does two things at once:
+#   (1) Simple questions: one loud vote wins. combined ~= confidence. Pure
+#       threshold gate, same as just raising the confidence bar.
+#   (2) Complex questions: a cluster of strong+linked votes all lock in
+#       together. A vote at 0.42 confidence with max linkage (12/12) gets
+#       0.42 + 0.15*1.0 = 0.57 combined -> locks in. A vote at 0.55 with
+#       zero linkage gets 0.55 combined -> still locks in (high confidence
+#       alone is enough).
+#
+# The tie-window (0.05) is STILL used, but only for the tie-break step that
+# picks the single primary from the top tier -- votes within the window of
+# the primary become "tied alternatives" (drives UNSURE certainty). Top-tier
+# votes outside the window are primary-strength but not tied.
+#
+# Relation gate still applies only to support band -- top-tier votes are
+# primary-strength by definition, they don't need to pass the relation gate.
+# =========================================================================
+
+"""
+    _compute_linkage_field(candidate_vote, candidate_node, peer_votes)
+
+GRUG v7.16.3: Compute the semantic linkage of a candidate vote to its
+strong peers. The "linkage field" is the maximum relation_score earned
+between this candidate and any peer (excluding the candidate itself).
+
+Returns a NORMALIZED linkage in [0.0, 1.0] by dividing the max raw score
+by AIML_RELATION_SCORE_MAX. Zero linkage (no peer, or no earned points)
+returns 0.0. Self-matches are skipped via the node_id check.
+
+Peers are expected to be votes that already cleared AIML_SUPPORT_FLOOR
+(0.35) -- no point measuring linkage against weak voices.
+"""
+function _compute_linkage_field(candidate_vote::Vote,
+                                candidate_node::Node,
+                                peer_votes::Vector{Vote})::Float64
+    max_raw = 0
+    for peer in peer_votes
+        # GRUG: Self-linkage is meaningless, skip. Also skip if the peer
+        # node vanished between scan and this orchestration step -- that's
+        # warned, not fatal, because the cycle can still proceed.
+        peer.node_id == candidate_vote.node_id && continue
+        peer_node = lock(() -> get(NODE_MAP, peer.node_id, nothing), NODE_LOCK)
+        if peer_node === nothing
+            @warn "[_compute_linkage_field v7.16.3] Peer node '$(peer.node_id)' vanished during linkage scan; skipping this peer."
+            continue
+        end
+        try
+            rs = relation_score(candidate_vote, candidate_node, peer, peer_node)
+            if rs.score > max_raw
+                max_raw = rs.score
+            end
+        catch e
+            # GRUG: A relation_score crash on one peer must not kill the
+            # whole linkage check. Warn and move on -- the max just gets
+            # computed from the remaining peers.
+            @warn "[_compute_linkage_field v7.16.3] relation_score threw for peer '$(peer.node_id)' ($e); skipping this peer."
+        end
+    end
+    # GRUG: Normalize to [0.0, 1.0]. Clamp in case the raw score ever
+    # exceeds AIML_RELATION_SCORE_MAX (e.g. if scoring axes are added
+    # without bumping the divisor) -- we'd rather cap at 1.0 than produce
+    # a combined score that silently overshoots the floor.
+    normalized = max_raw / VoteOrchestrator.AIML_RELATION_SCORE_MAX
+    return normalized > 1.0 ? 1.0 : normalized
+end
+
+"""
+    _combined_lockin_score(confidence, linkage_normalized)
+
+GRUG v7.16.3: Combine confidence and normalized-linkage into the single
+lock-in score. Pure arithmetic, no side effects. Exposed as its own
+function so tests can pin the formula without standing up the full
+orchestrator.
+"""
+function _combined_lockin_score(confidence::Float64, linkage_normalized::Float64)::Float64
+    return confidence + VoteOrchestrator.AIML_SEMANTIC_WEIGHT * linkage_normalized
+end
+
+# GRUG v7.16.3: Per-cycle lock-in telemetry. Map: node_id ->
+# (confidence, linkage_normalized, combined_score, locked_in::Bool).
+# Cleared in the same try/finally as _CURRENT_BAND_INFO. Debug block
+# surfaces per-vote breakdowns so the operator can see WHY a given vote
+# ended up in top vs support.
+const _CURRENT_LOCKIN_SCORES      = Dict{String, NamedTuple{(:conf, :link, :combined, :locked), Tuple{Float64, Float64, Float64, Bool}}}()
+const _CURRENT_LOCKIN_SCORES_LOCK = ReentrantLock()
+
+"""
+    _apply_lockin_promotion(top_votes, support_votes, hedge_votes)
+
+GRUG v7.16.3: Given the confidence-only band split from select_aiml_votes_banded,
+run the combined-score lock-in promotion pass. Every vote whose combined
+score (confidence + 0.15 * max_normalized_linkage) crosses AIML_TOP_LOCKIN_FLOOR
+ends up in the promoted top tier.
+
+Returns a NamedTuple (top, support, lockin_scores, emergency_fallback) where:
+  - top is the promoted top tier (confidence+linkage lock-ins only)
+  - support is the remainder (original support that didn't promote, PLUS
+    any original top vote whose combined score missed the floor -- those
+    get demoted because the old 0.05-window gate is no longer band-defining)
+  - lockin_scores is the per-vote telemetry map (every vote gets an entry)
+  - emergency_fallback is true iff no vote cleared the floor and we had
+    to seed top with the single highest-combined-score vote to keep the
+    cave talking instead of freezing silent
+
+The linkage field is computed against the ORIGINAL top+support union
+(all votes with confidence >= AIML_SUPPORT_FLOOR). Hedge band is never
+promoted -- hedge votes get telemetry but stay out of both top and support.
+NO SILENT PROMOTIONS; NO SILENT DROPS.
+"""
+function _apply_lockin_promotion(top_votes::Vector{Vote},
+                                 support_votes::Vector{Vote},
+                                 hedge_votes::Vector{Vote})
+    # GRUG: The "strong peer" field is original top + support -- everything
+    # above AIML_SUPPORT_FLOOR. Linkage of each candidate is measured against
+    # this field regardless of where the candidate itself lands after promotion.
+    peer_field = vcat(top_votes, support_votes)
+
+    promoted_top     = Vote[]
+    demoted_support  = Vote[]
+    lockin_scores    = Dict{String, NamedTuple{(:conf, :link, :combined, :locked), Tuple{Float64, Float64, Float64, Bool}}}()
+
+    # GRUG: Unified evaluation loop -- every vote in the union gets the
+    # same combined-score check. This makes the rule symmetric: old top
+    # votes can be demoted if their combined misses, and old support
+    # votes can be promoted if their combined clears. One rule, one floor.
+    function _evaluate(v::Vote)
+        cand_node = lock(() -> get(NODE_MAP, v.node_id, nothing), NODE_LOCK)
+        if cand_node === nothing
+            @warn "[_apply_lockin_promotion v7.16.3] Vote '$(v.node_id)' vanished during promotion scan; recording conf-only score and leaving unclassified."
+            lockin_scores[v.node_id] = (conf = v.confidence, link = 0.0, combined = v.confidence, locked = false)
+            return nothing  # don't place in either band; caller decides
+        end
+        link = _compute_linkage_field(v, cand_node, peer_field)
+        combined = _combined_lockin_score(v.confidence, link)
+        locked = combined >= VoteOrchestrator.AIML_TOP_LOCKIN_FLOOR
+        lockin_scores[v.node_id] = (conf = v.confidence, link = link, combined = combined, locked = locked)
+        return locked
+    end
+
+    for v in top_votes
+        res = _evaluate(v)
+        if res === true
+            push!(promoted_top, v)
+        elseif res === false
+            # GRUG: Old relative-window gate put this in top, but the
+            # absolute floor says it's support-grade at best. Demote.
+            push!(demoted_support, v)
+        end
+        # GRUG: res === nothing (vanished node) -- skip entirely, loud warn
+        # above covered it.
+    end
+
+    for v in support_votes
+        res = _evaluate(v)
+        if res === true
+            push!(promoted_top, v)
+        elseif res === false
+            push!(demoted_support, v)
+        end
+    end
+
+    # GRUG: Hedge votes get telemetry (honest accounting) but never land
+    # in top or support. Mark them locked=false always.
+    for v in hedge_votes
+        lockin_scores[v.node_id] = (conf = v.confidence, link = 0.0, combined = v.confidence, locked = false)
+    end
+
+    # GRUG: Emergency fallback -- if nothing cleared the floor, pick the
+    # single highest-combined vote from whatever we have so the cave
+    # always answers. Marked locked=false in telemetry so debug shows
+    # it was a fallback pick, not a genuine lock-in.
+    emergency_fallback = false
+    if isempty(promoted_top)
+        all_candidates = vcat(demoted_support, top_votes, support_votes)
+        # GRUG: de-duplicate by node_id (top_votes and support_votes are already
+        # in demoted_support after the first loop; union gives us everything).
+        seen = Set{String}()
+        uniq = Vote[]
+        for v in all_candidates
+            if !(v.node_id in seen)
+                push!(uniq, v)
+                push!(seen, v.node_id)
+            end
+        end
+        if !isempty(uniq)
+            # GRUG: Pick the vote with the highest combined score from
+            # lockin_scores (falling back to confidence if no score exists,
+            # which shouldn't happen but NO SILENT FAILURES).
+            best = argmax(v -> get(lockin_scores, v.node_id,
+                                    (conf = v.confidence, link = 0.0,
+                                     combined = v.confidence, locked = false)).combined,
+                          uniq)
+            push!(promoted_top, best)
+            # GRUG: Remove the emergency pick from demoted_support so it
+            # isn't in both bands.
+            filter!(v -> v.node_id != best.node_id, demoted_support)
+            emergency_fallback = true
+        end
+    end
+
+    return (top = promoted_top, support = demoted_support,
+            lockin_scores = lockin_scores, emergency_fallback = emergency_fallback)
+end
+
 # GRUG v7.16.0: CURRENT-CYCLE BAND INFO.
 # The banded orchestrator produces three bands (top / support / hedge). The
 # COMMANDS dispatcher signature is fixed historically at (mission, node,
@@ -1765,6 +1984,24 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     support_votes = Vote[candidate_to_vote[vc.node_id] for vc in support_tier]
     hedge_votes   = Vote[candidate_to_vote[vc.node_id] for vc in hedge_tier]
 
+    # GRUG v7.16.3: ABSOLUTE LOCK-IN PROMOTION PASS.
+    # select_aiml_votes_banded did a pure-confidence split (top = within
+    # AIML_TOP_TIER_WINDOW of max). Now re-score every vote with the
+    # combined confidence + semantic-linkage formula. Votes whose combined
+    # score crosses AIML_TOP_LOCKIN_FLOOR (0.50) end up in top; anything
+    # else (including old-style top votes that miss the absolute floor)
+    # gets demoted to support. Emergency fallback kicks in if nothing
+    # crosses -- the highest-combined vote is pushed into top so the
+    # cave always answers instead of freezing silent.
+    promotion_result = _apply_lockin_promotion(sure_votes, support_votes, hedge_votes)
+    sure_votes          = promotion_result.top
+    support_votes       = promotion_result.support
+    lockin_scores       = promotion_result.lockin_scores
+    emergency_fallback  = promotion_result.emergency_fallback
+    if emergency_fallback
+        @warn "[ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=$(VoteOrchestrator.AIML_TOP_LOCKIN_FLOOR). Emergency fallback: promoted highest-combined vote '$(sure_votes[1].node_id)' to keep cave talking."
+    end
+
     if isempty(sure_votes)
         # GRUG: Should be mathematically impossible after fallback, but NO SILENT FAILURES!
         error("!!! FATAL: Grug math broke! Top tier produced zero sure votes even after fallback! !!!")
@@ -1848,6 +2085,12 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
         empty!(_CURRENT_SUPPORT_STITCHES)
     end
+    # GRUG v7.16.3: Stash lock-in scores for the debug block. Cleared
+    # in the orchestrator try/finally alongside the other side-channels.
+    lock(_CURRENT_LOCKIN_SCORES_LOCK) do
+        empty!(_CURRENT_LOCKIN_SCORES)
+        merge!(_CURRENT_LOCKIN_SCORES, lockin_scores)
+    end
 
     # GRUG v7.16.1: unsure_votes (passed into COMMANDS) now bundles ALL non-top
     # bands so `generate_aiml_payload` can route each via band_of() to the
@@ -1870,6 +2113,10 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         # GRUG v7.16.2: Clear stitch telemetry too -- NO SILENT LEAKS.
         lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
             empty!(_CURRENT_SUPPORT_STITCHES)
+        end
+        # GRUG v7.16.3: Clear lock-in score telemetry on cycle exit.
+        lock(_CURRENT_LOCKIN_SCORES_LOCK) do
+            empty!(_CURRENT_LOCKIN_SCORES)
         end
     end
 
@@ -2484,6 +2731,29 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         println(payload_io, "Support Stitches (v7.16.2 composition-roll):")
         for (nid, stitch_name) in stitch_snapshot
             println(payload_io, "  - $nid -> $stitch_name")
+        end
+    end
+    # GRUG v7.16.3: Show lock-in breakdown -- confidence, normalized
+    # linkage, combined score, and whether the vote locked in to top.
+    # Makes the promotion pass completely auditable: operator can see
+    # exactly why a borderline-confidence vote got promoted, or why a
+    # slightly-lower-confidence vote stayed in support despite linkage.
+    lockin_snapshot = lock(_CURRENT_LOCKIN_SCORES_LOCK) do
+        copy(_CURRENT_LOCKIN_SCORES)
+    end
+    if !isempty(lockin_snapshot)
+        println(payload_io, "Lock-In Scores (floor=$(VoteOrchestrator.AIML_TOP_LOCKIN_FLOOR), w_sem=$(VoteOrchestrator.AIML_SEMANTIC_WEIGHT)):")
+        # GRUG: Sort by combined score descending so the strongest voices
+        # appear first. Stable against insertion order.
+        sorted_ids = sort(collect(keys(lockin_snapshot)),
+                          by = nid -> -lockin_snapshot[nid].combined)
+        for nid in sorted_ids
+            entry = lockin_snapshot[nid]
+            status = entry.locked ? "LOCKIN" : "      "
+            conf_str     = string(round(entry.conf,     digits=3))
+            link_str     = string(round(entry.link,     digits=3))
+            combined_str = string(round(entry.combined, digits=3))
+            println(payload_io, "  - $status $nid conf=$conf_str link=$link_str combined=$combined_str")
         end
     end
     println(payload_io, "Constraints: [$neg_str]")

@@ -63,6 +63,11 @@ const ALL_TESTS = [
     # Confirmed supports get WOVEN into the primary sentence via a
     # weighted random stitch pick from a strictly-gated registry.
     "test_support_composition.jl",
+    # GRUG v7.16.3 --- absolute lock-in floor with semantic weighting.
+    # Top tier membership is now combined(confidence + 0.15 * linkage)
+    # >= 0.50, so complex questions with multiple strong+linked peers
+    # all lock in together instead of only the top 2 via relative window.
+    "test_lockin_floor.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
