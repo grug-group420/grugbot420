@@ -82,6 +82,17 @@ const AIML_CONFIDENCE_THRESHOLD = 0.20
 # compact hedge -- they were not strong enough to stand as their own claim.
 const AIML_SUPPORT_FLOOR = 0.35
 
+# GRUG v7.16.1: RELATION SCORE FLOOR for the support band.
+# Even a loud vote (past SUPPORT_FLOOR) must have a detectable SEMANTIC OR
+# STRUCTURAL LINK to the primary winner before it can lock in as "Grug also
+# sure of". Without a link, a loud vote about an unrelated topic would sneak
+# in as pretend-support -- e.g. primary says "gravity pulls objects" and an
+# unrelated loud vote injects "bees pollinate flowers" as supposed support.
+# That's non-sequitur riding on confidence coattails. This floor demands an
+# actual link. Score below the floor -> demoted to reliability-flagged hedge.
+# See `relation_score` in Main.jl for the scoring weights.
+const AIML_SUPPORT_RELATION_FLOOR = 2
+
 # GRUG: How close to max confidence to be "top". Votes within this window of
 # the max confidence are the "top tier" and ALWAYS picked. No coinflip.
 const AIML_TOP_TIER_WINDOW = 0.05
@@ -749,6 +760,7 @@ end
 export VoteOrchestratorError, TaskTimeoutError
 export ACTIVE_FIRE_CAP, FIRE_BATCH_SIZE
 export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW, AIML_SUPPORT_FLOOR
+export AIML_SUPPORT_RELATION_FLOOR
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
 export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
 

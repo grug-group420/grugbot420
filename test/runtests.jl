@@ -56,6 +56,9 @@ const ALL_TESTS = [
     "test_group_registry_grave_everywhere.jl",
     "test_v15_cli_verbs.jl",
     "test_v15_cli_stdin_smoke.jl",
+    # GRUG v7.16.1 --- relation-gated support band for AIML orchestration.
+    # Proves each axis of relation_score earns points only for real links.
+    "test_support_relation_gate.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

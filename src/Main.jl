@@ -1158,6 +1158,206 @@ function immune_gate(cmd_name::String, input_text::String; is_critical::Bool=tru
     end
 end
 
+# GRUG v7.16.1: RELATION SCORE -- the "is this vote actually related to the
+# primary" gate. Even a loud vote that cleared AIML_SUPPORT_FLOOR must score
+# above AIML_SUPPORT_RELATION_FLOOR here to earn a "Grug also sure of" slot.
+# If it scores too low, it gets DEMOTED to the reliability-flagged hedge band
+# (with an explicit "came in strong but may be off-topic" warning to the user).
+#
+# Scoring (all additive, never negative):
+#   +3  same group (GroupRegistry.partners_for_node)
+#   +3  attachment-pair with primary (one side attached to the other)
+#   +2  same lobe
+#   +1  connected lobe (via /connectLobes)
+#   +1  per shared triple token (subject/object/relation), CAP +2
+#   +1  action appears in same concept class as primary action
+#   +1  any primary pattern token shares a concept class with a candidate pattern token (cap +1)
+#
+# Returns a NamedTuple (score::Int, reasons::Vector{String}) so telemetry can
+# show WHY a support vote locked in (or was demoted). NO SILENT FAILURES --
+# registry lookups are wrapped in try/catch with @warn so a missing subsystem
+# (e.g. GroupRegistry not loaded in a test harness) degrades to zero-score on
+# that axis rather than crashing the orchestrator.
+"""
+    relation_score(primary::Vote, primary_node::Node,
+                   candidate::Vote, candidate_node::Node)::NamedTuple
+
+GRUG v7.16.1: Compute the relation score between a primary winner and a
+support candidate. Returns (score::Int, reasons::Vector{String}).
+Score is used by the orchestrator to gate "Grug also sure of" inclusion.
+"""
+function relation_score(primary::Vote, primary_node::Node,
+                        candidate::Vote, candidate_node::Node)
+    # GRUG: Self-match is meaningless here. Should not happen in practice
+    # (primary is filtered out of support_tier upstream), but guard anyway.
+    if primary.node_id == candidate.node_id
+        return (score = 0, reasons = String["self-match-ignored"])
+    end
+
+    score = 0
+    reasons = String[]
+
+    # ------------------------------------------------------------
+    # (1) Group-membership link: +3
+    # ------------------------------------------------------------
+    try
+        partners = GroupRegistry.partners_for_node(primary.node_id)
+        if candidate.node_id in partners
+            score += 3
+            push!(reasons, "group+3")
+        end
+    catch e
+        @warn "[relation_score v7.16.1] GroupRegistry lookup failed for '$(primary.node_id)' ($e); skipping group axis."
+    end
+
+    # ------------------------------------------------------------
+    # (2) Attachment-pair link: +3
+    # Check BOTH directions: primary -> candidate OR candidate -> primary.
+    # ATTACHMENT_MAP: target_node_id -> Vector{AttachedNode}. If either node
+    # is the target of the other, they share a connector pattern.
+    # ------------------------------------------------------------
+    try
+        lock(ATTACHMENT_LOCK) do
+            # primary is the target, candidate is attached?
+            if haskey(ATTACHMENT_MAP, primary.node_id)
+                for att in ATTACHMENT_MAP[primary.node_id]
+                    if att.node_id == candidate.node_id
+                        score += 3
+                        push!(reasons, "attach+3")
+                        return
+                    end
+                end
+            end
+            # candidate is the target, primary is attached?
+            if haskey(ATTACHMENT_MAP, candidate.node_id)
+                for att in ATTACHMENT_MAP[candidate.node_id]
+                    if att.node_id == primary.node_id
+                        score += 3
+                        push!(reasons, "attach+3")
+                        return
+                    end
+                end
+            end
+        end
+    catch e
+        @warn "[relation_score v7.16.1] Attachment map lookup failed ($e); skipping attachment axis."
+    end
+
+    # ------------------------------------------------------------
+    # (3) Lobe locality: same lobe +2, connected lobe +1
+    # ------------------------------------------------------------
+    try
+        p_lobe = Lobe.find_lobe_for_node(primary.node_id)
+        c_lobe = Lobe.find_lobe_for_node(candidate.node_id)
+        if p_lobe !== nothing && c_lobe !== nothing
+            if p_lobe == c_lobe
+                score += 2
+                push!(reasons, "same-lobe+2")
+            else
+                # Connected-lobe check via LOBE_REGISTRY
+                lock(Lobe.LOBE_LOCK) do
+                    if haskey(Lobe.LOBE_REGISTRY, p_lobe)
+                        rec = Lobe.LOBE_REGISTRY[p_lobe]
+                        if c_lobe in rec.connected_lobe_ids
+                            score += 1
+                            push!(reasons, "connected-lobe+1")
+                        end
+                    end
+                end
+            end
+        end
+    catch e
+        @warn "[relation_score v7.16.1] Lobe lookup failed ($e); skipping lobe axis."
+    end
+
+    # ------------------------------------------------------------
+    # (4) Shared triple tokens: +1 each, capped at +2
+    # Walk primary.node_triples and candidate.node_triples; any shared
+    # non-trivial token (subject/object/relation, lowercased, stripped,
+    # minimum length 3 to skip "is"/"to") earns a point.
+    # ------------------------------------------------------------
+    triple_points = 0
+    try
+        p_tokens = Set{String}()
+        for t in primary.node_triples
+            for tok in (t.subject, t.object, t.relation)
+                clean = lowercase(strip(String(tok)))
+                length(clean) >= 3 && push!(p_tokens, clean)
+            end
+        end
+        c_tokens = Set{String}()
+        for t in candidate.node_triples
+            for tok in (t.subject, t.object, t.relation)
+                clean = lowercase(strip(String(tok)))
+                length(clean) >= 3 && push!(c_tokens, clean)
+            end
+        end
+        shared = intersect(p_tokens, c_tokens)
+        triple_points = min(length(shared), 2)
+        if triple_points > 0
+            score += triple_points
+            shared_str = join(collect(shared), ",")
+            push!(reasons, "triples+$(triple_points) ($(shared_str))")
+        end
+    catch e
+        @warn "[relation_score v7.16.1] Triple token check failed ($e); skipping triple axis."
+    end
+
+    # ------------------------------------------------------------
+    # (5) Concept-class overlap on actions: +1
+    # If primary.action and candidate.action share any concept class,
+    # or if either is a member of a class that contains the other.
+    # ------------------------------------------------------------
+    try
+        p_classes = Thesaurus.concept_classes_of(String(primary.action))
+        c_classes = Thesaurus.concept_classes_of(String(candidate.action))
+        if !isempty(intersect(p_classes, c_classes))
+            score += 1
+            push!(reasons, "action-class+1")
+        end
+    catch e
+        @warn "[relation_score v7.16.1] Action concept-class check failed ($e); skipping."
+    end
+
+    # ------------------------------------------------------------
+    # (6) Concept-class overlap on pattern tokens: +1 (capped at +1)
+    # Cheap lexical check -- tokens of primary pattern against candidate pattern.
+    # ------------------------------------------------------------
+    try
+        function _pattern_tokens(s::String)::Set{String}
+            out = Set{String}()
+            for raw in split(s)
+                clean = lowercase(strip(String(raw)))
+                length(clean) >= 3 && push!(out, clean)
+            end
+            return out
+        end
+        p_tokens = _pattern_tokens(primary_node.pattern)
+        c_tokens = _pattern_tokens(candidate_node.pattern)
+        found = false
+        for pt in p_tokens
+            found && break
+            p_cls = Thesaurus.concept_classes_of(pt)
+            isempty(p_cls) && continue
+            for ct in c_tokens
+                c_cls = Thesaurus.concept_classes_of(ct)
+                if !isempty(intersect(p_cls, c_cls))
+                    found = true
+                    break
+                end
+            end
+        end
+        if found
+            score += 1
+            push!(reasons, "pattern-class+1")
+        end
+    catch e
+        @warn "[relation_score v7.16.1] Pattern concept-class check failed ($e); skipping."
+    end
+
+    return (score = score, reasons = reasons)
+end
+
 # GRUG v7.16.0: CURRENT-CYCLE BAND INFO.
 # The banded orchestrator produces three bands (top / support / hedge). The
 # COMMANDS dispatcher signature is fixed historically at (mission, node,
@@ -1172,6 +1372,13 @@ end
 # Still guarded by a lock for safety -- NO SILENT FAILURES on race.
 const _CURRENT_BAND_INFO      = Dict{String, Symbol}()
 const _CURRENT_BAND_INFO_LOCK = ReentrantLock()
+
+# GRUG v7.16.1: Per-candidate relation-score telemetry for the current cycle.
+# Populated alongside _CURRENT_BAND_INFO so `generate_aiml_payload` debug
+# block can show why each support vote locked in or was demoted. Cleared in
+# the same try/finally as the band info. Map: node_id -> (score, reasons).
+const _CURRENT_RELATION_SCORES      = Dict{String, Tuple{Int, Vector{String}}}()
+const _CURRENT_RELATION_SCORES_LOCK = ReentrantLock()
 
 """
     band_of(node_id::String)::Symbol
@@ -1265,24 +1472,18 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         push!(top_tier, fallback)
     end
 
-    # GRUG v7.16.0: Record band membership for every kept vote so
-    # generate_aiml_payload can tell SUPPORT (confident helpers that render
-    # AFTER the main claim) from HEDGE (quieter voices that render as a
-    # compact "also on the table" hedge). Populated under lock, cleared
-    # in a try/finally at end of COMMANDS dispatch.
-    lock(_CURRENT_BAND_INFO_LOCK) do
-        empty!(_CURRENT_BAND_INFO)
-        for vc in top_tier;     _CURRENT_BAND_INFO[vc.node_id] = :top     end
-        for vc in support_tier; _CURRENT_BAND_INFO[vc.node_id] = :support end
-        for vc in hedge_tier;   _CURRENT_BAND_INFO[vc.node_id] = :hedge   end
-    end
+    # GRUG v7.16.1: BAND ASSIGNMENT happens AFTER primary selection (tie-break
+    # below) because the relation gate needs the primary winner to compare
+    # support candidates against. For now translate candidates to Votes; the
+    # actual _CURRENT_BAND_INFO writes happen after primary is locked in.
 
     # GRUG: Translate selected candidates back to Vote objects for downstream use.
     # COMMANDS signature is (mission, node, primary_vote, sure_votes, unsure_votes, all_votes)
     # so we keep that contract: sure_votes = top band, unsure_votes = support + hedge.
     # generate_aiml_payload uses band_of() to distinguish within unsure_votes.
-    sure_votes   = Vote[candidate_to_vote[vc.node_id] for vc in top_tier]
-    unsure_votes = Vote[candidate_to_vote[vc.node_id] for vc in vcat(support_tier, hedge_tier)]
+    sure_votes    = Vote[candidate_to_vote[vc.node_id] for vc in top_tier]
+    support_votes = Vote[candidate_to_vote[vc.node_id] for vc in support_tier]
+    hedge_votes   = Vote[candidate_to_vote[vc.node_id] for vc in hedge_tier]
 
     if isempty(sure_votes)
         # GRUG: Should be mathematically impossible after fallback, but NO SILENT FAILURES!
@@ -1317,6 +1518,57 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         error("!!! FATAL: Winning node $(primary_vote.node_id) vanished before Grug could grab it! !!!")
     end
 
+    # GRUG v7.16.1: RELATION GATE on the support band.
+    # Each support candidate is scored against the primary winner. Candidates
+    # scoring >= AIML_SUPPORT_RELATION_FLOOR keep their :support band (they
+    # have a real link and earn "Grug also sure of" rendering). Candidates
+    # below the floor are DEMOTED to :support_unlinked -- they still surface
+    # (they were loud) but with an explicit reliability warning to the user.
+    #
+    # Telemetry: _CURRENT_RELATION_SCORES records score + reasons per candidate
+    # so the debug block can show operator WHY each locked in or was demoted.
+    # Cleared in the same try/finally as _CURRENT_BAND_INFO -- NO SILENT LEAKS.
+    confirmed_support_votes = Vote[]
+    unlinked_support_votes  = Vote[]
+    score_map = Dict{String, Tuple{Int, Vector{String}}}()
+    for sv in support_votes
+        cand_node = lock(() -> get(NODE_MAP, sv.node_id, nothing), NODE_LOCK)
+        if cand_node === nothing
+            @warn "[ORCHESTRATOR v7.16.1] Support candidate '$(sv.node_id)' vanished during relation scoring; demoting to unlinked."
+            push!(unlinked_support_votes, sv)
+            score_map[sv.node_id] = (0, String["node-vanished"])
+            continue
+        end
+        rs = relation_score(primary_vote, node, sv, cand_node)
+        score_map[sv.node_id] = (rs.score, rs.reasons)
+        if rs.score >= VoteOrchestrator.AIML_SUPPORT_RELATION_FLOOR
+            push!(confirmed_support_votes, sv)
+        else
+            push!(unlinked_support_votes, sv)
+        end
+    end
+
+    # GRUG v7.16.1: Finalize band info. The :support_unlinked band is new --
+    # these votes render with an explicit "may be off-topic" warning rather
+    # than the "Grug also sure of" framing reserved for confirmed supporters.
+    lock(_CURRENT_BAND_INFO_LOCK) do
+        empty!(_CURRENT_BAND_INFO)
+        for v in sure_votes;              _CURRENT_BAND_INFO[v.node_id] = :top               end
+        for v in confirmed_support_votes; _CURRENT_BAND_INFO[v.node_id] = :support           end
+        for v in unlinked_support_votes;  _CURRENT_BAND_INFO[v.node_id] = :support_unlinked  end
+        for v in hedge_votes;             _CURRENT_BAND_INFO[v.node_id] = :hedge             end
+    end
+    lock(_CURRENT_RELATION_SCORES_LOCK) do
+        empty!(_CURRENT_RELATION_SCORES)
+        merge!(_CURRENT_RELATION_SCORES, score_map)
+    end
+
+    # GRUG v7.16.1: unsure_votes (passed into COMMANDS) now bundles ALL non-top
+    # bands so `generate_aiml_payload` can route each via band_of() to the
+    # right rendering path. Order matters only for rendering priority --
+    # confirmed support first, unlinked next, hedge last.
+    unsure_votes = vcat(confirmed_support_votes, unlinked_support_votes, hedge_votes)
+
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
     # GRUG v7.16.0: try/finally clears band info so it never leaks across cycles.
     # If COMMANDS throws, band info still cleared -- NO SILENT FAILURES, NO GHOSTS.
@@ -1325,6 +1577,9 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     finally
         lock(_CURRENT_BAND_INFO_LOCK) do
             empty!(_CURRENT_BAND_INFO)
+        end
+        lock(_CURRENT_RELATION_SCORES_LOCK) do
+            empty!(_CURRENT_RELATION_SCORES)
         end
     end
 
@@ -1664,23 +1919,31 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # -------------------------------------------------------------------
     support_pieces = String[]
 
-    # GRUG v7.16.0: Partition unsure_votes into SUPPORT band (confident helpers
-    # rendered AFTER the main claim) and HEDGE band (quiet voices rendered as
-    # a compact "also on the table" hedge). The orchestrator stashed band info
-    # in _CURRENT_BAND_INFO right before firing COMMANDS.
+    # GRUG v7.16.1: Partition unsure_votes into THREE sub-bands using band_of():
+    #   :support          -> loud AND linked to primary by relation_score
+    #                         => render as "Grug also sure of: <claim>"
+    #   :support_unlinked -> loud but FAILED the relation gate
+    #                         => render with explicit reliability warning so
+    #                            the user knows Grug is less confident about
+    #                            whether this is actually on-topic
+    #   :hedge            -> quiet voices under the support floor
+    #                         => compact deduplicated hedge, also reliability-flagged
     #
     # If band info is missing (:unknown -- e.g. test harness bypassing
     # orchestrator), we @warn and treat unknown as hedge. NO SILENT FAIL.
-    support_band_votes = Vote[]
-    hedge_band_votes   = Vote[]
+    support_band_votes    = Vote[]
+    unlinked_band_votes   = Vote[]
+    hedge_band_votes      = Vote[]
     for v in unsure_votes
         b = band_of(v.node_id)
         if b === :support
             push!(support_band_votes, v)
+        elseif b === :support_unlinked
+            push!(unlinked_band_votes, v)
         elseif b === :hedge
             push!(hedge_band_votes, v)
         else
-            @warn "[MAIN v7.16.0 synthesis] Vote '$(v.node_id)' had no band info (band=$b); routing to hedge band. Orchestrator should populate _CURRENT_BAND_INFO before COMMANDS."
+            @warn "[MAIN v7.16.1 synthesis] Vote '$(v.node_id)' had no band info (band=$b); routing to hedge band. Orchestrator should populate _CURRENT_BAND_INFO before COMMANDS."
             push!(hedge_band_votes, v)
         end
     end
@@ -1716,16 +1979,11 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (c) SUPPORT BAND \u2192 "Grug also sure of ..." supporting claims, rendered
-    # AFTER the main claim. These are confident voices that came in under the
-    # top-tier window but still above AIML_SUPPORT_FLOOR. Each surfaces as
-    # its own short claim -- the node pattern, swapped through the synonym
-    # pipeline. We cap at 2 support claims to keep the reply tight.
-    #
-    # This is the v7.16.0 fix for the "explain, explain, explain, describe,
-    # describe" babble: support-band votes used to collapse into a flat
-    # action-list hedge. Now they surface as their own claims, using each
-    # node's actual pattern, not a repeated action word.
+    # (c) CONFIRMED SUPPORT BAND \u2192 "Grug also sure of ..." supporting claims.
+    # These are LOUD votes that ALSO passed the relation gate (score >=
+    # AIML_SUPPORT_RELATION_FLOOR). They have a verified link to the primary
+    # via group / attachment / lobe / shared triples / concept class, so
+    # their pattern is legitimate supporting content. Cap at 2 claims.
     if !isempty(support_band_votes)
         support_claims_added = 0
         seen_patterns = Set{String}([node_pattern])  # avoid duplicates against primary
@@ -1735,8 +1993,6 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             sn === nothing && continue
             isempty(sn.pattern) && continue
             sn.pattern in seen_patterns && continue
-            # GRUG v7.16.0: Route support claim through synonym swap using the
-            # PRIMARY node's drop_table + required (it's the primary's reply).
             support_claim = _swap_words_in(String(sn.pattern),
                                             node_drop_table, node_required)
             push!(support_pieces, " Grug also sure of: $support_claim.")
@@ -1745,21 +2001,42 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (d) HEDGE BAND \u2192 honest hedge about alternative frames still on the
-    # table. Only renders when there are actual hedge-band votes AND vote
-    # certainty is UNSURE (top had ties). Flat action list is fine here
-    # because these ARE the quiet voices -- they don't get their own claim.
-    #
-    # GRUG v7.16.0: Deduplicate action words BEFORE prose-join so we never
-    # render "explain, explain, explain, describe". That was the exact
-    # babble bug from v7.15 Turn 6.
+    # (d) UNLINKED SUPPORT BAND \u2192 RELIABILITY-FLAGGED support.
+    # GRUG v7.16.1: These votes came in LOUD (past AIML_SUPPORT_FLOOR) but
+    # FAILED the relation gate -- they may be off-topic despite high
+    # confidence. We still surface them (biology rule: a loud voice should
+    # be heard), but with an EXPLICIT warning to the user so they know
+    # these claims haven't passed the topical-link check. Cap at 2 to
+    # keep the reply tight.
+    if !isempty(unlinked_band_votes)
+        unlinked_added = 0
+        seen_patterns = Set{String}([node_pattern])
+        for uv in unlinked_band_votes
+            unlinked_added >= 2 && break
+            un = lock(() -> get(NODE_MAP, uv.node_id, nothing), NODE_LOCK)
+            un === nothing && continue
+            isempty(un.pattern) && continue
+            un.pattern in seen_patterns && continue
+            un_claim = _swap_words_in(String(un.pattern),
+                                       node_drop_table, node_required)
+            push!(support_pieces, " Grug heard this strongly too but is not sure it fits here (take with caution): $un_claim.")
+            push!(seen_patterns, un.pattern)
+            unlinked_added += 1
+        end
+    end
+
+    # (e) HEDGE BAND \u2192 reliability-flagged quiet voices. These are votes
+    # that cleared AIML_CONFIDENCE_THRESHOLD but fell below AIML_SUPPORT_FLOOR
+    # -- Grug heard them but not loud enough to claim independently.
+    # GRUG v7.16.1: Reworded so user clearly knows these are less reliable.
+    # Only renders on UNSURE certainty (top had ties). Dedupe actions first.
     if !isempty(hedge_band_votes) && vote_certainty == "UNSURE"
         hedge_actions = [_pick_synonym(String(v.action), node_drop_table, node_required)
                           for v in hedge_band_votes]
         unique!(hedge_actions)
         hedge_prose = _prose_join(hedge_actions)
         if !isempty(hedge_prose)
-            push!(support_pieces, " I am not fully locked in \u2014 $hedge_prose is also on the table.")
+            push!(support_pieces, " Less certain \u2014 Grug also picked up $hedge_prose but these may not hold up.")
         end
     end
 
@@ -1847,19 +2124,40 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     println(payload_io, "Mission: '$mission'")
     println(payload_io, "Primary Action: $(primary_vote.action)  (conf=$(round(primary_vote.confidence, digits=2)), certainty=$vote_certainty)")
     println(payload_io, "Sure Actions: [$(join([v.action for v in sure_votes], ", "))]")
-    # GRUG v7.16.0: split the old "Unsure" line into SUPPORT + HEDGE so operators
-    # can see where each vote landed. Uses band_of() as authoritative source.
-    _support_acts = String[]
-    _hedge_acts   = String[]
+    # GRUG v7.16.1: split unsure_votes into THREE band columns with relation
+    # scores so operators can see WHY each support vote locked in or was
+    # demoted. _CURRENT_RELATION_SCORES is populated by the orchestrator.
+    _support_acts   = String[]
+    _unlinked_acts  = String[]
+    _hedge_acts     = String[]
+    _score_lines    = String[]
     for v in unsure_votes
-        if band_of(v.node_id) === :support
+        b = band_of(v.node_id)
+        score_info = lock(_CURRENT_RELATION_SCORES_LOCK) do
+            get(_CURRENT_RELATION_SCORES, v.node_id, (0, String[]))
+        end
+        reasons_str = isempty(score_info[2]) ? "" : " [$(join(score_info[2], ","))]"
+        label = "$(v.node_id):$(v.action) score=$(score_info[1])" * reasons_str
+        if b === :support
             push!(_support_acts, v.action)
+            push!(_score_lines, "SUPPORT   $label")
+        elseif b === :support_unlinked
+            push!(_unlinked_acts, v.action)
+            push!(_score_lines, "UNLINKED  $label")
         else
             push!(_hedge_acts, v.action)
+            push!(_score_lines, "HEDGE     $label")
         end
     end
-    println(payload_io, "Support Actions (rendered after main claim): [$(isempty(_support_acts) ? "None" : join(_support_acts, ", "))]")
-    println(payload_io, "Hedge Actions (compact hedge only): [$(isempty(_hedge_acts) ? "None" : join(_hedge_acts, ", "))]")
+    println(payload_io, "Support Actions (relation-linked, render as 'Grug also sure of'): [$(isempty(_support_acts) ? "None" : join(_support_acts, ", "))]")
+    println(payload_io, "Unlinked Support (loud but off-topic, reliability-flagged): [$(isempty(_unlinked_acts) ? "None" : join(_unlinked_acts, ", "))]")
+    println(payload_io, "Hedge Actions (quiet voices, reliability-flagged): [$(isempty(_hedge_acts) ? "None" : join(_hedge_acts, ", "))]")
+    if !isempty(_score_lines)
+        println(payload_io, "Relation Scores (floor=$(VoteOrchestrator.AIML_SUPPORT_RELATION_FLOOR)):")
+        for sl in _score_lines
+            println(payload_io, "  - $sl")
+        end
+    end
     println(payload_io, "Constraints: [$neg_str]")
     println(payload_io, "Winning Node: $(primary_vote.node_id)")
     # GRUG v7.15: lobe_str already includes the "Lobe Context: " prefix
