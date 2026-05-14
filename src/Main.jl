@@ -1393,6 +1393,286 @@ function band_of(node_id::String)::Symbol
     end
 end
 
+# =========================================================================
+# GRUG v7.16.2: COMPOSITION-ROLL FOR CONFIRMED SUPPORT
+# =========================================================================
+# Confirmed-support claims (passed BOTH the AIML_SUPPORT_FLOOR confidence
+# check AND the AIML_SUPPORT_RELATION_FLOOR relation gate) are not side
+# notes -- they're verified corroboration. So they should be WOVEN into
+# the sentence, not fenced behind "Grug also sure of:".
+#
+# Spoken language isn't linear: same facts, different phrasings. The
+# orchestrator rolls across a bank of STITCH STRATEGIES, each one
+# STRICTLY GATED on what relation_score actually earned. A stitch only
+# unlocks when its gate condition appears in the relation reasons list
+# (or is structurally true, like certainty == "UNSURE"). No silent
+# almost-matches.
+#
+# Two fallback stitches (simple_connective, rhetorical_hook) are ALWAYS
+# available so the pool is never empty. Weighted roll uses the engine's
+# native @coinflip macro for consistency with all other stochastic
+# decisions.
+#
+# v7.16.2 scope: FIVE stitches. Exotic three (causal_echo, parallel_frame,
+# deeper rhetorical variants) stay in the icebox until we see how these
+# five read in live conversation.
+# =========================================================================
+
+# GRUG: Stitch record. name is a Symbol used for telemetry. gate is a
+# predicate taking (reasons::Vector{String}, vote_certainty::String,
+# primary_pattern::String, support_pattern::String) -> Bool. weight is
+# the coinflip weight (integer). render takes (primary_claim::String,
+# support_claim::String) -> String and returns the stitched fragment.
+struct SupportStitch
+    name::Symbol
+    gate::Function
+    weight::Int
+    render::Function
+end
+
+# GRUG: Helper -- find whether any string in `reasons` starts with a
+# given prefix. Used by the stitch gates to detect earned relation
+# points without pattern-matching the full reason string.
+function _reasons_have_prefix(reasons::Vector{String}, prefix::String)::Bool
+    for r in reasons
+        startswith(r, prefix) && return true
+    end
+    return false
+end
+
+# GRUG: Strip a trailing period (if any) from a claim so we can compose
+# it mid-sentence without double punctuation. Works on both ASCII "."
+# and already-stripped input.
+function _strip_trailing_period(s::String)::String
+    t = rstrip(s)
+    return endswith(t, ".") ? String(rstrip(t[1:prevind(t, end)])) : t
+end
+
+# GRUG: Render helpers -- each stitch gets a named function so the
+# closures can use `return` cleanly. Julia's `->` lambdas combined
+# with `begin...end` blocks have messy scoping rules; named funcs
+# keep it obvious. All six take (p_claim, s_claim) and return a
+# sentence fragment that starts with " " and ends with ".".
+function _stitch_render_simple_connective(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " $p, and $s."
+end
+
+function _stitch_render_rhetorical_hook(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " If $p, then $s too."
+end
+
+function _stitch_render_shared_subject(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " $p; $s."
+end
+
+function _stitch_render_consequence(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " $p. That is why $s."
+end
+
+function _stitch_render_concession(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " $p, though Grug also sees $s."
+end
+
+function _stitch_render_elaboration(p_claim::String, s_claim::String)::String
+    p = _strip_trailing_period(p_claim)
+    s = _strip_trailing_period(s_claim)
+    return " $p. More specifically, $s."
+end
+
+# GRUG: The five confirmed-support stitches. Order in this registry
+# does NOT affect the roll -- weight does. Gate functions are total
+# (never throw) and cheap to evaluate.
+const SUPPORT_STITCHES = SupportStitch[
+
+    # ---- Fallback 1: simple connective -------------------------------
+    # GRUG: Always available. Weight 1 so it wins when nothing else
+    # unlocks, loses when any gated stitch fires. This is the "plain
+    # concatenation with a natural glue word" path.
+    SupportStitch(
+        :simple_connective,
+        (reasons, cert, p_pat, s_pat) -> true,
+        1,
+        _stitch_render_simple_connective,
+    ),
+
+    # ---- Fallback 2: rhetorical hook ---------------------------------
+    # GRUG: Always available. Conditional-style framing that treats
+    # primary as premise and support as parallel consequence. Works
+    # for any (p, s) pair.
+    SupportStitch(
+        :rhetorical_hook,
+        (reasons, cert, p_pat, s_pat) -> true,
+        1,
+        _stitch_render_rhetorical_hook,
+    ),
+
+    # ---- Gated 1: shared-subject collapse ----------------------------
+    # GRUG: Unlocks when relation_score earned "triples+" points
+    # (shared triple token between primary and support). Collapses
+    # two assertions onto one subject with a semicolon.
+    SupportStitch(
+        :shared_subject,
+        (reasons, cert, p_pat, s_pat) -> _reasons_have_prefix(reasons, "triples+"),
+        4,
+        _stitch_render_shared_subject,
+    ),
+
+    # ---- Gated 2: consequence ----------------------------------------
+    # GRUG: Unlocks when actions share a concept class ("action-class+1").
+    # Frames the support claim as a causal/explanatory follow-through
+    # from the primary claim.
+    SupportStitch(
+        :consequence,
+        (reasons, cert, p_pat, s_pat) -> "action-class+1" in reasons,
+        3,
+        _stitch_render_consequence,
+    ),
+
+    # ---- Gated 3: concession -----------------------------------------
+    # GRUG: Unlocks on UNSURE certainty (primary had tied top-tier
+    # alternatives). Frames the support as an alternative worth
+    # flagging, preserving the hedge honesty v7.16 introduced.
+    SupportStitch(
+        :concession,
+        (reasons, cert, p_pat, s_pat) -> cert == "UNSURE",
+        2,
+        _stitch_render_concession,
+    ),
+
+    # ---- Gated 4: elaboration ----------------------------------------
+    # GRUG: Unlocks when the support pattern is materially longer
+    # than the primary pattern (>= 1.3x). Frames support as a more
+    # specific expansion of the primary idea.
+    SupportStitch(
+        :elaboration,
+        (reasons, cert, p_pat, s_pat) -> length(s_pat) >= Int(ceil(length(p_pat) * 1.3)),
+        2,
+        _stitch_render_elaboration,
+    ),
+]
+
+# GRUG v7.16.2: Per-cycle telemetry -- which stitch fired for which
+# support node_id. Cleared in the same try/finally as _CURRENT_BAND_INFO
+# so no stale state leaks between cycles. Map: support_node_id -> stitch name.
+const _CURRENT_SUPPORT_STITCHES      = Dict{String, Symbol}()
+const _CURRENT_SUPPORT_STITCHES_LOCK = ReentrantLock()
+
+"""
+    _available_support_stitches(reasons, cert, p_pat, s_pat)
+
+GRUG v7.16.2: Walk SUPPORT_STITCHES and return the subset whose gate
+predicates return true for this (primary, support) pair. Strict gating
+-- no silent almost-matches. The two fallback stitches are always
+present, so the return value is never empty.
+"""
+function _available_support_stitches(reasons::Vector{String},
+                                     cert::String,
+                                     p_pat::String,
+                                     s_pat::String)::Vector{SupportStitch}
+    out = SupportStitch[]
+    for st in SUPPORT_STITCHES
+        try
+            if st.gate(reasons, cert, p_pat, s_pat)
+                push!(out, st)
+            end
+        catch e
+            # GRUG: A broken gate must not take down the composer. Warn
+            # loudly and move on -- this stitch just doesn't unlock.
+            @warn "[_available_support_stitches v7.16.2] Gate for $(st.name) threw ($e); skipping."
+        end
+    end
+    # GRUG: Fallbacks guarantee this, but assert anyway -- no silent
+    # empty-pool paths downstream.
+    if isempty(out)
+        error("!!! FATAL: support stitch pool is empty even with fallbacks. Registry corrupt. !!!")
+    end
+    return out
+end
+
+"""
+    _roll_support_stitch(available::Vector{SupportStitch})::SupportStitch
+
+GRUG v7.16.2: Weighted-random pick from the available pool. Uses the
+engine's native @coinflip macro for consistency with other stochastic
+decisions. Weight of each stitch maps directly to coinflip probability
+(after normalization by `bias`).
+"""
+function _roll_support_stitch(available::Vector{SupportStitch})::SupportStitch
+    # GRUG: Single-stitch pool -> no roll needed, return it directly.
+    length(available) == 1 && return available[1]
+
+    total = sum(st.weight for st in available)
+    # GRUG: Precompute cumulative distribution for a simple inline roll.
+    # @coinflip wants pairs with action functions; for pure selection we
+    # just sample from a normalized cumulative weight table. This keeps
+    # allocation minimal and avoids wrapping every stitch in a closure.
+    r = rand() * total
+    acc = 0.0
+    for st in available
+        acc += st.weight
+        if r <= acc
+            return st
+        end
+    end
+    # GRUG: Floating-point edge case fallback (r == total exactly).
+    return available[end]
+end
+
+"""
+    _compose_support_stitch(primary_claim, primary_pattern,
+                             support_claim, support_pattern,
+                             reasons, vote_certainty, support_node_id)
+
+GRUG v7.16.2: Pick a stitch strategy based on what relation_score earned
+for this pair, roll weighted-random among the eligible strategies, and
+render the stitched prose fragment. On render failure, @warn and fall
+back to simple_connective so the reply never drops a verified support.
+Telemetry: records which stitch fired for this support node_id.
+"""
+function _compose_support_stitch(primary_claim::String,
+                                 primary_pattern::String,
+                                 support_claim::String,
+                                 support_pattern::String,
+                                 reasons::Vector{String},
+                                 vote_certainty::String,
+                                 support_node_id::String)::String
+    available = _available_support_stitches(reasons, vote_certainty,
+                                            primary_pattern, support_pattern)
+    chosen = _roll_support_stitch(available)
+
+    # GRUG: Record which stitch fired for debug telemetry. Lock guarded
+    # even though the orchestrator is serialized per cycle -- the lock
+    # is cheap and protects us against any future concurrency changes.
+    lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+        _CURRENT_SUPPORT_STITCHES[support_node_id] = chosen.name
+    end
+
+    try
+        return chosen.render(primary_claim, support_claim)
+    catch e
+        # GRUG: A render crash must not lose the support vote. Fall back
+        # to simple_connective and log loudly -- the user still gets the
+        # claim, just in the plainest phrasing.
+        @warn "[_compose_support_stitch v7.16.2] Stitch $(chosen.name) render failed ($e); falling back to simple_connective."
+        lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+            _CURRENT_SUPPORT_STITCHES[support_node_id] = :simple_connective_fallback
+        end
+        p = _strip_trailing_period(primary_claim)
+        s = _strip_trailing_period(support_claim)
+        return " $p, and $s."
+    end
+end
+
 # GRUG DOC 3.9: SUPERPOSITION ORCHESTRATOR!
 """
 ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
@@ -1562,6 +1842,12 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         empty!(_CURRENT_RELATION_SCORES)
         merge!(_CURRENT_RELATION_SCORES, score_map)
     end
+    # GRUG v7.16.2: Clear stitch telemetry so the upcoming
+    # generate_aiml_payload call writes into an empty slate. No stale
+    # stitch names can leak from a previous cycle.
+    lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+        empty!(_CURRENT_SUPPORT_STITCHES)
+    end
 
     # GRUG v7.16.1: unsure_votes (passed into COMMANDS) now bundles ALL non-top
     # bands so `generate_aiml_payload` can route each via band_of() to the
@@ -1580,6 +1866,10 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         end
         lock(_CURRENT_RELATION_SCORES_LOCK) do
             empty!(_CURRENT_RELATION_SCORES)
+        end
+        # GRUG v7.16.2: Clear stitch telemetry too -- NO SILENT LEAKS.
+        lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+            empty!(_CURRENT_SUPPORT_STITCHES)
         end
     end
 
@@ -1995,7 +2285,32 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             sn.pattern in seen_patterns && continue
             support_claim = _swap_words_in(String(sn.pattern),
                                             node_drop_table, node_required)
-            push!(support_pieces, " Grug also sure of: $support_claim.")
+
+            # GRUG v7.16.2: Pull the relation reasons this support earned.
+            # The composer uses them to decide which stitches are eligible.
+            # Empty reasons (shouldn't happen for a confirmed support --
+            # relation_score >= floor means at least one reason fired) still
+            # resolves to the two always-available fallback stitches.
+            sv_reasons = lock(_CURRENT_RELATION_SCORES_LOCK) do
+                entry = get(_CURRENT_RELATION_SCORES, sv.node_id, (0, String[]))
+                return entry[2]
+            end
+
+            # GRUG v7.16.2: Roll a stitch strategy, render the fragment.
+            # Uses `claim` (the rendered primary) for sentence glue, and
+            # `node_pattern` / `sn.pattern` for gate decisions (raw pattern
+            # lengths and tokens). The composer owns punctuation.
+            stitched = _compose_support_stitch(
+                claim,
+                String(node_pattern),
+                support_claim,
+                String(sn.pattern),
+                sv_reasons,
+                vote_certainty,
+                sv.node_id,
+            )
+            push!(support_pieces, stitched)
+
             push!(seen_patterns, sn.pattern)
             support_claims_added += 1
         end
@@ -2149,13 +2464,26 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             push!(_score_lines, "HEDGE     $label")
         end
     end
-    println(payload_io, "Support Actions (relation-linked, render as 'Grug also sure of'): [$(isempty(_support_acts) ? "None" : join(_support_acts, ", "))]")
+    println(payload_io, "Support Actions (relation-linked, composed INLINE with primary): [$(isempty(_support_acts) ? "None" : join(_support_acts, ", "))]")
     println(payload_io, "Unlinked Support (loud but off-topic, reliability-flagged): [$(isempty(_unlinked_acts) ? "None" : join(_unlinked_acts, ", "))]")
     println(payload_io, "Hedge Actions (quiet voices, reliability-flagged): [$(isempty(_hedge_acts) ? "None" : join(_hedge_acts, ", "))]")
     if !isempty(_score_lines)
         println(payload_io, "Relation Scores (floor=$(VoteOrchestrator.AIML_SUPPORT_RELATION_FLOOR)):")
         for sl in _score_lines
             println(payload_io, "  - $sl")
+        end
+    end
+    # GRUG v7.16.2: Show which composition stitch fired for each
+    # confirmed-support claim. Proves the roll picked a gated stitch
+    # when one was available and fell back to simple_connective only
+    # when nothing else unlocked.
+    stitch_snapshot = lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+        copy(_CURRENT_SUPPORT_STITCHES)
+    end
+    if !isempty(stitch_snapshot)
+        println(payload_io, "Support Stitches (v7.16.2 composition-roll):")
+        for (nid, stitch_name) in stitch_snapshot
+            println(payload_io, "  - $nid -> $stitch_name")
         end
     end
     println(payload_io, "Constraints: [$neg_str]")

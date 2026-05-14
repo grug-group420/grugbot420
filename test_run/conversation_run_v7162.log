@@ -1,0 +1,901 @@
+WARNING: redefinition of constant GrugBot420.CAUSAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.SPATIAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.TEMPORAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.COMMANDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ID_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_HIT_COUNTS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_FIRE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_MUTED_LOBES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_BRIDGED_NODES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.AIML_DROP_TABLE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ALLOWED_RULE_TAGS. This may fail, cause incorrect answers, or produce other errors.
+Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...
+System Online. Grug waiting at cave entrance for instructions.
+Primary  : /mission <input>                    (text or image binary)
+Feedback : /wrong                              (penalize last response voters)
+Explicit : /explicit <cmd> [<node_id>] <input>
+Grow     : /grow <single_line_json_packet>
+Rules    : /addRule <rule text> [prob=0.0-1.0]
+           Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+Memory   : /pin <text>
+Nodes    : /nodes                              (show node map status)
+Status   : /status                             (show chatter + system status)
+Arousal  : /arousal <0.0-1.0>                 (set eye system arousal level)
+Verbs    : /addVerb <verb> <class>             (add verb to relation class)
+         : /addRelationClass <name>            (create new verb class bucket)
+         : /addSynonym <canonical> <alias>     (normalize alias->canonical)
+         : /listVerbs                          (show all verb classes + synonyms)
+Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
+         : /connectLobes <id_a> <id_b>         (connect two lobes)
+         : /lobeGrow <lobe_id> <json_packet>   (grow node into specific lobe)
+         : /lobes                              (list all lobes + node counts)
+         : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
+         : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
+Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
+         : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
+NegThes  : /negativeThesaurus add|remove|list|check|flush
+Attach   : /nodeAttach <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <target> <id>         (detach image node from target)
+         : /attachments                         (show all node attachments)
+Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
+         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Help     : /help                               (full command reference)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  SPECIMEN SEEDING GUIDE (read before /grow)                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Automatic neighbor latching is SUPPRESSED below 1000 nodes.   ║
+║  Below that threshold, YOU control topology via drop_table.     ║
+║                                                                  ║
+║  For a coherent specimen from the start:                        ║
+║  1. Seed ORTHOGONAL archetypes first - distinct semantic poles. ║
+║     Don't plant 50 near-identical nodes up front.               ║
+║  2. Use required_relations as semantic GATES from day one.      ║
+║     Nodes that demand specific verbs won't fire on noise.       ║
+║  3. Name action_packets deliberately - distinct action families ║
+║     give the superposition orchestrator something to work with. ║
+║  4. Wire drop_tables manually for known co-activation pairs.    ║
+║     Don't rely on the latch system to discover semantics.       ║
+║  5. Your first ~100 nodes are the specimen's DNA.               ║
+║     The engine enforces structure at scale (1000+ nodes).       ║
+║     You enforce MEANING at the start.                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=51, msg=39)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (7 classes, 27 verbs, 4 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (6)
+  📋 Lobe tables restored (6)
+  🌱 Nodes restored (51)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (7)
+  🚫 Inhibitions restored (3)
+  💬 Messages restored (39 total, 6 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (12)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (6 nodes across 6 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : test_run/grug_seeded.specimen.gz
+  📦  Compressed size  : 25445 bytes
+  📄  JSON size        : 163355 bytes
+  ⏱️   Time             : 1.34s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 51
+  🧠  Lobes            : 6
+  📋  Lobe tables      : 6
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 7
+  💬  Messages         : 39 (6 pinned)
+  🔧  Verb classes     : 7 (27 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 3
+  🔗  Attachments      : 12
+  🤖  AIML nodes       : 6 (6 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=51, msg=39
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > === LOBE REGISTRY (6 lobes, 48 nodes indexed) ===
+  daily_life | subject='food sleep work home and routine' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[emotions,nature] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  emotions | subject='feelings moods and social bonds' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  nature | subject='plants animals weather and ecosystems' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life,philosophy] | tbl[nodes=8 json=19 drop=40 hopf=0]
+  philosophy | subject='meaning ethics logic and existence' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[nature,science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  science | subject='scientific concepts and the natural laws' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[philosophy,technology] | tbl[nodes=8 json=24 drop=40 hopf=0]
+  technology | subject='computers software hardware networks and engineering' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_36' fired via target 'node_35' (conf=0.344, connector="sleep and food both restore en")
+[ENGINE] ⚡  Attachment relay: 'node_8' fired via target 'node_7' (conf=0.1, connector="energy and light are both elec")
+[ENGINE] ⚡  Attachment relay: 'node_4' fired via target 'node_3' (conf=0.137, connector="atoms and gravity both act acr")
+[v7.18] 🔇 Lobe topicality gate: muted=2 eligible=4 bridged=0 dropped=9
+--> 18 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about bees pollinate flowers and make honey] Here is the picture: bees pollinate flowers and build honey. Grug heard this strongly too but is not sure it fits here (take with caution): stars fuse hydrogen into helium and shine light. Grug heard this strongly too but is not sure it fits here (take with caution): gravity pulls objects toward earth element attracts stuff. Pinned note: every ai camp discovered one biological mechanism and they all belong together [Directives: When tell me about gravity and how it works activates, favor describe but keep describe ready.; Confidence level 0.66 shapes the tone of describe.; If SURE is UNSURE, mention None as options.; Anchor answer in [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.67 eligible=6] (Recent): [System]: /nodeAttach: Attached 'node_8' to 'node_7' with pattern "energy and light are both electromagneti" (base_conf=0.133, 1/4) (intensity=0.67) | [System]: /nodeAttach: Attached 'node_44' to 'node_43' with pattern "joy and fear are both warnings from the " (base_conf=0.281, 1/4) (intensity=0.69) only when mission asks about past.; Node node_33 is the primary voice; let describe, explain, analyze support it.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'tell me about gravity and how it works'
+Primary Action: describe  (conf=0.66, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [describe, describe, describe, describe, explain, explain, explain, explain, explain, describe, explain, explain, explain, analyze, explain, describe, describe]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Relation Scores (floor=2):
+  - UNLINKED  node_7:describe score=0
+  - UNLINKED  node_3:describe score=0
+  - UNLINKED  node_4:describe score=0
+  - UNLINKED  node_5:describe score=0
+  - UNLINKED  node_8:explain score=0
+  - UNLINKED  node_6:explain score=0
+  - UNLINKED  node_10:explain score=0
+  - UNLINKED  node_9:explain score=0
+  - UNLINKED  node_15:explain score=0
+  - UNLINKED  node_18:describe score=0
+  - UNLINKED  node_14:explain score=0
+  - UNLINKED  node_17:explain score=0
+  - UNLINKED  node_13:explain score=0
+  - UNLINKED  node_12:analyze score=0
+  - UNLINKED  node_11:explain score=0
+  - UNLINKED  node_16:describe score=0
+  - UNLINKED  node_48:describe score=0
+Constraints: [dont ignore]
+Winning Node: node_33
+Lobe Context: [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_7 | action=describe | conf=0.4 | relations=None
+  🔸 node_3 | action=describe | conf=0.4 | relations=None
+  🔸 node_4 | action=describe | conf=0.4 | relations=None
+  🔸 node_5 | action=describe | conf=0.4 | relations=None
+  🔸 node_8 | action=explain | conf=0.4 | relations=None
+  🔸 node_6 | action=explain | conf=0.4 | relations=None
+  🔸 node_10 | action=explain | conf=0.4 | relations=None
+  🔸 node_9 | action=explain | conf=0.4 | relations=None
+  🔸 node_15 | action=explain | conf=0.4 | relations=None
+  🔸 node_18 | action=describe | conf=0.4 | relations=None
+  🔸 node_14 | action=explain | conf=0.4 | relations=(code, is, written)
+  🔸 node_17 | action=explain | conf=0.4 | relations=None
+  🔸 node_13 | action=explain | conf=0.4 | relations=(internet, connects, computers)
+  🔸 node_12 | action=analyze | conf=0.4 | relations=None
+  🔸 node_11 | action=explain | conf=0.4 | relations=None
+  🔸 node_16 | action=describe | conf=0.4 | relations=None
+  🔸 node_48 | action=describe | conf=0.36 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.67 eligible=6] (Recent): [System]: /nodeAttach: Attached 'node_8' to 'node_7' with pattern "energy and light are both electromagneti" (base_conf=0.133, 1/4) (intensity=0.67) | [System]: /nodeAttach: Attached 'node_44' to 'node_43' with pattern "joy and fear are both warnings from the " (base_conf=0.281, 1/4) (intensity=0.69)
+Muted Lobes: [daily_life, philosophy]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=5 eligible=1 bridged=0 dropped=2
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=0 dropped=0
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: contemplate contemplate consider calculate. [Directives: When what does encryption protect activates, favor analyze but keep analyze ready.; Confidence level 0.23 shapes the tone of analyze.; If SURE is UNSURE, mention None as options.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.56 eligible=6] (Recent): [User]: tell me about gravity and how it works (intensity=0.84) | [System]: Mission "tell me about gravity and how it works" → primary=describe conf=0.66 node=node_33 (intensity=0.66) | [User]: what are atoms made of (intensity=0.74) only when mission asks about past.; Unsure votes go into None for soft hedging.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what does encryption protect'
+Primary Action: analyze  (conf=0.23, certainty=SURE)
+Sure Actions: [analyze]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.56 eligible=6] (Recent): [User]: tell me about gravity and how it works (intensity=0.84) | [System]: Mission "tell me about gravity and how it works" → primary=describe conf=0.66 node=node_33 (intensity=0.66) | [User]: what are atoms made of (intensity=0.74)
+Muted Lobes: [daily_life, emotions, nature, philosophy, science, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_8' fired via target 'node_7' (conf=0.175, connector="energy and light are both elec")
+[ENGINE] ⚡  Attachment relay: 'node_6' fired via target 'node_5' (conf=0.1, connector="dna mutation drives evolution")
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=0 dropped=20
+--> 2 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin. A companion frame: contemplate consider reflect evaluate. Pinned note: simulation theory is unfalsifiable and confuses map with territory [Directives: When is simulation theory a real proof of anything activates, favor greet but keep greet, reason ready.; Confidence level 0.43 shapes the tone of greet.; Anchor answer in [Unassigned nodes - no lobe context] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [User]: tell me about gravity and how it works (intensity=0.54) | [User]: explain how dna stores genetic information (intensity=0.42) | [User]: what does encryption protect (intensity=0.85) | [User]: is simulation theory a real proof of anything (intensity=1.29) only when mission asks about past.; Node node_0 is the primary voice; let greet, reason support it.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'is simulation theory a real proof of anything'
+Primary Action: greet  (conf=0.43, certainty=UNSURE)
+Sure Actions: [greet, reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_1 | action=reason | conf=0.41 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [User]: tell me about gravity and how it works (intensity=0.54) | [User]: explain how dna stores genetic information (intensity=0.42) | [User]: what does encryption protect (intensity=0.85) | [User]: is simulation theory a real proof of anything (intensity=1.29)
+Muted Lobes: [daily_life, emotions, nature, philosophy, science, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_4' fired via target 'node_3' (conf=0.142, connector="atoms and gravity both act acr")
+[ENGINE] ⚡  Attachment relay: 'node_14' fired via target 'node_13' (conf=0.1, connector="internet carries encrypted pac")
+[ENGINE] ⚡  Attachment relay: 'node_32' fired via target 'node_31' (conf=0.1, connector="fungi help tides of life conti")
+[ENGINE] ⚡  Attachment relay: 'node_28' fired via target 'node_27' (conf=0.314, connector="trees line rivers in the fores")
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=0 dropped=34
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin. Pinned note: grug believes biology cannot be guardrailed only evolved [Directives: When what does it mean for biology to be guardrailed activates, favor greet but keep greet ready.; Confidence level 0.43 shapes the tone of greet.; If SURE is UNSURE, mention None as options.; Anchor answer in [Unassigned nodes - no lobe context] when lobes fire together.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what does it mean for biology to be guardrailed'
+Primary Action: greet  (conf=0.43, certainty=SURE)
+Sure Actions: [greet]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=5] (Recent): [User]: what does encryption protect (intensity=0.69) | [User]: what does it mean for biology to be guardrailed (intensity=1.3)
+Muted Lobes: [daily_life, emotions, nature, philosophy, science, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=5 eligible=1 bridged=0 dropped=1
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=5 eligible=1 bridged=0 dropped=26
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about atoms combine into molecules through chemical bonds] Here is the picture: atoms combine into molecules through chemical bonds. Pinned note: transformers are one organ not the whole body of intelligence [Directives: When what restores the body after a long day activates, favor describe but keep describe ready.; Confidence level 0.44 shapes the tone of describe.; Anchor answer in [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] when lobes fire together.; Node node_4 is the primary voice; let describe support it.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what restores the body after a long day'
+Primary Action: describe  (conf=0.44, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont ignore]
+Winning Node: node_4
+Lobe Context: [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: what does it mean for biology to be guardrailed (intensity=0.88)
+Muted Lobes: [daily_life, emotions, nature, philosophy, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_6' fired via target 'node_5' (conf=0.1, connector="dna mutation drives evolution")
+[ENGINE] ⚡  Attachment relay: 'node_44' fired via target 'node_43' (conf=0.316, connector="joy and fear are both warnings")
+[ENGINE] ⚡  Attachment relay: 'node_12' fired via target 'node_11' (conf=0.263, connector="computers run neural networks")
+[ENGINE] 🔗  Attachment relay pass added 1 node(s) to expanded set.
+[v7.18] 🔇 Lobe topicality gate: muted=5 eligible=1 bridged=0 dropped=21
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about dna stores genetic code inside every living cell] Here is the picture: dna stores genetic code inside every living cell. Pinned note: transformers are one organ not the whole body of intelligence [Directives: When why does coffee wake me up in the morning activates, favor describe but keep describe ready.; Confidence level 0.33 shapes the tone of describe.; If SURE is UNSURE, mention None as options.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: what restores the body after a long day (intensity=0.89) only when mission asks about past.; Node node_5 is the primary voice; let describe, greet support it.; Unsure votes go into None for soft hedging.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'why does coffee wake me up in the morning'
+Primary Action: describe  (conf=0.33, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont ignore]
+Winning Node: node_5
+Lobe Context: [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: what restores the body after a long day (intensity=0.89)
+Muted Lobes: [daily_life, emotions, nature, philosophy, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_12' fired via target 'node_11' (conf=0.309, connector="computers run neural networks")
+[ENGINE] ⚡  Attachment relay: 'node_28' fired via target 'node_27' (conf=0.199, connector="trees line rivers in the fores")
+[v7.18] 🔇 Lobe topicality gate: muted=2 eligible=4 bridged=2 dropped=7
+--> 27 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about dna stores genetic code inside every living cell] Here is the picture: dna stores genetic code inside every living cell. Pinned note: every ai camp discovered one biological mechanism and they all belong together [Directives: When what is joy and when does it come activates, favor describe but keep describe ready.; Confidence level 0.43 shapes the tone of describe.; If SURE is UNSURE, mention None as options.; Anchor answer in [daily_life (8/8 active (music makes tasks feel lighter | reading books grows the mind s | food gives energy and tastes g))] | [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): No recent sounds only when mission asks about past.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is joy and when does it come'
+Primary Action: describe  (conf=0.43, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [describe, describe, explain, describe, analyze, explain, describe, describe, describe, describe]
+Relation Scores (floor=2):
+  - HEDGE     node_50:describe score=0
+  - HEDGE     node_15:describe score=0
+  - HEDGE     node_14:explain score=0
+  - HEDGE     node_13:describe score=0
+  - HEDGE     node_12:analyze score=0
+  - HEDGE     node_11:explain score=0
+  - HEDGE     node_33:describe score=0
+  - HEDGE     node_34:describe score=0
+  - HEDGE     node_31:describe score=0
+  - HEDGE     node_30:describe score=0
+Constraints: [dont ignore]
+Winning Node: node_5
+Lobe Context: [daily_life (8/8 active (music makes tasks feel lighter | reading books grows the mind s | food gives energy and tastes g))] | [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))]
+User Triples: (what, is, joy)
+Node Triples: None
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_50 | action=describe | conf=0.26 | relations=None
+  🔸 node_15 | action=describe | conf=0.26 | relations=None
+  🔸 node_14 | action=explain | conf=0.26 | relations=(code, is, written)
+  🔸 node_13 | action=describe | conf=0.26 | relations=(internet, connects, computers)
+  🔸 node_12 | action=analyze | conf=0.26 | relations=None
+  🔸 node_11 | action=explain | conf=0.26 | relations=None
+  🔸 node_33 | action=describe | conf=0.26 | relations=None
+  🔸 node_34 | action=describe | conf=0.26 | relations=None
+  🔸 node_31 | action=describe | conf=0.26 | relations=None
+  🔸 node_30 | action=describe | conf=0.26 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): No recent sounds
+Muted Lobes: [daily_life, philosophy]
+Bridged Nodes: [node_39@daily_life(dyn_triple:is), node_40@daily_life(dyn_triple:is)]
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=0 dropped=2
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=2 dropped=26
+--> 2 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about work is where most hours of the week go] Here is the picture: occupation is where most hours of the week go. The link is clear: profession is where. [Directives: When how is trust built between two people activates, favor describe but keep describe ready.; Confidence level 0.13 shapes the tone of describe.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: why does coffee wake me up in the morning (intensity=0.58) | [User]: when does fear warn us of danger (intensity=0.63) | [User]: how is trust built between two people (intensity=1.68) only when mission asks about past.; Node node_39 is the primary voice; let describe support it.; Unsure votes go into None for soft hedging.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'how is trust built between two people'
+Primary Action: describe  (conf=0.13, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont ignore]
+Winning Node: node_39
+Lobe Context: [daily_life (8/8 active (music makes tasks feel lighter | reading books grows the mind s | food gives energy and tastes g))]
+User Triples: (how, is, trust)
+Node Triples: (work, is, where)
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: why does coffee wake me up in the morning (intensity=0.58) | [User]: when does fear warn us of danger (intensity=0.63) | [User]: how is trust built between two people (intensity=1.68)
+Muted Lobes: [daily_life, emotions, nature, philosophy, science, technology]
+Bridged Nodes: [node_39@daily_life(dyn_triple:is), node_40@daily_life(dyn_triple:is)]
+=========================================
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_12' fired via target 'node_11' (conf=0.315, connector="computers run neural networks")
+[ENGINE] 🔗  Attachment relay pass added 1 node(s) to expanded set.
+[v7.18] 🔇 Lobe topicality gate: muted=6 eligible=0 bridged=0 dropped=22
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin. [Directives: When explain why light travels as an electromagnetic wave activates, favor welcome but keep welcome ready.; Confidence level 0.32 shapes the tone of welcome.; If SURE is UNSURE, mention None as options.; Anchor answer in [Unassigned nodes - no lobe context] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [System]: Mission "how is trust built between two people" → primary=describe conf=0.13 node=node_39 (intensity=0.66) | [User]: explain why light travels as an electromagnetic wave (intensity=1.24) only when mission asks about past.; Node node_0 is the primary voice; let welcome support it.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain why light travels as an electromagnetic wave'
+Primary Action: welcome  (conf=0.32, certainty=SURE)
+Sure Actions: [welcome]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [System]: Mission "how is trust built between two people" → primary=describe conf=0.13 node=node_39 (intensity=0.66) | [User]: explain why light travels as an electromagnetic wave (intensity=1.24)
+Muted Lobes: [daily_life, emotions, nature, philosophy, science, technology]
+Bridged Nodes: None
+=========================================
+
+Brain > [ENGINE] ✅ /right: contributors=1 rewarded=1 double_skip=0 coinflip_miss=0 grave_skip=0
+✅ /right applied. 1 contributor(s) processed: 1 rewarded, 0 skipped (already gained), 0 missed coinflip.
+   ↳ context intensity nudged up on 8 message(s) used last cycle.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_8' fired via target 'node_7' (conf=0.198, connector="energy and light are both elec")
+[ENGINE] ⚡  Attachment relay: 'node_4' fired via target 'node_3' (conf=0.169, connector="atoms and gravity both act acr")
+[ENGINE] ⚡  Attachment relay: 'node_6' fired via target 'node_5' (conf=0.1, connector="dna mutation drives evolution")
+[ENGINE] ⚡  Attachment relay: 'node_32' fired via target 'node_31' (conf=0.172, connector="fungi help tides of life conti")
+[v7.18] 🔇 Lobe topicality gate: muted=5 eligible=1 bridged=2 dropped=18
+--> 11 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: ponder ponder contemplate evaluate. Pinned note: transformers are one organ not the whole body of intelligence [Directives: When the sun is a giant fusion engine right activates, favor analyze but keep analyze ready.; Confidence level 0.23 shapes the tone of analyze.; If SURE is UNSURE, mention None as options.; Anchor answer in [daily_life (8/8 active (music makes tasks feel lighter | reading books grows the mind s | food gives energy and tastes g))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [System]: Mission "how is trust built between two people" → primary=describe conf=0.13 node=node_39 (intensity=0.77) | [User]: explain why light travels as an electromagnetic wave (intensity=1.16) only when mission asks about past.; Node node_1 is the primary voice; let analyze, describe, explain support it.; Unsure votes go into None for soft hedging.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'the sun is a giant fusion engine right'
+Primary Action: analyze  (conf=0.23, certainty=SURE)
+Sure Actions: [analyze]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [daily_life (8/8 active (music makes tasks feel lighter | reading books grows the mind s | food gives energy and tastes g))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))]
+User Triples: (sun, is, a)
+Node Triples: None
+Anti-Match Detected: false
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [System]: Mission "how is trust built between two people" → primary=describe conf=0.13 node=node_39 (intensity=0.77) | [User]: explain why light travels as an electromagnetic wave (intensity=1.16)
+Muted Lobes: [daily_life, emotions, nature, philosophy, technology]
+Bridged Nodes: [node_39@daily_life(dyn_triple:is), node_40@daily_life(dyn_triple:is)]
+=========================================
+
+Brain > [ENGINE] ❌  /wrong applied to 1 contributors. penalized= 1, newly_graved= 0.
+❌  /wrong applied. 1 contributor(s) penalized via coinflip.
+   ↳ context intensity nudged down on 8 message(s) used last cycle.
+
+Brain > 🎲 /brainstorm: entering heavy-jitter scope (ratio=0.08, coin_ratio=0.05) for one mission.
+--> Scanning specimens & looking for dialectical relations...
+[ENGINE] ⚡  Attachment relay: 'node_48' fired via target 'node_47' (conf=0.211, connector="love grows calm between two pe")
+[ENGINE] ⚡  Attachment relay: 'node_28' fired via target 'node_27' (conf=0.258, connector="trees line rivers in the fores")
+[v7.18] 🔇 Lobe topicality gate: muted=2 eligible=4 bridged=0 dropped=16
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Lobe seed node about the internet connects computers across the whole world] Here is the picture: the internet connects computers across the whole world. The link is clear: internet connects computers. Pinned note: transformers are one organ not the whole body of intelligence [Directives: When give me a weird connection between dna and the internet activates, favor explain but keep explain ready.; Confidence level 0.4 shapes the tone of explain.; If SURE is UNSURE, mention None as options.; Anchor answer in [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))] when lobes fire together.; Pull from Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=6] (Recent): [User]: give me a weird connection between dna and the internet (intensity=1.2) only when mission asks about past.]
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'give me a weird connection between dna and the internet'
+Primary Action: explain  (conf=0.4, certainty=SURE)
+Sure Actions: [explain]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [describe, describe, describe, describe, describe, describe, explain, describe, analyze, explain, explain, describe, describe, describe]
+Relation Scores (floor=2):
+  - HEDGE     node_45:describe score=0
+  - HEDGE     node_49:describe score=0
+  - HEDGE     node_43:describe score=0
+  - HEDGE     node_46:describe score=0
+  - HEDGE     node_48:describe score=0
+  - HEDGE     node_4:describe score=0
+  - HEDGE     node_5:explain score=0
+  - HEDGE     node_8:describe score=0
+  - HEDGE     node_6:analyze score=0
+  - HEDGE     node_10:explain score=0
+  - HEDGE     node_9:explain score=0
+  - HEDGE     node_28:describe score=0
+  - HEDGE     node_33:describe score=0
+  - HEDGE     node_31:describe score=0
+Constraints: [dont ignore]
+Winning Node: node_13
+Lobe Context: [emotions (8/8 active (anger burns when boundaries ar | trust grows slow and breaks fa | fear warns the body of danger ))] | [nature (8/8 active (rivers flow from mountains dow | bees pollinate flowers and mak | wolves hunt in coordinated fam))] | [science (8/8 active (stars fuse hydrogen into heliu | gravity pulls objects toward e | atoms combine into molecules t))] | [technology (8/8 active (encryption scrambles data usin | graphics cards render pixels u | code is written in programming))]
+User Triples: None
+Node Triples: (internet, connects, computers)
+Anti-Match Detected: false
+Other Possibilities (strong but not winners):
+  🔸 node_45 | action=describe | conf=0.24 | relations=(boundaries, are, crossed)
+  🔸 node_49 | action=describe | conf=0.24 | relations=None
+  🔸 node_43 | action=describe | conf=0.24 | relations=None
+  🔸 node_46 | action=describe | conf=0.24 | relations=None
+  🔸 node_48 | action=describe | conf=0.24 | relations=None
+  🔸 node_4 | action=describe | conf=0.24 | relations=None
+  🔸 node_5 | action=explain | conf=0.24 | relations=None
+  🔸 node_8 | action=describe | conf=0.24 | relations=None
+  🔸 node_6 | action=analyze | conf=0.24 | relations=None
+  🔸 node_10 | action=explain | conf=0.24 | relations=None
+  🔸 node_9 | action=explain | conf=0.24 | relations=None
+  🔸 node_28 | action=describe | conf=0.24 | relations=None
+  🔸 node_33 | action=describe | conf=0.24 | relations=None
+  🔸 node_31 | action=describe | conf=0.24 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: grug believes biology cannot be guardrailed only evolved | [User_Pinned]: transformers are one organ not the whole body of intelligence | [User_Pinned]: stochastic resonance is the ubiquitous jitter with snap back | [User_Pinned]: llms should be architects not oracles generating structure not answers | [User_Pinned]: every ai camp discovered one biological mechanism and they all belong together | [User_Pinned]: simulation theory is unfalsifiable and confuses map with territory
+Fresh Memory [threshold=0.38 eligible=6] (Recent): [User]: give me a weird connection between dna and the internet (intensity=1.2)
+Muted Lobes: [daily_life, philosophy]
+Bridged Nodes: None
+=========================================
+🎲 /brainstorm: scope closed; jitter ratios snapped back to defaults.
+
+Brain > ╔══════════════════════════════════════════════════╗
+║              GRUGBOT SYSTEM STATUS               ║
+╠══════════════════════════════════════════════════╣
+║  ENGINE                                          ║
+  Nodes in cave   : 51
+  Hopfield cache  : 0 entries
+  Memory messages : 70
+  Est. memory use : ~85 KB
+  Trajectory buf  : 16 entries
+  Temporal coher  : 0 entries
+  Morph cooldowns : 0 active
+  Current arousal : 0.3
+  Last input ago  : 0.0s
+║  LOBES                                           ║
+  Lobes registered: 6
+  Nodes in lobes  : 48
+  Top lobe (fires): emotions (0 fires)
+║  BRAINSTEM                                       ║
+  Dispatches run  : 0
+  Last winner     : none
+  Propagations    : 0
+  Is dispatching  : false
+║  CHATTER                                         ║
+  Chatter running : false
+  Input queue     : 0 pending
+  Sessions run    : 0
+║  AIML NODE TRIBES                                ║
+=== AIML NODE TRIBES (cycle=19) ===
+  daily_life | pop=1/6666 | live=1 | grave=0
+  emotions | pop=1/6666 | live=1 | grave=0
+  nature | pop=1/6666 | live=1 | grave=0
+  philosophy | pop=1/6666 | live=1 | grave=0
+  science | pop=1/6666 | live=1 | grave=0
+  technology | pop=1/6666 | live=1 | grave=0
+╚══════════════════════════════════════════════════╝
+
+Brain > === LOBE REGISTRY (6 lobes, 48 nodes indexed) ===
+  daily_life | subject='food sleep work home and routine' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[emotions,nature] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  emotions | subject='feelings moods and social bonds' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  nature | subject='plants animals weather and ecosystems' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[daily_life,philosophy] | tbl[nodes=8 json=19 drop=40 hopf=0]
+  philosophy | subject='meaning ethics logic and existence' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[nature,science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+  science | subject='scientific concepts and the natural laws' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[philosophy,technology] | tbl[nodes=8 json=24 drop=40 hopf=0]
+  technology | subject='computers software hardware networks and engineering' | nodes=8/20000 | fires=0 | inhibits=0 | connected=[science] | tbl[nodes=8 json=16 drop=40 hopf=0]
+
+Brain > === NODE MAP STATUS (51 nodes) ===
+  node_0 | str=4.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.327s | pattern="hello hi greeting mornin"
+  node_1 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.329s | pattern="think ponder reason calculate"
+  node_10 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="light travels as electromagnetic waves a"
+  node_11 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="computers process information using bina"
+  node_12 | str=5.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="neural networks learn patterns from trai"
+  node_13 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="the internet connects computers across t"
+  node_14 | str=4.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="code is written in programming languages"
+  node_15 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="encryption scrambles data using mathemat"
+  node_16 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="databases store queryable rows of struct"
+  node_17 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="robots use sensors and motors to act in "
+  node_18 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=2.098s | pattern="graphics cards render pixels using paral"
+  node_19 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="meaning comes from what we choose and wh"
+  node_2 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="grug hits rock and makes fire"
+  node_20 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="ethics asks what actions are right or wr"
+  node_21 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="knowledge requires justified true belief"
+  node_22 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="consciousness may be fundamental not der"
+  node_23 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="logic chains premises into valid conclus"
+  node_24 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="simulation theory confuses map with terr"
+  node_25 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="biology cannot be guardrailed only evolv"
+  node_26 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="every AI paradigm describes one biologic"
+  node_27 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="trees breathe carbon and grow tall in fo"
+  node_28 | str=4.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="rivers flow from mountains down to the s"
+  node_29 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="birds build nests and sing at sunrise"
+  node_3 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="gravity pulls objects toward earth mass "
+  node_30 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="weather patterns shift with the seasons"
+  node_31 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="mushrooms connect forests through fungal"
+  node_32 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="ocean tides rise and fall by lunar pull"
+  node_33 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="bees pollinate flowers and make honey"
+  node_34 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="wolves hunt in coordinated family packs"
+  node_35 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="sleep restores mind and body every night"
+  node_36 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="food gives energy and tastes good when f"
+  node_37 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="coffee wakes the brain with caffeine in "
+  node_38 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="walking outside clears the head and feel"
+  node_39 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.324s | pattern="work is where most hours of the week go"
+  node_4 | str=4.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.212s | pattern="atoms combine into molecules through che"
+  node_40 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.324s | pattern="cooking at home is cheaper and often hea"
+  node_41 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="reading books grows the mind slowly"
+  node_42 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=N/A | pattern="music makes tasks feel lighter and time "
+  node_43 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="joy rises when good things happen to fri"
+  node_44 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="fear warns the body of danger nearby"
+  node_45 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="anger burns when boundaries are crossed"
+  node_46 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="sadness asks the heart to slow and rest"
+  node_47 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="curiosity pulls the mind toward new thin"
+  node_48 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="love binds people across years and dista"
+  node_49 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="calm comes from breath and slow attentio"
+  node_5 | str=5.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.034s | pattern="dna stores genetic code inside every liv"
+  node_50 | str=2.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=0.325s | pattern="trust grows slow and breaks fast"
+  node_6 | str=5.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.212s | pattern="quantum particles behave as both wave an"
+  node_7 | str=3.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="stars fuse hydrogen into helium and shin"
+  node_8 | str=5.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="evolution selects traits that survive an"
+  node_9 | str=1.0 | neighbors=0 | [ALIVE] [LINKABLE] [TXT] | avg_rt=1.507s | pattern="energy cannot be created or destroyed on"
+┌ Warning: Replacing docs for `GrugBot420.words_to_signal :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.rewrite_passive_mission :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_relational_triples :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_dynamic_relational_triples :: Tuple{String, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.evaluate_relational_dialectics :: Tuple{Vector{GrugBot420.RelationalTriple}, Vector{GrugBot420.RelationalTriple}, Vector{String}, Dict{String, Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_input_hash :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_lookup :: Tuple{UInt64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_record! :: Tuple{UInt64, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_nonjitter :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.set_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.clear_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_nonjitter_ids :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_solidified :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.check_solidify_threshold! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.bump_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.penalize_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sync_grave_to_group_registry :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_grave! :: Tuple{GrugBot420.Node, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_contributor! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.try_link_nodes! :: Tuple{GrugBot420.Node, GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.find_best_latch_target :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._token_overlap_similarity :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._compute_lobe_topicality :: Tuple{String, Set{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._compute_muted_lobes :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._node_has_semantic_bridge :: Tuple{Any, Set{String}, Set{String}, Set{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_lobe_topicality_gate! :: Tuple{String, Vector}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_node! :: Tuple{String, String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.detach_node! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.fire_attachments! :: Tuple{String, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachment_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachments_for_target :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sdf_signal_similarity :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_image_node! :: Tuple{String, String, Vector{UInt8}, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.reset_throttle! :: Tuple{GrugBot420.Node, Float64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.create_node :: Tuple{String, String, Dict, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.parse_action_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.select_action :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.screen_input_complexity :: Tuple{Vector{Float64}, Vector{GrugBot420.RelationalTriple}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._effective_scan_mode :: Tuple{Int64, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._bidirectional_cheap_scan :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_drop_table_neighbors :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.strength_biased_scan_coinflip :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_specimens :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_and_expand :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_vote :: NTuple{5, Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_explicit_vote :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_right_feedback! :: Tuple{Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.grow_nodes_from_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_node_status_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.add_orchestration_rule! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.count_alive_nodes_in_lobe :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 8 tokens → 11 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.79 | ArousalNudge=0.0 | Weight=1.48
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'honey' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 6 tokens → 9 (+3 synonyms: data, facts, info)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.79 | ArousalNudge=0.0 | Weight=1.48
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 7 tokens → 13 (+6 synonyms: adapt, evolve, facts, improve, info, information)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.12 | ArousalNudge=0.0 | Weight=1.08
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 8 tokens → 11 (+3 synonyms: assumption, conjecture, hypothesis)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.34 | ArousalNudge=0.0 | Weight=1.14
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 9 tokens → 12 (+3 synonyms: exist, live, occur)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: build, construct, craft)
+[ Info: [ENGINE] 🔮 Action=ACTION_COMMAND | Tone=TONE_CURIOUS | Conf=0.47 | ArousalNudge=0.0 | Weight=1.24
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 6 tokens → 9 (+3 synonyms: migrate, relocate, shift)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.12 | ArousalNudge=0.0 | Weight=1.08
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'dna' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'code' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'cell' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.79 | ArousalNudge=0.0 | Weight=1.48
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'dna' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'code' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'cell' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+┌ Warning: [ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=0.2. Falling back to highest-confidence vote.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:1746
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'hours' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: awareness, cognition, mindfulness)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.34 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.79 | ArousalNudge=0.0 | Weight=1.48
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.34 | ArousalNudge=0.0 | Weight=1.14
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 10 tokens → 13 (+3 synonyms: deliver, grant, hand)
+[ Info: [ENGINE] 🔮 Action=ACTION_COMMAND | Tone=TONE_NEUTRAL | Conf=0.7 | ArousalNudge=0.0 | Weight=1.35
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'internet' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'internet' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420/src/Main.jl:2100
+
+=== ATTACHMENT MAP (12 targets with attachments) ===
+  🎯 node_11 (1/4 attached):
+      🔗 node_12 [ALIVE str=5.0] | base_conf=0.272 | connector="computers run neural networks"
+  🎯 node_13 (1/4 attached):
+      🔗 node_14 [ALIVE str=4.0] | base_conf=0.05 | connector="internet carries encrypted packets"
+  🎯 node_19 (1/4 attached):
+      🔗 node_20 [ALIVE str=1.0] | base_conf=0.15 | connector="meaning shapes ethics"
+  🎯 node_23 (1/4 attached):
+      🔗 node_24 [ALIVE str=1.0] | base_conf=0.272 | connector="simulation theory fails basic logic"
+  🎯 node_27 (1/4 attached):
+      🔗 node_28 [ALIVE str=4.0] | base_conf=0.217 | connector="trees line rivers in the forest"
+  🎯 node_3 (1/4 attached):
+      🔗 node_4 [ALIVE str=4.0] | base_conf=0.127 | connector="atoms and gravity both act across s"
+  🎯 node_31 (1/4 attached):
+      🔗 node_32 [ALIVE str=2.0] | base_conf=0.127 | connector="fungi help tides of life continue"
+  🎯 node_35 (1/4 attached):
+      🔗 node_36 [ALIVE str=1.0] | base_conf=0.323 | connector="sleep and food both restore energy"
+  🎯 node_43 (1/4 attached):
+      🔗 node_44 [ALIVE str=2.0] | base_conf=0.281 | connector="joy and fear are both warnings from"
+  🎯 node_47 (1/4 attached):
+      🔗 node_48 [ALIVE str=3.0] | base_conf=0.232 | connector="love grows calm between two people"
+  🎯 node_5 (1/4 attached):
+      🔗 node_6 [ALIVE str=5.0] | base_conf=0.05 | connector="dna mutation drives evolution"
+  🎯 node_7 (1/4 attached):
+      🔗 node_8 [ALIVE str=5.0] | base_conf=0.133 | connector="energy and light are both electroma"
+
+Brain > ┌── GROUP REGISTRY STATUS ─────────────────────────────────────
+│  Groups        : 0
+│  Members total : 0
+│  Graves total  : 0
+│  Unlinkable    : 0
+│  Window range  : [100,400]
+│  Partner cap   : [8,16]
+└──────────────────────────────────────────────────────────────
+
+Brain > 💎 /crystalizeList: no crystalized nodes.
+
+Brain > === ATTACHMENT MAP (12 targets with attachments) ===
+  🎯 node_11 (1/4 attached):
+      🔗 node_12 [ALIVE str=5.0] | base_conf=0.272 | connector="computers run neural networks"
+  🎯 node_13 (1/4 attached):
+      🔗 node_14 [ALIVE str=4.0] | base_conf=0.05 | connector="internet carries encrypted packets"
+  🎯 node_19 (1/4 attached):
+      🔗 node_20 [ALIVE str=1.0] | base_conf=0.15 | connector="meaning shapes ethics"
+  🎯 node_23 (1/4 attached):
+      🔗 node_24 [ALIVE str=1.0] | base_conf=0.272 | connector="simulation theory fails basic logic"
+  🎯 node_27 (1/4 attached):
+      🔗 node_28 [ALIVE str=4.0] | base_conf=0.217 | connector="trees line rivers in the forest"
+  🎯 node_3 (1/4 attached):
+      🔗 node_4 [ALIVE str=4.0] | base_conf=0.127 | connector="atoms and gravity both act across s"
+  🎯 node_31 (1/4 attached):
+      🔗 node_32 [ALIVE str=2.0] | base_conf=0.127 | connector="fungi help tides of life continue"
+  🎯 node_35 (1/4 attached):
+      🔗 node_36 [ALIVE str=1.0] | base_conf=0.323 | connector="sleep and food both restore energy"
+  🎯 node_43 (1/4 attached):
+      🔗 node_44 [ALIVE str=2.0] | base_conf=0.281 | connector="joy and fear are both warnings from"
+  🎯 node_47 (1/4 attached):
+      🔗 node_48 [ALIVE str=3.0] | base_conf=0.232 | connector="love grows calm between two people"
+  🎯 node_5 (1/4 attached):
+      🔗 node_6 [ALIVE str=5.0] | base_conf=0.05 | connector="dna mutation drives evolution"
+  🎯 node_7 (1/4 attached):
+      🔗 node_8 [ALIVE str=5.0] | base_conf=0.133 | connector="energy and light are both electroma"
+
+Brain > === SEMANTIC VERB REGISTRY ===
+  [causal]: causes, contradicts, hits, increases, makes, reduces, routes
+  [describe]: describe, narrate, recount
+  [empathize]: empathize, relate, understand
+  [explain]: clarify, elaborate, explain
+  [reflect]: consider, ponder, reflect
+  [spatial]: are, connects, is, was, were
+  [temporal]: chasing, follows, precedes
+  --- Synonyms ---
+    contemplate → reflect
+    expound → explain
+    portray → describe
+    sympathize → empathize
+
+Brain > [GRUG] 👋 /quit received. Cave closes. Goodbye.

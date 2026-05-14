@@ -59,6 +59,10 @@ const ALL_TESTS = [
     # GRUG v7.16.1 --- relation-gated support band for AIML orchestration.
     # Proves each axis of relation_score earns points only for real links.
     "test_support_relation_gate.jl",
+    # GRUG v7.16.2 --- composition-roll for confirmed-support claims.
+    # Confirmed supports get WOVEN into the primary sentence via a
+    # weighted random stitch pick from a strictly-gated registry.
+    "test_support_composition.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
