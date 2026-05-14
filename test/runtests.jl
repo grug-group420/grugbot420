@@ -18,6 +18,7 @@ const ALL_TESTS = [
     "test_brainstem.jl",
     "test_thesaurus.jl",
     "test_input_queue.jl",
+    "test_concept_class.jl",
     "test_action_packet.jl",
     "test_smoke.jl",
     "test_phagy.jl",

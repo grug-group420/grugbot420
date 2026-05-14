@@ -138,6 +138,19 @@ end
 const _NEG_THESAURUS = Dict{String, NegEntry}()
 const _NEG_LOCK = ReentrantLock()
 
+# ============================================================================
+# CONCEPT-CLASS INHIBITION (v7.16.0)
+# GRUG: Normal inhibition is word-at-a-time. Concept-class inhibition bans
+# an ENTIRE concept -- e.g. inhibit "inquiry" and now every word in the
+# Thesaurus.CONCEPT_CLASS_MEMBERS["inquiry"] set is considered inhibited.
+# Stored separately so the two systems stay clean:
+#   _NEG_THESAURUS     -> word-level bans (existing)
+#   _NEG_CONCEPT_BANS  -> concept-name-level bans (new)
+# is_inhibited(word) consults BOTH -- word-ban OR any-concept-ban containing word.
+# ============================================================================
+const _NEG_CONCEPT_BANS      = Dict{String, NegEntry}()
+const _NEG_CONCEPT_BANS_LOCK = ReentrantLock()
+
 """
 add_inhibition!(word::String; reason::String="")
 
@@ -184,11 +197,150 @@ end
 is_inhibited(word::String)::Bool
 
 GRUG: Check if a word is in the NegativeThesaurus. O(1) lookup.
+v7.16.0: also returns true if the word belongs to any concept class that is
+currently concept-banned. This lets operators ban a whole concept in one shot.
+Word-ban + concept-ban are OR'd -- either blocks the word.
 """
 function is_inhibited(word::String)::Bool
     clean = strip(lowercase(word))
-    lock(_NEG_LOCK) do
+    # GRUG: word-level check (existing semantic)
+    word_banned = lock(_NEG_LOCK) do
         haskey(_NEG_THESAURUS, clean)
+    end
+    word_banned && return true
+    # GRUG v7.16.0: concept-level check. Ask Thesaurus which classes contain
+    # this word, then see if any of those classes is banned. Done under the
+    # concept-ban lock so a ban in flight cannot tear.
+    return is_concept_inhibited(String(clean))
+end
+
+"""
+is_concept_inhibited(word::String)::Bool
+
+GRUG v7.16.0: Return true if any concept class containing `word` is banned.
+Cheaper than is_inhibited when the caller only wants concept-level semantics.
+Never throws -- unknown words return false (not in any class -> not banned).
+"""
+function is_concept_inhibited(word::String)::Bool
+    clean = strip(lowercase(word))
+    isempty(clean) && return false
+    # GRUG: Thesaurus module may not be loaded in every context (e.g. isolated
+    # unit tests of InputQueue alone). Guard the lookup so we never crash the
+    # inhibition check. NO SILENT FAIL -- @warn if the module is missing when
+    # concept bans exist (that would be a real architectural bug).
+    parent = parentmodule(@__MODULE__)
+    thesaurus_mod = nothing
+    if isdefined(parent, :Thesaurus)
+        thesaurus_mod = getfield(parent, :Thesaurus)
+    elseif isdefined(@__MODULE__, :Thesaurus)
+        thesaurus_mod = getfield(@__MODULE__, :Thesaurus)
+    end
+
+    if thesaurus_mod === nothing
+        # GRUG: No Thesaurus available. If there are concept bans registered,
+        # something is wrong -- scream. If not, silently fine.
+        has_bans = lock(_NEG_CONCEPT_BANS_LOCK) do
+            !isempty(_NEG_CONCEPT_BANS)
+        end
+        if has_bans
+            @warn "[NegativeThesaurus v7.16.0] Concept bans exist but Thesaurus module not reachable. Concept-level inhibition BYPASSED for '$clean'."
+        end
+        return false
+    end
+
+    local classes::Set{String}
+    try
+        classes = thesaurus_mod.concept_classes_of(clean)
+    catch e
+        @warn "[NegativeThesaurus v7.16.0] Thesaurus.concept_classes_of('$clean') threw $e; treating as no classes."
+        return false
+    end
+    isempty(classes) && return false
+    return lock(_NEG_CONCEPT_BANS_LOCK) do
+        for c in classes
+            haskey(_NEG_CONCEPT_BANS, c) && return true
+        end
+        return false
+    end
+end
+
+"""
+add_concept_inhibition!(concept_name::String; reason::String = "")
+
+GRUG v7.16.0: Ban an entire concept class by name. Every word in
+Thesaurus.CONCEPT_CLASS_MEMBERS[concept_name] becomes inhibited in one shot.
+Throws if the concept class doesn't exist (can't ban what isn't defined)
+or if it's already banned. NO SILENT FAILURES.
+"""
+function add_concept_inhibition!(concept_name::String; reason::String = "")
+    clean = strip(lowercase(concept_name))
+    if isempty(clean)
+        throw_queue_error("Cannot concept-inhibit empty name!", "add_concept_inhibition!")
+    end
+    # GRUG: Reach Thesaurus. Same lookup pattern as is_concept_inhibited.
+    parent = parentmodule(@__MODULE__)
+    thesaurus_mod = nothing
+    if isdefined(parent, :Thesaurus)
+        thesaurus_mod = getfield(parent, :Thesaurus)
+    elseif isdefined(@__MODULE__, :Thesaurus)
+        thesaurus_mod = getfield(@__MODULE__, :Thesaurus)
+    end
+    if thesaurus_mod === nothing
+        throw_queue_error("Thesaurus module not loaded. Cannot verify concept '$clean' exists.",
+                          "add_concept_inhibition!")
+    end
+    # GRUG: Check class is real.
+    class_names = Set(k for (k, _) in thesaurus_mod.list_concept_classes())
+    if !(clean in class_names)
+        throw_queue_error(
+            "Concept class '$clean' does not exist. Use /conceptClass list to see defined classes.",
+            "add_concept_inhibition!"
+        )
+    end
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        if haskey(_NEG_CONCEPT_BANS, clean)
+            throw_queue_error(
+                "Concept class '$clean' already inhibited. Use remove_concept_inhibition! first.",
+                "add_concept_inhibition!"
+            )
+        end
+        _NEG_CONCEPT_BANS[clean] = NegEntry(clean, reason, time())
+    end
+    return nothing
+end
+
+"""
+remove_concept_inhibition!(concept_name::String)::Bool
+
+GRUG v7.16.0: Lift a concept-class ban. Returns true if the ban existed,
+false if nothing to remove.
+"""
+function remove_concept_inhibition!(concept_name::String)::Bool
+    clean = strip(lowercase(concept_name))
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        haskey(_NEG_CONCEPT_BANS, clean) ? (delete!(_NEG_CONCEPT_BANS, clean); true) : false
+    end
+end
+
+"""
+list_concept_inhibitions()::Vector{NegEntry}
+
+GRUG v7.16.0: Return all active concept-class bans, sorted by name.
+"""
+function list_concept_inhibitions()::Vector{NegEntry}
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        sort(collect(values(_NEG_CONCEPT_BANS)); by = e -> e.word)
+    end
+end
+
+"""
+concept_inhibition_count()::Int
+
+GRUG v7.16.0: How many concept classes currently banned?
+"""
+function concept_inhibition_count()::Int
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        length(_NEG_CONCEPT_BANS)
     end
 end
 

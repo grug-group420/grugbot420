@@ -18,9 +18,11 @@ import re
 import sys
 from pathlib import Path
 
-LOG_PATH = Path("test_run/conversation_run.log")
+# GRUG v7.16.0: accept CLI args so we can re-run against different log files.
+#   python3 extract_conversation.py [log_path] [out_path]
+LOG_PATH   = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("test_run/conversation_run.log")
+OUT_PATH   = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("test_run/conversation_log.md")
 INPUT_PATH = Path("test_run/conversation.txt")
-OUT_PATH = Path("test_run/conversation_log.md")
 
 SCAFFOLD_HEADER = "AIML Output Scaffold:"
 DEBUG_BANNER = "--- DEBUG TELEMETRY"

@@ -1158,13 +1158,45 @@ function immune_gate(cmd_name::String, input_text::String; is_critical::Bool=tru
     end
 end
 
+# GRUG v7.16.0: CURRENT-CYCLE BAND INFO.
+# The banded orchestrator produces three bands (top / support / hedge). The
+# COMMANDS dispatcher signature is fixed historically at (mission, node,
+# primary_vote, sure_votes, unsure_votes, all_votes), so we need a side-channel
+# for generate_aiml_payload to distinguish SUPPORT votes from HEDGE votes
+# without breaking the command signature.
+#
+# This dict maps node_id -> :top | :support | :hedge. Populated by the
+# orchestrator right before firing COMMANDS, read by generate_aiml_payload,
+# cleared at end of orchestration. Single orchestrator runs at a time per
+# cycle (dispatch_task_with_timeout serializes), so no concurrent writes.
+# Still guarded by a lock for safety -- NO SILENT FAILURES on race.
+const _CURRENT_BAND_INFO      = Dict{String, Symbol}()
+const _CURRENT_BAND_INFO_LOCK = ReentrantLock()
+
+"""
+    band_of(node_id::String)::Symbol
+
+GRUG v7.16.0: Look up the band a vote was placed in by the current cycle's
+orchestrator. Returns :top, :support, :hedge, or :unknown. Never throws --
+unknown nodes return :unknown so downstream rendering can degrade gracefully.
+"""
+function band_of(node_id::String)::Symbol
+    lock(_CURRENT_BAND_INFO_LOCK) do
+        return get(_CURRENT_BAND_INFO, node_id, :unknown)
+    end
+end
+
 # GRUG DOC 3.9: SUPERPOSITION ORCHESTRATOR!
 """
 ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})
 
-GRUG: Superposition orchestrator. Finds heaviest rocks (max confidence) for "Sure"
-basket, coinflips smaller rocks into "Unsure" basket. Builds AIML payload and
-fires the generative engine. Throws on empty votes — NO SILENT FAILURES.
+GRUG: Superposition orchestrator. v7.16.0 upgrades the old two-band split
+(sure/unsure) to a three-band split (top/support/hedge) via
+`select_aiml_votes_banded`. The COMMANDS signature stays binary-compatible --
+`sure_votes` is the top band, `unsure_votes` is `support \u222a hedge`. The band
+mapping is stashed in `_CURRENT_BAND_INFO` so `generate_aiml_payload` can
+render support votes AFTER the main claim and hedge votes as a compact hedge.
+Throws on empty votes -- NO SILENT FAILURES.
 """
 function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tuple{String, Vector{Vote}, Vector{Vote}}
     if isempty(votes)
@@ -1210,25 +1242,47 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         error("!!! FATAL: Orchestrator failed: All votes referenced vanished nodes! !!!")
     end
 
-    top_tier, subtop_tier, rejected_tier = VoteOrchestrator.select_aiml_votes(
-        vote_candidates;
-        threshold  = VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD,
-        top_window = VoteOrchestrator.AIML_TOP_TIER_WINDOW
-    )
+    top_tier, support_tier, hedge_tier, rejected_tier = let
+        bands = VoteOrchestrator.select_aiml_votes_banded(
+            vote_candidates;
+            threshold     = VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD,
+            support_floor = VoteOrchestrator.AIML_SUPPORT_FLOOR,
+            top_window    = VoteOrchestrator.AIML_TOP_TIER_WINDOW
+        )
+        (bands.top, bands.support, bands.hedge, bands.rejected)
+    end
 
-    # GRUG: If nothing passed the threshold, fall back to the highest-confidence
+    # GRUG: If nothing passed the threshold at all, fall back to the highest-confidence
     # vote we have. Biology rule: cave should always try to answer, not freeze.
     # This also preserves backwards compatibility with tests that feed low-confidence votes.
-    if isempty(top_tier) && isempty(subtop_tier)
-        @warn "[ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=$(VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD). Falling back to highest-confidence vote."
+    if isempty(top_tier) && isempty(support_tier) && isempty(hedge_tier)
+        @warn "[ORCHESTRATOR] \u26a0 No votes passed AIML_CONFIDENCE_THRESHOLD=$(VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD). Falling back to highest-confidence vote."
         # GRUG: Pick top of the rejected list as emergency fallback.
+        if isempty(rejected_tier)
+            error("!!! FATAL: Grug math broke! No votes AND no rejected fallback candidates! !!!")
+        end
         fallback = rejected_tier[1]
         push!(top_tier, fallback)
     end
 
+    # GRUG v7.16.0: Record band membership for every kept vote so
+    # generate_aiml_payload can tell SUPPORT (confident helpers that render
+    # AFTER the main claim) from HEDGE (quieter voices that render as a
+    # compact "also on the table" hedge). Populated under lock, cleared
+    # in a try/finally at end of COMMANDS dispatch.
+    lock(_CURRENT_BAND_INFO_LOCK) do
+        empty!(_CURRENT_BAND_INFO)
+        for vc in top_tier;     _CURRENT_BAND_INFO[vc.node_id] = :top     end
+        for vc in support_tier; _CURRENT_BAND_INFO[vc.node_id] = :support end
+        for vc in hedge_tier;   _CURRENT_BAND_INFO[vc.node_id] = :hedge   end
+    end
+
     # GRUG: Translate selected candidates back to Vote objects for downstream use.
+    # COMMANDS signature is (mission, node, primary_vote, sure_votes, unsure_votes, all_votes)
+    # so we keep that contract: sure_votes = top band, unsure_votes = support + hedge.
+    # generate_aiml_payload uses band_of() to distinguish within unsure_votes.
     sure_votes   = Vote[candidate_to_vote[vc.node_id] for vc in top_tier]
-    unsure_votes = Vote[candidate_to_vote[vc.node_id] for vc in subtop_tier]
+    unsure_votes = Vote[candidate_to_vote[vc.node_id] for vc in vcat(support_tier, hedge_tier)]
 
     if isempty(sure_votes)
         # GRUG: Should be mathematically impossible after fallback, but NO SILENT FAILURES!
@@ -1264,8 +1318,16 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     end
 
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
-    output = COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
-    
+    # GRUG v7.16.0: try/finally clears band info so it never leaks across cycles.
+    # If COMMANDS throws, band info still cleared -- NO SILENT FAILURES, NO GHOSTS.
+    output = try
+        COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+    finally
+        lock(_CURRENT_BAND_INFO_LOCK) do
+            empty!(_CURRENT_BAND_INFO)
+        end
+    end
+
     # GRUG: Return output along with contributing votes (sure + unsure)
     # These are the votes that actually contributed to generating output
     return output, sure_votes, unsure_votes
@@ -1293,8 +1355,15 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     memory_str = extract_aiml_memory_context()
     lobe_str  = extract_lobe_aware_context(all_votes)
 
-    sure_str   = join([v.action for v in sure_votes], ", ")
-    unsure_str = isempty(unsure_votes) ? "None" : join([v.action for v in unsure_votes], ", ")
+    # GRUG v7.16.0: Dedupe action lists BEFORE interpolating into rule templates.
+    # Raw {SURE_ACTIONS} / {UNSURE_ACTIONS} used to render as
+    # "explain, explain, explain, explain, describe, describe" when many nodes
+    # voted the same action. That was the exact babble source in v7.15 Turn 6.
+    # unique! collapses repeats while preserving first-seen order.
+    sure_actions_uniq   = unique!([v.action for v in sure_votes])
+    unsure_actions_uniq = unique!([v.action for v in unsure_votes])
+    sure_str   = join(sure_actions_uniq, ", ")
+    unsure_str = isempty(unsure_actions_uniq) ? "None" : join(unsure_actions_uniq, ", ")
 
     # GRUG: VOTE CERTAINTY — SURE if primary stands alone at top, UNSURE if ties exist.
     # Tied alternatives = other sure_votes that were NOT picked as primary.
@@ -1321,7 +1390,13 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             processed = replace(processed, "{PRIMARY_ACTION}" => primary_vote.action)
             processed = replace(processed, "{SURE_ACTIONS}"   => sure_str)
             processed = replace(processed, "{UNSURE_ACTIONS}" => unsure_str)
-            processed = replace(processed, "{ALL_ACTIONS}"    => join([v.action for v in all_votes], ", "))
+            # GRUG v7.16.0: Dedupe {ALL_ACTIONS} too -- a seeded rule like
+            # "Node {NODE_ID} is the primary voice; let {ALL_ACTIONS} support it"
+            # was rendering "let describe, describe, describe, describe, explain,
+            # explain support it" with 25 votes. unique! collapses to "describe,
+            # explain" preserving first-seen order. Primary babble source killed.
+            _all_actions_uniq = unique!([v.action for v in all_votes])
+            processed = replace(processed, "{ALL_ACTIONS}"    => join(_all_actions_uniq, ", "))
             processed = replace(processed, "{CONFIDENCE}"     => string(round(primary_vote.confidence, digits=2)))
             processed = replace(processed, "{NODE_ID}"        => primary_vote.node_id)
             processed = replace(processed, "{MEMORY}"         => memory_str)
@@ -1444,6 +1519,18 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             end
         catch e
             @warn "[MAIN v7.16 synthesis] Runtime synonym lookup failed ($e); continuing with seed-map only."
+        end
+        # GRUG v7.16.0: CONCEPT-CLASS EQUIVALENTS. If this word sits in any
+        # Thesaurus concept class (e.g. "inquiry"), pull every sibling member
+        # as a candidate. Concept classes are equivalence groups -- no intensity
+        # ranking, any member is a legitimate swap. Widens the vocabulary pool
+        # during synthesis without bloating the pairwise synonym map.
+        try
+            for sibling in Thesaurus.get_concept_equivalents(clean)
+                push!(candidates, sibling)
+            end
+        catch e
+            @warn "[MAIN v7.16.0 synthesis] Concept-class lookup failed for '$word' ($e); continuing without concept widening."
         end
         unique!(candidates)
 
@@ -1577,7 +1664,28 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # -------------------------------------------------------------------
     support_pieces = String[]
 
-    # (a) Relational triple → sub-clause. Pick up to 1 triple to keep
+    # GRUG v7.16.0: Partition unsure_votes into SUPPORT band (confident helpers
+    # rendered AFTER the main claim) and HEDGE band (quiet voices rendered as
+    # a compact "also on the table" hedge). The orchestrator stashed band info
+    # in _CURRENT_BAND_INFO right before firing COMMANDS.
+    #
+    # If band info is missing (:unknown -- e.g. test harness bypassing
+    # orchestrator), we @warn and treat unknown as hedge. NO SILENT FAIL.
+    support_band_votes = Vote[]
+    hedge_band_votes   = Vote[]
+    for v in unsure_votes
+        b = band_of(v.node_id)
+        if b === :support
+            push!(support_band_votes, v)
+        elseif b === :hedge
+            push!(hedge_band_votes, v)
+        else
+            @warn "[MAIN v7.16.0 synthesis] Vote '$(v.node_id)' had no band info (band=$b); routing to hedge band. Orchestrator should populate _CURRENT_BAND_INFO before COMMANDS."
+            push!(hedge_band_votes, v)
+        end
+    end
+
+    # (a) Relational triple \u2192 sub-clause. Pick up to 1 triple to keep
     # the reply tight. Prefer a triple whose relation is in required_relations.
     if !isempty(node_triples_obj)
         preferred = nothing
@@ -1594,8 +1702,8 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         push!(support_pieces, " The link is clear: $subj_swapped $rel_swapped $obj_swapped.")
     end
 
-    # (b) Sure companion → supporting claim. Only if we have at least
-    # one tied alternative AND it has a pattern different from the
+    # (b) Sure companion \u2192 supporting claim from the TOP band. Only if we have
+    # at least one tied alternative AND it has a pattern different from the
     # primary. This keeps the reply from repeating itself.
     if !isempty(tied_alternatives)
         companion = tied_alternatives[1]
@@ -1608,15 +1716,51 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (c) UNSURE hedge: honest about alternative frames still on the table.
-    if !isempty(unsure_votes) && vote_certainty == "UNSURE"
-        # Use a plain action list for the hedge, also routed through
-        # synonym-swap so inhibited action words are replaced.
-        unsure_actions = [_pick_synonym(String(v.action), node_drop_table, node_required)
-                          for v in unsure_votes]
-        unique!(unsure_actions)
-        hedge_prose = _prose_join(unsure_actions)
-        push!(support_pieces, " I am not fully locked in — $hedge_prose is also on the table.")
+    # (c) SUPPORT BAND \u2192 "Grug also sure of ..." supporting claims, rendered
+    # AFTER the main claim. These are confident voices that came in under the
+    # top-tier window but still above AIML_SUPPORT_FLOOR. Each surfaces as
+    # its own short claim -- the node pattern, swapped through the synonym
+    # pipeline. We cap at 2 support claims to keep the reply tight.
+    #
+    # This is the v7.16.0 fix for the "explain, explain, explain, describe,
+    # describe" babble: support-band votes used to collapse into a flat
+    # action-list hedge. Now they surface as their own claims, using each
+    # node's actual pattern, not a repeated action word.
+    if !isempty(support_band_votes)
+        support_claims_added = 0
+        seen_patterns = Set{String}([node_pattern])  # avoid duplicates against primary
+        for sv in support_band_votes
+            support_claims_added >= 2 && break
+            sn = lock(() -> get(NODE_MAP, sv.node_id, nothing), NODE_LOCK)
+            sn === nothing && continue
+            isempty(sn.pattern) && continue
+            sn.pattern in seen_patterns && continue
+            # GRUG v7.16.0: Route support claim through synonym swap using the
+            # PRIMARY node's drop_table + required (it's the primary's reply).
+            support_claim = _swap_words_in(String(sn.pattern),
+                                            node_drop_table, node_required)
+            push!(support_pieces, " Grug also sure of: $support_claim.")
+            push!(seen_patterns, sn.pattern)
+            support_claims_added += 1
+        end
+    end
+
+    # (d) HEDGE BAND \u2192 honest hedge about alternative frames still on the
+    # table. Only renders when there are actual hedge-band votes AND vote
+    # certainty is UNSURE (top had ties). Flat action list is fine here
+    # because these ARE the quiet voices -- they don't get their own claim.
+    #
+    # GRUG v7.16.0: Deduplicate action words BEFORE prose-join so we never
+    # render "explain, explain, explain, describe". That was the exact
+    # babble bug from v7.15 Turn 6.
+    if !isempty(hedge_band_votes) && vote_certainty == "UNSURE"
+        hedge_actions = [_pick_synonym(String(v.action), node_drop_table, node_required)
+                          for v in hedge_band_votes]
+        unique!(hedge_actions)
+        hedge_prose = _prose_join(hedge_actions)
+        if !isempty(hedge_prose)
+            push!(support_pieces, " I am not fully locked in \u2014 $hedge_prose is also on the table.")
+        end
     end
 
     support = join(support_pieces, "")
@@ -1703,7 +1847,19 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     println(payload_io, "Mission: '$mission'")
     println(payload_io, "Primary Action: $(primary_vote.action)  (conf=$(round(primary_vote.confidence, digits=2)), certainty=$vote_certainty)")
     println(payload_io, "Sure Actions: [$(join([v.action for v in sure_votes], ", "))]")
-    println(payload_io, "Unsure Actions (Coinflip Side-Features): [$(isempty(unsure_votes) ? "None" : join([v.action for v in unsure_votes], ", "))]")
+    # GRUG v7.16.0: split the old "Unsure" line into SUPPORT + HEDGE so operators
+    # can see where each vote landed. Uses band_of() as authoritative source.
+    _support_acts = String[]
+    _hedge_acts   = String[]
+    for v in unsure_votes
+        if band_of(v.node_id) === :support
+            push!(_support_acts, v.action)
+        else
+            push!(_hedge_acts, v.action)
+        end
+    end
+    println(payload_io, "Support Actions (rendered after main claim): [$(isempty(_support_acts) ? "None" : join(_support_acts, ", "))]")
+    println(payload_io, "Hedge Actions (compact hedge only): [$(isempty(_hedge_acts) ? "None" : join(_hedge_acts, ", "))]")
     println(payload_io, "Constraints: [$neg_str]")
     println(payload_io, "Winning Node: $(primary_vote.node_id)")
     # GRUG v7.15: lobe_str already includes the "Lobe Context: " prefix
@@ -4023,6 +4179,25 @@ function run_cli()
             m_neglist      = match(r"^/negativeThesaurus\s+list\s*$",                   line)
             m_negcheck     = match(r"^/negativeThesaurus\s+check\s+(.+)$",              line)
             m_negflush     = match(r"^/negativeThesaurus\s+flush\s*$",                  line)
+            # GRUG v7.16.0: Concept-class commands. Concept classes are named
+            # equivalence groups (unlike pairwise synonyms). Any member of the
+            # class is interchangeable with any other during synthesis.
+            #   /conceptClass add <name> <word1> <word2> ...
+            #   /conceptClass remove <name>
+            #   /conceptClass list
+            #   /conceptClass of <word>
+            m_cc_add      = match(r"^/conceptClass\s+add\s+(\S+)\s+(.+)$",              line)
+            m_cc_remove   = match(r"^/conceptClass\s+remove\s+(\S+)\s*$",               line)
+            m_cc_list     = match(r"^/conceptClass\s+list\s*$",                         line)
+            m_cc_of       = match(r"^/conceptClass\s+of\s+(\S+)\s*$",                   line)
+            # GRUG v7.16.0: Concept-inhibit commands mirror /negativeThesaurus
+            # but ban an entire concept class in one shot.
+            #   /conceptInhibit add <name> [--reason <text>]
+            #   /conceptInhibit remove <name>
+            #   /conceptInhibit list
+            m_ci_add      = match(r"^/conceptInhibit\s+add\s+(\S+?)(?:\s+--reason\s+(.+))?\s*$", line)
+            m_ci_remove   = match(r"^/conceptInhibit\s+remove\s+(\S+)\s*$",             line)
+            m_ci_list     = match(r"^/conceptInhibit\s+list\s*$",                       line)
             # GRUG: Help command — show all commands
             m_loadspecimen = match(r"^/loadSpecimen\s+(\S+)\s*$",                          line)
             m_savespecimen = match(r"^/saveSpecimen\s+(\S+)\s*$",                          line)
@@ -4745,6 +4920,142 @@ elseif !isnothing(m_right)
                     empty!(InputQueue._NEG_THESAURUS)
                 end
                 println("🧹 NegativeThesaurus flushed. Removed $(old_count) inhibition(s). Cave filter is now empty.")
+
+            # =====================================================================
+            # GRUG v7.16.0: CONCEPT-CLASS HANDLERS
+            # =====================================================================
+            elseif !isnothing(m_cc_add)
+                # GRUG: /conceptClass add <name> <word1> <word2> ...
+                # Register or extend a named equivalence group. Every member
+                # becomes interchangeable during synthesis.
+                cc_name    = String(strip(m_cc_add.captures[1]))
+                cc_members_raw = String(strip(m_cc_add.captures[2]))
+                cc_members = [String(strip(w)) for w in split(cc_members_raw) if !isempty(strip(w))]
+                # GRUG: IMMUNE GATE \u2014 concept classes are stored structure!
+                if !immune_gate("/conceptClass add", cc_name * " " * join(cc_members, " "); is_critical=false)
+                    println("\u26d4 /conceptClass add blocked by immune system.")
+                else
+                    try
+                        (name, total) = Thesaurus.add_concept_class!(cc_name, cc_members)
+                        println("\ud83c\udf33 Concept class '$(name)' updated. Total members: $(total).")
+                        println("   Class count: $(Thesaurus.concept_class_count())")
+                    catch e
+                        if e isa Thesaurus.ThesaurusError
+                            println("!!! CONCEPTCLASS ERROR [$(e.context)]: $(e.message) !!!")
+                        else
+                            println("!!! CONCEPTCLASS ERROR: $e !!!")
+                        end
+                    end
+                end  # GRUG: end immune_gate else block
+
+            elseif !isnothing(m_cc_remove)
+                # GRUG: /conceptClass remove <name>
+                cc_name = String(strip(m_cc_remove.captures[1]))
+                if !immune_gate("/conceptClass remove", cc_name; is_critical=false)
+                    println("\u26d4 /conceptClass remove blocked by immune system.")
+                else
+                    try
+                        removed = Thesaurus.remove_concept_class!(cc_name)
+                        if removed
+                            println("\u2705 Concept class '$(cc_name)' removed.")
+                        else
+                            println("\u26a0\ufe0f  Concept class '$(cc_name)' not found. Nothing changed.")
+                        end
+                    catch e
+                        println("!!! CONCEPTCLASS ERROR: $e !!!")
+                    end
+                end  # GRUG: end immune_gate else block
+
+            elseif !isnothing(m_cc_list)
+                # GRUG: /conceptClass list \u2014 show all concept classes and members.
+                try
+                    classes = Thesaurus.list_concept_classes()
+                    if isempty(classes)
+                        println("\ud83d\udccb No concept classes registered.")
+                    else
+                        println("\ud83c\udf33 $(length(classes)) concept class(es):")
+                        for (name, members) in sort(classes; by = first)
+                            println("   \u2022 $(name)  [$(length(members))]  \u2192  $(join(members, ", "))")
+                        end
+                    end
+                catch e
+                    println("!!! CONCEPTCLASS ERROR: $e !!!")
+                end
+
+            elseif !isnothing(m_cc_of)
+                # GRUG: /conceptClass of <word> \u2014 what classes does this word belong to?
+                cc_word = String(strip(m_cc_of.captures[1]))
+                try
+                    classes = Thesaurus.concept_classes_of(cc_word)
+                    if isempty(classes)
+                        println("\u2139\ufe0f  '$(cc_word)' is not in any concept class.")
+                    else
+                        println("\ud83c\udf33 '$(cc_word)' belongs to: $(join(sort(collect(classes)), ", "))")
+                        # GRUG: also show equivalents for convenience
+                        equivs = Thesaurus.get_concept_equivalents(cc_word)
+                        if !isempty(equivs)
+                            println("   Equivalents: $(join(sort(collect(equivs)), ", "))")
+                        end
+                    end
+                catch e
+                    println("!!! CONCEPTCLASS ERROR: $e !!!")
+                end
+
+            # =====================================================================
+            # GRUG v7.16.0: CONCEPT-INHIBIT HANDLERS
+            # =====================================================================
+            elseif !isnothing(m_ci_add)
+                # GRUG: /conceptInhibit add <name> [--reason <text>]
+                # Ban an entire concept class. Every member becomes is_inhibited.
+                ci_name   = String(strip(m_ci_add.captures[1]))
+                ci_reason = isnothing(m_ci_add.captures[2]) ? "" : String(strip(m_ci_add.captures[2]))
+                if !immune_gate("/conceptInhibit add", ci_name; is_critical=false)
+                    println("\u26d4 /conceptInhibit add blocked by immune system.")
+                else
+                    try
+                        InputQueue.add_concept_inhibition!(ci_name; reason=ci_reason)
+                        println("\ud83d\udeab Concept inhibited: '$(ci_name)'" * (isempty(ci_reason) ? "" : "  reason: $(ci_reason)"))
+                        println("   Active concept bans: $(InputQueue.concept_inhibition_count())")
+                    catch e
+                        if e isa InputQueue.InputQueueError
+                            println("!!! CONCEPTINHIBIT ERROR [$(e.context)]: $(e.message) !!!")
+                        else
+                            println("!!! CONCEPTINHIBIT ERROR: $e !!!")
+                        end
+                    end
+                end  # GRUG: end immune_gate else block
+
+            elseif !isnothing(m_ci_remove)
+                # GRUG: /conceptInhibit remove <name>
+                ci_name = String(strip(m_ci_remove.captures[1]))
+                try
+                    removed = InputQueue.remove_concept_inhibition!(ci_name)
+                    if removed
+                        println("\u2705 Concept ban lifted: '$(ci_name)'.")
+                    else
+                        println("\u26a0\ufe0f  '$(ci_name)' was not concept-inhibited. Nothing changed.")
+                    end
+                catch e
+                    println("!!! CONCEPTINHIBIT ERROR: $e !!!")
+                end
+
+            elseif !isnothing(m_ci_list)
+                # GRUG: /conceptInhibit list
+                try
+                    entries = InputQueue.list_concept_inhibitions()
+                    if isempty(entries)
+                        println("\ud83d\udccb No concept classes are currently inhibited.")
+                    else
+                        println("\ud83d\udccb $(length(entries)) inhibited concept class(es):")
+                        for e in entries
+                            age_s  = round(time() - e.added_at, digits=0)
+                            reason = isempty(e.reason) ? "(no reason)" : e.reason
+                            println("   \ud83d\udeab '$(e.word)'   reason: $(reason)   added: $(age_s)s ago")
+                        end
+                    end
+                catch e
+                    println("!!! CONCEPTINHIBIT ERROR: $e !!!")
+                end
 
             elseif !isnothing(m_savespecimen)
                 # GRUG: /saveSpecimen <filepath> — freeze the entire cave state to a

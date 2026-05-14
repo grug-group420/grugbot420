@@ -696,4 +696,249 @@ end
 # GRUG say: module done! Seed synonyms bridge structural gap. Gate filter ready for scan.
 # GRUG say: Runtime seeds via add_seed_synonym!() keep cave growing without restart.
 
+# ============================================================================
+# CONCEPT CLASSES (v7.16.0)
+# GRUG: Synonyms are word-to-word with intensity scores ("happy ~ joyful at 0.8").
+# Concept classes are different: a NAMED EQUIVALENCE GROUP where every member
+# stands in for the concept equally. No intensity ranking -- you are in the
+# class or you are not.
+#
+# Example:
+#   CONCEPT_CLASS["inquiry"] = {question, ask, query, probe, wonder,
+#                                investigate, interrogate}
+# Any of those words, when seen, signals "inquiry". During synthesis, the
+# orchestrator can widen its vocabulary by pulling ALL members of the class
+# containing the seed word.
+#
+# Structural difference from synonyms:
+#   - Synonyms: pairwise bidirectional, intensity-weighted (0.0-1.0)
+#   - Concepts: named-group, flat equivalence (in or out), no intensity
+#
+# Both coexist. _pick_synonym in Main.jl consults BOTH:
+#   1. Thesaurus.SYNONYM_SEED_MAP (pairwise)
+#   2. Thesaurus.CONCEPT_CLASS_MEMBERS (concept-group)
+#   3. SemanticVerbs._SYNONYM_MAP (runtime alias->canonical)
+# ============================================================================
+
+# GRUG: Main registry. concept_name -> Set{String} of equivalent members.
+const CONCEPT_CLASS_MEMBERS = Dict{String, Set{String}}()
+
+# GRUG: Reverse index. word -> Set{String} of concept names it belongs to.
+# A word can belong to MULTIPLE concepts (e.g. "probe" is both :inquiry
+# and :tool). Rebuilt on every mutation -- readers pay zero cost.
+const CONCEPT_CLASS_REVERSE = Dict{String, Set{String}}()
+
+# GRUG: Lock guards BOTH dicts. One lock, consistent writes.
+const CONCEPT_CLASS_LOCK = ReentrantLock()
+
+# GRUG: Seeded concept classes. These cover common orchestration needs where
+# the synonym seed map misses because the words aren't pairwise-similar but
+# ARE semantically interchangeable in AIML context.
+const _SEED_CONCEPT_CLASSES_RAW = [
+    # INQUIRY: verbs of asking, probing, seeking
+    ("inquiry",       ["question", "ask", "query", "probe", "wonder",
+                       "investigate", "interrogate", "inquire", "seek"]),
+
+    # ASSISTANCE: verbs of helping / supporting action
+    ("assistance",    ["help", "assist", "aid", "support", "guide",
+                       "facilitate", "back", "bolster"]),
+
+    # DANGER: nouns/adjectives of threat
+    ("danger",        ["danger", "threat", "risk", "hazard", "peril",
+                       "menace", "jeopardy"]),
+
+    # AGREEMENT: verbs of assent / validation
+    ("agreement",     ["agree", "accept", "endorse", "affirm", "confirm",
+                       "consent", "concur", "validate"]),
+
+    # REFUSAL: verbs of denial / rejection
+    ("refusal",       ["refuse", "reject", "deny", "decline", "dismiss",
+                       "repudiate", "veto"]),
+
+    # INVESTIGATION: methodical inquiry (meatier than bare "inquiry")
+    ("investigation", ["investigate", "examine", "analyze", "study",
+                       "research", "inspect", "scrutinize", "explore"]),
+
+    # CHANGE: verbs of transformation
+    ("change",        ["change", "alter", "modify", "transform", "shift",
+                       "convert", "adjust", "adapt"]),
+
+    # CREATION: verbs of making / producing
+    ("creation",      ["create", "make", "build", "produce", "generate",
+                       "construct", "forge", "craft"]),
+
+    # DESTRUCTION: verbs of ending / dismantling
+    ("destruction",   ["destroy", "ruin", "demolish", "dismantle", "break",
+                       "shatter", "wreck", "obliterate"]),
+
+    # UNDERSTANDING: verbs of cognition / comprehension
+    ("understanding", ["understand", "comprehend", "grasp", "know",
+                       "realize", "recognize", "apprehend", "perceive"]),
+
+    # COMMUNICATION: verbs of speech / signaling
+    ("communication", ["say", "tell", "speak", "communicate", "convey",
+                       "express", "articulate", "state", "declare"]),
+
+    # EMOTION_POSITIVE: broad "good feeling" concept
+    ("emotion_positive", ["happy", "joy", "glad", "content", "pleased",
+                          "delighted", "satisfied", "cheerful"]),
+
+    # EMOTION_NEGATIVE: broad "bad feeling" concept
+    ("emotion_negative", ["sad", "angry", "afraid", "distressed", "upset",
+                          "troubled", "anguished"]),
+]
+
+# GRUG: Build seed concept classes at module load time.
+function _build_concept_class_seed!()
+    for (concept_name, members) in _SEED_CONCEPT_CLASSES_RAW
+        clean_name = lowercase(strip(concept_name))
+        clean_members = Set{String}()
+        for m in members
+            cm = lowercase(strip(m))
+            isempty(cm) || push!(clean_members, cm)
+        end
+        CONCEPT_CLASS_MEMBERS[clean_name] = clean_members
+        # GRUG: reverse index
+        for m in clean_members
+            if !haskey(CONCEPT_CLASS_REVERSE, m)
+                CONCEPT_CLASS_REVERSE[m] = Set{String}()
+            end
+            push!(CONCEPT_CLASS_REVERSE[m], clean_name)
+        end
+    end
+end
+
+_build_concept_class_seed!()
+
+"""
+    add_concept_class!(concept_name::AbstractString, members::Vector{<:AbstractString})
+
+GRUG v7.16.0: Register or extend a named concept class. concept_name is the
+group label (e.g. "inquiry"). members is the list of interchangeable words.
+If the class exists, new members are MERGED in (additive, idempotent).
+Thread-safe via CONCEPT_CLASS_LOCK. NO SILENT FAILURES -- empty name or
+empty members list throws. Returns (concept_name, new_member_count) so the
+caller can report how many members are now in the class.
+"""
+function add_concept_class!(concept_name::AbstractString,
+                             members::Vector{<:AbstractString})
+    name = lowercase(strip(String(concept_name)))
+    if isempty(name)
+        throw_thesaurus_error("Concept class name cannot be empty", "add_concept_class!")
+    end
+    if isempty(members)
+        throw_thesaurus_error("Concept class '$name' needs at least one member",
+                              "add_concept_class!")
+    end
+
+    cleaned = Set{String}()
+    for m in members
+        cm = lowercase(strip(String(m)))
+        if isempty(cm)
+            throw_thesaurus_error("Empty member string for concept class '$name'",
+                                  "add_concept_class!")
+        end
+        push!(cleaned, cm)
+    end
+
+    lock(CONCEPT_CLASS_LOCK) do
+        if !haskey(CONCEPT_CLASS_MEMBERS, name)
+            CONCEPT_CLASS_MEMBERS[name] = Set{String}()
+        end
+        union!(CONCEPT_CLASS_MEMBERS[name], cleaned)
+        # GRUG: refresh reverse index for new members
+        for m in cleaned
+            if !haskey(CONCEPT_CLASS_REVERSE, m)
+                CONCEPT_CLASS_REVERSE[m] = Set{String}()
+            end
+            push!(CONCEPT_CLASS_REVERSE[m], name)
+        end
+        return (name, length(CONCEPT_CLASS_MEMBERS[name]))
+    end
+end
+
+"""
+    remove_concept_class!(concept_name::AbstractString)::Bool
+
+GRUG v7.16.0: Remove an entire concept class and its members' reverse-index
+entries. Returns true if the class existed, false if it didn't. Thread-safe.
+"""
+function remove_concept_class!(concept_name::AbstractString)::Bool
+    name = lowercase(strip(String(concept_name)))
+    isempty(name) && return false
+    lock(CONCEPT_CLASS_LOCK) do
+        haskey(CONCEPT_CLASS_MEMBERS, name) || return false
+        members = CONCEPT_CLASS_MEMBERS[name]
+        for m in members
+            if haskey(CONCEPT_CLASS_REVERSE, m)
+                delete!(CONCEPT_CLASS_REVERSE[m], name)
+                isempty(CONCEPT_CLASS_REVERSE[m]) && delete!(CONCEPT_CLASS_REVERSE, m)
+            end
+        end
+        delete!(CONCEPT_CLASS_MEMBERS, name)
+        return true
+    end
+end
+
+"""
+    get_concept_equivalents(word::AbstractString)::Set{String}
+
+GRUG v7.16.0: Given a word, return the union of all its concept-class
+siblings (members of any class this word belongs to, EXCLUDING the word
+itself). Used by Main.jl's _pick_synonym to widen the synonym pool.
+Empty set for unknown words. Thread-safe.
+"""
+function get_concept_equivalents(word::AbstractString)::Set{String}
+    clean = lowercase(strip(String(word)))
+    isempty(clean) && return Set{String}()
+    lock(CONCEPT_CLASS_LOCK) do
+        haskey(CONCEPT_CLASS_REVERSE, clean) || return Set{String}()
+        out = Set{String}()
+        for concept in CONCEPT_CLASS_REVERSE[clean]
+            for sibling in CONCEPT_CLASS_MEMBERS[concept]
+                sibling == clean || push!(out, sibling)
+            end
+        end
+        return out
+    end
+end
+
+"""
+    concept_classes_of(word::AbstractString)::Set{String}
+
+GRUG v7.16.0: Return the set of concept class names a word belongs to.
+For diagnostics and /conceptClass list --word <w>.
+"""
+function concept_classes_of(word::AbstractString)::Set{String}
+    clean = lowercase(strip(String(word)))
+    isempty(clean) && return Set{String}()
+    lock(CONCEPT_CLASS_LOCK) do
+        haskey(CONCEPT_CLASS_REVERSE, clean) || return Set{String}()
+        return copy(CONCEPT_CLASS_REVERSE[clean])
+    end
+end
+
+"""
+    list_concept_classes()::Vector{Tuple{String, Vector{String}}}
+
+GRUG v7.16.0: Return all concept classes as (name, sorted members) pairs.
+For /conceptClass list CLI and /saveSpecimen serialization.
+"""
+function list_concept_classes()::Vector{Tuple{String, Vector{String}}}
+    lock(CONCEPT_CLASS_LOCK) do
+        return [(k, sort!(collect(v))) for (k, v) in CONCEPT_CLASS_MEMBERS]
+    end
+end
+
+"""
+    concept_class_count()::Int
+
+GRUG v7.16.0: How many concept classes exist? For diagnostics.
+"""
+function concept_class_count()::Int
+    lock(CONCEPT_CLASS_LOCK) do
+        return length(CONCEPT_CLASS_MEMBERS)
+    end
+end
+
 end # module Thesaurus

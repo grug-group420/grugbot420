@@ -60,9 +60,27 @@ const ACTIVE_FIRE_CAP = 1000
 # Smaller = more parallelism but more overhead. 64 is sweet spot on most CPUs.
 const FIRE_BATCH_SIZE = 64
 
-# GRUG: Positive confidence threshold. Votes below this are ignored by AIML.
-# Raw token+rel confidence floor for "this rock has real opinion".
-const AIML_CONFIDENCE_THRESHOLD = 0.15
+# GRUG v7.16.0: TWO-TIER CONFIDENCE FLOORS.
+# Raised floor because v7.15.x floor of 0.15 let too many weak voices through,
+# producing "explain, explain, explain, describe, describe" babble when 8 weak
+# nodes tied at 0.16. New scheme:
+#
+#   conf >= AIML_TOP_TIER_WINDOW distance from max  ->  TOP BAND  (drives claim + voice)
+#   AIML_SUPPORT_FLOOR <= conf < top                ->  SUPPORT BAND  ("Grug also sure of")
+#   AIML_CONFIDENCE_THRESHOLD <= conf < support     ->  SUBTOP BAND   (coinflip, hedge only)
+#   conf < AIML_CONFIDENCE_THRESHOLD                ->  REJECTED
+#
+# Biology: only loud confident voices lead. Mid-confidence voices support AFTER
+# the main claim. Below floor is silence. NO SILENT FAILURES -- dropped votes
+# are still reported in the (top_tier, subtop_tier, rejected_tier) tuple so
+# telemetry stays honest.
+const AIML_CONFIDENCE_THRESHOLD = 0.20
+
+# GRUG: Support floor. Votes >= this AND below top become "Grug also sure of"
+# supporting claims, rendered AFTER the main claim (not inline, not as hedge).
+# Votes between THRESHOLD and SUPPORT_FLOOR still exist but only appear as a
+# compact hedge -- they were not strong enough to stand as their own claim.
+const AIML_SUPPORT_FLOOR = 0.35
 
 # GRUG: How close to max confidence to be "top". Votes within this window of
 # the max confidence are the "top tier" and ALWAYS picked. No coinflip.
@@ -633,13 +651,104 @@ function select_aiml_votes(candidates::Vector{VoteCandidate};
     return (top_tier, kept_subtop, rejected)
 end
 
+"""
+    select_aiml_votes_banded(candidates::Vector{VoteCandidate};
+                             threshold::Float64     = AIML_CONFIDENCE_THRESHOLD,
+                             support_floor::Float64 = AIML_SUPPORT_FLOOR,
+                             top_window::Float64    = AIML_TOP_TIER_WINDOW)
+        ::NamedTuple
+
+GRUG v7.16.0: THREE-BAND vote splitter. Unlike the two-band `select_aiml_votes`,
+this function carves the survivors into three semantic bands:
+
+  - `top`:     confidence within `top_window` of max. Drives primary claim.
+  - `support`: confidence >= `support_floor` AND below top. Renders AFTER the
+               main claim as "Grug also sure of ..." supporting confident voices.
+  - `hedge`:   `threshold` <= confidence < `support_floor`. Strength-biased
+               coinflip decides survival; survivors render as a compact hedge
+               only. These are the "quiet voices in the room" -- heard, not led by.
+  - `rejected`: below `threshold` OR lost the hedge coinflip.
+
+Returns a NamedTuple with fields `:top, :support, :hedge, :rejected`. Using
+NamedTuple (not positional) so callers never confuse band order. NO SILENT
+FAILURES -- throws on empty input or invalid floors.
+"""
+function select_aiml_votes_banded(candidates::Vector{VoteCandidate};
+                                  threshold::Float64     = AIML_CONFIDENCE_THRESHOLD,
+                                  support_floor::Float64 = AIML_SUPPORT_FLOOR,
+                                  top_window::Float64    = AIML_TOP_TIER_WINDOW)
+    if isempty(candidates)
+        throw_vo_error("select_aiml_votes_banded received zero candidates. Cave is silent.",
+                       "select_aiml_votes_banded")
+    end
+    if threshold < 0.0
+        throw_vo_error("threshold must be >= 0, got $threshold", "select_aiml_votes_banded")
+    end
+    if support_floor < threshold
+        throw_vo_error("support_floor ($support_floor) must be >= threshold ($threshold) -- " *
+                       "support band sits ABOVE the hedge band.",
+                       "select_aiml_votes_banded")
+    end
+    if top_window < 0.0
+        throw_vo_error("top_window must be >= 0, got $top_window", "select_aiml_votes_banded")
+    end
+
+    # GRUG: First pass -- split by threshold. Below floor = gone, no recovery.
+    above_threshold = VoteCandidate[]
+    rejected        = VoteCandidate[]
+    for vc in candidates
+        if vc.confidence >= threshold
+            push!(above_threshold, vc)
+        else
+            push!(rejected, vc)
+        end
+    end
+
+    if isempty(above_threshold)
+        # GRUG: Nothing cleared the floor. Caller (orchestrator) handles fallback.
+        return (top = VoteCandidate[], support = VoteCandidate[],
+                hedge = VoteCandidate[], rejected = rejected)
+    end
+
+    max_conf = maximum(vc.confidence for vc in above_threshold)
+    top_boundary = max_conf - top_window
+
+    # GRUG: Carve the three bands.
+    top_tier     = VoteCandidate[]
+    support_tier = VoteCandidate[]
+    hedge_tier   = VoteCandidate[]
+    for vc in above_threshold
+        if vc.confidence >= top_boundary
+            push!(top_tier, vc)
+        elseif vc.confidence >= support_floor
+            push!(support_tier, vc)
+        else
+            push!(hedge_tier, vc)
+        end
+    end
+
+    # GRUG: Hedge band gets the old strength-biased coinflip. Strong weak-voters
+    # more likely to survive to hedge. Losers rejected with honest accounting.
+    kept_hedge = VoteCandidate[]
+    for vc in hedge_tier
+        if strength_biased_vote_coinflip(vc)
+            push!(kept_hedge, vc)
+        else
+            push!(rejected, vc)
+        end
+    end
+
+    return (top = top_tier, support = support_tier,
+            hedge = kept_hedge, rejected = rejected)
+end
+
 # ==============================================================================
 # EXPORTS
 # ==============================================================================
 
 export VoteOrchestratorError, TaskTimeoutError
 export ACTIVE_FIRE_CAP, FIRE_BATCH_SIZE
-export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW
+export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW, AIML_SUPPORT_FLOOR
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
 export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
 
@@ -657,6 +766,6 @@ export DoneSignal, make_done_channel, send_done!, wait_for_done
 export parallel_fire_batches
 
 # AIML vote selection
-export VoteCandidate, select_aiml_votes, strength_biased_vote_coinflip
+export VoteCandidate, select_aiml_votes, select_aiml_votes_banded, strength_biased_vote_coinflip
 
 end # module VoteOrchestrator
