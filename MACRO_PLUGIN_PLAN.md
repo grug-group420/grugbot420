@@ -4,7 +4,18 @@
 resolved.
 
 **Revision history (most recent first):**
-- *current* — Hopfield familiarity correction. The Hopfield fast-path
+- *current* — complexity-coupled extraction ladder folded into §1
+  reality-check. The substrate's `screen_input_complexity` →
+  `scan_mode` ∈ {1,2,3} → `extract_relational_triples` (basic) vs
+  `extract_dynamic_relational_triples` (compound / nested / causal-
+  chain / multi-clause) coupling is load-bearing for any voter
+  whose `relational_patterns` reference complex shapes. Such voters
+  naturally act as complexity-gated activators — and any macro tail
+  they declare fires only on inputs complex enough to trigger
+  mode 3. New §1.10 documents the coupling; §5 activation-pathway
+  list now distinguishes basic-vs-dynamic triples; §11 gains an
+  open question on a phase-2 `:relational_triples` macro scope.
+- *prior* — Hopfield familiarity correction. The Hopfield fast-path
   is disabled in current grug (`engine.jl:2453` call site commented
   out, functions retained for test compat only); the savings were
   sub-microsecond at the 1000-nodes-per-cycle lobe cap and didn't
@@ -280,6 +291,82 @@ edge-case bugs than it returned in throughput.
 
 This plan was originally drafted referencing Hopfield familiarity
 as a live activation pathway; that reference has been corrected.
+
+### 1.10 Complexity-driven scan mode and dynamic relational triples (`engine.jl:181`, `engine.jl:2371`)
+
+The substrate has a **deterministic complexity-coupled extraction
+ladder** that's load-bearing for any voter whose `relational_patterns`
+reference compound, nested, or causal structure. This was missing from
+earlier drafts of the §1 reality-check; flagging it here because it's
+a real activation pathway macros piggyback on (see §5).
+
+The flow:
+
+1. `screen_input_complexity(target_signal, RelationalTriple[])` at
+   `engine.jl:2372` computes `scan_mode :: Int` ∈ `{1, 2, 3}` from
+   the input's signal density.
+   - **mode 1** = `cheap_scan`
+   - **mode 2** = `medium_scan`
+   - **mode 3** = `high_res_scan` (input was complex enough to
+     warrant deep parsing)
+2. The relational-extraction call site at `engine.jl:2396` is
+   **deterministically gated on `scan_mode`**:
+   ```julia
+   user_triples = if scan_mode >= 3
+       extract_dynamic_relational_triples(input_text, scan_mode)
+   else
+       extract_relational_triples(input_text)
+   end
+   ```
+   - **basic triples** (mode 1, 2): subject-verb-object surface
+     extraction.
+   - **dynamic triples** (mode 3): per `engine.jl:181-195`'s
+     contract — *"compound subjects/objects across multiple
+     tokens, nested relations (A causes B which causes C),
+     implicit relations through conjunctions and prepositions,
+     causal chains and temporal sequences, multiple clauses with
+     proper scope."*
+3. Mode-3 failure is **fatal** (`@error` + rethrow). The engine
+   refuses to silently degrade complex inputs to basic extraction;
+   the input "earned" high-res scanning. Mode-1/2 failure is
+   non-fatal (warn + empty triples).
+
+**Why this matters for macros:**
+
+The voter's `relational_patterns` / `required_relations` /
+`relation_weights` (existing fields on `Node`) match against the
+extracted triples. Triples extracted by `extract_dynamic_relational_triples`
+include shapes that `extract_relational_triples` *cannot* produce
+(causal chains, multi-clause structures). So a voter whose relational
+pattern is `(X, causes, (Y, causes, Z))` **only activates on inputs
+complex enough to trigger mode 3**. That activation pathway is
+implicit, deterministic, and zero-cost from the macro side — it's
+just the existing relational-pattern match running against a richer
+triple set.
+
+This means the §5 activation-pathway list has a sixth real pathway:
+"relational triples — basic on simple inputs, dynamic on complex
+inputs (mode 3)." A voter with a complex-shaped relational pattern
+acts as a **complexity-gated activator**, and any macro tail it
+declares fires only when the input is genuinely complex.
+
+**Implications for this plan:**
+
+1. **No new pattern-bind machinery for macros to invent.** This is
+   already in the engine, working today, deterministic.
+2. **Macros do not see `scan_mode` directly in phase 1.** The macro
+   spec has a `:current_input` scope, not a `:dynamic_triples`
+   scope. If a macro author wants their macro to fire only on
+   complex inputs, they put a complex-shaped relational pattern on
+   the *voter*, not on the macro.
+3. **Phase 2 may add a `:relational_triples` scope** that lets a
+   macro regex against the carrier `Vote.user_triples` (which the
+   engine has already extracted at the appropriate complexity
+   level) — see §11 open question 9. Phase 1 doesn't add it.
+4. **No code change in this plan touches `screen_input_complexity`,
+   `_effective_scan_mode`, or `extract_dynamic_relational_triples`.**
+   They're load-bearing for activation but the macro plug-in is
+   transparent to all three.
 
 ---
 
@@ -708,7 +795,12 @@ activation pathway for macros for free:
 - Lexical patterns (`"what is {NUMBER} plus {NUMBER}"`).
 - Lemma classes (`{NUMERIC}`, `{TEMPORAL}`, `{SELF_PRONOUN}`).
 - Verb classes (`{ARITHMETIC}`, `{INTROSPECTIVE}`).
-- Relational triples (`(user, asks, time)`).
+- Relational triples — **basic** (subject-verb-object) on simple
+  inputs (scan_mode 1/2), and **dynamic** (compound, nested,
+  causal-chain, multi-clause) on complex inputs (scan_mode 3,
+  via `extract_dynamic_relational_triples`). A voter whose
+  `relational_patterns` reference complex shapes naturally acts
+  as a complexity-gated activator. See §1.10.
 - Neighbor links (the voter activated because a sibling activated).
 - Lobe routing.
 - Immune gates.
@@ -1010,6 +1102,16 @@ and 2 ship).**
 8. **`MACRO_SPEC_REGISTRY` scope.** Specimen-local (per-specimen
    macros), or global (cross-specimen)? Phase 1: specimen-local,
    following the same convention as nodes.
+
+9. **`:relational_triples` scope (deferred to phase 2).** A macro
+   regex against the carrier `Vote.user_triples` would let macros
+   surface complex relational structure (causal chains,
+   multi-clause subjects) that mode-3 `extract_dynamic_relational_triples`
+   has already extracted. Phase 1 does not include this scope —
+   complexity-gated activation is handled by the voter's
+   `relational_patterns` (existing) rather than at the macro level.
+   Confirm phase deferral, or promote to phase 1 if there's a
+   concrete use case the existing scopes can't cover.
 
 ---
 
