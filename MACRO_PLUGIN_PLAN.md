@@ -41,7 +41,7 @@ Eight things sharpen this:
 3. **Bioavailability**: only **lock-ins** (top-tier winners, the
    high-confidence hard selections) get to fire macros. The pattern-bind
    peg is more bioavailable than the macro peg.
-4. **Single-fire dedup per cycle**. `%TIME%` resolves once per cycle no
+4. **Single-fire dedup per cycle**. `&TIME&` resolves once per cycle no
    matter how many carriers carry it or how many rules reference it.
 5. **Inherited activator**. The macro is a property attached *to* a node,
    but its *eligibility on a given input* does NOT require the node's
@@ -311,7 +311,7 @@ metaphor:
 | peg                 | bioavailability | scope         | content                     | analog                           |
 |---------------------|-----------------|---------------|-----------------------------|----------------------------------|
 | **Pattern-bind**    | High            | Per-node      | Node's stored `pattern`     | Hippocampal/basal-ganglia recall |
-| **Semantic macro**  | Low             | Universal     | Plug-in name (e.g. `%TIME%`)| Prefrontal executive integration |
+| **Semantic macro**  | Low             | Universal     | Plug-in name (e.g. `&TIME&`)| Prefrontal executive integration |
 
 **Pattern-bind** is high-bioavailability — many nodes can compete on
 their own stored content; their pattern-bind output is unique to each
@@ -321,7 +321,7 @@ node; many can fire in the same cycle.
 winners qualify, and a given macro can fire only once per cycle no
 matter how many carriers exist.
 
-Crucially, **the macro is universal**: `%TIME%` resolves the same way
+Crucially, **the macro is universal**: `&TIME&` resolves the same way
 regardless of which node carried it — `time#7`, `clock#3`, or even
 `dog#42` if the user opted that node in. The carrier node's stored
 pattern doesn't constrain the macro's content; it only determines who
@@ -403,7 +403,7 @@ in spirit — runtime-tunable via `/setMacroCoherence <float>` and
 ```
 struct MacroTrigger
     name         :: String           # e.g. "current_time"
-    placeholder  :: String           # e.g. "%TIME%"
+    placeholder  :: String           # e.g. "&TIME&"
     profile      :: MacroCoherenceProfile
     kind         :: Symbol           # :builtin | :user_resolver | :user_text | :remote
     payload      :: MacroPayload     # discriminated union (see §3.5)
@@ -421,7 +421,7 @@ verbatim:
 
 ```
 struct MacroFact
-    placeholder    :: String                          # e.g. "%TIME%"
+    placeholder    :: String                          # e.g. "&TIME&"
     semantic_role  :: Symbol                          # e.g. :current_time
     rendered_text  :: String                          # canonical phrasing fallback
     structured     :: Union{Nothing, Dict{String, Any}}   # rich form for synthesis
@@ -441,76 +441,141 @@ end
   synthesis can re-phrase without re-parsing English. Text payloads
   leave it `nothing`.
 
-#### 3.5.2 `MacroPayload` — discriminated union (literal text / resolver / remote)
+#### 3.5.2 `MacroPayload` — sigil-tagged sum type (token / functor / both)
 
-The third positional arg of `/macro` is *both* a code-backed resolver
-*and* a literal text body, auto-detected. Three concrete payload shapes:
+**Macros are user-defined variants of a single sum type. The variant
+tag is carried by the sigil on the placeholder.** This is the
+Raku/Perl model — sigils are type discipline made visible in the
+syntax. The parser knows what kind of macro a placeholder is *before*
+any registry lookup, just from the sigil characters bracketing the
+name.
+
+The three sigil-tagged variants:
+
+| Sigil      | Variant            | Meaning                                                              |
+|------------|--------------------|----------------------------------------------------------------------|
+| `%NAME%`   | `TokenPayload`     | A named literal. Same string in, same string out. No `ctx` needed.   |
+| `&NAME&`   | `FunctorPayload`   | A named computation over `CycleContext`. No seed text.               |
+| `@NAME@`   | `BothPayload`      | A literal seed *plus* a functor that may transform it given `ctx`.   |
+
+All three live in the same `MacroPayload` sum type. They share the
+registry, the bioavailability gate, the coherence profile machinery,
+and both render channels (§7a / §7b). They differ only in *what gets
+called at fire time*:
 
 ```
-struct ResolverPayload         # kind == :builtin OR :user_resolver
-    resolver_id :: String      # key into RESOLVER_REGISTRY
+struct TokenPayload
+    text :: String                         # literal body. emitted verbatim.
 end
 
-struct TextPayload             # kind == :user_text
-    text :: String             # literal substitution body
+struct FunctorPayload
+    resolver_id :: String                  # key into RESOLVER_REGISTRY.
+                                           # signature: (ctx::CycleContext) -> MacroFact
 end
 
-struct RemotePayload           # kind == :remote (phase 2)
-    url_template :: String     # e.g. "https://wttr.in/{q}?format=j1"
-    json_path    :: String     # e.g. ".current_condition[0].temp_C"
+struct BothPayload
+    seed        :: String                  # literal seed. acts as scaffold.
+    resolver_id :: String                  # key into RESOLVER_REGISTRY.
+                                           # signature: (seed::String, ctx::CycleContext) -> MacroFact
+end
+
+struct RemotePayload                       # phase 2 — separate variant for HTTP-backed macros.
+    url_template :: String                 # e.g. "https://wttr.in/{q}?format=j1"
+    json_path    :: String                 # e.g. ".current_condition[0].temp_C"
     timeout_s    :: Float64
 end
 
-const MacroPayload = Union{ResolverPayload, TextPayload, RemotePayload}
+const MacroPayload = Union{TokenPayload, FunctorPayload, BothPayload, RemotePayload}
 ```
 
-The auto-detection at registration time:
+**Sigil ↔ variant invariant.** A `MacroTrigger`'s placeholder must have
+sigils consistent with its payload variant:
 
-1. If the third arg matches a key in `RESOLVER_REGISTRY` →
-   `ResolverPayload(resolver_id)`.
-2. Else → `TextPayload(literal)`. The literal can be a quoted string
-   (recommended: `"hello there friend"`) or an unquoted single token
-   (e.g. `hi`).
-3. Phase 2: `/macroRemote <name> <url> <jq>` writes a `RemotePayload`.
+- `TokenPayload`     ↔ placeholder bracketed by `%`
+- `FunctorPayload`   ↔ placeholder bracketed by `&`
+- `BothPayload`      ↔ placeholder bracketed by `@`
+- `RemotePayload`    ↔ placeholder bracketed by `&` (treated as a remote-backed functor by the substrate)
 
-#### 3.5.3 Resolver signature and resolution
+This is enforced at registration time. Mismatches are a hard error.
 
-The resolver registry stores **functions of `(CycleContext) -> MacroFact`**:
+**Why three variants and not two-with-optional-fields.** Earlier drafts
+had a single `MacroPayload` struct with optional `seed`/`functor`
+fields and a "at least one non-nothing" invariant. The user clarified
+this should be a proper sum type: each variant has a clean, distinct
+resolver signature, no nullable plumbing, no runtime "is this seeded
+or not" branching. The dispatcher picks the right call shape from the
+variant tag (which the sigil already tells us at parse time).
+
+**The user-defined-variant property.** The sigil space is open. Any
+`/macro` registration creates a new entry that inhabits one of the four
+variants. The registry is heterogeneous-but-typed: from the engine's
+perspective every entry is a `MacroPayload`; from the substrate's
+perspective every entry is just a sigil-tagged identifier flowing
+through the same two render channels.
+
+#### 3.5.3 Resolver signatures and resolution
+
+Resolvers come in two shapes, chosen by the variant they back:
 
 ```
-const RESOLVER_REGISTRY :: Dict{String, Function}   # all entries: (ctx::CycleContext) -> MacroFact
+# functor-mode signature (used by FunctorPayload):
+(ctx::CycleContext) -> MacroFact
+
+# both-mode signature (used by BothPayload — receives its own seed text):
+(seed::String, ctx::CycleContext) -> MacroFact
 ```
 
-World-value resolvers (`time_utc`, `calc_eval`) ignore `ctx` for their
-own data but use it to build the right `MacroFact` envelope.
-Introspection resolvers (`reflect_self`, `mood_summary`) read heavily
-from `ctx`. Text payloads bypass the function-call machinery entirely.
+The registry stores both shapes in a single dict using a discriminated
+function-wrapper that retains the variant arity:
+
+```
+const RESOLVER_REGISTRY :: Dict{String, ResolverFn}
+# where ResolverFn is one of:
+#   FunctorResolver(::Function)   # arity-1: takes ctx
+#   BothResolver(::Function)      # arity-2: takes seed + ctx
+```
+
+`TokenPayload` doesn't consult the resolver registry at all — its
+`resolve_payload` method just wraps the literal text in a `MacroFact`.
+`RemotePayload` (phase 2) bypasses the function registry too; it owns
+its own HTTP/JSON-path machinery.
 
 ```julia
-function resolve_payload(p::ResolverPayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
-    fn = lock(MACRO_TRIGGER_LOCK) do
+function resolve_payload(p::TokenPayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
+    return MacroFact(trigger.placeholder, :literal_text, p.text, nothing)
+end
+
+function resolve_payload(p::FunctorPayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
+    entry = lock(MACRO_TRIGGER_LOCK) do
         get(RESOLVER_REGISTRY, p.resolver_id, nothing)
     end
-    isnothing(fn) && error("!!! FATAL: macro resolver '$(p.resolver_id)' not registered !!!")
-    fact = fn(ctx)::MacroFact
-    # Trust but verify: resolver must populate placeholder + non-empty rendered_text.
+    isnothing(entry) && error("!!! FATAL: macro resolver '$(p.resolver_id)' not registered !!!")
+    entry isa FunctorResolver || error("!!! FATAL: resolver '$(p.resolver_id)' is not functor-arity !!!")
+    fact = entry.fn(ctx)::MacroFact
     isempty(fact.rendered_text) && error("!!! FATAL: resolver '$(p.resolver_id)' returned empty rendered_text !!!")
     return fact
 end
 
-function resolve_payload(p::TextPayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
-    return MacroFact(trigger.placeholder, :literal_text, p.text, nothing)
+function resolve_payload(p::BothPayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
+    entry = lock(MACRO_TRIGGER_LOCK) do
+        get(RESOLVER_REGISTRY, p.resolver_id, nothing)
+    end
+    isnothing(entry) && error("!!! FATAL: macro resolver '$(p.resolver_id)' not registered !!!")
+    entry isa BothResolver || error("!!! FATAL: resolver '$(p.resolver_id)' is not both-arity !!!")
+    fact = entry.fn(p.seed, ctx)::MacroFact
+    isempty(fact.rendered_text) && error("!!! FATAL: resolver '$(p.resolver_id)' returned empty rendered_text !!!")
+    return fact
 end
 
 function resolve_payload(p::RemotePayload, trigger::MacroTrigger, ctx::CycleContext)::MacroFact
-    # phase 2: HTTP fetch, JSON-path extract, build MacroFact.
+    # phase 2: HTTP fetch with timeout, JSON-path extract, build MacroFact.
     ...
 end
 ```
 
 This is the only place the resolver registry is consulted at fire time.
-Per-cycle caching (§7) wraps this so a resolver function fires at most
-once per cycle per macro name.
+Per-cycle caching (§7.1) wraps this so a resolver function fires at
+most once per cycle per macro name regardless of variant.
 
 #### 3.5.4 The `semantic_role` taxonomy (phase 1)
 
@@ -565,87 +630,178 @@ doesn't" intuition better than a noisy mean.
 
 ---
 
-## 4. The slash command — `/macro`
+## 4. The slash command — `/macro` (JSON registration)
 
-### 4.1 Surface syntax
+### 4.1 Surface syntax — JSON object
 
-```
-/macro %NAME% <modality_tag> [<modality_tag> ...] <payload>
-```
-
-Where:
-- `%NAME%` is the placeholder, must match `r"^%[A-Z_]+%$"`.
-- Modality tags are `key:value` pairs, space-separated, all AND
-  (combiner = `:all`) in phase 1.
-- `<payload>` is either a registered resolver name (auto-detected
-  against `RESOLVER_REGISTRY`) or a quoted literal string or an
-  unquoted single token.
-
-### 4.2 Modality tag prefixes (phase 1 + planned phase 2)
-
-| tag    | source                      | match argument                    | reads from                          | phase |
-|--------|-----------------------------|-----------------------------------|-------------------------------------|-------|
-| `af:`  | `action_family` (ATP)       | symbol or set: `query`, `query,command` | `prediction.action_family` / `action_distribution` | 1     |
-| `tf:`  | `tone_family` (ATP)         | symbol or set: `curious`, `urgent` | `prediction.tone_family` / `tone_distribution`     | 1     |
-| `vc:`  | `verb_class` (SemanticVerbs) | class name: `temporal`, `causal`   | `verb_class_of()` over input verbs  | 1     |
-| `lc:`  | `lemma_class` (patternscanner+thesaurus) | named class: `numeric`, `pronoun_self` | input token classification | 1     |
-| `ar:`  | `arousal` (EyeSystem)       | comparator: `>0.6`, `<0.3`         | `EyeSystem.get_arousal()`           | 1     |
-| `to:`  | `triple_object_class`       | class label: `location`, `temporal_anchor` | basic OR dynamic triples (whichever the cycle produced) | 1 |
-
-(Phase 2 adds `clauses:>=2`, `dynamic:on`, `tonemix:weighted`, etc.)
-
-### 4.3 Examples
-
-**Built-in code-backed resolvers** (registered at module init):
+The `/macro` command takes a single JSON object. This unifies the
+three sigil-tagged variants into one parser, makes the variant tag
+explicit, and keeps the door open for future fields without
+backward-incompatible syntax changes.
 
 ```
-/macro %TIME%    af:query  vc:temporal               time_utc
-/macro %DATE%    af:query  vc:temporal               date_utc
-/macro %CALC%    vc:arithmetic  lc:numeric           calc_eval
+/macro <json_object>
 ```
 
-**User-defined literal text** (no code change):
+The JSON object's required fields:
+
+| field         | type   | required          | meaning                                                               |
+|---------------|--------|-------------------|-----------------------------------------------------------------------|
+| `placeholder` | string | yes               | e.g. `"%GREETING%"`, `"&TIME&"`, `"@MOOD_PHRASE@"`                    |
+| `variant`     | string | yes               | one of `"token"`, `"functor"`, `"both"`, `"remote"`                   |
+| `text`        | string | yes for `token` and `both` | literal body (token mode) or seed text (both mode)            |
+| `fn`          | string | yes for `functor` and `both` | resolver name in `RESOLVER_REGISTRY`                       |
+| `coherence`   | object | yes for `functor`, `both`, `remote`; optional for `token` | modality + combiner spec         |
+| `url`         | string | yes for `remote`  | URL template for HTTP fetch (phase 2)                                 |
+| `json_path`   | string | yes for `remote`  | JSON path expression for response extraction (phase 2)                |
+| `timeout_s`   | number | optional, `remote` only | per-call timeout, default 5.0                                   |
+
+The `coherence` sub-object:
+
+```json
+{
+  "modalities": [
+    {"source": "action_family", "match": ["query", "command"], "weight": 1.0},
+    {"source": "verb_class",    "match": "temporal",            "weight": 1.0}
+  ],
+  "combiner": "all",
+  "threshold": 1.0
+}
+```
+
+The placeholder's sigil bracketing **must agree with** the `variant`
+field. Mismatch is a hard error at registration. (`%X%` ↔ `token`,
+`&X&` ↔ `functor` or `remote`, `@X@` ↔ `both`.)
+
+### 4.2 Modality sources (unchanged from prior draft)
+
+| source                | match argument                            | reads from                                                |
+|-----------------------|-------------------------------------------|-----------------------------------------------------------|
+| `action_family`       | symbol or list: `"query"`, `["query","command"]` | `prediction.action_family` / `action_distribution`  |
+| `tone_family`         | symbol or list: `"curious"`, `"urgent"`   | `prediction.tone_family` / `tone_distribution`            |
+| `verb_class`          | class name: `"temporal"`, `"causal"`      | `verb_class_of()` over input verbs                        |
+| `lemma_class`         | named class: `"numeric"`, `"self_pronoun"` | input token classification                               |
+| `arousal`             | comparator string: `">0.6"`, `"<0.3"`     | `EyeSystem.get_arousal()`                                 |
+| `triple_object_class` | class label: `"location"`, `"temporal_anchor"` | basic OR dynamic triples (whichever cycle produced) |
+
+### 4.3 Examples — one per variant
+
+**Token (`%X%`) — literal text, no computation:**
 
 ```
-/macro %GREETING% af:assert  vc:social_greet         "hello there friend"
-/macro %SHRUG%    af:assert  tf:reflective           "i dunno man"
+/macro {
+  "placeholder": "%GREETING%",
+  "variant":     "token",
+  "text":        "hey there friend",
+  "coherence": {
+    "modalities": [
+      {"source": "action_family", "match": "assert"},
+      {"source": "verb_class",    "match": "social_greet"}
+    ],
+    "combiner": "all"
+  }
+}
 ```
 
-**Phase 2 remote resolvers** (separate command):
+**Functor (`&X&`) — computation over `CycleContext`:**
 
 ```
-/macroRemote weather_wttr  https://wttr.in/{q}?format=j1  .current_condition[0].temp_C
-/macro %WEATHER% af:query  vc:weather                weather_wttr
+/macro {
+  "placeholder": "&TIME&",
+  "variant":     "functor",
+  "fn":          "time_utc",
+  "coherence": {
+    "modalities": [
+      {"source": "action_family", "match": ["query","command"]},
+      {"source": "verb_class",    "match": "temporal"}
+    ],
+    "combiner": "all"
+  }
+}
+```
+
+**Both (`@X@`) — seed text plus a transforming functor:**
+
+```
+/macro {
+  "placeholder": "@MOOD_PHRASE@",
+  "variant":     "both",
+  "text":        "i'm",
+  "fn":          "mood_word_for_arousal",
+  "coherence": {
+    "modalities": [
+      {"source": "action_family", "match": "query"},
+      {"source": "lemma_class",   "match": "affect_word"}
+    ],
+    "combiner": "all"
+  }
+}
+```
+
+The both-mode resolver `mood_word_for_arousal` has signature
+`(seed::String, ctx::CycleContext) -> MacroFact`. Its body might
+return `MacroFact("@MOOD_PHRASE@", :mood, "$seed wired",
+Dict("arousal"=>0.78))` — the seed acts as a scaffold that the functor
+extends.
+
+**Remote (`&X&`, phase 2) — HTTP-backed:**
+
+```
+/macro {
+  "placeholder": "&WEATHER&",
+  "variant":     "remote",
+  "url":         "https://wttr.in/{q}?format=j1",
+  "json_path":   ".current_condition[0].temp_C",
+  "timeout_s":   5.0,
+  "coherence": {
+    "modalities": [
+      {"source": "action_family", "match": "query"},
+      {"source": "verb_class",    "match": "weather"}
+    ],
+    "combiner": "all"
+  }
+}
 ```
 
 ### 4.4 Companion slash commands
 
 ```
-/macro %NAME% <tags> <payload>     # add (or replace) trigger
-/macroRemove %NAME%                # remove trigger
-/macroList                         # pretty-print all triggers + their modalities
-/macroRemote <id> <url> <json_path>  # phase 2 — register a remote resolver
-/nodeMacro <node_id> %NAME%        # attach %NAME% to a voter node
-/nodeMacroClear <node_id>          # detach (sets node.macro_signal = "")
-/setMacroCoherence <float>         # tune MACRO_COHERENCE_THRESHOLD (phase 2)
-/setMacroStrict on|off             # tune MACRO_STRICT_MODE
+/macro <json>                       # add or replace trigger
+/macroRemove <placeholder>          # remove trigger
+/macroList                          # pretty-print all triggers + variants + coherence
+/nodeMacro <node_id> <placeholder>  # attach a placeholder to a voter node
+/nodeMacroClear <node_id>           # detach (sets node.macro_signal = "")
+/setMacroCoherence <float>          # tune MACRO_COHERENCE_THRESHOLD (phase 2)
+/setMacroStrict on|off              # tune MACRO_STRICT_MODE
 ```
 
 All gated by `immune_gate(...)` like the existing `/addVerb`,
 `/addSynonym`, etc.
 
-### 4.5 Why placeholder uniqueness is enforced at registration
+### 4.5 Placeholder uniqueness and sigil/variant agreement
 
-Two registered macros pointing at the same `%TIME%` placeholder makes
-fire-time substitution ambiguous. So `register_macro_trigger!` does:
+Two enforcements at registration time:
 
-```julia
-for existing in values(MACRO_TRIGGER_REGISTRY)
-    if existing.placeholder == new.placeholder && existing.name != new.name
-        error("!!! FATAL: placeholder collision: $(new.placeholder) already used by $(existing.name) !!!")
-    end
-end
-```
+1. **Placeholder uniqueness.** Two registered macros pointing at the
+   same placeholder makes fire-time dispatch ambiguous:
+   ```julia
+   for existing in values(MACRO_TRIGGER_REGISTRY)
+       if existing.placeholder == new.placeholder && existing.name != new.name
+           error("!!! FATAL: placeholder collision: $(new.placeholder) already used by $(existing.name) !!!")
+       end
+   end
+   ```
+
+2. **Sigil-variant agreement.** The placeholder's sigil must match the
+   variant tag:
+   ```julia
+   sigil_pair = (first(new.placeholder), last(new.placeholder))
+   variant_ok = sigil_pair == ('%', '%') ? new.variant === :token        :
+                sigil_pair == ('&', '&') ? new.variant in (:functor, :remote) :
+                sigil_pair == ('@', '@') ? new.variant === :both         :
+                                            false
+   variant_ok || error("!!! FATAL: sigil $(sigil_pair) inconsistent with variant $(new.variant) !!!")
+   ```
 
 Loud failure, no silent ambiguity. Same convention as the rest of
 grugbot420.
@@ -700,7 +856,7 @@ Five things to nail down explicitly:
 
 3. **Single-fire dedup**. `unique(...)` on the macro names handles
    carrier-side dedup. Per-cycle resolver caching (§7) handles
-   render-side dedup so multiple `%TIME%` references in multiple rules
+   render-side dedup so multiple `&TIME&` references in multiple rules
    resolve once.
 
 4. **Orphaned macros warn but don't kill.** A node with
@@ -711,6 +867,17 @@ Five things to nail down explicitly:
 
 5. **Empty `locked_macros` is normal.** Most cycles will have it empty.
    The render pass skips trivially.
+
+6. **Snap-rounded thresholds (see §17).** The bioavailability gate's
+   threshold comparisons (`AIML_TOP_TIER_WINDOW = 0.05`,
+   `AIML_CONFIDENCE_THRESHOLD = 0.15`) are evaluated *after* a snap
+   pass that rounds inputs near round points to those round points.
+   This prevents borderline-flicker — confidence 0.149 vs 0.151 on
+   adjacent cycles no longer produces categorically different macro
+   firing behaviour. Same snap applies to the top-tier window edge.
+   The gate's *shape* is unchanged (still a threshold); the snap just
+   makes the threshold robust to noise near the edge. See §17 for the
+   `_snap` helper and the engine-wide snap-point catalog.
 
 ---
 
@@ -841,7 +1008,7 @@ end
 ## 7. The render pass — two channels, one resolver call
 
 **This is the section the most recent user clarification rewrote.** A
-naive single-pass `replace(template, "%TIME%" => "14:32 UTC")` produces
+naive single-pass `replace(template, "&TIME&" => "14:32 UTC")` produces
 output like *"the time is 14:32 UTC"* glued onto whatever rule text
 fired. That works for rule-board directives (which already feel
 template-y and end up in the `[Directives: …]` tail), but it is the
@@ -860,9 +1027,9 @@ preserved):
 |---|---|---|
 | Where it lands | `[Directives: …]` tail of AIML payload | The spoken spine, woven into `support_pieces` |
 | What it consumes | `MacroFact.rendered_text` | `MacroFact` as a whole (role + structured) |
-| Operation | `replace(rule_text, "%TIME%" => fact.rendered_text)` | `_macro_fact_to_clause(fact, action_family)` → routed through `_swap_words_in` alongside triples / companion patterns / UNSURE hedges |
+| Operation | `replace(rule_text, "&TIME&" => fact.rendered_text)` | `_macro_fact_to_clause(fact, action_family)` → routed through `_swap_words_in` alongside triples / companion patterns / UNSURE hedges |
 | Shape of output | Template-like, fine for directive tail | Organic clause, joins the synthesis pipeline at `Main.jl:1497–1527` |
-| Purpose | Lets rule authors still write `"the time is %TIME%"` if they want | Default behaviour: macros become a 4th `support_pieces` source so the spine reads naturally |
+| Purpose | Lets rule authors still write `"the time is &TIME&"` if they want | Default behaviour: macros become a 4th `support_pieces` source so the spine reads naturally |
 
 Both channels see the same locked macro set, both use the same
 per-cycle resolver cache, both honour single-fire dedup. The user's
@@ -900,7 +1067,7 @@ end
 This runs **once per cycle, regardless of how many rules reference any
 given placeholder**. The cache survives both downstream channels. Each
 resolver function is invoked exactly once per cycle even if three rules
-all carry `%TIME%`.
+all carry `&TIME&`.
 
 ### 7.2 Stage B (§7a) — rule-board substitution channel
 
@@ -916,14 +1083,20 @@ for (name, fact) in fact_cache
     processed = replace(processed, trig.placeholder => fact.rendered_text)
 end
 
-# Strict-mode survivor check.
+# Strict-mode survivor check.  Regex matches all three sigil shapes:
+#   %X% (token), &X& (functor), @X@ (both).
+const _MACRO_SIGIL_RE = r"[%&@][A-Z_]+[%&@]"
+
 if MacroTriggers.MACRO_STRICT_MODE[]
-    surviving = collect(eachmatch(r"%[A-Z_]+%", processed))
+    surviving = collect(eachmatch(_MACRO_SIGIL_RE, processed))
+    # Filter for *matched-bracket* placeholders (skip e.g. "%X&" which can't be a real macro).
+    surviving = filter(m -> first(m.match) == last(m.match), surviving)
     if !isempty(surviving)
         error("!!! FATAL: unresolved macro placeholders survived render: $(join([m.match for m in surviving], \", \")) !!!")
     end
 else
-    for m in eachmatch(r"%[A-Z_]+%", processed)
+    for m in eachmatch(_MACRO_SIGIL_RE, processed)
+        first(m.match) == last(m.match) || continue
         @warn "[MACRO] unresolved placeholder $(m.match) left intact (strict mode off)"
     end
 end
@@ -984,7 +1157,7 @@ end
 - `InputQueue` token inhibitions (recently-used-word suppression)
 
 This means a macro-generated clause comes out the other side feeling
-varied across cycles, not parroted. Two consecutive `%TIME%` fires
+varied across cycles, not parroted. Two consecutive `&TIME&` fires
 won't say the literal same thing.
 
 ### 7.4 The skeleton-aware phrasing dispatcher — `_macro_fact_to_clause`
@@ -1023,14 +1196,14 @@ function _macro_fact_to_clause(fact::MacroFact, action_family::Symbol)::String
         return isempty(expr) ? "that comes out to $txt" : "$expr equals $txt"
 
     elseif role === :self_narrative
-        # %REFLECT% — first-person introspection, no template glue
+        # &REFLECT& — first-person introspection, no template glue
         return txt   # resolver already produced a sentence-like fragment
 
     elseif role === :mood
         return "i'm feeling $txt"
 
     elseif role === :uncertainty
-        # %UNCERTAINTY% — hedges into the spine
+        # &UNCERTAINTY& — hedges into the spine
         return txt   # e.g. "i'm not totally sure but"
 
     elseif role === :literal_text
@@ -1046,7 +1219,7 @@ end
 
 Three things to note:
 
-1. **No JSON-template scaffolding, no `[Time: %TIME%]` brackets.** The
+1. **No JSON-template scaffolding, no `[Time: &TIME&]` brackets.** The
    output is a clause fragment. The synthesis pipeline downstream
    handles capitalization, punctuation, and joining via the same path
    triples and companion patterns already use.
@@ -1063,7 +1236,7 @@ Three things to note:
 
 ### 7.5 Conflict resolution between §7a and §7b
 
-If a fired rule's template explicitly contains `%TIME%`, §7a substitutes
+If a fired rule's template explicitly contains `&TIME&`, §7a substitutes
 it inline. The same `MacroFact` *also* gets woven into `support_pieces`
 by §7b. Result: the rule-board tail will mention the time, AND the
 spoken spine may also reference it. **This is acceptable and matches
@@ -1101,14 +1274,14 @@ function time_utc(ctx::CycleContext)::MacroFact
     hh = Dates.hour(n)
     mm = Dates.minute(n)
     rendered = Dates.format(n, "HH:MM \"UTC\"")
-    return MacroFact("%TIME%", :current_time, rendered,
+    return MacroFact("&TIME&", :current_time, rendered,
                      Dict{String,Any}("hh"=>hh, "mm"=>mm, "tz"=>"UTC"))
 end
 
 function date_utc(ctx::CycleContext)::MacroFact
     t = today()
     rendered = Dates.format(t, "yyyy-mm-dd")
-    return MacroFact("%DATE%", :current_date, rendered,
+    return MacroFact("&DATE&", :current_date, rendered,
                      Dict{String,Any}("y"=>Dates.year(t),
                                       "m"=>Dates.month(t),
                                       "d"=>Dates.day(t)))
@@ -1120,11 +1293,11 @@ function calc_eval(ctx::CycleContext)::MacroFact
     # NEVER calls eval. Supports +, -, *, /, parentheses, decimals.
     expr = _extract_numeric_expression(ctx.mission_text)
     if isnothing(expr)
-        return MacroFact("%CALC%", :calculation, "<no expression found>",
+        return MacroFact("&CALC&", :calculation, "<no expression found>",
                          Dict{String,Any}("expression"=>"", "result"=>nothing))
     end
     result = _safe_arithmetic(expr)
-    return MacroFact("%CALC%", :calculation, string(result),
+    return MacroFact("&CALC&", :calculation, string(result),
                      Dict{String,Any}("expression"=>expr, "result"=>result))
 end
 
@@ -1138,7 +1311,7 @@ function reflect_self(ctx::CycleContext)::MacroFact
     #   "i've been mostly agreeing with myself the last few cycles"
     #   "my action choices have drifted toward query lately"
     fragment = _summarize_recent_self(ctx)   # reads ctx.recent_lobe_paths, ctx.recent_action_families
-    return MacroFact("%REFLECT%", :self_narrative, fragment,
+    return MacroFact("&REFLECT&", :self_narrative, fragment,
                      Dict{String,Any}("window"=>ctx.reflection_window))
 end
 
@@ -1149,7 +1322,7 @@ function mood_summary(ctx::CycleContext)::MacroFact
            arousal > 0.5 ? "engaged" :
            arousal > 0.3 ? "even"    :
                            "low-key"
-    return MacroFact("%MOOD%", :mood, word,
+    return MacroFact("&MOOD&", :mood, word,
                      Dict{String,Any}("arousal"=>arousal))
 end
 
@@ -1161,7 +1334,7 @@ function uncertainty_phrase(ctx::CycleContext)::MacroFact
                conf > 0.4  ? "i think"                   :
                conf > 0.25 ? "i'm not totally sure but"  :
                              "honestly i'm guessing here"
-    return MacroFact("%UNCERTAINTY%", :uncertainty, fragment,
+    return MacroFact("&UNCERTAINTY&", :uncertainty, fragment,
                      Dict{String,Any}("confidence"=>conf))
 end
 
@@ -1207,7 +1380,7 @@ function __init__()
 
         # Phase-1 built-in triggers seeded:
         register_macro_trigger!(MacroTrigger(
-            "current_time", "%TIME%",
+            "current_time", "&TIME&",
             MacroCoherenceProfile([
                 ModalityCheck(:action_family, [:ACTION_QUERY, :ACTION_COMMAND], 1.0),
                 ModalityCheck(:verb_class,    "temporal",                       1.0),
@@ -1215,7 +1388,7 @@ function __init__()
             :builtin, ResolverPayload("time_utc")
         ))
         register_macro_trigger!(MacroTrigger(
-            "current_date", "%DATE%",
+            "current_date", "&DATE&",
             MacroCoherenceProfile([
                 ModalityCheck(:action_family, [:ACTION_QUERY], 1.0),
                 ModalityCheck(:verb_class,    "temporal",     1.0),
@@ -1223,7 +1396,7 @@ function __init__()
             :builtin, ResolverPayload("date_utc")
         ))
         register_macro_trigger!(MacroTrigger(
-            "calc", "%CALC%",
+            "calc", "&CALC&",
             MacroCoherenceProfile([
                 ModalityCheck(:lemma_class, "numeric",    1.0),
                 ModalityCheck(:verb_class,  "arithmetic", 1.0),
@@ -1231,7 +1404,7 @@ function __init__()
             :builtin, ResolverPayload("calc_eval")
         ))
         register_macro_trigger!(MacroTrigger(
-            "reflect", "%REFLECT%",
+            "reflect", "&REFLECT&",
             MacroCoherenceProfile([
                 ModalityCheck(:action_family, [:ACTION_QUERY, :ACTION_REFLECT], 1.0),
                 ModalityCheck(:lemma_class,   "self_pronoun",                   1.0),
@@ -1239,7 +1412,7 @@ function __init__()
             :builtin, ResolverPayload("reflect_self")
         ))
         register_macro_trigger!(MacroTrigger(
-            "mood", "%MOOD%",
+            "mood", "&MOOD&",
             MacroCoherenceProfile([
                 ModalityCheck(:action_family, [:ACTION_QUERY],    1.0),
                 ModalityCheck(:lemma_class,   "affect_word",      1.0),
@@ -1247,7 +1420,7 @@ function __init__()
             :builtin, ResolverPayload("mood_summary")
         ))
         register_macro_trigger!(MacroTrigger(
-            "uncertainty", "%UNCERTAINTY%",
+            "uncertainty", "&UNCERTAINTY&",
             MacroCoherenceProfile([
                 ModalityCheck(:tone_family, [:TONE_HEDGED, :TONE_CURIOUS], 1.0),
             ], :all, 1.0),
@@ -1357,7 +1530,7 @@ will throw at fire time, caught by the strict-mode handler in §7.
 - locked_macros = top_tier carriers ∩ coherence-eligible (sub-top
   carriers' macros excluded).
 - Single-fire dedup when same macro carried by multiple top-tier nodes.
-- Per-cycle resolver caching: `%TIME%` referenced N times resolves once.
+- Per-cycle resolver caching: `&TIME&` referenced N times resolves once.
 - Coherence: macro fires when ALL declared modalities match, doesn't
   fire when ANY missed.
 - Strict mode: unresolved `%X%` throws; non-strict warns and leaves
@@ -1369,7 +1542,7 @@ will throw at fire time, caught by the strict-mode handler in §7.
 - Placeholder collision rejected at registration.
 - Calc resolver: `"what is 12 * (3 + 4)"` returns `"84"`. NEVER calls
   `Meta.parse` or `eval`.
-- Built-in `%TIME%`, `%DATE%`, `%CALC%` work end-to-end with their
+- Built-in `&TIME&`, `&DATE&`, `&CALC&` work end-to-end with their
   default profiles.
 
 ### Phase 2 — remote resolvers + richer modalities
@@ -1435,7 +1608,7 @@ will throw at fire time, caught by the strict-mode handler in §7.
    `arithmetic` (verb), `temporal` (verb, augmentation), `numeric`
    (lemma), `self_pronoun` (lemma), `affect_word` (lemma). Confirm all
    five land in phase 1, or defer the introspection-related ones
-   (`self_pronoun`, `affect_word`) along with `%REFLECT%` / `%MOOD%`.
+   (`self_pronoun`, `affect_word`) along with `&REFLECT&` / `&MOOD&`.
 
 4. **`/nodeMacro` placement.** Phase 1 assumes the user explicitly
    attaches a macro to a node via slash command. Confirm that's the
@@ -1499,3 +1672,288 @@ gate, single-fire dedup, multi-modal coherence dispatcher, `MacroFact`
 envelope, two-channel render (§7a rule-board + §7b synthesis weaving),
 six phase-1 resolvers spanning world-value / introspection / literal
 text.*
+
+---
+
+## 15. Relational delta and meta-arrows
+
+**This section is conceptual scaffolding, not a code change.** It
+names the principle the engine is already enacting and pre-lists the
+phase-2 resolver roles that will expose it.
+
+### 15.1 The relational-delta principle
+
+Every meta-concept the engine cares about — time, knowledge, identity,
+context, evaluation, commitment — is *a delta between two states of
+the same relational field*, not an absolute position. The arrow exists
+because the delta has a preferred sign at the boundary conditions even
+though the substrate rules are symmetric.
+
+This is the same trick a transformer uses, with two differences:
+
+| Transformer | grugbot420 |
+|---|---|
+| Soft attention over fixed token positions | Bioavailability + coherence gates over evolving concepts |
+| Multi-head, each head reading one projection | Multi-modal (`af:` `tf:` `vc:` `lc:` `ar:` `to:`), each modality reading one semantic subsystem |
+| Differentiable softmax weights | Threshold-gated discrete locks-in (with snap-rounding, §17) |
+| Residual stream | Node strength accumulating across cycles |
+| Layer-N → Layer-N+1 delta | Cycle-N → Cycle-N+1 lobe-path delta |
+| Position encoding | InputQueue recency + cycle counter |
+| Gradient backprop | `/right` / `/wrong` strength shifts (local, not global) |
+
+**Where grugbot diverges by design** — these are features, not bugs:
+
+- **Discrete identity per concept.** `dog#42` has a name and a history.
+  Transformers smear "dog" across embedding dimensions.
+- **Hard forgetting via apoptosis.** Strength → 0 → grave is real
+  deletion. Transformer weights only ever decay toward zero.
+- **Refusal to commit.** No top-tier lock-in → no fire (or UNSURE
+  hedge). Transformers always emit something.
+- **Reorganizable substrate.** Nodes spawn, link, die. Transformer
+  weights are fixed once trained.
+- **Nonlinear gates.** Threshold-and-snap, not smooth sigmoid
+  weighting. Decisions are discrete; the *deltas* between them are
+  continuous.
+
+The fuzzy-and-nonlinear character is what makes the relational-delta
+substrate behave like a cognitive system rather than a function
+approximator.
+
+### 15.2 Meta-arrows the engine already implicitly tracks
+
+Each of these is a directional gradient on a relational field that's
+substrate-symmetric but boundary-asymmetric. They exist in current
+code as *implicit state changes between cycles*; the §15 framing just
+names them.
+
+| Meta-arrow | Where it lives in current code |
+|---|---|
+| **Time** | Cycle counter, recency-weighted recent-lobe-paths, InputQueue token decay |
+| **Knowledge / information** | Node strength accumulating, contributor lists growing, drop_table learning |
+| **Commitment / decision** | Vote → lock-in pipeline; once `cast_vote` fires, the vote is recorded |
+| **Identity / individuation** | Nodes refining over their lifetime; apoptosis as the only de-individuation |
+| **Context / habituation** | InputQueue inhibitions (recently-said-words get suppressed) |
+| **Evaluation** | `/right` / `/wrong` shifting strength; once shifted, can be re-shifted but never un-shifted |
+| **Causation** | Contributor chains: votes that contributed to output are recorded as upstream of that output |
+
+### 15.3 Phase-2 arrow-relative resolver roles
+
+These extend the §3.5.4 `semantic_role` taxonomy with **delta** roles
+alongside the existing **snapshot** roles. Adding a new role is
+additive (new `_macro_fact_to_clause` dispatch branch) and does not
+require any engine-level changes if the delta data is already implicit
+in `CycleContext`.
+
+| role                     | snapshot or delta | typical use                                           |
+|--------------------------|-------------------|-------------------------------------------------------|
+| `:elapsed_cycles`        | delta             | "a few cycles back you said X"                        |
+| `:strength_shift`        | delta             | "i've been warming up to that idea"                   |
+| `:habituation_level`     | snapshot of delta-history | "i've been thinking about that a lot lately"  |
+| `:confidence_shift`      | delta             | "i used to be more sure"                              |
+| `:recency_position`      | snapshot near head of time arrow | "you just mentioned X"                  |
+| `:topic_drift`           | delta             | "we were on Y, now we're on X"                        |
+| `:commitment_age`        | delta             | "i decided that a while ago"                          |
+
+Each delta resolver returns a `MacroFact` whose `structured` carries the
+**numeric delta** but whose `rendered_text` is **qualitative** ("a
+while ago", "warming up", "lately"). The fuzzy-nonlinear character
+pays off here: the user never sees a number, just the arrow's
+direction projected into language.
+
+**Phase 2 is when these land.** Phase 1 ships only the six snapshot
+resolvers in §8. The §15 framing is documentation that this is the
+direction of expansion.
+
+### 15.4 Engine-level prerequisite (deferred)
+
+Implementing arrow-relative resolvers requires lightweight delta
+plumbing in the engine — minimally `previous_strength` on `Node`,
+`previous_inhibition` on InputQueue tokens, and a `deltas` sub-bundle
+on `CycleContext`. **This is a separate plan doc** (working title:
+`RELATIONAL_DELTA_NOTES.md`) to be written when phase 2 starts. It
+isn't on the phase-1 critical path.
+
+---
+
+## 16. Sigils and user-defined variants
+
+This section makes explicit the type-discipline-via-sigil model
+introduced in §3.5.2. It's the same content from a different angle —
+focused on the user-facing semantics and how the substrate dispatches.
+
+### 16.1 The three sigils
+
+| Sigil      | Variant      | Resolver signature                                | Computation? | Seed?  |
+|------------|--------------|---------------------------------------------------|--------------|--------|
+| `%NAME%`   | `token`      | (none — literal text)                             | no           | yes    |
+| `&NAME&`   | `functor`    | `(ctx::CycleContext) -> MacroFact`                | yes          | no     |
+| `@NAME@`   | `both`       | `(seed::String, ctx::CycleContext) -> MacroFact`  | yes          | yes    |
+
+A `&NAME&` variant tagged `remote` (phase 2) shares the functor sigil
+but bypasses the resolver registry — it owns its own HTTP/JSON-path
+machinery.
+
+### 16.2 Why sigils
+
+Three reasons sigils are the right shape for this:
+
+1. **Type discipline is visible at parse time.** The substrate knows
+   what kind of macro it's looking at *before* any registry lookup,
+   from the bracketing characters alone. No null checks, no runtime
+   "is this seeded" branching.
+
+2. **The registry is heterogeneous-but-typed.** All four variants
+   (`token`, `functor`, `both`, `remote`) live in the same
+   `MACRO_TRIGGER_REGISTRY` because they're variants of the same
+   `MacroPayload` sum type. The dispatcher picks the right call shape
+   from the variant tag.
+
+3. **The user-facing namespace is open.** Anyone running `/macro`
+   creates a new entry that inhabits one of the three sigil-tagged
+   variants. The sigil space is finite (three characters); the *name*
+   space is infinite (any `[A-Z_]+`). Users author variants of a
+   single type without writing code — provided their macro is `token`
+   or uses an existing functor.
+
+### 16.3 Reading rule-board templates with mixed sigils
+
+A rule-board template can mix all three sigil shapes:
+
+```
+"hey, &TIME& and i was thinking about %DOG_FACT% — @MOOD_PHRASE@"
+```
+
+The render pass (§7) handles each sigil shape with the same
+substitution-or-weave routing, dispatching by variant:
+
+- `&TIME&` → functor resolver call → `MacroFact` with `rendered_text="14:32 UTC"`
+- `%DOG_FACT%` → token literal lookup → `MacroFact` with `rendered_text="dogs are mammals"`
+- `@MOOD_PHRASE@` → both resolver call (seed `"i'm"` + functor) → `MacroFact` with `rendered_text="i'm wired"`
+
+All three then flow through both render channels (§7a substitution into
+the rule-board tail, §7b weaving as `support_pieces`).
+
+### 16.4 Adding a new variant in the future
+
+If phase 3 introduces another macro mode (e.g. `?NAME?` for stochastic
+macros that return different facts each call within a cycle), it adds:
+
+- One new sigil character pair
+- One new payload struct
+- One new method of `resolve_payload`
+- One new sigil pair entry in §4.5's sigil-variant agreement check
+
+Everything else in the substrate is sigil-agnostic. **The sigil model
+is extensible by design.**
+
+---
+
+## 17. Fuzzy snap-rounding at decision boundaries
+
+Engine-wide numerical hygiene. Continuous values that feed discrete
+decisions get **snapped to the nearest round point** when they're
+within a small epsilon. This eliminates borderline-flicker without
+changing the *shape* of any decision boundary.
+
+### 17.1 The principle
+
+Floating-point comparison `==` is unsafe for the same reason that
+threshold-style decisions are unsafe at the boundary: infinitesimal
+differences produce categorically different outcomes. The fix is the
+same in both cases — compare within tolerance.
+
+```julia
+function _snap(x::Real, point::Real, eps::Real = 0.01)::Real
+    return abs(x - point) < eps ? point : x
+end
+
+function _snap_to_any(x::Real, points::Vector{<:Real}, eps::Real = 0.01)::Real
+    for p in points
+        abs(x - p) < eps && return p
+    end
+    return x
+end
+```
+
+The default epsilon is `0.01` (1% of the `[0, 1]` range that most
+engine continuous values live in). Per-snap-point overrides allowed.
+
+### 17.2 Snap points the engine cares about
+
+Each consumer that branches on a continuous value snaps before
+comparing. No new subsystem; just a `_snap` call inserted before the
+existing `>` or `>=` test.
+
+| Consumer | Continuous value | Natural snap points |
+|---|---|---|
+| Bioavailability gate (§5) | vote confidence | `{0, AIML_CONFIDENCE_THRESHOLD, 1}` |
+| Top-tier window | confidence delta from max | `{0, AIML_TOP_TIER_WINDOW}` |
+| Apoptosis | node strength | `{0, APOPTOSIS_THRESHOLD, 1}` |
+| Coherence weighted score (phase 2) | modality match score | `{0, MACRO_COHERENCE_THRESHOLD, 1}` |
+| InputQueue inhibition | decay value | `{0, 1}` |
+| Arousal mood-band edges | EyeSystem arousal | `{0, 0.3, 0.5, 0.7, 1}` (current mood thresholds in `mood_summary`) |
+
+### 17.3 Why this is engine-wide hygiene, not macro-specific
+
+Snap-rounding belongs in the engine because **every continuous-to-
+discrete decision boundary has the same boundary-flicker problem.**
+The macro plan documents it because §5 (bioavailability) and §6
+(coherence) both depend on it being in place. But the right
+implementation is:
+
+1. Add `_snap` / `_snap_to_any` to a small `EngineMath.jl` (or inline
+   into `engine.jl`).
+2. Insert `_snap` calls at the comparison sites listed in §17.2.
+3. Macro code consumes `_snap` for its own threshold checks the same
+   way every other engine subsystem does.
+
+### 17.4 What snapping is NOT
+
+To prevent scope creep, snap-rounding is explicitly **not**:
+
+- A smoothstep / sigmoid envelope. Decisions stay discrete; only the
+  *inputs* to those decisions get rounded.
+- A band-pass filter. There's no upper-saturation roll-off. A vote
+  with confidence 0.97 is still maximally bioavailable; it just isn't
+  meaningfully different from confidence 0.96 for gating purposes.
+- A change to the `0.05` window or `0.15` threshold values. The
+  numbers stay the same; their *evaluation* gains epsilon-tolerance.
+- A replacement for `:weighted` coherence. That phase-2 combiner still
+  produces a weighted score; snap-rounding just stabilizes the
+  threshold check at the end.
+
+### 17.5 Worked example
+
+Without snapping, two adjacent cycles might behave like this:
+
+```
+cycle N:    confidence = 0.1497   →  below threshold (0.15) → no fire
+cycle N+1:  confidence = 0.1503   →  above threshold       → fire
+cycle N+2:  confidence = 0.1499   →  below threshold       → no fire
+```
+
+A user observes the engine flickering at the edge.
+
+With snapping (eps = 0.01):
+
+```
+cycle N:    confidence = 0.1497   →  snaps to 0.15 → at threshold → tie-broken consistently
+cycle N+1:  confidence = 0.1503   →  snaps to 0.15 → at threshold → same outcome
+cycle N+2:  confidence = 0.1499   →  snaps to 0.15 → at threshold → same outcome
+```
+
+The tie-breaking rule (e.g. `>=` vs `>`) is now what determines
+behaviour at the snapped point, not floating-point noise. Whichever
+rule is chosen, **the engine's behavior is consistent across nearby
+cycles**.
+
+This is the smoothness the user named: not smoothing the *decisions*,
+but smoothing the *inputs* so decisions stop being noise-driven at
+their boundaries.
+
+---
+
+*Plan revisions complete: §3.5 (sigil-tagged sum-type variants), §4
+(JSON registration), §5 (snap-aware bioavailability), §7 (sigil-aware
+regex), and new §15 (relational delta + meta-arrows), §16 (sigils +
+user-defined variants), §17 (fuzzy snap-rounding).*
