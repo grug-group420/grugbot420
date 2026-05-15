@@ -4,7 +4,14 @@
 resolved.
 
 **Revision history (most recent first):**
-- *current* — radical simplification. Macros are not functors; they
+- *current* — Hopfield familiarity correction. The Hopfield fast-path
+  is disabled in current grug (`engine.jl:2453` call site commented
+  out, functions retained for test compat only); the savings were
+  sub-microsecond at the 1000-nodes-per-cycle lobe cap and didn't
+  justify the cache-coherence bookkeeping. §1 gains a §1.9
+  subsection making this explicit; §5's activation-pathway list
+  drops the obsolete "Hopfield familiarity" entry.
+- *prior* — radical simplification. Macros are not functors; they
   are `(regex, scope, template)` enforcement directives optionally
   attached to a vote. Pattern-bind already identifies that the input
   contains a macro-relevant structure (existing engine surface, no
@@ -88,7 +95,7 @@ mutable struct Node
     grave_reason::String
     response_times::Vector{Float64}
     ledger_last_cleared::Float64
-    hopfield_key::UInt64
+    hopfield_key::UInt64                 # ← legacy field; Hopfield fast-path is disabled in current engine (functions retained for test compat only — see §1.9)
     fired_this_cycle::Bool
     voted_this_cycle::Bool
     gained_this_cycle::Bool
@@ -231,6 +238,48 @@ strings flow into the synthesis pipeline as ordinary
 (action-family skeleton claims, supporting triples, companion
 patterns, UNSURE hedges). No new keyword arguments. No envelope.
 No skeleton-aware clause dispatcher.
+
+### 1.9 Hopfield familiarity cache — disabled, not load-bearing
+
+`engine.jl` retains the Hopfield surface (`HOPFIELD_CACHE`,
+`HOPFIELD_CACHE_LOCK`, `hopfield_input_hash`, `hopfield_lookup`,
+`hopfield_record!`, plus `Node.hopfield_key`) **for test-suite
+compatibility only**. The actual fast-path call site that would
+short-circuit a full lobe scan with a precomputed node-id list
+is commented out at `engine.jl:2453`. The disabling rationale is
+in the comment block above that call site:
+
+> *"Hopfield caching should only be used for RIDICULOUSLY LARGE
+> lobe sizes (50,000+ nodes per lobe) where memory access becomes
+> a bottleneck. Current lobe architecture with 1000 node cap per
+> cycle makes this obsolete."*
+
+In practice the cache was saving sub-microsecond per cycle on the
+current architecture while introducing cache-coherence bookkeeping
+(stale signatures when patterns mutated, hit-count thresholds,
+LobeTable-shard fanout) that cost more in maintenance and
+edge-case bugs than it returned in throughput.
+
+**Implications for this plan:**
+
+1. **§5's activation-pathway list omits Hopfield familiarity.**
+   The voter's pattern-bind reaches it via the standard scan
+   pathways (lexical / lemma / verb / relational / neighbor /
+   lobe / immune); Hopfield is not a real shortcut today.
+2. **Macros do not interact with `HOPFIELD_*` symbols.** The
+   `MacroPlugins` module does not read or write the cache.
+3. **`Node.hopfield_key` is a legacy field that survives in the
+   struct.** This plan does not propose removing it. If a future
+   cleanup pass deletes the field, no macro-side code is
+   affected.
+4. **`Main.jl` save/load and stats still touch `HOPFIELD_CACHE`**
+   for inventory purposes (counting entries, draining on `/clear`,
+   reporting in `/sandboxStatus`). Specimen JSON may still carry
+   a hopfield section. None of this is on the macro hot path; the
+   existing serialization stays as-is.
+
+This plan was originally drafted referencing Hopfield familiarity
+as a live activation pathway; that reference has been corrected.
 
 ---
 
@@ -661,9 +710,16 @@ activation pathway for macros for free:
 - Verb classes (`{ARITHMETIC}`, `{INTROSPECTIVE}`).
 - Relational triples (`(user, asks, time)`).
 - Neighbor links (the voter activated because a sibling activated).
-- Hopfield familiarity (the input is similar to a known input).
 - Lobe routing.
 - Immune gates.
+
+(Hopfield familiarity was a sixth pathway in earlier engine
+revisions but the fast-path is disabled in current grug —
+`hopfield_lookup` / `hopfield_record!` are still exported for
+test-suite compatibility, but the call site at `engine.jl:2453`
+is commented out. The savings were sub-microsecond at the current
+1000-nodes-per-cycle lobe cap and the cache-coherence bookkeeping
+created more headaches than it removed. See §1.9 for context.)
 
 If pattern-bind activates the voter, the voter is "relevant" and
 its macro tail (if any) fires. If pattern-bind doesn't activate
