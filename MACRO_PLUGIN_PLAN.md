@@ -186,69 +186,195 @@ runs unchanged.
 
 ---
 
-## 2. Mental model — macros are user-defined commands
+## 2. Mental model — macros are mandatory follow-ons to a primary action
 
-The clean restatement:
+The clean restatement (revised, supersedes every earlier framing):
 
 > **Every voter node has a `pattern` (what activates it) and an
 > `action_packet` (what it can do when it wins).** Pattern-bind handles
-> activation. `select_action` picks one of the action packet's entries
-> as the winning action. `COMMANDS[winning_action]` is the handler that
-> produces output text. **Macros are user-registered entries in
-> `COMMANDS`**, with arbitrary internal logic — regex parsers, functor
-> calls, thesaurus lookups — composed declaratively at registration
-> time.
+> activation. `select_action` picks one of the *primary* action-packet
+> entries — grug-defined actions like `reason`, `greet`, `inform` —
+> via the existing weighted coinflip. **The macro, if the voter
+> declared one, fires *after* the primary. It's not a coinflip
+> candidate. It is mandatory.** AIML then weaves the primary's output
+> and the macro's output into one natural-language utterance.
 
-Three properties this commits to:
+In other words: the action_packet now has **two halves separated by
+`>>`**:
 
-1. **No new node type.** Macros do not introduce a new `Node` subclass.
-   Voter nodes write macro action names into their action packets like
-   any other action.
+```
+primary_action[neg]^weight | other_primary^weight  >>  &MACRO&(args)[neg]^weight
+        ── coinflip pool ──────────────────────────       ── always fires after ──
+```
 
-2. **No cycle-level eligibility gate.** Activation is voter-pattern-bind;
-   selection is `select_action` weighted coinflip. If the macro's
-   containing voter loses, the macro doesn't fire. The lock-in
-   bioavailability concept is subsumed entirely by the voting machinery.
+The `>>` is new grammar. To the left: same old weighted-coinflip world.
+To the right: an optional single macro invocation that fires
+unconditionally if the voter wins the cycle.
 
-3. **No parallel registry.** `COMMANDS` is the registry. Macro handlers
-   live alongside `"reason"`, `"greet"`, etc. The user's `/macro`
-   command registers a new `COMMANDS[action_name]` entry built from
-   declaratively-composed parts (functor + arg-parser + optional output
-   shaper).
+### Three properties this commits to
+
+1. **Primary vote is grug-flavoured.** `reason` / `greet` / `inform` /
+   etc. — never the macro. The coinflip never picks `&calculate&`.
+   Macros are not in the same pool.
+
+2. **Macro is not optional once attached.** If the voter has a `>>`
+   tail and that voter wins, the macro fires. No second coinflip,
+   no probability gate. The voter's pattern-bind already decided
+   "this input warrants this macro"; once the primary fires, the
+   macro just runs.
+
+3. **AIML weaves both outputs.** The primary handler produces its
+   text the way it always has. The macro handler produces a
+   `MacroFact`. AIML's existing synthesis pipeline takes both
+   simultaneously — the primary's output as the spoken spine, the
+   macro's `MacroFact` woven in via the §7b channel. **One utterance,
+   not two.**
+
+Concretely: ask `"hey what time is it"` to a voter with action_packet
+`"inform^1.0 >> &TIME&"`. Primary fires `inform` (produces "ok so").
+Macro fires `&TIME&` (produces `MacroFact(rendered_text="14:32 UTC")`).
+AIML weaves: *"ok so right now it's 14:32 UTC"*.
 
 ### Why this is better than every prior framing
 
-I'd been forcing macros to be a parallel system bolted onto voting:
-cycle-level registry iteration, separate eligibility check, separate
-dispatcher, separate persistence, separate feedback path. **Every one
-of those redundancies disappears under the user-definable-COMMANDS
-model**, because `COMMANDS` already has all of it.
+The earlier "macros are coinflip candidates" model conflated two
+distinct decisions: *what kind of speech act is this?* (primary) and
+*what world-fact am I committing to?* (macro). Forcing both through
+one weighted coinflip meant 71% of the time you'd get the calculator,
+29% you'd get plain `reason`, and the answer to "what is 2 plus 2"
+would sometimes lose its arithmetic. The split-grammar model fixes
+this: the speech act is the coinflip, the world-fact commitment is
+mandatory once the voter wins.
 
-| Concern                | Old framing (parallel)                        | New framing (user-defined COMMANDS)                |
-|------------------------|-----------------------------------------------|----------------------------------------------------|
-| Pattern matching       | Custom multi-modal coherence dispatcher       | **Voter pattern-bind. Same as every other node.**  |
-| Eligibility            | Cycle-level registry iteration + coherence    | **`select_action` picks the macro entry. Done.**   |
-| Firing predicate       | "Top-tier non-empty" cycle gate               | **Vote lock-in. Same as text-node actions.**       |
-| Dedup                  | Per-cycle `MacroFact` cache by name           | **Each macro action is one COMMANDS entry; runs once if selected.** |
-| Multiple per cycle     | Awkward "first carrier ferries all"           | **Each top-tier voter contributes whatever its action is, including macro actions.** |
-| Reinforcement          | Phase 3 self-tuning of coherence profiles     | **Existing strength/apoptosis/contributor-chain machinery.** |
-| Persistence            | New top-level registry section                | **Persist the `/macro` JSON spec list; replay at boot to rebuild COMMANDS entries.** |
-| Sigil discipline       | Parser-level type tag                         | **Naming convention for user-registered actions.** |
+The earlier "parallel subsystem" framing (cycle-level registry,
+coherence dispatcher, bioavailability gate) is still gone — pattern-
+bind is still the eligibility gate, `COMMANDS[action]` is still the
+dispatch table, persistence is still just the JSON spec list. **What
+changes is one new field on `Vote`, one new separator in the
+action_packet grammar, and one new line in `cast_vote` that fills
+the field.**
 
-The macro plug-in becomes a **specialization of the existing command
-system**, not a parallel system.
+| Concern                | Old framing (coinflip candidate)                  | New framing (mandatory follow-on)                  |
+|------------------------|---------------------------------------------------|----------------------------------------------------|
+| Pattern matching       | Voter pattern-bind                                | **Voter pattern-bind. Unchanged.**                 |
+| Primary selection      | Macro competes against `reason` etc.              | **Coinflip is grug-actions only. Macro is separate.** |
+| Macro firing           | Selected by coinflip (might not fire)             | **Mandatory if voter wins and declared one.**      |
+| Output composition     | Macro replaces primary handler entirely           | **Primary fires → macro fires → AIML weaves both.** |
+| Registry               | `COMMANDS[macro_action]`                          | **`COMMANDS[macro_action]`. Same.**                |
+| Persistence            | `MACRO_SPEC_REGISTRY` JSON specs                  | **`MACRO_SPEC_REGISTRY` JSON specs. Same.**        |
+| Sigil discipline       | Naming convention                                 | **Naming convention. Same.**                       |
+| New engine state       | Zero                                              | **One `String` field on `Vote`. (§3)**             |
+
+The macro plug-in is **a sidecar to the primary action**, registered
+the same way, dispatched through the same `COMMANDS` table, but
+sequenced *after* the primary instead of competing with it.
 
 ---
 
-## 3. Struct additions — none
+## 3. Struct additions — one field on `Vote`, one separator in the grammar
 
-**The phase-1 surface area on engine-side mutable state is zero new
-fields.** `Node`, `Vote`, `VoteCandidate`, `cast_vote`, `select_action`,
-`parse_action_packet` are all unchanged. Specimens loaded from before
-this feature lands are forward-compatible with no migration.
+The phase-1 surface area on engine-side mutable state is **one new
+`String` field on `Vote`**. Earlier drafts of this document claimed
+"zero struct changes"; that claim is **retracted** as of the
+mandatory-follow-on revision (§2). The change is small and additive:
+specimens loaded from before this feature lands remain
+forward-compatible because the new field defaults to `""` (empty
+string = no macro tail).
 
-The only new module-level state is two new registries inside the new
-`MacroTriggers.jl` module (see §4):
+### 3.0 The `Vote` struct change
+
+```julia
+struct Vote
+    node_id::String
+    action::String                       # primary action (grug-defined, picked by select_action)
+    confidence::Float64
+    negatives::Vector{String}
+    user_triples::Vector{RelationalTriple}
+    node_triples::Vector{RelationalTriple}
+    antimatch::Bool
+    macro_action::String                 # NEW: full macro invocation string, "" if none
+end
+```
+
+`macro_action` is the **verbatim macro tail** as it appeared after the
+`>>` separator in the voter's action_packet — e.g.
+`"&calculate&(parse math from input)[don't assume]^2.5"`. It carries
+the whole invocation including args and inhibitions. Empty string
+means no macro tail was declared (most existing voters).
+
+### 3.1 The `>>` separator in `parse_action_packet`
+
+`parse_action_packet` (engine.jl:1912) gains a single split before
+its existing pipe-loop:
+
+```julia
+function parse_action_packet(packet::String)
+    # NEW: split off the macro tail (if any).
+    primary_packet, macro_tail = if occursin(">>", packet)
+        parts = split(packet, ">>"; limit=2)
+        (strip(parts[1]), strip(parts[2]))
+    else
+        (packet, "")
+    end
+
+    # ... existing pipe-loop logic operates on `primary_packet` only ...
+    # ... return now also includes macro_tail ...
+end
+```
+
+The macro tail is a **single invocation string** — not pipe-delimited,
+not coinflipped. It's stored in `Vote.macro_action` verbatim by
+`cast_vote` and consumed by the macro dispatch step (§5).
+
+Constraint: a voter declares **at most one macro per action_packet**.
+If the user wants conditional macro behaviour (e.g. "calculate when
+math, reflect when introspective"), they create separate voter nodes
+with different patterns. Pattern-bind already specializes; the macro
+tail rides on the pattern.
+
+### 3.2 The `cast_vote` change
+
+`cast_vote` (engine.jl:2850) gains two lines: one to receive the
+macro tail from the parser, one to store it on the Vote.
+
+```julia
+function cast_vote(id, conf, antimatch, u_trips, n_trips)
+    # ... existing setup ...
+
+    winning_action, negatives, macro_tail = select_action(node.action_packet)
+    #                              ^^^^^^^^^^ NEW: parser also returns the tail
+
+    # ... existing COMMANDS validation for winning_action (primary) ...
+
+    # NEW: validate the macro tail's action name resolves in COMMANDS too.
+    if !isempty(macro_tail)
+        macro_action_name = _extract_macro_action_name(macro_tail)
+        if !haskey(COMMANDS, macro_action_name)
+            error("!!! FATAL: Grug rolled unknown macro [$macro_action_name]! !!!")
+        end
+    end
+
+    bump_strength!(node)
+
+    return Vote(id, winning_action, conf, negatives, u_trips, n_trips,
+                antimatch, macro_tail)
+    #                      ^^^^^^^^^^ NEW
+end
+```
+
+`_extract_macro_action_name` is a small helper that pulls the
+sigil-bracketed name out of an invocation string like
+`"&calculate&(args)[neg]^2.5"`. Phase-1 implementation: regex match
+against `^([%&@][A-Z_a-z0-9]+[%&@])`.
+
+`select_action` is augmented to return a 3-tuple; the existing
+weighted-coinflip logic stays exactly the same and operates only on
+the primary half.
+
+### 3.3 Module-level state — registries unchanged
+
+The new module-level state inside `MacroTriggers.jl` is the same as
+before:
 
 ```
 const RESOLVER_REGISTRY     :: Dict{String, ResolverFn}   # functor implementations
@@ -260,7 +386,11 @@ const MACRO_STRICT_MODE     :: Ref{Bool}                  # default false
 
 The `COMMANDS` dict in `engine.jl` is not duplicated — it's extended
 by `register_macro!` calls (which add closures into the existing
-`COMMANDS`).
+`COMMANDS`). Macro handlers live alongside `"reason"`, `"greet"`,
+etc. The only difference between a grug-defined `COMMANDS` entry
+and a macro `COMMANDS` entry is **how it's invoked** — primary
+handler runs as `Vote.action`, macro handler runs as the tail of
+`Vote.macro_action` (§5).
 
 ### 3.1 `MacroFact` envelope — return type for resolvers
 
@@ -394,14 +524,23 @@ When a `/macro` command runs, the substrate:
    convention as the rest of the engine.
 3. **Stores the `MacroSpec`** in `MACRO_SPEC_REGISTRY` keyed by
    `action_name`. This is the persisted-to-specimen state.
-4. **Builds the handler closure** and inserts it into `COMMANDS`:
+4. **Builds the handler closure** and inserts it into `COMMANDS`.
+
+**Important: the macro handler closure has a different shape from a
+grug-defined command handler.** Grug-defined handlers (e.g. `reason`)
+take the full vote bundle and return a finished AIML payload string.
+Macro handlers take the same bundle but return a `MacroFact` — they
+**do not call `generate_aiml_payload` themselves**. AIML weaving is
+the dispatch site's job (§5), because AIML needs to weave the
+primary's output and the macro's fact together. A macro that calls
+AIML on its own would render twice.
 
 ```julia
 function _build_macro_handler(spec::MacroSpec)::Function
     return (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
-        # 1. Extract arg-string from the action invocation.
-        #    primary_vote.action is e.g. "&calculate&(parse math from input)".
-        arg_string = _extract_macro_args(primary_vote.action, spec.placeholder)
+        # 1. Extract arg-string from the macro invocation tail on the vote.
+        #    primary_vote.macro_action is e.g. "&calculate&(parse math from input)[don't assume]^2.5".
+        arg_string = _extract_macro_args(primary_vote.macro_action, spec.placeholder)
 
         # 2. Apply registered arg-parser.
         parser_fn = lock(MACRO_TRIGGER_LOCK) do
@@ -410,7 +549,8 @@ function _build_macro_handler(spec::MacroSpec)::Function
         isnothing(parser_fn) && error("!!! FATAL: arg_parser '$(spec.arg_parser)' not registered !!!")
         parsed_args = parser_fn(arg_string, mission, primary_vote)
 
-        # 3. Build CycleContext (see §6).
+        # 3. Build CycleContext (see §6). System clock + Julia REPL eval are
+        #    accessible to resolvers through the AIMLResolvers helpers (see §8).
         ctx = build_cycle_context(mission, node, primary_vote, sure_votes, unsure_votes, all_votes)
 
         # 4. Call the resolver per kind.
@@ -437,22 +577,25 @@ function _build_macro_handler(spec::MacroSpec)::Function
         # 5. Trust but verify.
         isempty(fact.rendered_text) && error("!!! FATAL: resolver '$(spec.fn)' returned empty rendered_text !!!")
 
-        # 6. Funnel through generate_aiml_payload, threading the MacroFact
-        #    in as a synthesis input. Two-channel render handles both
-        #    rule-board substitution (§7a) and synthesis weaving (§7b).
-        return generate_aiml_payload(
-            mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data;
-            macro_fact = fact
-        )
+        # 6. Return the MacroFact.  The dispatch site (Main.jl, §5) is what
+        #    threads this into generate_aiml_payload alongside the primary
+        #    handler's output.  The macro does NOT render on its own.
+        return fact
     end
 end
 ```
 
-The closure is a normal function. The substrate inserts it into
-`COMMANDS[spec.action_name]`. From `cast_vote`'s perspective, it's
-indistinguishable from a grug-defined command.
+The closure is a normal function, but its return type (`MacroFact`)
+differs from grug-defined handlers (`String`). The dispatch site
+distinguishes them by inspecting `Vote.macro_action`: if non-empty,
+the dispatcher knows the entry in `COMMANDS[macro_name]` is a macro
+handler returning a `MacroFact`, not a primary handler returning text.
 
 ### 4.3 Examples — one per kind
+
+In every example below, the voter's action_packet uses the new `>>`
+separator: primary candidates on the left (coinflip pool), the macro
+tail on the right (mandatory).
 
 **Token (`%X%`) — literal text, no computation:**
 
@@ -465,11 +608,14 @@ indistinguishable from a grug-defined command.
 }
 ```
 
-A voter node that writes `"%GREETING%[don't be too formal]^1.5"` into
-its action packet uses this. When the voter wins and `select_action`
-picks the macro entry, `COMMANDS["%GREETING%"]` runs the closure,
-which produces a `MacroFact` with `rendered_text="hey there friend"`,
-and the synthesis pipeline weaves it organically.
+A voter node with action_packet
+`"greet^1.0 | inform^0.5 >> %GREETING%[don't be too formal]^1.5"`
+uses this. When the voter wins the cycle, `select_action` coinflips
+between `greet` (weight 1.0) and `inform` (weight 0.5) — that's the
+primary. **Then** the macro fires unconditionally:
+`COMMANDS["%GREETING%"]` runs, returns
+`MacroFact(rendered_text="hey there friend")`. AIML weaves both into
+one utterance.
 
 **Functor (`&X&`) — computation over `CycleContext`:**
 
@@ -482,7 +628,9 @@ and the synthesis pipeline weaves it organically.
 }
 ```
 
-Voter: `"&TIME&[don't say utc unless asked]^2.0 | reason^1.0"`.
+Voter: `"inform^1.0 | reason^0.5 >> &TIME&[don't say utc unless asked]"`.
+Primary coinflip picks `inform` or `reason`. Macro fires after, hits
+the system clock, weaves "right now it's 14:32" into the response.
 
 **Both (`@X@`) — seed text plus a transforming functor:**
 
@@ -496,11 +644,9 @@ Voter: `"&TIME&[don't say utc unless asked]^2.0 | reason^1.0"`.
 }
 ```
 
-Voter: `"@MOOD_PHRASE@(emphasize current state)[don't be melodramatic]^1.5"`.
-The both-mode resolver `mood_word_for_arousal` has signature
-`(seed::String, parsed_args::Any, ctx::CycleContext) -> MacroFact`.
-It might return `MacroFact("@MOOD_PHRASE@", :mood, "$seed wired",
-Dict("arousal"=>0.78))`.
+Voter: `"reflect^1.0 >> @MOOD_PHRASE@(emphasize current state)[don't be melodramatic]"`.
+Primary fires `reflect`. Macro then composes `seed + arousal-word` →
+`MacroFact(rendered_text="i'm wired", structured=Dict("arousal"=>0.78))`.
 
 **Functor with custom arg-parser — math-from-natural-language:**
 
@@ -514,13 +660,15 @@ Dict("arousal"=>0.78))`.
 }
 ```
 
-Voter: `"&calculate&(parse math operation from user input, use thesaurus to identify word-forms)[don't make up numbers]^2.5"`.
+Voter: `"inform^1.5 | reason^1.0 >> &calculate&(parse math operation from user input, use thesaurus to identify word-forms)[don't make up numbers]"`.
 
-The `regex_math_or_thesaurus` arg-parser reads the voter's arg-string
-as a directive, looks at the user's mission text, runs a math-shaped
-regex pass, falls back to thesaurus number-word resolution, hands the
-extracted expression to `calc_eval`. `calc_eval` evaluates safely (no
-`Meta.parse`, no `eval`) and returns a `MacroFact` with the result.
+The `regex_math_or_thesaurus` arg-parser reads the user's mission
+text, runs a math-shaped regex pass, falls back to thesaurus
+number-word resolution, hands the extracted expression to `calc_eval`.
+`calc_eval` evaluates safely via the sandboxed Julia REPL eval helper
+(see §8) and returns a `MacroFact` with the result. Primary `inform`
+fires the speech-act framing; the macro contributes the actual
+arithmetic answer; AIML composes "ok so 2 plus 2 is 4."
 
 ### 4.4 Companion slash commands
 
@@ -557,93 +705,158 @@ know which kind of macro they're looking at.
 
 ### 4.6 Action-packet author constraints
 
-Voter authors writing macro entries into action packets must respect:
+Voter authors writing macro tails into action packets must respect:
 
-- **No `[`, `]`, `|`, `^` inside the macro arg-string.** These are
-  action-packet metasyntax. The arg-parser receives the arg-string
-  verbatim and can do whatever regex/thesaurus work it likes, but
-  the action-packet parser must be able to find the entry boundaries.
+- **At most one macro per action_packet.** The `>>` separator divides
+  the packet into a primary half (pipe-delimited coinflip pool) and a
+  macro half (single invocation). Two macro tails are not supported;
+  if you need conditional macro behaviour, create separate voter
+  nodes with different patterns.
+- **No `[`, `]`, `|`, `^`, `>` inside the macro arg-string.** These
+  are action-packet metasyntax. The arg-parser receives the
+  arg-string verbatim and can do whatever regex/thesaurus/REPL work
+  it likes, but the action-packet parser must be able to find entry
+  boundaries.
 - **No nested macro invocations.** `&outer&(&inner&(x))` is not
   supported in phase 1. The arg-parser reads the arg-string as
-  natural language, not as a recursive macro-language.
+  natural language, not as a recursive macro-language. (If a
+  resolver internally wants to invoke another macro's logic, it can
+  call the underlying functor directly via `RESOLVER_REGISTRY`.)
 - **Action-name uniqueness.** Two macros cannot share an action name.
   Two voters can both reference the same macro action; the registered
   closure runs identically for both.
+- **The `>>` separator is exact.** Whitespace around it is fine
+  (`pkt >> &macro&` or `pkt>>&macro&`). Anything else (`>>>`, `→`,
+  `==>`) is a parse error.
 
 ---
 
-## 5. Activation = voter pattern-bind. (Bioavailability gate removed.)
+## 5. Activation flow — primary fires, macro fires after, AIML weaves
 
-**The cycle-level bioavailability gate is gone.** Earlier drafts had a
-separate post-vote check ("only fire macros if `top_tier` non-empty"),
-plus a coherence-eligibility iteration over the registry. Both are
-**subsumed entirely by the existing voting machinery**.
+The cycle-level bioavailability gate is gone. The coherence-eligibility
+iteration over the registry is gone. **Everything that decides "does
+this macro run?" is the voter's pattern-bind plus the new `>>`
+separator in its action_packet.**
 
-The actual flow:
+### 5.1 The actual flow, end to end
 
 1. **Pattern-bind activates voter nodes** that match the input. Lexical
    patterns, signal scanning, relational triples, neighbor links,
    immune gates, lobe routing, Hopfield familiarity — every existing
-   activation pathway works for macros, because macros are just legal
-   `action_packet` entries on those voters.
+   activation pathway works. Macros add zero activation logic.
 
-2. **`select_action` picks the winning action** for each activated
-   voter via weighted coinflip. If the voter's action_packet contained
-   a macro entry, the coinflip might pick it. If picked, `Vote.action`
-   carries the macro string verbatim.
+2. **`select_action` picks the primary action** for each activated
+   voter via weighted coinflip over the **left half** of `>>` only.
+   Macros are not in this pool; they cannot win or lose this
+   coinflip. The voter's primary half might be `"reason^1.0 |
+   inform^0.5"` or just `"reason"` — same machinery, same probabilities.
 
-3. **`select_aiml_votes` produces `top_tier`, `subtop_tier`,
+3. **`select_action` also returns the macro tail.** If the voter's
+   action_packet had a `>>` separator, the right-hand string comes
+   back verbatim. If not, the macro tail is `""`.
+
+4. **`cast_vote` populates `Vote.macro_action`** with the tail and
+   validates the macro's action name resolves in `COMMANDS`. Loud
+   fail if not.
+
+5. **`select_aiml_votes` produces `top_tier`, `subtop_tier`,
    `rejected_tier`.** Standard. Macros that ride on rejected-tier
    voters are dropped because their carrier vote is dropped — not
    because of a separate macro gate.
 
-4. **`COMMANDS[primary_vote.action]` dispatches.** If the action is a
-   macro, the user-registered closure (§4.2) runs; otherwise a
-   grug-defined family handler runs. Either way the synthesis
-   pipeline is the same.
+6. **Dispatch site (Main.jl:1173) runs in two beats.**
 
-5. **Multiple top-tier macros in one cycle.** If two top-tier voters
-   each had a different macro action selected, both run during their
-   respective `COMMANDS` invocations. The synthesis pipeline weaves
-   both `MacroFact`s into the support_pieces stream (§7b). Single-fire
-   dedup is automatic — each voter votes once, each macro action runs
-   at most once per cycle by virtue of the voting structure.
+   ```julia
+   # Beat 1: primary handler runs.  Same line as today.
+   primary_output = COMMANDS[primary_vote.action](
+       mission, node, primary_vote, sure_votes, unsure_votes, votes)
 
-6. **No cycle-level coherence check.** Coherence-of-input-to-macro is
+   # Beat 2: NEW.  If the vote carried a macro tail, fire it.
+   macro_fact = nothing
+   if !isempty(primary_vote.macro_action)
+       macro_action_name = _extract_macro_action_name(primary_vote.macro_action)
+       macro_fact = COMMANDS[macro_action_name](
+           mission, node, primary_vote, sure_votes, unsure_votes, votes)
+       # macro_fact is a MacroFact, not a String.
+   end
+
+   # Beat 3: AIML weaves both into one utterance.
+   output = generate_aiml_payload(
+       mission, primary_vote, sure_votes, unsure_votes, votes, node.json_data;
+       primary_output = primary_output,
+       macro_fact     = macro_fact)
+   ```
+
+   Note: the existing dispatch line today already calls
+   `COMMANDS[primary_vote.action](...)` and assigns its result to
+   `output`. Under this plan, the primary handler's job changes:
+   instead of returning a finished payload, it returns the **spoken-
+   spine text** that AIML will weave with the macro's fact. (Phase-1
+   pragmatism: grug-defined handlers can be left returning their full
+   payload string, and `generate_aiml_payload` simply uses that as the
+   primary spine when `primary_output` is non-empty. Existing handlers
+   need no rewrite.)
+
+7. **Multiple top-tier voters in one cycle.** Each top-tier vote goes
+   through beats 1+2 independently. If two voters both had macro tails,
+   both macros fire. The synthesis pipeline weaves multiple `MacroFact`s
+   into the support_pieces stream (§7b). Single-fire dedup is automatic
+   per voter — each voter votes once, each macro tail runs at most
+   once per cycle by virtue of the voting structure.
+
+8. **No cycle-level coherence check.** Coherence-of-input-to-macro is
    handled by the voter's own pattern: if the voter doesn't match the
    input, it doesn't activate, its action_packet is never read, the
-   macro never even competes. The substrate's pattern-bind IS the
-   coherence gate.
+   macro never fires. The substrate's pattern-bind IS the coherence
+   gate.
 
-### 5.1 Snap-rounded thresholds (see §17)
+### 5.2 Why "fires after primary" matters
+
+The earlier "macros are coinflip candidates" model had a dead spot:
+when the user asked `"hey what time is it"` and the voter's
+action_packet was `"&TIME&^2.0 | reason^1.0"`, 33% of the time the
+coinflip picked `reason` and the time never got reported. Under the
+mandatory-follow-on model the primary coinflip becomes
+`"inform^1.0 | reason^0.5 >> &TIME&"` — the speech-act varies but
+the time always lands. **The voter author's intent ("this input
+warrants the time") gets honoured every cycle, while the speech-act
+phrasing still has natural variation.**
+
+Conversely if a voter doesn't want the macro to always fire, they
+just don't write a `>>` tail. Or they create a sibling voter with a
+narrower pattern that does have the tail. Pattern-bind specializes;
+the macro tail rides on the pattern.
+
+### 5.3 Snap-rounded thresholds (see §17)
 
 Existing voting thresholds (`AIML_TOP_TIER_WINDOW = 0.05`,
 `AIML_CONFIDENCE_THRESHOLD = 0.15`) get snap-rounded inputs to
 prevent borderline-flicker. This is engine-wide hygiene, not
 macro-specific. See §17 for the catalog of snap points.
 
-### 5.2 What the meta-programming feels like to a voter author
+### 5.4 What the meta-programming feels like to a voter author
 
-The user creates a node like this (existing slash command, unchanged):
+The user creates a node like this (existing slash command, unchanged
+except the action_packet now has a `>>` tail):
 
 ```
 /createNode "what is 2 plus 2"
   pattern: "what is {NUMBER} plus {NUMBER}"
-  action_packet: "&calculate&(extract two number tokens from user input, compute sum)[don't show work unless asked]^2.5 | reason^1.0"
+  action_packet: "inform^1.5 | reason^1.0 >> &calculate&(extract two number tokens from user input, compute sum)[don't show work unless asked]"
 ```
 
-The first action_packet entry is a macro invocation. Pattern-bind
-matches the input. `select_action` weighted-coinflips between the macro
-(weight 2.5) and `reason` (weight 1.0); 71% of the time, the macro
-wins. `cast_vote` returns a `Vote` whose action is the macro string.
-The macro handler runs, computes the answer, returns a `MacroFact`,
-synthesis weaves it into a natural-sounding sentence. Done.
+Pattern-bind matches the input. `select_action` weighted-coinflips
+between `inform` (1.5) and `reason` (1.0); 60% of the time `inform`
+wins, 40% `reason`. `cast_vote` returns a `Vote` whose `action` is
+the primary winner and whose `macro_action` is the calculator
+invocation verbatim. The dispatch site runs the primary handler,
+runs the macro handler, hands both to AIML. AIML synthesises one
+sentence: *"2 plus 2 is 4"* if `inform` won, *"so we add 2 and 2 and
+get 4"* if `reason` won. **The arithmetic answer always lands**;
+the speech-act phrasing varies organically.
 
-The voter author **never wrote a coherence profile**. The voter's
-pattern-bind handled coherence by activating only on matching inputs.
-The voter author just **wrote a regular action packet that happened to
-include a macro entry**. Identical to writing a normal action packet
-with `reason` or `greet`.
+The voter author **never wrote a coherence profile**. They just
+wrote a regular action packet with a macro tail.
 
 ---
 
@@ -729,12 +942,22 @@ they want over `CycleContext`.
 
 ---
 
-## 7. The render pass — `MacroFact` flows through synthesis
+## 7. The render pass — primary spine + `MacroFact` flow through synthesis
 
-The two-channel render is unchanged from the prior plan revision. The
-only difference: `MacroFact` arrives at synthesis through the
-`generate_aiml_payload` keyword argument `macro_fact`, set by the macro
-handler closure (§4.2), instead of via a separate `locked_macros` list.
+The two-channel render is unchanged in shape, but its inputs now
+include the **primary handler's spoken-spine output** alongside the
+`MacroFact`. Both arrive at `generate_aiml_payload` via the dispatch
+site (§5.1, beat 3) as keyword arguments:
+
+```julia
+generate_aiml_payload(...; primary_output=primary_output, macro_fact=fact)
+```
+
+The primary output is the spoken spine (what the chosen speech-act
+sounds like — `inform`'s "ok so", `reason`'s "thinking through this",
+etc.). The `MacroFact` is the world-fact commitment (the time, the
+arithmetic answer, the mood word). AIML weaves them into a single
+utterance.
 
 ### 7.1 The user's "normal sentence" requirement
 
@@ -878,39 +1101,121 @@ trigger out of §7b.
 ## 8. Built-in resolvers and arg-parsers — `AIMLResolvers.jl`
 
 A new module containing the phase-1 set of registered functors and
-arg-parsers.
+arg-parsers. Two AIML-side capabilities are wired into the resolver
+toolkit explicitly:
+
+- **System clock access** via `Dates.now(UTC)` / `Dates.today()`. Used
+  by `time_utc`, `date_utc`, and any user resolver that registers and
+  needs a wall clock.
+- **Julia REPL eval (sandboxed)** via the `_repl_eval(expr_str)`
+  helper. Evaluates an expression string inside a tightly-scoped
+  module that whitelists a small set of safe operators and functions.
+  This is what gives `calc_eval` its arithmetic, what gives users the
+  ability to register `&lambda&`-style resolvers that compute
+  arbitrary closure-shaped logic at macro-fire time, and what makes
+  meta-programming over the cycle state genuinely open-ended.
+
+### 8.0 The sandboxed REPL eval helper
+
+```julia
+# Sandbox module — created once at load time, reused on every eval.
+baremodule _MacroEvalSandbox
+    using Base: +, -, *, /, ^, %, ÷, \\, abs, min, max, round, floor, ceil,
+                sqrt, exp, log, sin, cos, tan, π, ℯ, Float64, Int, ==, !=,
+                <, <=, >, >=, &&, ||, !, ifelse
+    # Nothing else.  No `eval`, no `include`, no `Core`, no `Base.run`,
+    # no I/O, no filesystem, no network.
+end
+
+function _repl_eval(expr_str::String)
+    # 1. Parse to AST.  This step uses Meta.parse but does not execute.
+    expr = Meta.parse(expr_str)
+
+    # 2. Walk the AST and reject any symbol/call not in the sandbox whitelist.
+    _validate_ast(expr)   # throws on disallowed names, macros, blocks, etc.
+
+    # 3. Evaluate inside the sandbox module.  Any reference to a non-
+    #    whitelisted binding fails at lookup with UndefVarError.
+    return Core.eval(_MacroEvalSandbox, expr)
+end
+```
+
+`_validate_ast` enforces:
+- No `:macrocall`, `:module`, `:import`, `:using`, `:export`,
+  `:global`, `:toplevel`, `:eval`, `:include`.
+- No symbol whose name starts with `@`.
+- All `:call` heads must be a `Symbol` present in the sandbox's
+  imported set; method calls on objects (`x.foo()`) are rejected.
+- All bare `Symbol`s must be either whitelisted operators/functions
+  or the names bound by the expression itself (let-bindings, lambda
+  args).
+
+Lambdas (`x -> x*2`, `(a,b) -> a+b`) are allowed — `:->` is a normal
+Expr head, the validator just walks into the body. This is what
+"macros can do lambda type moves" cashes out as: a user can register
+a resolver that builds and applies an anonymous function at fire
+time, all inside the sandbox.
+
+If the AST validator rejects the expression, the resolver returns a
+`MacroFact` with `semantic_role=:unavailable` and `rendered_text="<unsafe expression>"` (under non-strict mode), or throws (under strict
+mode).
 
 ### 8.1 Resolvers (registered in `RESOLVER_REGISTRY`)
 
 ```julia
 module AIMLResolvers
 using Dates
-using ..MacroTriggers: MacroFact, CycleContext
+using ..MacroTriggers: MacroFact, CycleContext, _repl_eval
 
 # === Category A: world-value =============================================
 
 function time_utc(args, ctx::CycleContext)::MacroFact
-    n  = now(UTC)
+    n  = now(UTC)                   # system clock access
     return MacroFact("&TIME&", :current_time, Dates.format(n, "HH:MM \"UTC\""),
                      Dict{String,Any}("hh"=>Dates.hour(n), "mm"=>Dates.minute(n), "tz"=>"UTC"))
 end
 
 function date_utc(args, ctx::CycleContext)::MacroFact
-    t = today()
+    t = today()                     # system clock access
     return MacroFact("&DATE&", :current_date, Dates.format(t, "yyyy-mm-dd"),
                      Dict{String,Any}("y"=>Dates.year(t), "m"=>Dates.month(t), "d"=>Dates.day(t)))
 end
 
 function calc_eval(args, ctx::CycleContext)::MacroFact
     # `args` is the parsed expression string from the arg-parser.
-    # Hand-rolled shunting-yard. NEVER calls Meta.parse, NEVER calls eval.
+    # Evaluates via the sandboxed Julia REPL helper — full arithmetic,
+    # math functions, and lambda forms are allowed, nothing else.
     expr_str = args isa String ? args : string(args)
     if isempty(expr_str)
         return MacroFact("&CALC&", :calculation, "<no expression found>",
                          Dict{String,Any}("expression"=>"", "result"=>nothing))
     end
-    result = _safe_arithmetic(expr_str)
+    result = try
+        _repl_eval(expr_str)
+    catch err
+        return MacroFact("&CALC&", :calculation, "<unsafe or invalid expression>",
+                         Dict{String,Any}("expression"=>expr_str, "result"=>nothing,
+                                          "error"=>sprint(showerror, err)))
+    end
     return MacroFact("&CALC&", :calculation, string(result),
+                     Dict{String,Any}("expression"=>expr_str, "result"=>result))
+end
+
+function repl_eval(args, ctx::CycleContext)::MacroFact
+    # Generic sandboxed-eval functor.  Lets user macros register
+    # against this resolver to get full arithmetic + lambda power
+    # with a custom arg-parser that decides what gets evaluated.
+    expr_str = args isa String ? args : string(args)
+    isempty(expr_str) && return MacroFact("&EVAL&", :calculation, "",
+                                          Dict{String,Any}("expression"=>"", "result"=>nothing))
+    result = try
+        _repl_eval(expr_str)
+    catch err
+        return MacroFact("&EVAL&", :calculation, "<unsafe or invalid expression>",
+                         Dict{String,Any}("expression"=>expr_str, "result"=>nothing,
+                                          "error"=>sprint(showerror, err)))
+    end
+    return MacroFact("&EVAL&", :calculation, string(result),
                      Dict{String,Any}("expression"=>expr_str, "result"=>result))
 end
 
@@ -955,6 +1260,13 @@ end
 end # module
 ```
 
+The new `repl_eval` resolver is the meta-programming workhorse: a
+user can register their own arg-parser that transforms a voter's
+arg-string + cycle context into a Julia expression string, point it
+at `repl_eval`, and effectively register **arbitrary computational
+macros** at runtime — including lambda forms, conditional dispatch,
+small numerical pipelines — without ever touching the engine source.
+
 ### 8.2 Arg-parsers (registered in `ARG_PARSER_REGISTRY`)
 
 ```julia
@@ -987,7 +1299,10 @@ end
 
 The four phase-1 starter parsers cover the main shapes: raw-passthrough,
 discard, math-from-natural-language, topic-extraction. Phase 2 lets users
-register their own arg-parsers via a separate slash command.
+register their own arg-parsers via a separate slash command — at which
+point users can compose any `(arg_parser → repl_eval)` pipeline they
+want and effectively define lambdas-at-fire-time entirely from the
+slash-command surface.
 
 ### 8.3 Registration — `MacroTriggers.__init__()`
 
@@ -998,6 +1313,7 @@ function __init__()
         RESOLVER_REGISTRY["time_utc"]              = FunctorResolver(AIMLResolvers.time_utc)
         RESOLVER_REGISTRY["date_utc"]              = FunctorResolver(AIMLResolvers.date_utc)
         RESOLVER_REGISTRY["calc_eval"]             = FunctorResolver(AIMLResolvers.calc_eval)
+        RESOLVER_REGISTRY["repl_eval"]             = FunctorResolver(AIMLResolvers.repl_eval)
         RESOLVER_REGISTRY["reflect_self"]          = FunctorResolver(AIMLResolvers.reflect_self)
         RESOLVER_REGISTRY["mood_summary"]          = FunctorResolver(AIMLResolvers.mood_summary)
         RESOLVER_REGISTRY["uncertainty_phrase"]    = FunctorResolver(AIMLResolvers.uncertainty_phrase)
@@ -1016,6 +1332,9 @@ function __init__()
                                    "date_utc",      "passthrough",    "", ""))
         register_macro!(MacroSpec("&CALC&",         "&CALC&",         :functor,
                                    "calc_eval",     "regex_math_or_thesaurus", "", ""))
+        register_macro!(MacroSpec("&EVAL&",         "&EVAL&",         :functor,
+                                   "repl_eval",     "passthrough",    "",
+                                   "sandboxed Julia eval — supports lambdas, math, conditionals"))
         register_macro!(MacroSpec("&REFLECT&",      "&REFLECT&",      :functor,
                                    "reflect_self",  "passthrough",    "", ""))
         register_macro!(MacroSpec("&MOOD&",         "&MOOD&",         :functor,
@@ -1202,10 +1521,16 @@ node-level migration is needed — `Node` and `Vote` are unchanged.
 
 ## 12. What this plan deliberately rejects
 
+- **Macros as competing entries in the primary coinflip.** Earlier
+  drafts had voters write `"&calculate&^2.5 | reason^1.0"` — putting
+  the macro and a grug-action into one weighted pool. Rejected:
+  conflates the speech-act decision with the world-fact commitment,
+  and lets the calculator stochastically *not* fire when the user
+  asked an arithmetic question. Mandatory-follow-on (§2 / §5) replaces
+  this entirely.
 - **A new `Node` subtype for macros.** Macros are not a node type. They
-  are user-registered entries in `COMMANDS`, dispatched via the same
-  `cast_vote` → `select_action` → `COMMANDS[action]` pipeline that
-  every other action uses.
+  are user-registered entries in `COMMANDS`, dispatched as
+  mandatory follow-ons after the primary handler.
 - **A cycle-level macro registry iteration.** Activation is voter
   pattern-bind, not a separate eligibility loop over registered
   macros. The substrate's pattern-bind IS the eligibility filter.
@@ -1213,23 +1538,39 @@ node-level migration is needed — `Node` and `Vote` are unchanged.
   multi-modal machinery becomes optional internal tooling for
   resolver authors (phase 2), not a system-level eligibility gate.
 - **Per-node `macro_signal` field.** Macros are written into voter
-  `action_packet`s as legal action-name entries. No per-node
-  attachment, no parallel field.
+  `action_packet`s after the `>>` separator. No per-node
+  attachment, no parallel field — only `Vote.macro_action` carries
+  the per-cycle invocation forward (§3.0).
 - **Template-paste output.** Macros never produce rigid sentence
-  structures. The two-channel render (§7) routes `MacroFact`s through
-  the existing organic synthesis pipeline.
-- **`Meta.parse` / `eval` for math.** `calc_eval` uses a hand-rolled
-  shunting-yard, never Julia's evaluator.
+  structures. The two-channel render (§7) routes `MacroFact`s and
+  the primary handler's spine output through the existing organic
+  synthesis pipeline.
+- **Hand-rolled arithmetic-only `calc_eval`.** Phase 1 uses a
+  sandboxed Julia REPL eval (§8.0) because users will inevitably
+  want lambda forms, conditionals, and small numerical pipelines —
+  a hand-rolled shunting-yard would force every non-trivial macro
+  to live in engine source. The sandbox whitelists a small set of
+  safe operators/functions and rejects everything else at AST-walk
+  time.
 
 ---
 
 ## 13. Open questions still requiring sign-off before code
 
-1. **Phase 1 resolver scope.** Phase 1 ships SEVEN resolvers:
-   `time_utc`, `date_utc`, `calc_eval`, `reflect_self`, `mood_summary`,
-   `uncertainty_phrase`, `mood_word_for_arousal`. Confirm scope, or
-   trim if any of `reflect_self` / `mood_summary` need engine-level
-   plumbing not yet present.
+1. **Phase 1 resolver scope.** Phase 1 ships EIGHT resolvers:
+   `time_utc`, `date_utc`, `calc_eval`, `repl_eval`, `reflect_self`,
+   `mood_summary`, `uncertainty_phrase`, `mood_word_for_arousal`.
+   Confirm scope, or trim if any of `reflect_self` / `mood_summary`
+   need engine-level plumbing not yet present.
+
+2. **Sandbox whitelist scope (§8.0).** Phase 1 imports a small set of
+   safe operators and `Base` math functions into `_MacroEvalSandbox`:
+   arithmetic operators, comparisons, logical operators, `abs`, `min`,
+   `max`, `round`, `floor`, `ceil`, `sqrt`, `exp`, `log`, `sin`,
+   `cos`, `tan`, `π`, `ℯ`, plus numeric type constructors. Confirm
+   the set; in particular, confirm whether `string`, `length`,
+   collection literals, and tuple/array indexing should be in or out
+   for phase 1.
 
 2. **Default strict mode.** Warn-and-keep-placeholder, or hard-error,
    when an unlocked sigil placeholder survives the §7a substitution
@@ -1270,33 +1611,37 @@ node-level migration is needed — `Node` and `Vote` are unchanged.
 
 | location                                  | change                                                                                                  |
 |-------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| `engine.jl`                               | **no struct changes.** `Node`, `Vote`, `cast_vote`, `select_action`, `parse_action_packet` untouched.   |
+| `engine.jl` :: `Vote`                     | + `macro_action::String` field (defaults to `""` for no tail)                                          |
+| `engine.jl` :: `parse_action_packet`      | + split off `>>` macro-tail before pipe-loop; return `(positives, negatives, action_items, macro_tail)` |
+| `engine.jl` :: `select_action`            | + return 3-tuple `(winning_action, negatives, macro_tail)`; coinflip logic over primary half only      |
+| `engine.jl` :: `cast_vote`                | + populate `Vote.macro_action`; + validate macro action name resolves in `COMMANDS`                    |
 | `engine.jl` (snap helpers, §17)           | + `_snap` and `_snap_to_any` helpers; insert at bioavailability / top-tier / apoptosis comparison sites |
 | `VoteOrchestrator.jl`                     | **no changes.**                                                                                         |
-| `Main.jl :: generate_aiml_payload`        | + optional `macro_fact::Union{Nothing,MacroFact}` keyword arg; §7a inline substitution; §7b synthesis weaving at line ~1497–1527 |
+| `Main.jl` (dispatch site, ~line 1173)     | + beat 2: if `vote.macro_action` non-empty, call `COMMANDS[macro_name](...)` returning `MacroFact`; + beat 3: pass `primary_output` and `macro_fact` kwargs to `generate_aiml_payload` |
+| `Main.jl :: generate_aiml_payload`        | + optional `primary_output::String` and `macro_fact::Union{Nothing,MacroFact}` keyword args; §7a inline substitution; §7b synthesis weaving at line ~1497–1527 |
 | `Main.jl :: _macro_fact_to_clause`        | NEW skeleton-aware phrasing dispatcher (~20 templates, 6 roles × QUERY/INFORM/COMMAND)                  |
 | `Main.jl` (slash command parser)          | JSON parser for `/macro` + `/macroForce`; literal matchers for `/macroRemove`, `/macroList`, `/argParserList`, `/resolverList`, `/setMacroStrict`. **No `/nodeMacro` / `/nodeMacroClear`.** |
 | `SemanticVerbs.jl`                        | + `arithmetic` verb class default; `temporal` augmentation                                              |
-| `patternscanner.jl` (or new helper)       | + `numeric`, `self_pronoum`, `affect_word` lemma classes                                                |
-| **NEW** `MacroTriggers.jl`                | `MacroFact`, `MacroSpec`, `CycleContext`, `RESOLVER_REGISTRY`, `ARG_PARSER_REGISTRY`, `MACRO_SPEC_REGISTRY`, `register_macro!`, `_build_macro_handler`, `_extract_macro_args`, `rebuild_macro_commands_from_specs!` |
-| **NEW** `AIMLResolvers.jl`                | `time_utc`, `date_utc`, `calc_eval`, `reflect_self`, `mood_summary`, `uncertainty_phrase`, `mood_word_for_arousal`, plus `__init__()` that seeds phase-1 specs into `MACRO_SPEC_REGISTRY` and `COMMANDS` |
+| `patternscanner.jl` (or new helper)       | + `numeric`, `self_pronoun`, `affect_word` lemma classes                                                |
+| **NEW** `MacroTriggers.jl`                | `MacroFact`, `MacroSpec`, `CycleContext`, `RESOLVER_REGISTRY`, `ARG_PARSER_REGISTRY`, `MACRO_SPEC_REGISTRY`, `_MacroEvalSandbox`, `_repl_eval`, `_validate_ast`, `register_macro!`, `_build_macro_handler`, `_extract_macro_args`, `_extract_macro_action_name`, `rebuild_macro_commands_from_specs!` |
+| **NEW** `AIMLResolvers.jl`                | `time_utc`, `date_utc`, `calc_eval`, `repl_eval`, `reflect_self`, `mood_summary`, `uncertainty_phrase`, `mood_word_for_arousal`, plus `__init__()` that seeds phase-1 specs into `MACRO_SPEC_REGISTRY` and `COMMANDS` |
 | `GrugBot420.jl`                           | include `MacroTriggers.jl` + `AIMLResolvers.jl` between `engine.jl` and `AIMLNodeSystem.jl`              |
 | Specimen JSON                             | + top-level `MACRO_SPEC_REGISTRY` section (specs persist; closures rebuild on boot)                     |
 
 ---
 
 *End of plan. No code lands until §13 open questions are resolved.
-Architecturally settled: macros are user-defined `COMMANDS` entries;
-activation is voter pattern-bind; selection is `select_action`
-weighted coinflip; dispatch is `COMMANDS[action]` exactly as for
-grug-defined actions. The substrate's existing pattern-bind /
-voting / lock-in / contributor / persistence / feedback machinery
-handles macros for free. The macro-specific machinery is purely
-render-time: `MacroFact` envelope, two-channel render
-(§7a rule-board substitution + §7b synthesis weaving), six phase-1
-resolvers spanning world-value / introspection / both-mode, four
-phase-1 arg-parsers covering passthrough / discard / math-extraction
-/ topic-extraction.*
+Architecturally settled: macros are user-defined `COMMANDS` entries
+that fire as **mandatory follow-ons** to the primary handler;
+activation is voter pattern-bind; primary selection is `select_action`
+weighted coinflip over the left half of `>>` only; macro dispatch is
+unconditional once the voter wins. AIML weaves the primary's spoken
+spine and the macro's `MacroFact` into one utterance via the existing
+two-channel render. Resolvers have direct system-clock access (via
+`Dates`) and full sandboxed Julia REPL eval (lambdas + math +
+conditionals, AST-validated against a small operator/function
+whitelist), giving users genuine meta-programming power from the
+slash-command surface.*
 
 ---
 
