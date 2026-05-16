@@ -24,9 +24,34 @@ The shapes are the same — the comparison frame was just wrong.
 
 ---
 
+## Pattern Bind
+
+### QoL-002: Thesaurus-expanded input at pattern bind phase
+**Status:** [ ] Pending  
+**Area:** Pattern bind / user input processing  
+**Problem:** Pattern bind runs user input as-is — one phrasing, one pass. If the
+nodes don't match on that exact wording, you miss. "Big cat" and "large cat"
+are the same sentence but only one door opens per pass.  
+**Fix:** At pattern bind phase, run the user input through the thesaurus
+(word-level synonym substitution only — no concept expansion, no intensity
+relations, no semantic inference). Generate multiple rephrasings of the same
+sentence and try each one. The meaning doesn't change — the input deforms to
+fit the topology that's already there. Natural leverage: don't force the nodes
+to handle every phrasing, let the query route to them.  
+**Constraints:**
+- Thesaurus is words only, not concepts. Matches only, not intensity relations.
+- Each rephrasing gets its own thread through pattern bind (no cross-contamination
+  between wordings). Results merge or compete downstream.
+- Cap limit on number of variations per input. Prevents combinatorial explosion.
+  Exact cap TBD — likely in the low single digits per word, total variations
+  bounded by a small constant N.
+- Only substitute words that contribute to coverage. Don't rephrase for no gain.
+
+---
+
 ## General
 
-### QoL-002: (reserved for future entries)
+### QoL-003: (reserved for future entries)
 
 ---
 
