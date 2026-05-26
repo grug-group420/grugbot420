@@ -3206,7 +3206,22 @@ function grow_nodes_from_packet(json_str::String;
 
     new_ids = String[]
     for (p, a, j, d, is_img) in validated
-        nid = create_node(p, a, j, d; is_image_node=is_img)
+        # GRUG: Optional initial_strength from json_data. Lets seed packets
+        # anchor "obvious-winner" nodes (e.g. greeting's "good morning" node
+        # for a greeting-domain query) at high strength so the strength-biased
+        # coinflip and downstream confidence ranking favor them. Honest fallback
+        # to 1.0 default if missing or malformed. Clamped to [FLOOR, CAP] inside
+        # create_node, so a packet asking for strength=999 lands at STRENGTH_CAP
+        # rather than crashing.
+        init_str = 1.0
+        if haskey(j, "initial_strength")
+            try
+                init_str = Float64(j["initial_strength"])
+            catch e
+                @warn "[ENGINE] grow_nodes_from_packet: bad initial_strength on a node ($(j["initial_strength"])), falling back to 1.0: $e"
+            end
+        end
+        nid = create_node(p, a, j, d; is_image_node=is_img, initial_strength=init_str)
         push!(new_ids, nid)
 
         # GRUG QoL-2025 BUG-008: If a target lobe was specified, route the
