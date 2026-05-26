@@ -672,6 +672,69 @@ function collect_nonjitter_ids()::Set{String}
 end
 
 # ==============================================================================
+# v7.20 — VOTE-LEVEL NONJITTER OVERRIDE
+# ==============================================================================
+# GRUG: Old NONJITTER was an absolute lifetime tag — once a node solidified,
+# every vote it cast was bit-stable forever. New rule: the tag is a
+# *baseline*, not an absolute. A solidified node's high-confidence votes stay
+# bit-stable (still a "crystallized rock"), but a *low-confidence* firing
+# from the same node still jitters. Why? "The solid rock is guessing" —
+# you don't want to ossify a guess just because the rock is usually right.
+#
+# Plumbing:
+#   - JITTER_CONFIDENCE_FLOOR : confidence below this forces jitter through.
+#   - jitter_allowed_for(node, conf) : single point of truth; both the node
+#     tag and the per-firing confidence are consulted.
+#
+# Callsite contract:
+#   * Node-only check (no confidence available yet, e.g. relational weight
+#     jitter at growth time): keep using is_nonjitter(node).
+#   * Confidence-bearing check (scan output, vote relay): use
+#     jitter_allowed_for(node, conf).
+#
+# Why a constant, not a config? The floor lives at the "this is a guess"
+# threshold — same conceptual line that CONTEXT_TRUST_FLOOR draws for memory
+# pulls. Both should move together if at all. A constant in the engine is
+# the right home; if it ever needs runtime tuning we expose a setter.
+# ==============================================================================
+
+# GRUG: A vote firing below this confidence is treated as a guess. Even on a
+# solidified (NONJITTER) node, jitter still runs to avoid ossifying the
+# guess. 0.50 is "I'm 50/50 on this" — anything below that is honestly
+# uncertain and deserves substrate noise.
+const JITTER_CONFIDENCE_FLOOR = 0.50
+
+"""
+    jitter_allowed_for(node::Node, confidence::Float64)::Bool
+
+GRUG v7.20: Single point of truth for "should jitter run for this firing?"
+Combines the node-level NONJITTER baseline with a per-firing confidence
+override.
+
+RETURNS:
+  - `true`  → jitter SHOULD run (default for unsolid nodes; also for solid
+              nodes when the current vote is low-confidence)
+  - `false` → jitter is suppressed (solid node firing a high-confidence vote)
+
+LOGIC:
+  - Unsolid node (no NONJITTER tag): jitter always runs → return true
+  - Solid node + confidence ≥ JITTER_CONFIDENCE_FLOOR: bit-stable → return false
+  - Solid node + confidence < JITTER_CONFIDENCE_FLOOR: low-conf override fires
+    → return true (rock is guessing, don't ossify the guess)
+
+CONTRACT: this function is pure (no mutation, no allocation, no I/O). Safe
+to call from hot paths.
+"""
+function jitter_allowed_for(node::Node, confidence::Float64)::Bool
+    # GRUG: Fast path — unsolid nodes always jitter.
+    if !is_nonjitter(node)
+        return true
+    end
+    # GRUG: Solid node — honor the per-firing confidence override.
+    return confidence < JITTER_CONFIDENCE_FLOOR
+end
+
+# ==============================================================================
 # v7.22 — STRENGTH-DRIVEN SOLIDIFICATION
 # ==============================================================================
 # GRUG: Nodes that prove themselves stop wiggling. Simple rule:
@@ -1539,7 +1602,16 @@ function fire_attachments!(target_id::String, active_count::Int, active_cap::Int
             # confidence is exactly att.base_confidence (floored at 0.1). This
             # is the system-wide promise of the tag: wherever a node-scoped
             # jitter happens, a NONJITTER-tagged node skips it.
-            jitter = is_nonjitter(attach_node_ref) ? 0.0 : randn() * RELAY_CONF_JITTER_SIGMA
+            #
+            # GRUG v7.20 VOTE-LEVEL OVERRIDE: even on a NONJITTER node, if the
+            # base confidence carried by the attachment is below
+            # JITTER_CONFIDENCE_FLOOR, the relay still jitters. "Solid rock,
+            # weak signal → still nudge it; we don't ossify guesses." This
+            # uses the same single-source-of-truth helper jitter_allowed_for
+            # used by the scan-side override.
+            jitter = jitter_allowed_for(attach_node_ref, att.base_confidence) ?
+                     randn() * RELAY_CONF_JITTER_SIGMA :
+                     0.0
             confidence = max(0.1, att.base_confidence + jitter)
 
             # GRUG: Return the connector pattern so generative knows WHY this relay fired.
@@ -2391,12 +2463,21 @@ v7.20 NONJITTER KWARG:
   inside the underlying cheap_scan calls is unaffected — that is a substrate-level
   behavior of the scanner and remains in effect for both forward and reverse passes.
   The NONJITTER tag silences only the post-fusion bounded micro-variance.
+
+v7.20 VOTE-LEVEL OVERRIDE (`jitter_floor`):
+  The NONJITTER tag is a *baseline*, not an absolute. If `nonjitter=true` BUT
+  the fused coherence comes in below `jitter_floor`, jitter still runs on the
+  output. This stops a solidified node from ossifying a low-confidence guess.
+  Default `jitter_floor=0.0` preserves the old behavior (no override). The
+  scan_and_expand caller passes `jitter_floor=JITTER_CONFIDENCE_FLOOR` to
+  activate the override system-wide.
 """
 function _bidirectional_cheap_scan(
     target::Vector{Float64},
     pattern::Vector{Float64};
     threshold::Real = 0.3,
-    nonjitter::Bool = false
+    nonjitter::Bool = false,
+    jitter_floor::Float64 = 0.0
 )::Tuple{Int, Float64}
     if isempty(target)
         # GRUG: Empty target is a scanner crash waiting to happen. Scream now!
@@ -2480,7 +2561,16 @@ function _bidirectional_cheap_scan(
     # the output is bit-stable for that node. Global _JITTER_ENABLED in
     # RelationalJitter is not consulted here — that switch governs relational
     # weight jitter, not confidence fusion.
-    final_conf = nonjitter ? smoothed_conf : slight_jitter(smoothed_conf)
+    #
+    # v7.20 VOTE-LEVEL OVERRIDE: NONJITTER is a *baseline*, not an absolute.
+    # When jitter_floor > 0 and the fused coherence falls below it, jitter
+    # runs even on a NONJITTER node. The semantics: a solidified rock that's
+    # only 30% sure of itself on this firing is *guessing*, and we don't want
+    # to ossify the guess. High-confidence firings (≥ floor) on solidified
+    # rocks remain bit-stable. Default jitter_floor=0.0 disables the override
+    # (old behavior).
+    suppress_jitter = nonjitter && smoothed_conf >= jitter_floor
+    final_conf = suppress_jitter ? smoothed_conf : slight_jitter(smoothed_conf)
 
     # GRUG: Return best alignment index (forward preferred; reverse is orientation-flipped
     # so its index doesn't map back to the original signal cleanly).
@@ -2856,6 +2946,11 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                 # canonical-form nodes return bit-stable confidence. Tag lives in
                 # node.required_relations (see is_nonjitter / set_nonjitter! above).
                 #
+                # v7.20 VOTE-LEVEL OVERRIDE: also pass JITTER_CONFIDENCE_FLOOR so a
+                # solidified rock firing low-confidence still gets jittered. The
+                # combined behavior is "high-conf solid: silent; low-conf solid:
+                # still jitters; unsolid: always jitters." See jitter_allowed_for.
+                #
                 # BUG-004: When pattern is longer than input, swap arg roles so
                 # the (smaller) input acts as the pattern and the (larger) node
                 # signal acts as the target. The cheap scan loops `(length(target)
@@ -2864,13 +2959,15 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                     _, token_conf = _bidirectional_cheap_scan(
                         node.signal, target_signal;
                         threshold=CHEAP_SCAN_THRESHOLD,
-                        nonjitter=is_nonjitter(node)
+                        nonjitter=is_nonjitter(node),
+                        jitter_floor=JITTER_CONFIDENCE_FLOOR
                     )
                 else
                     _, token_conf = _bidirectional_cheap_scan(
                         target_signal, node.signal;
                         threshold=CHEAP_SCAN_THRESHOLD,
-                        nonjitter=is_nonjitter(node)
+                        nonjitter=is_nonjitter(node),
+                        jitter_floor=JITTER_CONFIDENCE_FLOOR
                     )
                 end
             elseif effective_mode == 2

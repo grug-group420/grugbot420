@@ -43,6 +43,7 @@ const ALL_TESTS = [
     "test_nonjitter_tag.jl",
     "test_strength_solidify.jl",
     "test_chatter_v2.jl",
+    "test_v7_20.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

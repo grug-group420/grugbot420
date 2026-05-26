@@ -1379,19 +1379,42 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # "warm fire welcome friend" greeting node KNOWS it doesn't.
     #
     # CONTRACT: nodes opt in via `json_data["wants_context"] = true`
-    # at growth time. The orchestrator OR's all participating votes —
-    # if ANY contributing vote requests context, fresh memory is pulled.
-    # Default is FALSE: silence is grounding, noise must be earned.
+    # at growth time. The orchestrator OR's *winner* votes only —
+    # if any contributing winning vote requests context, fresh memory
+    # is pulled. Default is FALSE: silence is grounding, noise must be
+    # earned.
+    #
+    # GRUG v7.20: WINNERS-ONLY restriction.
+    # ------------------------------------------------------------------
+    # Previously, ANY contributing vote (including losers that didn't
+    # make it past the orchestrator's primary-or-tied filter) could
+    # flip pull_fresh=true. That was too generous: a low-confidence
+    # losing vote — which by definition didn't shape the answer —
+    # shouldn't get to drag the whole conversation tail in.
+    #
+    # New rule: only the primary vote and any votes tied with it at
+    # top confidence are eligible to request context. Losing votes
+    # are ignored. This matches the principle that *only what shapes
+    # the answer is allowed to ask for memory*.
     #
     # SAFETY NETS (independent of node flags):
     #   * UNSURE vote (ties at top)         → pull fresh
     #   * primary confidence < trust floor  → pull fresh
     # These cover the "cave is genuinely uncertain" case where context
-    # helps disambiguate even if no node asked for it.
+    # helps disambiguate even if no winner asked for it.
     # ------------------------------------------------------------------
+
+    # GRUG v7.20: Build the winning set = primary + any votes tied at the top.
+    # `sure_votes` already contains primary + ties (built upstream by the
+    # orchestrator). We use that directly so this stays in sync with the
+    # orchestrator's own "what counts as winning" definition. If sure_votes
+    # were empty (defensive edge case), fall back to {primary_vote} so the
+    # gate still has a single anchor to consult.
+    winning_votes = isempty(sure_votes) ? Vote[primary_vote] : sure_votes
+
     requesting_nodes = String[]
     lock(NODE_LOCK) do
-        for v in all_votes
+        for v in winning_votes
             n = get(NODE_MAP, v.node_id, nothing)
             isnothing(n) && continue
             if get(n.json_data, "wants_context", false) === true
@@ -1402,7 +1425,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
 
     pull_fresh_reason = ""
     pull_fresh = if !isempty(requesting_nodes)
-        pull_fresh_reason = "node(s) requested context: " * join(requesting_nodes, ", ")
+        pull_fresh_reason = "winning node(s) requested context: " * join(requesting_nodes, ", ")
         true
     elseif vote_certainty == "UNSURE"
         pull_fresh_reason = "vote certainty=UNSURE — context helps disambiguate"
@@ -1411,7 +1434,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         pull_fresh_reason = "primary confidence=$(round(primary_vote.confidence, digits=2)) < trust floor $(CONTEXT_TRUST_FLOOR)"
         true
     else
-        pull_fresh_reason = "SURE vote (conf=$(round(primary_vote.confidence, digits=2))) and no node requested context — fresh memory withheld"
+        pull_fresh_reason = "SURE vote (conf=$(round(primary_vote.confidence, digits=2))) and no winning node requested context — fresh memory withheld"
         false
     end
 

@@ -49,7 +49,10 @@ export ActionFamily, ToneFamily, PredictionResult,
        predict_action_tone, apply_prediction_to_arousal!,
        get_action_weight_multiplier, format_prediction_summary,
        reset_trajectory!, get_trajectory_state, TrajectoryConfig,
-       LAST_PREDICTION
+       LAST_PREDICTION,
+       # GRUG v7.20: heavy-fallback classifier surface
+       LOW_SIGNAL_THRESHOLD, FALLBACK_DAMP_THRESHOLD,
+       get_predictor_telemetry, reset_predictor_telemetry!
 
 # ==============================================================================
 # ENUM TYPES
@@ -89,6 +92,15 @@ struct PredictionResult
     action_distribution ::Dict{ActionFamily, Float64}  # Normalized action probabilities
     tone_distribution   ::Dict{ToneFamily, Float64}    # Normalized tone probabilities
     trajectory_damped   ::Bool   # True if Lorenz damping was applied this prediction
+    # GRUG v7.20: Which classifier path produced this result.
+    #   :lexicon  → keyword/marker lexicon (the default path; cheap and accurate
+    #              when the input contains explicit family markers).
+    #   :fallback → character-bigram fingerprint scoring (heavier; activated
+    #              when the lexicon shrugs because the input is a fragment,
+    #              jargon, or otherwise marker-poor). Pure Julia, no LLM.
+    # Why not a Bool? More modes may follow (e.g. :embedding, :phonetic);
+    # Symbol keeps the field future-proof and self-documenting in logs.
+    mode             ::Symbol
 end
 
 # GRUG: Last prediction stash. Set by predict_action_tone after a successful
@@ -271,6 +283,202 @@ const REFLECTIVE_PHRASES = [
     "i think", "i believe", "it seems", "i wonder",
     "one might", "it appears", "it suggests"
 ]
+
+# ==============================================================================
+# v7.20 — HEAVY-FALLBACK CHARACTER-BIGRAM CLASSIFIER
+# ==============================================================================
+# GRUG: When the lexicon shrugs (no marker tokens hit, total_action_signal <
+# LOW_SIGNAL_THRESHOLD), the old code defaulted to ASSERT and gave up. The
+# input might be a fragment, jargon, code, a typo'd command, or just text
+# that doesn't use any of our hand-curated marker words. Defaulting to
+# ASSERT in those cases is wrong twice: it's wrong about the action, and
+# it's wrong about the *confidence* — we report a confidence as if we
+# classified properly when we didn't.
+#
+# The fix: when the lexicon shrugs, run a heavier path that scores the
+# input's character bigrams against per-family fingerprints built from the
+# marker sets at module load time. This is NOT an LLM, NOT a transformer.
+# It's a tiny, fully-deterministic substring-shape classifier: pure Julia,
+# no deps, < 1ms per call, no network. The point is: when keywords don't
+# fire, *shape* still tells us something. "wat happen?" has no QUERY marker
+# (we don't have "wat") but its bigrams overlap heavily with the QUERY
+# fingerprint built from {"what","why","how",...}.
+#
+# Mode telemetry rides on PredictionResult.mode (:lexicon vs :fallback) so
+# downstream consumers can see which path produced the call. Counters are
+# kept in PREDICTOR_TELEMETRY for diagnostic readout.
+#
+# Trigger conditions (any of):
+#   1. total_action_signal < LOW_SIGNAL_THRESHOLD (the existing tripwire)
+#   2. Lorenz damping fired AND top-family confidence < FALLBACK_DAMP_THRESHOLD
+#      (i.e. the trajectory is locked into a strange attractor and the
+#      lexicon isn't pulling us out)
+#
+# Why the second trigger? Without it, a marker-rich input that happens to
+# be in a damped regime would never escape the attractor — the lexicon
+# would always return enough signal to skip the fallback. The damped-low-
+# conf trigger lets the heavier path break the loop.
+# ==============================================================================
+
+# GRUG: When raw action signal sums to less than this, the lexicon has
+# nothing to say and the heavy fallback takes over. Was implicit at 0.5
+# in the original code; now named so it's tunable + searchable.
+const LOW_SIGNAL_THRESHOLD = 0.5
+
+# GRUG: Top-family confidence below this, when combined with active Lorenz
+# damping, also triggers the heavy fallback. 0.4 is "the system isn't sure
+# even after damping was applied" — a strong signal that the lexicon path
+# has run out of road.
+const FALLBACK_DAMP_THRESHOLD = 0.4
+
+# GRUG: Build a character-bigram fingerprint from a set of marker words.
+# Returns Dict{String, Int} of bigram → count. Pure helper; called once
+# per family at module load. Uses 2-char windows over the lowercased word
+# with a leading/trailing space marker so word-boundary bigrams are
+# captured (`"^w"` and `"t$"` for "what" become `" w"` and `"t "`).
+function _build_bigram_fingerprint(words::Set{String})::Dict{String, Int}
+    fp = Dict{String, Int}()
+    for w in words
+        wl = " " * lowercase(w) * " "    # GRUG: pad with spaces so word-boundary bigrams count
+        if length(wl) < 2
+            continue
+        end
+        # GRUG: Iterate in BYTE space, not char space. ASCII markers only,
+        # so byte-bigrams are safe and let us avoid Char→String conversions
+        # on the hot path. nextind/prevind keep us valid even if a marker
+        # has unicode (none do today, but a future addition wouldn't crash).
+        idx = firstindex(wl)
+        while true
+            nxt = nextind(wl, idx)
+            nxt > lastindex(wl) && break
+            bg = wl[idx:nxt]
+            fp[bg] = get(fp, bg, 0) + 1
+            idx = nxt
+        end
+    end
+    return fp
+end
+
+# GRUG: Pre-built fingerprints for every action family. Built ONCE at
+# module load (these are `const`) — the marker sets never change at
+# runtime. If a future version exposes a "register marker" API, these
+# would need to become Refs and the API would rebuild them, but for now
+# the static const path is the fastest and simplest.
+const _ACTION_FAMILY_FINGERPRINTS = Dict{ActionFamily, Dict{String, Int}}(
+    ACTION_QUERY     => _build_bigram_fingerprint(QUERY_MARKERS),
+    ACTION_COMMAND   => _build_bigram_fingerprint(COMMAND_MARKERS),
+    ACTION_NEGATE    => _build_bigram_fingerprint(NEGATE_MARKERS),
+    ACTION_SPECULATE => _build_bigram_fingerprint(SPECULATE_MARKERS),
+    # GRUG: ASSERT and ESCALATE have no dedicated marker set in the
+    # lexicon — ASSERT is the default fallthrough and ESCALATE is signaled
+    # by punctuation/caps. Give them empty fingerprints so the fallback
+    # never *favors* them just because they have nothing to compete
+    # against; if no other family scores, ASSERT remains the default.
+    ACTION_ASSERT    => Dict{String, Int}(),
+    ACTION_ESCALATE  => Dict{String, Int}()
+)
+
+"""
+    _heavy_fallback_score(input_text::String) -> Dict{ActionFamily, Float64}
+
+GRUG v7.20: Score an input's character bigrams against each per-family
+fingerprint. Returns a Dict of family → raw score (NOT normalized — the
+caller folds these into action_scores and re-normalizes there).
+
+Score formula: for each bigram in the input that appears in a family's
+fingerprint, add `min(1.0, fp_count / 3.0)` to that family's score. The
+cap means a family with one heavily-recurring bigram doesn't dominate;
+breadth wins over depth, which matches the spirit of "shape-overlap"
+rather than "literal word match."
+
+PURE: no I/O, no allocation beyond the result dict, deterministic.
+
+NO SILENT FAILURES: empty input is a contract violation (the caller has
+already validated tokens_clean is non-empty by the time we reach the
+fallback), but we still defensively return an all-zero dict instead of
+crashing — the fallback is a *recovery* path and should never be the
+thing that crashes the predictor.
+"""
+function _heavy_fallback_score(input_text::String)::Dict{ActionFamily, Float64}
+    scores = Dict{ActionFamily, Float64}(
+        ACTION_ASSERT    => 0.0,
+        ACTION_QUERY     => 0.0,
+        ACTION_COMMAND   => 0.0,
+        ACTION_NEGATE    => 0.0,
+        ACTION_SPECULATE => 0.0,
+        ACTION_ESCALATE  => 0.0
+    )
+
+    # GRUG: Defensive — empty input would be a caller bug, but recovery
+    # paths should never crash. Return an all-zero dict so the upstream
+    # softmax falls through to the neutral default.
+    if isempty(strip(input_text))
+        return scores
+    end
+
+    # GRUG: Same padding scheme as fingerprint builder so bigrams align.
+    padded = " " * lowercase(input_text) * " "
+    if length(padded) < 2
+        return scores
+    end
+
+    # GRUG: Walk byte-bigrams over the input.
+    idx = firstindex(padded)
+    while true
+        nxt = nextind(padded, idx)
+        nxt > lastindex(padded) && break
+        bg = padded[idx:nxt]
+        # GRUG: Score this bigram against every family fingerprint. Hot
+        # path; the dict lookups are O(1) average.
+        for (fam, fp) in _ACTION_FAMILY_FINGERPRINTS
+            cnt = get(fp, bg, 0)
+            if cnt > 0
+                # GRUG: Cap per-bigram contribution so high-recurrence
+                # bigrams don't dominate. Divisor=3 picks "small but
+                # non-trivial" — most marker bigrams appear 1-3 times
+                # across their family.
+                scores[fam] += min(1.0, cnt / 3.0)
+            end
+        end
+        idx = nxt
+    end
+
+    return scores
+end
+
+# GRUG: Module-level diagnostic counters. Read by /status or test code.
+# Not lock-protected — single increment-per-call, last-write wins is fine
+# for telemetry. If we ever care about exact counts we can wrap a lock.
+const PREDICTOR_TELEMETRY = Dict{Symbol, Int}(
+    :predictions_total => 0,
+    :lexicon_path      => 0,
+    :fallback_path     => 0,
+    :fallback_low_sig  => 0,    # fallback fired due to LOW_SIGNAL_THRESHOLD
+    :fallback_damp_lc  => 0     # fallback fired due to damped + low conf
+)
+
+"""
+    get_predictor_telemetry()::Dict{Symbol, Int}
+
+GRUG v7.20: Return a copy of the predictor telemetry counters. Copy so
+callers can't mutate our internal counter dict.
+"""
+function get_predictor_telemetry()::Dict{Symbol, Int}
+    return copy(PREDICTOR_TELEMETRY)
+end
+
+"""
+    reset_predictor_telemetry!()
+
+GRUG v7.20: Zero the predictor telemetry. Used by tests to isolate runs;
+not called during normal operation (counters accumulate over a session).
+"""
+function reset_predictor_telemetry!()
+    for k in keys(PREDICTOR_TELEMETRY)
+        PREDICTOR_TELEMETRY[k] = 0
+    end
+    return nothing
+end
 
 # ==============================================================================
 # MODULATION TABLES
@@ -665,10 +873,36 @@ function predict_action_tone(
         action_scores[ACTION_COMMAND] += 0.8
     end
 
-    # GRUG: If no action signal found at all, default to ASSERT.
+    # GRUG v7.20: LOW-SIGNAL FALLBACK TRIGGER (path 1 of 2).
+    # Old code: if the lexicon hit nothing, just default to ASSERT and shrug.
+    # New code: kick into the heavy character-bigram fallback FIRST. Only if
+    # the fallback also produces no signal do we keep the ASSERT default —
+    # at which point we're honestly ASSERTing because we genuinely have no
+    # idea, not because we silently gave up. Mode telemetry tracks which
+    # path produced the result so /status can show fallback hit-rate.
     total_action_signal = sum(values(action_scores))
-    if total_action_signal < 0.5
-        action_scores[ACTION_ASSERT] += 1.0
+    classifier_mode = :lexicon
+    if total_action_signal < LOW_SIGNAL_THRESHOLD
+        # GRUG: Lexicon shrugged. Run the bigram fallback and fold its
+        # scores into action_scores. We ADD instead of REPLACE so that any
+        # tiny signal from the lexicon (e.g. a single ! pushing ESCALATE)
+        # still counts — the fallback is a recovery layer on top, not a
+        # replacement.
+        fallback_scores = _heavy_fallback_score(input_text)
+        fallback_total  = sum(values(fallback_scores))
+        if fallback_total > 0.0
+            for (fam, s) in fallback_scores
+                action_scores[fam] += s
+            end
+            classifier_mode = :fallback
+            PREDICTOR_TELEMETRY[:fallback_path]    += 1
+            PREDICTOR_TELEMETRY[:fallback_low_sig] += 1
+        else
+            # GRUG: Even the fallback found nothing. Honest ASSERT default
+            # with the original boost preserved (so downstream confidence
+            # math still works the same when both paths are silent).
+            action_scores[ACTION_ASSERT] += 1.0
+        end
     end
 
     # ------------------------------------------------------------------
@@ -787,6 +1021,51 @@ function predict_action_tone(
     # to get a useful [0.05, 1.0] confidence range.
     action_confidence = clamp(action_confidence * 2.5, 0.05, 1.0)
 
+    # GRUG v7.20: LOW-SIGNAL FALLBACK TRIGGER (path 2 of 2).
+    # Even if the lexicon DID produce signal, if Lorenz damping fired and the
+    # post-damping confidence is still weak, we're stuck in a strange-attractor
+    # rut that the lexicon alone can't break. Run the heavy fallback as a
+    # second-chance corrective. Only re-classify if the fallback would change
+    # the winner — otherwise we'd be paying the cost for nothing.
+    if trajectory_damped &&
+       action_confidence < FALLBACK_DAMP_THRESHOLD &&
+       classifier_mode === :lexicon
+        fallback_scores = _heavy_fallback_score(input_text)
+        if sum(values(fallback_scores)) > 0.0
+            # GRUG: Re-fold fallback into raw scores and re-distribute.
+            for (fam, s) in fallback_scores
+                action_scores[fam] += s
+            end
+            new_dist = _softmax_normalize(action_scores, config.softmax_temperature)
+            new_action = argmax(new_dist)
+            new_vals   = sort(collect(values(new_dist)), rev=true)
+            new_conf   = length(new_vals) >= 2 ?
+                clamp((new_vals[1] - new_vals[2]) * 2.5, 0.05, 1.0) :
+                clamp(new_vals[1] * 2.5, 0.05, 1.0)
+
+            # GRUG: Adopt fallback only if it gives us strictly better
+            # confidence. Otherwise the original (lexicon-damped) result
+            # stays — the fallback is a recovery layer, not a mandatory
+            # override.
+            if new_conf > action_confidence
+                action_dist       = new_dist
+                predicted_action  = new_action
+                action_confidence = new_conf
+                classifier_mode   = :fallback
+                PREDICTOR_TELEMETRY[:fallback_path]   += 1
+                PREDICTOR_TELEMETRY[:fallback_damp_lc] += 1
+                @info "[PREDICTOR] 🌀 damped+low-conf → heavy fallback adopted " *
+                      "(action=$(predicted_action), conf=$(round(action_confidence, digits=3)))"
+            end
+        end
+    end
+
+    # GRUG v7.20: Telemetry — every prediction increments total + path.
+    PREDICTOR_TELEMETRY[:predictions_total] += 1
+    if classifier_mode === :lexicon
+        PREDICTOR_TELEMETRY[:lexicon_path] += 1
+    end
+
     # ------------------------------------------------------------------
     # STEP 6: Incomplete causal chain detection
     # ------------------------------------------------------------------
@@ -839,7 +1118,8 @@ function predict_action_tone(
         time(),
         action_dist,
         tone_dist,
-        trajectory_damped
+        trajectory_damped,
+        classifier_mode    # GRUG v7.20: which path produced this result
     )
 
     # GRUG: Stash for downstream consumers (vote orchestrator scoring,
@@ -986,11 +1266,15 @@ function format_prediction_summary(prediction::PredictionResult)::String
     chain_str = prediction.incomplete_chain ?
         " [dangling: '$(prediction.dangling_verb)']" : ""
     damp_str  = prediction.trajectory_damped ? " [LORENZ-DAMPED]" : ""
+    # GRUG v7.20: Surface the classifier mode so /status and the diagnostic
+    # log line make it obvious when fallback fired. Lexicon path is the
+    # default and silent; fallback gets an explicit tag.
+    mode_str  = prediction.mode === :fallback ? " [FALLBACK]" : ""
     return "Action=$(prediction.action_family) | " *
            "Tone=$(prediction.tone_family) | " *
            "Conf=$(round(prediction.confidence, digits=2)) | " *
            "ArousalNudge=$(round(prediction.arousal_nudge, digits=2)) | " *
-           "Weight=$(round(prediction.action_weight, digits=2))$(chain_str)$(damp_str)"
+           "Weight=$(round(prediction.action_weight, digits=2))$(chain_str)$(damp_str)$(mode_str)"
 end
 
 end # module ActionTonePredictor
