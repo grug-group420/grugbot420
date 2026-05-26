@@ -2077,23 +2077,34 @@ function process_mission(mission_text::String)
         end
     end
 
-    # GRUG: THESAURUS GATE EXPANSION (text inputs only)
-    # Before the scan fires, expand the mission tokens with synonym cloud.
-    # This bridges the structural gap (happy/joyful = 0.0 without seeds).
-    # Expansion is logged so operator can see what the gate added.
-    # Non-fatal: if thesaurus throws for any reason, scan proceeds on raw text.
-    if !is_image
-        try
-            gate_tokens = Thesaurus.thesaurus_gate_filter(mission_text)
-            original_tokens = Set(split(lowercase(strip(mission_text))))
-            new_tokens = setdiff(gate_tokens, original_tokens)
-            if !isempty(new_tokens)
-                @info "[MAIN] 🔤 Thesaurus gate expanded $(length(original_tokens)) tokens → $(length(gate_tokens)) (+$(length(new_tokens)) synonyms: $(join(sort(collect(new_tokens)), ", ")))"
-            end
-        catch e
-            @warn "[MAIN] Thesaurus gate expansion failed (non-fatal): $e"
-        end
-    end
+    # GRUG: THESAURUS GATE EXPANSION — DISABLED AT SCAN PHASE.
+    # ------------------------------------------------------------
+    # The thesaurus belongs at orchestration / synthesis time, NOT in the
+    # pre-scan path. Pattern matching's job is to find what literally hit;
+    # synonym swap is a generative concern that runs later (see the AIML
+    # synthesis layer around Main.jl:1339 where Thesaurus.SYNONYM_SEED_MAP
+    # is consulted while filling the output skeleton).
+    #
+    # This block previously called Thesaurus.thesaurus_gate_filter and
+    # logged the expansion, but the result was never handed to
+    # scan_specimens — it was log-only, contributing zero to matching while
+    # still doing the work. Commented out, not deleted, because we may want
+    # to revive a true gate (one that actually feeds into the scanner) in
+    # the future. If you re-enable it, make sure gate_tokens is plumbed into
+    # the scan path, not just printed.
+    # ------------------------------------------------------------
+    # if !is_image
+    #     try
+    #         gate_tokens = Thesaurus.thesaurus_gate_filter(mission_text)
+    #         original_tokens = Set(split(lowercase(strip(mission_text))))
+    #         new_tokens = setdiff(gate_tokens, original_tokens)
+    #         if !isempty(new_tokens)
+    #             @info "[MAIN] 🔤 Thesaurus gate expanded $(length(original_tokens)) tokens → $(length(gate_tokens)) (+$(length(new_tokens)) synonyms: $(join(sort(collect(new_tokens)), ", ")))"
+    #         end
+    #     catch e
+    #         @warn "[MAIN] Thesaurus gate expansion failed (non-fatal): $e"
+    #     end
+    # end
 
     println("--> Scanning specimens & looking for dialectical relations...")
     t_start = time()
