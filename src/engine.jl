@@ -2318,6 +2318,24 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     
     # GRUG: Convert input to number rocks!
     target_signal = words_to_signal(input_text)
+
+    # GRUG: LITERAL TOKEN PRE-GATE — input side.
+    # Compute the lowercased, whitespace-split token set of the input ONCE here
+    # so every fire_one call can do a cheap set lookup. The gate exists because
+    # words_to_signal hashes tokens to uniformly-distributed Float64 values in
+    # [0, 1], and the matcher then accepts |a - b| <= 0.1 as a "match." That
+    # gives unrelated word pairs a ~20% false-match rate per token comparison,
+    # which is why nodes from semantically unrelated lobes kept firing on
+    # short inputs. The fix: require at least one literal token of the node's
+    # pattern to appear in the input (or vice-versa for short inputs) BEFORE
+    # the float scanner gets to vote. Float math still runs on the survivors —
+    # it's the fuzzy-refinement step on top of a real lexical hit.
+    #
+    # Thesaurus expansion is intentionally NOT applied here. The thesaurus is
+    # an orchestration / synthesis-time concern, not a matching one — the
+    # scanner's job is to find what literally hit, the synthesizer's job is
+    # to remix the result with synonyms. See Main.jl:1339 for that path.
+    input_token_set = Set(split(lowercase(strip(input_text))))
     
     # GRUG: DETERMINISTIC SCAN SELECTION
     # Grug look at how complex input is to choose scanner eye.
@@ -2452,10 +2470,46 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             return nothing
         end
 
-        # GRUG NEW: STRENGTH-BIASED COINFLIP before even scanning pattern!
-        # Strong nodes are biased to activate. Weak nodes may be skipped.
-        if !strength_biased_scan_coinflip(node)
-            return nothing
+        # GRUG: LITERAL TOKEN PRE-GATE — pattern side.
+        # Hard correctness gate AND coinflip-bypass for text nodes.
+        #
+        # Order is intentional: this runs BEFORE strength_biased_scan_coinflip.
+        # Why? Because the coinflip is a "should we burn cycles on fuzzy work?"
+        # gate. If the input literally contains one of the node's pattern
+        # tokens, the work is already justified — there's no reason to skip
+        # a sure thing 70% of the time just because the node is freshly
+        # created with strength=1.0. That was causing weak-but-relevant nodes
+        # (e.g. greeting's "good morning" node firing on input "good morning")
+        # to go silent half the time.
+        #
+        # Behavior matrix:
+        #   text node + literal-token hit  → BYPASS coinflip, fall through to scanner.
+        #   text node + no literal hit     → reject outright (no fuzzy noise vote).
+        #   text node + empty pattern      → coinflip as before.
+        #   image node                     → coinflip as before (uses SDF signal,
+        #                                    different match path entirely).
+        literal_hit = false
+        if !node.is_image_node && !isempty(node.pattern)
+            pattern_token_set = Set(split(lowercase(strip(node.pattern))))
+            if !isempty(pattern_token_set) && !isempty(input_token_set)
+                if isempty(intersect(pattern_token_set, input_token_set))
+                    # No shared token → no real lexical hit → reject.
+                    return nothing
+                else
+                    # Shared token → guaranteed entry, skip coinflip.
+                    literal_hit = true
+                end
+            end
+        end
+
+        # GRUG: STRENGTH-BIASED COINFLIP — only runs when no literal hit decided
+        # the question. A literal-token match is a sure thing; don't roll dice
+        # on it. Image nodes and empty-pattern nodes still go through coinflip
+        # because their match path can't be cheaply pre-gated by tokens.
+        if !literal_hit
+            if !strength_biased_scan_coinflip(node)
+                return nothing
+            end
         end
 
         # GRUG: Image nodes use SDF signal, not text signal. Skip size check for them.
