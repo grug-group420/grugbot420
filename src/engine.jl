@@ -2489,15 +2489,22 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         #   image node                     → coinflip as before (uses SDF signal,
         #                                    different match path entirely).
         literal_hit = false
+        literal_jaccard = 0.0
         if !node.is_image_node && !isempty(node.pattern)
             pattern_token_set = Set(split(lowercase(strip(node.pattern))))
             if !isempty(pattern_token_set) && !isempty(input_token_set)
-                if isempty(intersect(pattern_token_set, input_token_set))
+                shared = intersect(pattern_token_set, input_token_set)
+                if isempty(shared)
                     # No shared token → no real lexical hit → reject.
                     return nothing
                 else
                     # Shared token → guaranteed entry, skip coinflip.
+                    # Compute Jaccard once so the scanner-fallback path below
+                    # can use it as a literal-hit floor when the float scanner
+                    # rejects on noise-dominated windows.
                     literal_hit = true
+                    union_size = length(union(pattern_token_set, input_token_set))
+                    literal_jaccard = length(shared) / max(1, union_size)
                 end
             end
         end
@@ -2582,8 +2589,27 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             end
         catch e
             if e isa PatternNotFoundError
-                # Normal logic: Scanner says no match in any direction. Skip!
-                return nothing
+                # Normal logic: Scanner says no match in any direction.
+                #
+                # BUT: if the literal-token gate confirmed a real lexical hit
+                # earlier, we don't want to silently drop this node just
+                # because the float scanner couldn't find a clean window. A
+                # short pattern (e.g. "hello hi") embedded in a longer input
+                # (e.g. "hello again old friend") will fail cheap_scan's
+                # window threshold even though "hello" is literally present —
+                # the noise tokens around it drag the per-window similarity
+                # below CHEAP_SCAN_THRESHOLD.
+                #
+                # Resolution: when literal_hit=true, fall back to the Jaccard
+                # of pattern_tokens ∩ input_tokens / pattern_tokens ∪ input_tokens
+                # as a literal-hit floor. This is honest about partial overlap:
+                # full overlap → ~1.0, single-word-of-many → low. Still gives
+                # the node a fair shot at the vote pool instead of dropping it.
+                if literal_hit
+                    token_conf = literal_jaccard
+                else
+                    return nothing
+                end
             elseif e isa PatternScanError
                 # FATAL LOGIC ERROR. NO SILENT FAILURE! Scream loud!
                 rethrow(e)
