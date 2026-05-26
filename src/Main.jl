@@ -1646,6 +1646,24 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             return word
         end
 
+        # GRUG v7.21c-2: SWAP_RATE probabilistic gate.
+        # Prior versions returned `rand(allowed)` unconditionally — that swapped
+        # EVERY swappable token in every reply, producing word-salad like
+        # "Subsist polite, brief" / "Construct tribemate" / "delete" for "clear".
+        # Natural prose has continuity: most words should land as written, with
+        # occasional fresh variants. Default 0.25 means ~3 of every 4 swappable
+        # tokens stay original; ~1 in 4 picks a synonym. Env-overridable for
+        # tests or operator tuning.
+        swap_rate = try
+            r = parse(Float64, get(ENV, "GRUG_THESAURUS_SWAP_RATE", "0.25"))
+            (r < 0.0 || r > 1.0) ? 0.25 : r
+        catch
+            0.25
+        end
+        if rand() > swap_rate
+            return word
+        end
+
         # Stochastic pick — this is the natural-variation engine.
         # Two cycles on the same prompt roll different synonyms.
         return rand(allowed)
@@ -1687,6 +1705,99 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             push!(out_tokens, picked * tail)
         end
         return join(out_tokens, " ")
+    end
+
+    # -------------------------------------------------------------------
+    # GRUG v7.21c-2: _reorder_clauses — phrase-level variety layer.
+    #
+    # Splits a sentence on commas and the conjunctions "and"/"or" into
+    # segments, shuffles them probabilistically, and rejoins with natural
+    # connectors. Adds the third layer of variety on top of (1) slot pick
+    # and (2) word swap, so two cycles producing the same slot-prose still
+    # speak it in different orders.
+    #
+    # Conservative by default:
+    #   - REORDER_RATE (default 0.40) — chance the reorder fires at all
+    #   - Only fires when ≥2 segments AND total tokens ≥4 (single short
+    #     clauses don't reorder — nothing to shuffle)
+    #   - Preserves the head-word capitalization of the original sentence
+    #   - Preserves trailing punctuation (. ! ?) by detaching+reattaching
+    #
+    # Env override: GRUG_PHRASE_REORDER_RATE
+    # -------------------------------------------------------------------
+    function _reorder_clauses(sentence::String)::String
+        s = strip(sentence)
+        isempty(s) && return ""
+
+        reorder_rate = try
+            r = parse(Float64, get(ENV, "GRUG_PHRASE_REORDER_RATE", "0.40"))
+            (r < 0.0 || r > 1.0) ? 0.40 : r
+        catch
+            0.40
+        end
+        rand() > reorder_rate && return String(s)
+
+        # Detach trailing terminal punctuation
+        m_end = match(r"^(.*?)([.!?]+)\s*$", String(s))
+        body = m_end === nothing ? String(s) : String(m_end.captures[1])
+        terminal = m_end === nothing ? "" : String(m_end.captures[2])
+
+        # Split on comma OR " and " OR " or " (case-insensitive, surrounded by spaces).
+        # We deliberately do NOT split on bare "and"/"or" without surrounding
+        # spaces because they may appear inside compound words.
+        segs = split(body, r",\s*|\s+and\s+|\s+or\s+"; limit=0)
+        segs = String[strip(seg) for seg in segs if !isempty(strip(seg))]
+
+        # Need at least 2 segments AND a total token count ≥4 to bother.
+        if length(segs) < 2 || sum(length(split(seg)) for seg in segs) < 4
+            return String(s)
+        end
+
+        # Shuffle. Reject the identity permutation if we got it back (so
+        # the reorder is observable when it fires).
+        shuffled = copy(segs)
+        Random.shuffle!(shuffled)
+        if shuffled == segs && length(segs) >= 2
+            # Force a swap of the first two so the result really differs.
+            shuffled[1], shuffled[2] = shuffled[2], shuffled[1]
+        end
+
+        # Lowercase the first character of each segment except the first,
+        # so post-reorder we don't mid-sentence capitalize. Then capitalize
+        # the new first segment to match natural prose head-casing.
+        shuffled_norm = String[]
+        for (i, seg) in enumerate(shuffled)
+            if isempty(seg)
+                continue
+            end
+            if i == 1
+                # Capitalize first char if alpha
+                first_char = first(seg)
+                if isletter(first_char) && islowercase(first_char)
+                    rest = length(seg) > 1 ? seg[nextind(seg, 1):end] : ""
+                    push!(shuffled_norm, uppercase(first_char) * rest)
+                else
+                    push!(shuffled_norm, seg)
+                end
+            else
+                first_char = first(seg)
+                if isletter(first_char) && isuppercase(first_char)
+                    rest = length(seg) > 1 ? seg[nextind(seg, 1):end] : ""
+                    push!(shuffled_norm, lowercase(first_char) * rest)
+                else
+                    push!(shuffled_norm, seg)
+                end
+            end
+        end
+
+        # Rejoin with comma-then-and: "A, B, and C" feels natural.
+        rejoined = if length(shuffled_norm) == 2
+            shuffled_norm[1] * " and " * shuffled_norm[2]
+        else
+            join(shuffled_norm[1:end-1], ", ") * ", and " * shuffled_norm[end]
+        end
+
+        return rejoined * terminal
     end
 
     # -------------------------------------------------------------------
@@ -1811,7 +1922,17 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # legacy path. Used when:
     #   (a) frame_skeleton is empty (no judgement available), OR
     #   (b) integration test that bypasses the judge.
-    action_skeleton = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
+    # GRUG v7.21c-2: when the picked action is prose (multi-word), the
+    # CLAIM already IS the answer — verb-family bucketing doesn't apply.
+    # We drop the preamble and let the claim stand on its own. The frame
+    # skeleton (when judge fired) still wraps it — that's intentional:
+    # frame is about felt-shape (warm/terse/etc.) and applies to any prose.
+    action_is_prose_skel = length(split(String(primary_vote.action))) >= 2 &&
+                           length(String(primary_vote.action)) >= 8
+
+    action_skeleton = if action_is_prose_skel
+        "{CLAIM}.{SUPPORT}"                     # prose actions stand alone
+    elseif primary_vote.action in ["greet", "welcome", "smile", "laugh"]
         "Hello — here is what matters: {CLAIM}.{SUPPORT}"
     elseif primary_vote.action in ["flee", "hide", "fight"]
         "A concern worth raising: {CLAIM}.{SUPPORT}"
@@ -1849,14 +1970,23 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
 
     # --- CLAIM construction (Fix A) ------------------------------------
-    # GRUG v7.21c-1: Priority order extended to include noun_anchors:
-    #   1. system_prompt body  (the seeded grug-voice answer)
-    #   2. node_pattern        (legacy v7.16 fallback)
-    #   3. noun_anchors[1]     (NEW — wraps a single noun in its PPT-shape
-    #                           when pattern is short and body is empty;
-    #                           prevents bare-noun CLAIMs like "hammer.")
+    # GRUG v7.21c-2: Priority order with prose-action as top-priority:
+    #   0. primary_vote.action  (NEW — when seed slots ARE answer-prose,
+    #                            the picked slot IS the answer. The action
+    #                            field carries the prose verbatim. Detection
+    #                            heuristic: action has ≥2 word tokens AND
+    #                            length ≥ 8 chars. Verbs like "greet" /
+    #                            "flee" / "explain" stay sub-threshold.)
+    #   1. system_prompt body   (the seeded grug-voice answer, c-1)
+    #   2. node_pattern         (legacy v7.16 fallback)
+    #   3. noun_anchors[1]      (c-1, wraps a single noun in its PPT-shape)
     #   4. mission-quoted fallback (last resort)
-    claim_raw = if !isempty(voice_body)
+    action_str = String(primary_vote.action)
+    action_is_prose = length(split(action_str)) >= 2 && length(action_str) >= 8
+
+    claim_raw = if action_is_prose
+        action_str                                # NEW v7.21c-2 top priority
+    elseif !isempty(voice_body)
         voice_body
     elseif !isempty(node_pattern) && length(split(node_pattern)) >= 2
         # Pattern has at least 2 words — use it directly.
@@ -1870,7 +2000,12 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     else
         "the mission \"$mission\" touches unseeded territory"
     end
+    # GRUG v7.21c-2: After synonym swap, run the phrase-reorder layer so
+    # multi-clause prose-actions ("hot rock that bites and dances") don't
+    # always speak in the same comma-order across cycles. Single-clause
+    # claims pass through unchanged (reorder fires only on ≥2 segments).
     claim = _swap_words_in(String(claim_raw), node_drop_table, node_required)
+    claim = _reorder_clauses(claim)
 
     # -------------------------------------------------------------------
     # GRUG v7.16: Build SUPPORT. Up to 2 sentences, drawn from:
@@ -3696,6 +3831,16 @@ function load_specimen_from_file!(filepath::String)::String
                                 String(get(rp, "object", ""))
                             ))
                         end
+                    end
+
+                    # GRUG v7.21c-2: Re-register any prose-slot actions in this
+                    # node's action_packet. COMMANDS is a runtime dict (not
+                    # serialized), so prose handlers must be rebuilt on load
+                    # or the node's votes will TaskFailedException at vote-time.
+                    try
+                        ensure_action_packet_registered!(String(nd["action_packet"]))
+                    catch e
+                        @warn "[MAIN] load_specimen: failed to re-register prose action for node '$(get(nd, "id", "<?>"))': $e"
                     end
 
                     node = Node(

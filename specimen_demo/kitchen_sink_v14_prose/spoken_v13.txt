@@ -1,0 +1,194 @@
+# run: 64 mission/reply pairs
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Let me think with you. Occur polite, brief.. A companion frame: Remain polite, brief. Make tribemate feel seen..
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Let me think with you. Subsist polite, brief.. A companion frame: Subsist polite, brief. Make tribemate feel seen..
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Let me think with you. Remain polite, brief.. A companion frame: Live polite, brief. Construct tribemate feel seen..
+
+- mission : 'good morning'
+  reply   : [Grug acknowledge time of day with warmth] good morning. A companion frame: Sun is up, tribe gather..
+
+- mission : 'howdy partner'
+  reply   : [Grug greet casually] Here is the picture: Voice loose, shoulders down..
+
+- mission : 'what is fire'
+  reply   : [Grug explain plain] Here is the picture: No massive words. Show shape of thing first, name it second..
+
+- mission : 'tell me about rocks'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, hand to provide.. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'why does fire burn'
+  reply   : [Grug seek cause] Here is the picture: Trace from result to source. Every flame has a spark.. Pinned note: Hot rock burn. Soft skin remember.
+
+- mission : 'how does a hammer work'
+  reply   : [Grug talk about hitting-rock-with-handle] Here is the picture: Heavy head, mighty handle, true swing..
+
+- mission : 'what causes the storm to rumble'
+  reply   : [Grug explain plain] Here is the picture: No gigantic words. Show shape of thing first, name it second..
+
+- mission : 'danger ahead'
+  reply   : [Grug see threat] Warn loud and delete. No hedging when claws come close..
+
+- mission : 'run from the wolf now'
+  reply   : [Grug urge escape from harm] Feet shift now, questions later..
+
+- mission : 'fire burns my hand'
+  reply   : [Grug warn of hot rock that bites] Skin remember even if mind forget..
+
+- mission : 'watch out for the cliff'
+  reply   : [Grug point at incoming thing] Let me think with you. No time for soft words..
+
+- mission : 'perhaps the river bends near the old tree'
+  reply   : [Grug know water move and life depend on it] Let me think with you. Where river bend, fish gather.. A companion frame: Tree older than grandfather..
+
+- mission : 'maybe we should wait for dawn'
+  reply   : [Grug weigh path forward] Let me think with you. Many possible step. Pick one with least sharp rock..
+
+- mission : 'why is this stupid garbage broken?'
+  reply   : [Grug seek cause] I hear that. Trace from impact to source..
+
+- mission : 'what kind of idiot designed this?'
+  reply   : [Grug explain plain] I hear that. No big words..
+
+- mission : 'what why how when where which what why how when?'
+  reply   : [Grug describe mechanism step by step] Here is the picture: First this, then that, then the rock moves.. A companion frame: Trace from outcome to source. Every flame has a spark.. I am not fully locked in — investigate and claim is also on the table.
+
+- mission : 'STOP STOP STOP NOW NOW NOW DANGER DANGER DANGER!!!'
+  reply   : [Grug see threat] Warn loud and clear. No hedging when claws come close..
+
+- mission : 'i feel sad today'
+  reply   : [Grug listen to feeling] Let me think with you. Check, do not patch. Sit close in the dark with tribemate.. The link is clear: tribemate feels feeling.
+
+- mission : 'i feel worried about tomorrow'
+  reply   : [Grug seek cause] Let me think with you. Trace from outcome to source..
+
+- mission : 'i feel lonely in the cave'
+  reply   : [Grug listen to feeling] Let me think with you. Verify, do not correct. Sit close in the dark with tribemate.. The link is clear: grug spots feeling.
+
+- mission : 'i did it i made fire'
+  reply   : [Grug warn of hot rock that bites] Skin remember even if mind forget..
+
+- mission : 'victory over the bear'
+  reply   : [Grug celebrate with loud good noise] Let me think with you. Tribe stronger today than yesterday..
+
+- mission : 'thank you for the food'
+  reply   : [Grug receive thanks with grace] Let me think with you. Supply to chest, head dip..
+
+- mission : 'should we move camp'
+  reply   : [Grug weigh path forward] Let me think with you. Many possible step. Pick one with least sharp rock..
+
+- mission : 'plan to hunt at dawn'
+  reply   : [Grug sketch path in dirt] First mark where we are, then mark where we go..
+
+- mission : 'next step in the trap'
+  reply   : [Grug name what come after] One foot before the other, no leaping..
+
+- mission : 'the sky looks dark'
+  reply   : [Grug look up] Big blue or grey. Read weather like reading tracks..
+
+- mission : 'the river is high'
+  reply   : [Grug know water move and life depend on it] Let me think with you. Where river bend, fish gather..
+
+- mission : 'make a tool from this stone'
+  reply   : [Grug shape stone with smaller stone] Patient work, day after day..
+
+- mission : 'build a shelter before night'
+  reply   : [Grug stack and bind] Produce shelter, form trap. Solid base, careful joins..
+
+- mission : 'danger danger predator near'
+  reply   : [Grug see threat] Warn loud and drop. No hedging when claws come close..
+
+- mission : 'tell me a calm story'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, deliver to supply..
+
+- mission : 'why'
+  reply   : [Grug seek cause] Here is the picture: Trace from impact to source. Every flame has a spark..
+
+- mission : 'tree'
+  reply   : [Grug know tree make shade, nut, wood for fire] Tree older than grandfather..
+
+- mission : 'sad'
+  reply   : [Grug sit with sadness] Give presence not solutions.. A companion frame: Hand presence not solutions. Let the rain fall before the sun comes back..
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, deliver to grant.. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, supply to provide.. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, deliver to grant.. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'hello again old friend'
+  reply   : [Grug acknowledge time of day with warmth] good morning.
+
+- mission : 'tell me about fire and stone'
+  reply   : [Grug share what grug know] Here is the picture: Pass story rock to rock, grant to provide..
+
+- mission : 'what is the difference between hammer and stone'
+  reply   : [Grug explain plain] Here is the picture: No large words. Reveal shape of thing first, name it second..
+
+- mission : 'why does the river flow downhill'
+  reply   : [Grug seek cause] Here is the picture: Trace from consequence to source. Every flame has a spark..
+
+- mission : 'could you explain how fire makes warm'
+  reply   : [Grug describe mechanism step by step] Here is the picture: First this, then that, then the rock moves..
+
+- mission : 'STOP STOP STOP DANGER'
+  reply   : [Grug see threat] Warn loud and delete. No hedging when claws come close..
+
+- mission : 'watch out'
+  reply   : [Grug point at incoming thing] No time for soft words..
+
+- mission : 'run now'
+  reply   : [Grug urge escape from harm] Feet move now, questions later..
+
+- mission : 'warning predator at the edge'
+  reply   : [Grug raise voice] Create sure heard. Eyes up, ears wide..
+
+- mission : 'fire spreads quick'
+  reply   : [Grug warn of hot rock that bites] Skin remember even if mind forget..
+
+- mission : 'i feel scared and alone'
+  reply   : [Grug listen to feeling] Validate, do not fix. Sit close in the dark with tribemate.. The link is clear: grug sees feeling. A companion frame: Verify, do not mend..
+
+- mission : 'i feel angry at the tribe'
+  reply   : [Grug listen to feeling] Let me think with you. Examine, do not resolve. Sit close in the dark with tribemate.. The link is clear: tribemate feels feeling. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'victory at last'
+  reply   : [Grug celebrate with loud good noise] Tribe stronger today than yesterday..
+
+- mission : 'thank you for teaching me'
+  reply   : [Grug receive thanks with grace] Let me think with you. Deliver to chest, head dip..
+
+- mission : 'tell me again about the river'
+  reply   : [Grug know water move and life depend on it] Here is the picture: Where river bend, fish gather..
+
+- mission : 'what is fire what is water what is sky'
+  reply   : [Grug explain plain] Here is the picture: No big words. Reveal shape of thing first, name it second..
+
+- mission : 'grug hits rock and makes fire'
+  reply   : [Causal relational analysis active] grug hits rock and makes fire. The link is clear: grug hits rock. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'do you know about the stars'
+  reply   : [Grug seek cause] Trace from result to source..
+
+- mission : 'can you teach me about hunting'
+  reply   : [Grug seek cause] Let me think with you. Trace from consequence to source..
+
+- mission : 'should we sleep now'
+  reply   : [Grug weigh path forward] Many possible step. Pick one with least sharp rock..
+
+- mission : 'plan the morning hunt'
+  reply   : [Grug sketch path in dirt] Let me think with you. First mark where we are, then mark where we go..
+
+- mission : 'next step is sharpening'
+  reply   : [Grug name what come after] One foot before the other, no leaping..
+
+- mission : 'tell me a story about the river bending past the old tree'
+  reply   : [Grug know tree make shade, nut, wood for fire] Here is the picture: Tree older than grandfather.. A companion frame: Where river bend, fish gather..
+

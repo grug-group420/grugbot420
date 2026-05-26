@@ -223,6 +223,14 @@ end
 # 6. Smoke: a node carrying ALL four new keys still produces coherent output
 # ------------------------------------------------------------------------------
 @testset "[6] smoke — full schema node produces coherent reply" begin
+    # GRUG v7.21c-2: pin swap+reorder to 0 so the assertions on exact
+    # body fragments ("Sun is up" / "tribe gather") aren't randomly
+    # broken by a synonym swap of "Sun"/"tribe".
+    prev_swap = get(ENV, "GRUG_THESAURUS_SWAP_RATE", "")
+    prev_reorder = get(ENV, "GRUG_PHRASE_REORDER_RATE", "")
+    ENV["GRUG_THESAURUS_SWAP_RATE"] = "0.0"
+    ENV["GRUG_PHRASE_REORDER_RATE"] = "0.0"
+    try
     TJ.reset_last_judgement!()
     make_test_node!("smoke_full", "good morning",
         Dict{String,Any}(
@@ -246,6 +254,10 @@ end
     @test !occursin(": good morning.", line)
     @test !occursin("matters: good morning", line)
     TJ.reset_last_judgement!()
+    finally
+        if isempty(prev_swap); delete!(ENV, "GRUG_THESAURUS_SWAP_RATE"); else ENV["GRUG_THESAURUS_SWAP_RATE"] = prev_swap; end
+        if isempty(prev_reorder); delete!(ENV, "GRUG_PHRASE_REORDER_RATE"); else ENV["GRUG_PHRASE_REORDER_RATE"] = prev_reorder; end
+    end
 end
 
 println("="^70)

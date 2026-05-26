@@ -3555,6 +3555,48 @@ end
 # ==============================================================================
 
 """
+    ensure_action_packet_registered!(action_packet::AbstractString)
+
+GRUG v7.21c-2: PROSE-SLOT REGISTRY HELPER.
+
+Walks every slot in an action_packet. For each slot's action_name, if it
+is not already in COMMANDS:
+  - If it looks like prose (>=2 words AND >=8 chars), auto-register a
+    passthrough handler that funnels through `generate_aiml_payload`.
+  - Otherwise (single short word, looks like a typo): raise a FATAL error
+    with the list of valid actions, preserving QoL-2025 BUG-007 behavior.
+
+Called from grow_nodes_from_packet (seed-time) and from load_specimen
+(restore-time), so prose-slot nodes survive a save/load round-trip.
+
+Idempotent: registering the same prose action twice is a no-op.
+"""
+function ensure_action_packet_registered!(action_packet::AbstractString)
+    for entry in split(action_packet, '|')
+        cleaned = strip(entry)
+        isempty(cleaned) && continue
+        no_brackets = replace(cleaned, r"\[[^\]]*\]" => "")
+        action_name = String(strip(split(no_brackets, '^')[1]))
+        isempty(action_name) && continue
+        haskey(COMMANDS, action_name) && continue
+
+        is_prose_slot = (length(split(action_name)) >= 2) && (length(action_name) >= 8)
+        if is_prose_slot
+            COMMANDS[action_name] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+                return Base.invokelatest(generate_aiml_payload, mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            end
+        else
+            valid_actions = sort(collect(keys(COMMANDS)))
+            valid_list = join(valid_actions, ", ")
+            error("!!! FATAL: action_packet contains unknown action '$action_name'. " *
+                  "Valid actions: $valid_list. " *
+                  "(see plans/semantic_plugins/QOL_SWEEP_2025.md BUG-007) !!!")
+        end
+    end
+    return nothing
+end
+
+"""
 grow_nodes_from_packet(json_str::String; target_lobe::Union{String,Nothing}=nothing,
                                           default_system_prompt::String="Grug speaks plainly.")::Vector{String}
 
@@ -3635,25 +3677,11 @@ function grow_nodes_from_packet(json_str::String;
         # GRUG NEW: Check for is_image_node flag in JSON packet
         is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
 
-        # GRUG QoL-2025 BUG-007: Validate every action name against COMMANDS
-        # at grow time, not vote time. Surfaces typos at the seed step where
-        # they can be fixed, not 50 missions later in a stack trace.
-        for entry in split(action_packet, '|')
-            # Strip leading/trailing whitespace, drop optional [neg1, neg2]
-            # bracketed inhibitions, then split on `^` to get the action name.
-            cleaned = strip(entry)
-            isempty(cleaned) && continue
-            no_brackets = replace(cleaned, r"\[[^\]]*\]" => "")
-            action_name = strip(split(no_brackets, '^')[1])
-            isempty(action_name) && continue
-            if !haskey(COMMANDS, action_name)
-                valid_actions = sort(collect(keys(COMMANDS)))
-                valid_list = join(valid_actions, ", ")
-                error("!!! FATAL: action_packet contains unknown action '$action_name'. " *
-                      "Valid actions: $valid_list. " *
-                      "(see plans/semantic_plugins/QOL_SWEEP_2025.md BUG-007) !!!")
-            end
-        end
+        # GRUG QoL-2025 BUG-007 + v7.21c-2 PROSE-SLOT EXTENSION:
+        # Validate every action name against COMMANDS at grow time, but
+        # auto-register prose answer-slots (multi-word, 8+ chars). Single-word
+        # unknown actions are still treated as typos.
+        ensure_action_packet_registered!(action_packet)
 
         push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
     end
