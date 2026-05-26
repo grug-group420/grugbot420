@@ -2770,7 +2770,22 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
     end
 
     if !isnothing(prediction)
-        @info "[ENGINE] 🔮 $(ActionTonePredictor.format_prediction_summary(prediction))"
+        # GRUG v7.21b-3a: Run the TonalJudge against the prediction so its
+        # frame_hint verdict lands in LAST_JUDGEMENT. b-3a is OBSERVATION-ONLY
+        # at the orchestrator level — the judge runs and surfaces a [FRAME=...]
+        # diagnostic, but no scoring dimension reads it yet (that's b-3b). If
+        # judging fails for any reason, log and continue — the existing log
+        # line keeps working without the frame tag.
+        frame_str = try
+            judgement = TonalJudge.judge_from_prediction(prediction)
+            mode_label = judgement.mode === TonalJudge.RELATIONAL ? "rel" : "basic"
+            " [FRAME=$(TonalJudge.frame_hint_label(judgement.frame_hint))/$(mode_label)]"
+        catch e
+            @warn "[ENGINE] TonalJudge.judge_from_prediction failed (non-fatal): $e"
+            ""
+        end
+
+        @info "[ENGINE] 🔮 $(ActionTonePredictor.format_prediction_summary(prediction))$(frame_str)"
         # GRUG: If predictor found a dangling verb (incomplete causal chain), warn user.
         # Informational only -- scan still proceeds, but output may be less coherent.
         if prediction.incomplete_chain
