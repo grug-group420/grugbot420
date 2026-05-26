@@ -1,0 +1,50 @@
+{
+  "version": "v7.21b-3d",
+  "name": "kitchen_sink_v12_coherence",
+  "purpose": "Verify Fix A (system_prompt body as CLAIM) and Fix B (frame-keyed skeleton) deliver coherent spoken replies vs the v11 parroted-trigger output.",
+  "missions_total": 89,
+  "spoken_replies_extracted": 64,
+  "errors": 0,
+  "warnings_const_redef": 22,
+  "primary_action_distribution": {
+    "explain": 14,
+    "describe": 9,
+    "alert": 5,
+    "acknowledge": 5,
+    "warn": 4,
+    "comfort": 4,
+    "analyze": 4,
+    "welcome": 3,
+    "reason": 3,
+    "greet": 3,
+    "ponder": 2,
+    "flee": 2,
+    "define": 2,
+    "smile": 1,
+    "reassure": 1,
+    "other": 2
+  },
+  "frame_distribution": {
+    "contemplative": 25,
+    "imperative": 29,
+    "exploratory": 20,
+    "de-escalating": 10,
+    "terse": 5
+  },
+  "judge_mode_distribution": {
+    "basic": 65,
+    "relational": 24,
+    "relational_pct": 26.97
+  },
+  "coherence_examples": {
+    "hello_v11": "[Grug greet warm] Hello — here is what matters: hello hi.",
+    "hello_v12": "[Grug greet warm] Let me think with you. Subsist polite, brief.",
+    "i_feel_sad_today_v11": "[Grug listen to feeling] To acknowledge what matters here: i feel.",
+    "i_feel_sad_today_v12": "[Grug sit close] Let me think with you. Many tribe feel this.. A companion frame: Assess, do not mend.",
+    "what_is_fire_v11": "[Grug explain plain] Here is the picture: what is.",
+    "what_is_fire_v12": "[Grug explain plain] Here is the picture: No big words."
+  },
+  "specimen_seed": "kitchen_sink.specimen.gz (copied from v11, identical seed state)",
+  "missions_file": "missions_clean.txt (copied from v11; only the loadSpecimen path differs)",
+  "test_status": "31/31 testfiles green (added test_v7_21b3d.jl: 10 testsets / 27 individual tests)"
+}

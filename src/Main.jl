@@ -1711,17 +1711,82 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
 
     # -------------------------------------------------------------------
-    # GRUG v7.16: Sentence skeletons keyed by primary action family.
-    # Each skeleton accepts two slots:
-    #   {CLAIM}   — the core claim (the winning node's pattern, with
-    #               every word routed through the synonym + inhibition
-    #               pipeline).
-    #   {SUPPORT} — zero or more supporting sentences (sure companion
-    #               patterns, relational triples, or empty).
-    # We keep 6 skeletons aligned with the 6 action families in
-    # COMMANDS so every vote resolves to a spoken shape.
     # -------------------------------------------------------------------
-    skeleton = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
+    # GRUG v7.21b-3d: COHERENCE-FIX — split the seeded grug-voice from
+    # the structural skeleton.
+    #
+    # PROBLEM (v7.21b-3b leak): the synthesis filled {CLAIM} with the
+    # raw trigger pattern (e.g. "hello hi", "i feel", "why"). Combined
+    # with the action-keyed skeleton this produced echoey, parrot-style
+    # responses like "Hello — here is what matters: hello hi.".
+    #
+    # FIX A: every node already carries a `system_prompt` whose first
+    # sentence becomes the [voice prefix] tag. The REST of system_prompt
+    # is a complete grug-voice utterance the seed author wrote
+    # (e.g. node_18: "Grug listen to feeling. Validate, do not fix." →
+    # body = "Validate, do not fix"). We use that body as the spoken
+    # core whenever it's non-empty. Pattern-as-claim is kept as the
+    # fallback for legacy / single-sentence prompts.
+    #
+    # FIX B: when we DO fall back to the skeleton, dispatch on the
+    # judge's frame_hint (the felt-shape-of-the-moment) rather than the
+    # action family. This wires v7.21b-2's TonalJudge into the prose
+    # layer, completing the predictor → judge → orchestrator → speech
+    # pipeline. The action-keyed skeletons remain as a final fallback
+    # for the case where no judgement is available (e.g. judge module
+    # disabled or LAST_JUDGEMENT not yet populated this session).
+    # -------------------------------------------------------------------
+
+    # --- voice split (Fix A) -------------------------------------------
+    # First sentence = persona tag (still used as voice_prefix below).
+    # Rest = grug-voice body (used as CLAIM when present).
+    sp_parts = split(system_prompt, ".")
+    voice_first_local = strip(get(sp_parts, 1, ""))
+    voice_body_pieces = String[]
+    for i in 2:length(sp_parts)
+        s = strip(sp_parts[i])
+        isempty(s) && continue
+        push!(voice_body_pieces, String(s))
+    end
+    voice_body = isempty(voice_body_pieces) ? "" : join(voice_body_pieces, ". ") * "."
+
+    # --- frame-keyed skeleton (Fix B) ----------------------------------
+    # Read the most recent TonalJudge verdict. nothing is fine — we just
+    # don't have a frame opinion this cycle and fall back to the action
+    # path. This keeps the change non-fatal for any caller that bypasses
+    # the predictor (e.g. ephemeral_aiml_orchestrator on synthetic input).
+    judged_frame_label = try
+        j = TonalJudge.get_last_judgement()
+        j === nothing ? "" : TonalJudge.frame_hint_label(j.frame_hint)
+    catch
+        ""
+    end
+
+    # Frame skeletons. Each keeps a {CLAIM}.{SUPPORT} contract so the
+    # downstream substitute step is unchanged.
+    frame_skeleton = if judged_frame_label == "warm"
+        "Hello — {CLAIM}.{SUPPORT}"
+    elseif judged_frame_label == "exploratory"
+        "Here is the picture: {CLAIM}.{SUPPORT}"
+    elseif judged_frame_label == "imperative"
+        "{CLAIM}.{SUPPORT}"                        # bare, urgent — no preamble
+    elseif judged_frame_label == "contemplative"
+        "Let me think with you. {CLAIM}.{SUPPORT}"
+    elseif judged_frame_label == "de-escalating"
+        "I hear that. {CLAIM}.{SUPPORT}"           # short, calm, non-defensive
+    elseif judged_frame_label == "terse"
+        "{CLAIM}."                                 # one sentence, no support
+    elseif judged_frame_label == "plain"
+        "{CLAIM}.{SUPPORT}"
+    else
+        ""  # sentinel — fall back to the action-keyed skeleton below
+    end
+
+    # Action-keyed skeleton — preserved verbatim from v7.16 as the
+    # legacy path. Used when:
+    #   (a) frame_skeleton is empty (no judgement available), OR
+    #   (b) integration test that bypasses the judge.
+    action_skeleton = if primary_vote.action in ["greet", "welcome", "smile", "laugh"]
         "Hello — here is what matters: {CLAIM}.{SUPPORT}"
     elseif primary_vote.action in ["flee", "hide", "fight"]
         "A concern worth raising: {CLAIM}.{SUPPORT}"
@@ -1735,13 +1800,20 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         "Thinking it through: {CLAIM}.{SUPPORT}"
     end
 
-    # -------------------------------------------------------------------
-    # GRUG v7.16: Build the CLAIM. If the winning node has a pattern we
-    # use it (that IS the seeded answer). If not (shouldn't happen —
-    # /lobeGrow enforces pattern), we fall back to a generic frame
-    # around the mission so we never emit an empty reply.
-    # -------------------------------------------------------------------
-    claim_raw = isempty(node_pattern) ? "the mission \"$mission\" touches unseeded territory" : node_pattern
+    skeleton = isempty(frame_skeleton) ? action_skeleton : frame_skeleton
+
+    # --- CLAIM construction (Fix A) ------------------------------------
+    # Priority order:
+    #   1. system_prompt body (the seeded grug-voice answer)
+    #   2. node_pattern       (legacy v7.16 behavior)
+    #   3. mission-quoted fallback (last resort, never emit empty)
+    claim_raw = if !isempty(voice_body)
+        voice_body
+    elseif !isempty(node_pattern)
+        node_pattern
+    else
+        "the mission \"$mission\" touches unseeded territory"
+    end
     claim = _swap_words_in(String(claim_raw), node_drop_table, node_required)
 
     # -------------------------------------------------------------------
@@ -1772,16 +1844,31 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
 
     # (b) Sure companion → supporting claim. Only if we have at least
-    # one tied alternative AND it has a pattern different from the
-    # primary. This keeps the reply from repeating itself.
+    # one tied alternative AND it gives us NEW prose (not a re-statement
+    # of the primary's pattern). v7.21b-3d: prefer the companion's
+    # system_prompt body too, falling back to its pattern only if no
+    # body is available — this keeps companion clauses from echoing
+    # trigger-tokens like "i feel" / "why" the way they did in v7.16.
     if !isempty(tied_alternatives)
         companion = tied_alternatives[1]
         comp_node = lock(() -> get(NODE_MAP, companion.node_id, nothing), NODE_LOCK)
-        if comp_node !== nothing && !isempty(comp_node.pattern) &&
-           comp_node.pattern != node_pattern
-            comp_claim = _swap_words_in(String(comp_node.pattern),
-                                         node_drop_table, node_required)
-            push!(support_pieces, " A companion frame: $comp_claim.")
+        if comp_node !== nothing
+            comp_sp = String(get(comp_node.json_data, "system_prompt", ""))
+            comp_parts = split(comp_sp, ".")
+            comp_body_pieces = String[]
+            for i in 2:length(comp_parts)
+                s = strip(comp_parts[i])
+                isempty(s) && continue
+                push!(comp_body_pieces, String(s))
+            end
+            comp_body = isempty(comp_body_pieces) ? "" : join(comp_body_pieces, ". ") * "."
+
+            comp_text = !isempty(comp_body) ? comp_body : String(comp_node.pattern)
+
+            if !isempty(comp_text) && comp_text != node_pattern && comp_text != claim_raw
+                comp_claim = _swap_words_in(comp_text, node_drop_table, node_required)
+                push!(support_pieces, " A companion frame: $comp_claim.")
+            end
         end
     end
 
@@ -1841,7 +1928,8 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
 
     # Voice prefix: first sentence of the system_prompt is the persona tag.
-    voice_first = split(system_prompt, "."; limit=2)[1] |> strip
+    # v7.21b-3d: re-use the voice_first_local we already split out above.
+    voice_first = String(voice_first_local)
     voice_prefix = isempty(voice_first) ? "" : "[$voice_first] "
 
     # Shaping directives — v7.15 kept them as a separate bulleted block
