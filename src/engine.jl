@@ -1011,14 +1011,27 @@ end
 # via drop tables. Attachments are ASYMMETRIC: target fires → attached MAY fire.
 # Attached nodes don't cause the target to fire. One-way dependency chain.
 
-struct AttachedNode
+mutable struct AttachedNode
     node_id::String          # GRUG: ID of the node being attached (must exist in NODE_MAP)
     pattern::String          # GRUG: Connector pattern — middleman reason WHY these nodes are related
     signal::Vector{Float64}  # GRUG: Pre-baked signal from connector pattern (for PatternScanner compat)
     base_confidence::Float64 # GRUG: JIT-baked confidence computed at attach time, NOT at fire time!
                              #       Formula: token_overlap(connector, attached_node.pattern) + (strength/CAP)*0.5
                              #       At fire time, only jitter is applied: max(0.1, base_confidence + jitter)
+    is_crystalized::Bool     # GRUG (CRYSTALIZE spec): if true, skip the strength-biased coinflip —
+                             #       this attachment ALWAYS fires when the target fires. Set by user
+                             #       via /crystalize, or auto-set when the attached node has high
+                             #       strength AND high semantic-truth on its relational triples.
+                             #       Auto-revoked if strength drops below the crystalization floor.
+    crystal_origin::Symbol   # GRUG: :user (manual /crystalize), :auto (semantic-truth triggered),
+                             #       or :none (not crystalized). Lets the auto-revoker only touch
+                             #       nodes it crystalized itself — manual marks stay sticky.
 end
+
+# Backwards-compat 4-arg constructor: old attach sites get a non-crystalized
+# attachment by default. CRYSTALIZE-aware sites use the 6-arg form.
+AttachedNode(node_id::String, pattern::String, signal::Vector{Float64}, base_confidence::Float64) =
+    AttachedNode(node_id, pattern, signal, base_confidence, false, :none)
 
 # GRUG: Map from target_node_id -> Vector of AttachedNode (max MAX_ATTACHMENTS each)
 const ATTACHMENT_MAP  = Dict{String, Vector{AttachedNode}}()
@@ -1250,7 +1263,9 @@ function fire_attachments!(target_id::String, active_count::Int, active_cap::Int
 
             # GRUG: STRENGTH-BIASED COINFLIP! Same formula as scan coinflip.
             # Strong attached nodes fire more often. Weak ones still have a chance.
-            if !strength_biased_scan_coinflip(attach_node_ref)
+            # CRYSTALIZE: crystalized attachments SKIP the coinflip — they always
+            # fire when the target fires. This is the user-spec'd hard-fire path.
+            if !att.is_crystalized && !strength_biased_scan_coinflip(attach_node_ref)
                 # GRUG: Lost the coinflip. This attached node stays dormant this round.
                 continue
             end
@@ -1308,7 +1323,8 @@ function get_attachment_summary()::String
                     n = get(NODE_MAP, att.node_id, nothing)
                     isnothing(n) ? "[MISSING]" : (n.is_grave ? "[GRAVE]" : "[ALIVE str=$(round(n.strength, digits=1))]")
                 end, NODE_LOCK)
-                push!(lines, "      🔗 $(att.node_id) $node_status | base_conf=$(round(att.base_confidence, digits=3)) | connector=\"$(first(att.pattern, 35))\"")
+                crystal_tag = att.is_crystalized ? " 💎[CRYSTAL:$(att.crystal_origin)]" : ""
+                push!(lines, "      🔗 $(att.node_id) $node_status$crystal_tag | base_conf=$(round(att.base_confidence, digits=3)) | connector=\"$(first(att.pattern, 35))\"")
             end
         end
     end
@@ -1323,6 +1339,198 @@ Returns empty vector if no attachments exist.
 """
 function get_attachments_for_target(target_id::String)::Vector{AttachedNode}
     return lock(() -> get(ATTACHMENT_MAP, target_id, AttachedNode[]), ATTACHMENT_LOCK)
+end
+
+# ==============================================================================
+# CRYSTALIZE — manual + auto crystalization of attached nodes
+# ==============================================================================
+# GRUG: A crystalized attached node SKIPS the strength-biased coinflip in
+# fire_attachments! and ALWAYS fires when its target fires. Two ways to
+# crystalize:
+#   1. Manual:  user calls /crystalize <target_id> <attach_id>     (origin=:user)
+#   2. Auto:    background sweep marks high-strength + high-semantic-truth
+#               attachments as crystalized. Auto-marks are revoked when the
+#               attached node's strength drops below CRYSTAL_AUTO_STRENGTH_FLOOR.
+# Manual marks are sticky — only /decrystalize removes them.
+
+# GRUG: Tunables for auto-crystalization. Tuned conservative so only nodes
+# that have proven themselves get the always-fire privilege.
+const CRYSTAL_AUTO_STRENGTH_FLOOR  = 5.0   # node.strength >= this to auto-crystallize
+const CRYSTAL_AUTO_SEMANTIC_FLOOR  = 0.7   # mean relational-truth score >= this
+const CRYSTAL_AUTO_REVOKE_FLOOR    = 3.0   # auto-crystal revoked if strength drops below this
+
+"""
+    crystalize_attachment!(target_id, attach_id; origin=:user) -> String
+
+GRUG: Mark the attachment from `target_id`→`attach_id` as crystalized so it
+fires unconditionally on target activation. Returns a status string. Errors
+if no such attachment exists.
+
+`origin` should be `:user` for manual marks (sticky) or `:auto` for
+auto-crystallizer marks (revocable when strength drops).
+"""
+function crystalize_attachment!(target_id::String, attach_id::String;
+                                origin::Symbol = :user)::String
+    if origin ∉ (:user, :auto)
+        error("!!! FATAL: crystalize_attachment! origin must be :user or :auto, got :$origin !!!")
+    end
+    found = false
+    msg = ""
+    lock(ATTACHMENT_LOCK) do
+        atts = get(ATTACHMENT_MAP, target_id, AttachedNode[])
+        for (i, att) in enumerate(atts)
+            if att.node_id == attach_id
+                if att.is_crystalized && att.crystal_origin == origin
+                    msg = "Attachment $target_id→$attach_id already crystalized (origin=:$(origin))."
+                else
+                    # Replace in-place via reassignment (mutable struct so
+                    # we can also just mutate fields, but reassignment keeps
+                    # the API symmetric with non-mutable-friendly callers).
+                    att.is_crystalized = true
+                    att.crystal_origin = origin
+                    msg = "💎 Attachment $target_id→$attach_id CRYSTALIZED (origin=:$(origin)). Always fires."
+                end
+                found = true
+                break
+            end
+        end
+    end
+    if !found
+        error("!!! FATAL: crystalize_attachment! found no attachment from '$target_id' to '$attach_id' !!!")
+    end
+    return msg
+end
+
+"""
+    decrystalize_attachment!(target_id, attach_id; force=false) -> String
+
+GRUG: Clear the crystalize tag. By default this only clears `:auto` marks
+(so the auto-revoker can't accidentally remove a manual mark). Pass
+`force=true` to also clear `:user` marks (used by /decrystalize).
+"""
+function decrystalize_attachment!(target_id::String, attach_id::String;
+                                  force::Bool = false)::String
+    found = false
+    msg = ""
+    lock(ATTACHMENT_LOCK) do
+        atts = get(ATTACHMENT_MAP, target_id, AttachedNode[])
+        for att in atts
+            if att.node_id == attach_id
+                if !att.is_crystalized
+                    msg = "Attachment $target_id→$attach_id was not crystalized."
+                elseif att.crystal_origin == :user && !force
+                    msg = "Attachment $target_id→$attach_id is :user-crystalized — pass force=true (or use /decrystalize)."
+                else
+                    prev = att.crystal_origin
+                    att.is_crystalized = false
+                    att.crystal_origin = :none
+                    msg = "🪨 Attachment $target_id→$attach_id de-crystalized (was :$prev)."
+                end
+                found = true
+                break
+            end
+        end
+    end
+    if !found
+        error("!!! FATAL: decrystalize_attachment! found no attachment from '$target_id' to '$attach_id' !!!")
+    end
+    return msg
+end
+
+"""
+    _semantic_truth_score(node) -> Float64
+
+GRUG: Cheap semantic-truth proxy used by the auto-crystallizer. Returns a
+score in [0,1] based on how well a node's relational triples are anchored:
+  - fraction of triples whose verb is a registered relation class verb
+  - bonus for required_relations (declared semantic anchors)
+  - bonus for non-empty relation_weights map (intentional weighting)
+"""
+function _semantic_truth_score(node)::Float64
+    triples = node.relational_patterns
+    n_triples = length(triples)
+    if n_triples == 0 && isempty(node.required_relations)
+        return 0.0
+    end
+
+    known_verbs = try
+        Set(lowercase.(SemanticVerbs.get_all_verbs()))
+    catch
+        Set{String}()
+    end
+
+    matched = 0
+    for t in triples
+        v = lowercase(strip(t.relation))
+        if v in known_verbs
+            matched += 1
+        end
+    end
+    triple_score = n_triples == 0 ? 0.0 : matched / n_triples
+
+    req_bonus  = isempty(node.required_relations) ? 0.0 : 0.20
+    wts_bonus  = isempty(node.relation_weights)   ? 0.0 : 0.10
+
+    return clamp(triple_score + req_bonus + wts_bonus, 0.0, 1.0)
+end
+
+"""
+    auto_crystalize_sweep!() -> Tuple{Int, Int}
+
+GRUG: Walk every attachment in ATTACHMENT_MAP. Auto-crystallize attachments
+whose attached node has BOTH:
+  - strength >= CRYSTAL_AUTO_STRENGTH_FLOOR, AND
+  - semantic_truth_score >= CRYSTAL_AUTO_SEMANTIC_FLOOR
+Auto-revoke attachments previously auto-crystalized whose strength has
+dropped below CRYSTAL_AUTO_REVOKE_FLOOR. Manual (`:user`) marks are never
+touched. Returns (crystallized_count, revoked_count).
+
+Called from the idle / phagy sweep loop. Cheap to run — O(attachments).
+"""
+function auto_crystalize_sweep!()::Tuple{Int, Int}
+    crystallized = 0
+    revoked = 0
+    lock(ATTACHMENT_LOCK) do
+        for (target_id, atts) in ATTACHMENT_MAP
+            for att in atts
+                node = lock(() -> get(NODE_MAP, att.node_id, nothing), NODE_LOCK)
+                isnothing(node) && continue
+                node.is_grave && continue
+
+                if att.is_crystalized && att.crystal_origin == :auto
+                    if node.strength < CRYSTAL_AUTO_REVOKE_FLOOR
+                        att.is_crystalized = false
+                        att.crystal_origin = :none
+                        revoked += 1
+                    end
+                elseif !att.is_crystalized
+                    if node.strength >= CRYSTAL_AUTO_STRENGTH_FLOOR &&
+                       _semantic_truth_score(node) >= CRYSTAL_AUTO_SEMANTIC_FLOOR
+                        att.is_crystalized = true
+                        att.crystal_origin = :auto
+                        crystallized += 1
+                    end
+                end
+                # :user marks are sticky — never auto-touched.
+            end
+        end
+    end
+    return (crystallized, revoked)
+end
+
+"""
+    is_crystalized(target_id, attach_id) -> Bool
+
+GRUG: Convenience query. Returns false if attachment doesn't exist.
+"""
+function is_crystalized(target_id::String, attach_id::String)::Bool
+    return lock(ATTACHMENT_LOCK) do
+        atts = get(ATTACHMENT_MAP, target_id, AttachedNode[])
+        for att in atts
+            att.node_id == attach_id && return att.is_crystalized
+        end
+        return false
+    end
 end
 
 # ==============================================================================

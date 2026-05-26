@@ -1890,6 +1890,8 @@ Attach   : /nodeAttach <target> <id> <pat> ...  (attach nodes with relational fi
 ImgAttach: /imgnodeAttach <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
          : /imgnodeDetach <target> <id>         (detach image node from target)
          : /attachments                         (show all node attachments)
+Crystal  : /crystalize <target> <attach>        (💎 mark attachment as sticky/user-locked)
+         : /decrystalize <target> <attach>      (🔓 remove sticky flag, restore coinflip)
 Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
          : /loadSpecimen <filepath>            (restore full cave state from compressed file)
 Help     : /help                               (full command reference)
@@ -3985,6 +3987,9 @@ function run_cli()
             m_imgnodeattach = match(r"^/imgnodeAttach\s+(.+)"s,                          line)
             m_imgnodedetach = match(r"^/imgnodeDetach\s+(\S+)\s+(\S+)\s*$",              line)
             m_attachments  = match(r"^/attachments\s*$",                                 line)
+            # GRUG: CRYSTALIZE — sticky attachments that bypass strength-biased coinflip
+            m_crystalize   = match(r"^/crystalize\s+(\S+)\s+(\S+)\s*$",                  line)
+            m_decrystalize = match(r"^/decrystalize\s+(\S+)\s+(\S+)\s*$",                line)
             m_help         = match(r"^/help\s*$",                                       line)
             
             if !isnothing(m_help)
@@ -4948,6 +4953,25 @@ elseif !isnothing(m_right)
                 # GRUG: /attachments — show all current node attachments
                 summary = get_attachment_summary()
                 println(summary)
+
+            elseif !isnothing(m_crystalize)
+                # GRUG: /crystalize <target_id> <attach_id> — mark attachment as user-sticky
+                # Crystalized attachments bypass the strength-biased fire coinflip and
+                # are NOT auto-revoked when strength drops. Origin = :user.
+                target_id = String(strip(m_crystalize.captures[1]))
+                attach_id = String(strip(m_crystalize.captures[2]))
+                result = crystalize_attachment!(target_id, attach_id; origin=:user)
+                println("💎 $result")
+                add_message_to_history!("System", "/crystalize: $result", false)
+
+            elseif !isnothing(m_decrystalize)
+                # GRUG: /decrystalize <target_id> <attach_id> — remove sticky flag
+                # Force=true clears even :user origin. Without force, only :auto is cleared.
+                target_id = String(strip(m_decrystalize.captures[1]))
+                attach_id = String(strip(m_decrystalize.captures[2]))
+                result = decrystalize_attachment!(target_id, attach_id; force=true)
+                println("🔓 $result")
+                add_message_to_history!("System", "/decrystalize: $result", false)
 
             else
                 error("!!! FATAL: Grug command bad format. Use /help to see all valid commands. !!!")
