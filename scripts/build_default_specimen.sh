@@ -19,9 +19,11 @@ echo "==============================================================="
 echo "Building $OUT_FILE from $SEED_FILE"
 echo "==============================================================="
 
-# Strip comments and blank lines, pipe to Main.jl
-grep -v '^\s*#' "$SEED_FILE" | grep -v '^\s*$' | \
-    julia --project=. src/Main.jl
+# Strip comments and blank lines, pipe to Main.jl.
+# GRUG_NO_AUTOLOAD=1 skips loading the existing default.specimen.gz so we
+# build cleanly from the seed file, not on top of the previous specimen.
+GRUG_NO_AUTOLOAD=1 grep -v '^\s*#' "$SEED_FILE" | grep -v '^\s*$' | \
+    GRUG_NO_AUTOLOAD=1 julia --project=. src/Main.jl
 
 if [[ -f "$OUT_FILE" ]]; then
     echo

@@ -2449,6 +2449,7 @@ function save_specimen_to_file!(filepath::String)::String
                 "is_image_node"       => node.is_image_node,
                 "neighbor_ids"        => node.neighbor_ids,
                 "is_unlinkable"       => node.is_unlinkable,
+                "max_neighbors"       => node.max_neighbors,
                 "is_grave"            => node.is_grave,
                 "grave_reason"        => node.grave_reason,
                 "response_times"      => node.response_times,
@@ -3238,6 +3239,10 @@ function load_specimen_from_file!(filepath::String)::String
                         Bool(get(nd, "is_image_node", false)),
                         String.(get(nd, "neighbor_ids", String[])),
                         Bool(get(nd, "is_unlinkable", false)),
+                        # GRUG: max_neighbors — back-compat for old specimens that lack it.
+                        # If missing, roll a fresh per-node cap so the loaded node still
+                        # has heterogeneous capacity instead of inheriting the old uniform 4.
+                        Int(get(nd, "max_neighbors", rand(LATCH_PARTNER_CAP_MIN:LATCH_PARTNER_CAP_MAX))),
                         Bool(get(nd, "is_grave", false)),
                         String(get(nd, "grave_reason", "")),
                         Float64.(get(nd, "response_times", Float64[])),

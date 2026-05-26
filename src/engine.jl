@@ -416,7 +416,14 @@ const SLOW_NODE_THRESHOLD_SECONDS = 5.0
 const LEDGER_CLEAR_INTERVAL       = 86400.0  # GRUG: 24 hours in seconds
 
 # GRUG: Max neighbors before node is UNLINKABLE (apoptosis of link capacity).
+# DEPRECATED as a hard cap — kept as a fallback default. The real cap is rolled
+# per-node at construction time in [LATCH_PARTNER_CAP_MIN, LATCH_PARTNER_CAP_MAX]
+# and stored on Node.max_neighbors. This randomized cap stops every node from
+# saturating at the same uniform link count and lets dense hubs / sparse satellites
+# emerge organically.
 const MAX_NEIGHBORS = 4
+const LATCH_PARTNER_CAP_MIN = 8
+const LATCH_PARTNER_CAP_MAX = 16
 
 # GRUG: Minimum map size before automatic neighbor latching is allowed.
 # Below this threshold, the map is too small for token overlap similarity to be
@@ -448,9 +455,10 @@ mutable struct Node
     # GRUG NEW: Is this node an image node? (pattern is SDF binary, not text)
     is_image_node::Bool
 
-    # GRUG NEW: Neighbor linking (max MAX_NEIGHBORS before UNLINKABLE)
+    # GRUG NEW: Neighbor linking (max neighbors rolled per-node 8-16 before UNLINKABLE)
     neighbor_ids::Vector{String}
-    is_unlinkable::Bool              # GRUG: True when neighbor_ids reaches MAX_NEIGHBORS
+    is_unlinkable::Bool              # GRUG: True when neighbor_ids reaches max_neighbors
+    max_neighbors::Int               # GRUG: Per-node cap, rolled in [LATCH_PARTNER_CAP_MIN, LATCH_PARTNER_CAP_MAX]
 
     # GRUG NEW: Grave tracking (strength hits 0 OR slow response average)
     is_grave::Bool
@@ -890,7 +898,9 @@ end
 try_link_nodes!(node_a::Node, node_b::Node)::Bool
 
 GRUG: Attempt to link two nodes as neighbors.
-Fails (returns false) if either node already has MAX_NEIGHBORS (is UNLINKABLE).
+Fails (returns false) if either node already has its per-node max_neighbors cap
+(is UNLINKABLE). Each node rolls its own cap in [LATCH_PARTNER_CAP_MIN, LATCH_PARTNER_CAP_MAX]
+at construction so connectivity is heterogeneous (hub vs. satellite emergence).
 On success, both nodes gain each other as neighbors.
 """
 function try_link_nodes!(node_a::Node, node_b::Node)::Bool
@@ -912,14 +922,14 @@ function try_link_nodes!(node_a::Node, node_b::Node)::Bool
         push!(node_a.neighbor_ids, node_b.id)
         push!(node_b.neighbor_ids, node_a.id)
 
-        # GRUG: Check if either node just hit the UNLINKABLE threshold
-        if length(node_a.neighbor_ids) >= MAX_NEIGHBORS
+        # GRUG: Check if either node just hit its per-node UNLINKABLE threshold
+        if length(node_a.neighbor_ids) >= node_a.max_neighbors
             node_a.is_unlinkable = true
-            println("[ENGINE] 🔒  Node $(node_a.id) is now UNLINKABLE ($(MAX_NEIGHBORS) neighbors reached).")
+            println("[ENGINE] 🔒  Node $(node_a.id) is now UNLINKABLE ($(node_a.max_neighbors) neighbors reached).")
         end
-        if length(node_b.neighbor_ids) >= MAX_NEIGHBORS
+        if length(node_b.neighbor_ids) >= node_b.max_neighbors
             node_b.is_unlinkable = true
-            println("[ENGINE] 🔒  Node $(node_b.id) is now UNLINKABLE ($(MAX_NEIGHBORS) neighbors reached).")
+            println("[ENGINE] 🔒  Node $(node_b.id) is now UNLINKABLE ($(node_b.max_neighbors) neighbors reached).")
         end
 
         return true
@@ -1775,6 +1785,7 @@ function create_node(
         is_image_node,      # is_image_node
         String[],           # neighbor_ids
         false,              # is_unlinkable
+        rand(LATCH_PARTNER_CAP_MIN:LATCH_PARTNER_CAP_MAX),  # max_neighbors (per-node 8-16 roll)
         false,              # is_grave
         "",                 # grave_reason
         Float64[],          # response_times (big-O ledger)
