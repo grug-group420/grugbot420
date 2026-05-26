@@ -1885,13 +1885,13 @@ Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
 Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
          : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
 NegThes  : /negativeThesaurus add|remove|list|check|flush
-Attach   : /nodeAttach <target> <id> <pat> ...  (attach nodes with relational fire patterns)
-         : /nodeDetach <target> <id>            (detach a node from target)
-ImgAttach: /imgnodeAttach <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
-         : /imgnodeDetach <target> <id>         (detach image node from target)
+Attach   : /nodeAttach <lobe> <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <lobe> <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <lobe> <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <lobe> <target> <id>         (detach image node from target)
          : /attachments                         (show all node attachments)
-Crystal  : /crystalize <target> <attach>        (💎 mark attachment as sticky/user-locked)
-         : /decrystalize <target> <attach>      (🔓 remove sticky flag, restore coinflip)
+Crystal  : /crystalize <lobe> <target> <attach>        (💎 mark attachment as sticky/user-locked)
+         : /decrystalize <lobe> <target> <attach>      (🔓 remove sticky flag, restore coinflip)
 Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
          : /loadSpecimen <filepath>            (restore full cave state from compressed file)
 Help     : /help                               (full command reference)
@@ -1976,17 +1976,22 @@ const HELP_MSG = """
 ║  /negativeThesaurus flush                                   ║
 ║                                                              ║
 ║  RELATIONAL FIRE (NODE ATTACHMENTS)                          ║
-║  /nodeAttach <tgt> <id> <pat> ...                            ║
+║  /nodeAttach <lobe> <tgt> <id> <pat> ...                     ║
 ║    Attach up to 4 nodes to target with firing patterns       ║
 ║    Confidence JIT-baked at attach time (not at fire time)    ║
-║    Example: /nodeAttach node_0 node_1 "fire pattern"         ║
-║  /nodeDetach <target> <id>   Detach node from target         ║
-║  /imgnodeAttach <tgt> <id> <b64> [w h]                       ║
+║    All nodes (target + attachments) must be in same lobe.    ║
+║    Example: /nodeAttach greeting node_0 node_1 "fire pattern"║
+║  /nodeDetach <lobe> <target> <id>   Detach node from target  ║
+║  /imgnodeAttach <lobe> <tgt> <id> <b64> [w h]                ║
 ║    Attach image node with SDF-based relational fire          ║
 ║    Image→SDF conversion at attach time (JIT GPU accel)       ║
-║    Example: /imgnodeAttach n0 img1 "data:image/png;..." 64 64║
-║  /imgnodeDetach <tgt> <id>   Detach image node from target   ║
+║    Example: /imgnodeAttach vision n0 img1 "data:image/..." 64 64║
+║  /imgnodeDetach <lobe> <tgt> <id>   Detach image node        ║
 ║  /attachments                Show all attachment map          ║
+║                                                              ║
+║  CRYSTAL (STICKY ATTACHMENTS)                                ║
+║  /crystalize <lobe> <tgt> <attach>     💎 mark sticky        ║
+║  /decrystalize <lobe> <tgt> <attach>   🔓 unmark sticky      ║
 ║                                                              ║
 ║  SPECIMEN PERSISTENCE                                        ║
 ║  /saveSpecimen <filepath>    Save full cave to compressed gz ║
@@ -3876,6 +3881,34 @@ end
 # ==============================================================================
 
 """
+_assert_node_in_lobe(lobe_id::String, node_id::String, cmd::String)
+
+GRUG: Validate a node truly belongs to the lobe the user named. Catches
+copy-paste mistakes and cross-lobe id collisions BEFORE the engine fires.
+Throws a clean FATAL the user can read instead of letting silent state-mismatch
+percolate. Used by every node-targeted CLI command (/nodeAttach, /nodeDetach,
+/imgnodeAttach, /imgnodeDetach, /crystalize, /decrystalize) so each command is
+self-documenting and addressable from a script without first running /lobes.
+"""
+function _assert_node_in_lobe(lobe_id::String, node_id::String, cmd::String)
+    if !haskey(Lobe.LOBE_REGISTRY, lobe_id)
+        existing = sort(collect(keys(Lobe.LOBE_REGISTRY)))
+        existing_list = join(existing, ", ")
+        error("!!! FATAL: $cmd: lobe '$lobe_id' does not exist. " *
+              "Known lobes: [$existing_list]. !!!")
+    end
+    rec = Lobe.LOBE_REGISTRY[lobe_id]
+    if !(node_id in rec.node_ids)
+        members = sort(collect(rec.node_ids))
+        preview_list = length(members) > 8 ? join(members[1:8], ", ") * ", ..." : join(members, ", ")
+        error("!!! FATAL: $cmd: node '$node_id' is not a member of lobe '$lobe_id'. " *
+              "Lobe members: [$preview_list]. !!!")
+    end
+    return true
+end
+
+
+"""
 run_cli()
 
 GRUG: Main REPL loop. Prints boot message, then loops forever reading input.
@@ -3987,14 +4020,18 @@ function run_cli()
             m_logout       = match(r"^/logout\s*$",                                        line)
             m_writesave    = match(r"^/writeSave\s+(\S+)\s+(.+)$"s,                        line)
             # GRUG: Relational fire system commands (node attachment)
-            m_nodeattach   = match(r"^/nodeAttach\s+(.+)"s,                              line)
-            m_nodedetach   = match(r"^/nodeDetach\s+(\S+)\s+(\S+)\s*$",                  line)
-            m_imgnodeattach = match(r"^/imgnodeAttach\s+(.+)"s,                          line)
-            m_imgnodedetach = match(r"^/imgnodeDetach\s+(\S+)\s+(\S+)\s*$",              line)
+            # GRUG: Node-targeted commands now require <lobe_id> as the first arg.
+            # This disambiguates which lobe owns the node, makes the commands
+            # script-addressable, and lets the CLI validate intent before the
+            # engine fires. /nodeAttach takes pairs after the target_id.
+            m_nodeattach   = match(r"^/nodeAttach\s+(\S+)\s+(.+)"s,                       line)
+            m_nodedetach   = match(r"^/nodeDetach\s+(\S+)\s+(\S+)\s+(\S+)\s*$",           line)
+            m_imgnodeattach = match(r"^/imgnodeAttach\s+(\S+)\s+(.+)"s,                   line)
+            m_imgnodedetach = match(r"^/imgnodeDetach\s+(\S+)\s+(\S+)\s+(\S+)\s*$",       line)
             m_attachments  = match(r"^/attachments\s*$",                                 line)
             # GRUG: CRYSTALIZE — sticky attachments that bypass strength-biased coinflip
-            m_crystalize   = match(r"^/crystalize\s+(\S+)\s+(\S+)\s*$",                  line)
-            m_decrystalize = match(r"^/decrystalize\s+(\S+)\s+(\S+)\s*$",                line)
+            m_crystalize   = match(r"^/crystalize\s+(\S+)\s+(\S+)\s+(\S+)\s*$",           line)
+            m_decrystalize = match(r"^/decrystalize\s+(\S+)\s+(\S+)\s+(\S+)\s*$",         line)
             m_help         = match(r"^/help\s*$",                                       line)
             
             if !isnothing(m_help)
@@ -4787,17 +4824,21 @@ elseif !isnothing(m_right)
                 end
 
             elseif !isnothing(m_nodeattach)
-                # GRUG: /nodeAttach <target_id> <attach_id1> <pattern1> [<attach_id2> <pattern2> ...]
+                # GRUG: /nodeAttach <lobe_id> <target_id> <attach_id1> <pattern1> [<attach_id2> <pattern2> ...]
                 # Relational fire system: bolt nodes onto a target with user-defined patterns.
-                # Parsing: target_id is first token. Remaining tokens alternate between
-                # node_id and quoted/unquoted pattern. Each pair is one attachment.
+                # The leading <lobe_id> scopes both target AND every attach_id; cross-lobe
+                # attachments are rejected. This makes the command script-addressable
+                # (you no longer need to /lobes + /tableStatus to find which lobe owns a node).
+                # Parsing: lobe_id is captures[1], everything else is captures[2].
+                # Then within captures[2]: target_id is first token, remaining tokens
+                # alternate between node_id and quoted/unquoted pattern.
                 #
                 # Supported formats:
-                #   /nodeAttach target_0 node_1 "hello world" node_2 "fire pattern"
-                #   /nodeAttach target_0 node_1 hello node_2 fire
+                #   /nodeAttach greeting target_0 node_1 "hello world" node_2 "fire pattern"
+                #   /nodeAttach greeting target_0 node_1 hello node_2 fire
                 #
-                # GRUG: Use a regex to extract pairs of (node_id, pattern) after target_id.
-                raw_args = String(strip(m_nodeattach.captures[1]))
+                lobe_id  = String(strip(m_nodeattach.captures[1]))
+                raw_args = String(strip(m_nodeattach.captures[2]))
                 # GRUG: IMMUNE GATE — node attachments are stored structure!
                 if !immune_gate("/nodeAttach", raw_args; is_critical=false)
                     println("⛔ /nodeAttach blocked by immune system.")
@@ -4831,10 +4872,12 @@ elseif !isnothing(m_right)
                 end
 
                 if length(tokens) < 3
-                    error("!!! FATAL: /nodeAttach needs at least: <target_id> <attach_id> <pattern>. Got $(length(tokens)) token(s)! !!!")
+                    error("!!! FATAL: /nodeAttach needs at least: <lobe_id> <target_id> <attach_id> <pattern>. Got $(length(tokens)) token(s) after lobe_id! !!!")
                 end
 
                 target_id = tokens[1]
+                # GRUG: Validate target lives in the named lobe BEFORE any engine call.
+                _assert_node_in_lobe(lobe_id, target_id, "/nodeAttach")
                 
                 # GRUG: Remaining tokens are pairs: (node_id, pattern)
                 pair_tokens = tokens[2:end]
@@ -4851,6 +4894,9 @@ elseif !isnothing(m_right)
                 for i in 1:n_pairs
                     aid = pair_tokens[(i-1)*2 + 1]
                     pat = pair_tokens[(i-1)*2 + 2]
+                    # GRUG: Each attached node must also live in the same lobe.
+                    # Cross-lobe attachments aren't supported — bridge via /connectLobes instead.
+                    _assert_node_in_lobe(lobe_id, aid, "/nodeAttach")
                     result = attach_node!(target_id, aid, pat)
                     push!(results, result)
                 end
@@ -4863,27 +4909,33 @@ elseif !isnothing(m_right)
                 end  # GRUG: End immune_gate else block for /nodeAttach
 
             elseif !isnothing(m_nodedetach)
-                # GRUG: /nodeDetach <target_id> <attach_id>
-                # Remove a specific attached node from a target.
-                target_id = String(strip(m_nodedetach.captures[1]))
-                attach_id = String(strip(m_nodedetach.captures[2]))
+                # GRUG: /nodeDetach <lobe_id> <target_id> <attach_id>
+                # Remove a specific attached node from a target. Lobe specifier
+                # validates target ownership; attach_id is verified to be in the
+                # same lobe (matches the attach-time invariant from /nodeAttach).
+                lobe_id   = String(strip(m_nodedetach.captures[1]))
+                target_id = String(strip(m_nodedetach.captures[2]))
+                attach_id = String(strip(m_nodedetach.captures[3]))
+                _assert_node_in_lobe(lobe_id, target_id, "/nodeDetach")
+                _assert_node_in_lobe(lobe_id, attach_id, "/nodeDetach")
                 result = detach_node!(target_id, attach_id)
                 println("🔓 $result")
                 add_message_to_history!("System", "/nodeDetach: $result", false)
 
             elseif !isnothing(m_imgnodeattach)
-                # GRUG: /imgnodeAttach <target_id> <attach_id> <image_data_b64> [<width> <height>]
-                # Same as /nodeAttach but for image nodes. Image binary is converted to
-                # nonlinear SDF at attach time (JIT GPU accel). Confidence is baked from
-                # SDF signal similarity. The attach_id MUST be an image node.
+                # GRUG: /imgnodeAttach <lobe_id> <target_id> <attach_id> <image_data_b64> [<width> <height>]
+                # Same as /nodeAttach but for image nodes. The leading <lobe_id> scopes
+                # both target and attach_id; cross-lobe image attachments are rejected.
+                # Image binary is converted to nonlinear SDF at attach time (JIT GPU accel).
+                # The attach_id MUST be an image node.
                 #
                 # Supported formats:
-                #   /imgnodeAttach target_0 img_node_1 "data:image/png;base64,iVBOR..." 64 64
-                #   /imgnodeAttach target_0 img_node_1 "data:image/png;base64,iVBOR..."
+                #   /imgnodeAttach vision target_0 img_node_1 "data:image/png;base64,iVBOR..." 64 64
+                #   /imgnodeAttach vision target_0 img_node_1 "data:image/png;base64,iVBOR..."
                 #   (if width/height omitted, defaults to 8x8 — user should specify)
                 #
-                # GRUG: Tokenize respecting quoted strings (same as /nodeAttach)
-                raw_args = String(strip(m_imgnodeattach.captures[1]))
+                lobe_id  = String(strip(m_imgnodeattach.captures[1]))
+                raw_args = String(strip(m_imgnodeattach.captures[2]))
                 # GRUG: IMMUNE GATE — image node attachments are stored structure!
                 if !immune_gate("/imgnodeAttach", raw_args; is_critical=false)
                     println("⛔ /imgnodeAttach blocked by immune system.")
@@ -4913,12 +4965,17 @@ elseif !isnothing(m_right)
                 end
 
                 if length(tokens) < 3
-                    error("!!! FATAL: /imgnodeAttach needs at least: <target_id> <attach_id> <image_data>. Got $(length(tokens)) token(s)! !!!")
+                    error("!!! FATAL: /imgnodeAttach needs at least: <lobe_id> <target_id> <attach_id> <image_data>. Got $(length(tokens)) token(s) after lobe_id! !!!")
                 end
 
                 target_id = tokens[1]
                 attach_id = tokens[2]
                 image_input = tokens[3]
+
+                # GRUG: Validate both nodes live in the named lobe BEFORE decoding the image.
+                # Fail fast — image decode is expensive, no point doing it on a bad lobe arg.
+                _assert_node_in_lobe(lobe_id, target_id, "/imgnodeAttach")
+                _assert_node_in_lobe(lobe_id, attach_id, "/imgnodeAttach")
 
                 # GRUG: Parse optional width/height (default 8x8 if not provided)
                 img_width = length(tokens) >= 4 ? parse(Int, tokens[4]) : 8
@@ -4946,10 +5003,13 @@ elseif !isnothing(m_right)
                 end  # GRUG: End immune_gate else block for /imgnodeAttach
 
             elseif !isnothing(m_imgnodedetach)
-                # GRUG: /imgnodeDetach <target_id> <attach_id>
+                # GRUG: /imgnodeDetach <lobe_id> <target_id> <attach_id>
                 # Same as /nodeDetach — reuse detach_node! since AttachedNode is universal.
-                target_id = String(strip(m_imgnodedetach.captures[1]))
-                attach_id = String(strip(m_imgnodedetach.captures[2]))
+                lobe_id   = String(strip(m_imgnodedetach.captures[1]))
+                target_id = String(strip(m_imgnodedetach.captures[2]))
+                attach_id = String(strip(m_imgnodedetach.captures[3]))
+                _assert_node_in_lobe(lobe_id, target_id, "/imgnodeDetach")
+                _assert_node_in_lobe(lobe_id, attach_id, "/imgnodeDetach")
                 result = detach_node!(target_id, attach_id)
                 println("🖼️🔓 $result")
                 add_message_to_history!("System", "/imgnodeDetach: $result", false)
@@ -4960,20 +5020,27 @@ elseif !isnothing(m_right)
                 println(summary)
 
             elseif !isnothing(m_crystalize)
-                # GRUG: /crystalize <target_id> <attach_id> — mark attachment as user-sticky
+                # GRUG: /crystalize <lobe_id> <target_id> <attach_id> — mark attachment as user-sticky
                 # Crystalized attachments bypass the strength-biased fire coinflip and
                 # are NOT auto-revoked when strength drops. Origin = :user.
-                target_id = String(strip(m_crystalize.captures[1]))
-                attach_id = String(strip(m_crystalize.captures[2]))
+                # Lobe specifier disambiguates the target across multiple lobes.
+                lobe_id   = String(strip(m_crystalize.captures[1]))
+                target_id = String(strip(m_crystalize.captures[2]))
+                attach_id = String(strip(m_crystalize.captures[3]))
+                _assert_node_in_lobe(lobe_id, target_id, "/crystalize")
+                _assert_node_in_lobe(lobe_id, attach_id, "/crystalize")
                 result = crystalize_attachment!(target_id, attach_id; origin=:user)
                 println("💎 $result")
                 add_message_to_history!("System", "/crystalize: $result", false)
 
             elseif !isnothing(m_decrystalize)
-                # GRUG: /decrystalize <target_id> <attach_id> — remove sticky flag
+                # GRUG: /decrystalize <lobe_id> <target_id> <attach_id> — remove sticky flag
                 # Force=true clears even :user origin. Without force, only :auto is cleared.
-                target_id = String(strip(m_decrystalize.captures[1]))
-                attach_id = String(strip(m_decrystalize.captures[2]))
+                lobe_id   = String(strip(m_decrystalize.captures[1]))
+                target_id = String(strip(m_decrystalize.captures[2]))
+                attach_id = String(strip(m_decrystalize.captures[3]))
+                _assert_node_in_lobe(lobe_id, target_id, "/decrystalize")
+                _assert_node_in_lobe(lobe_id, attach_id, "/decrystalize")
                 result = decrystalize_attachment!(target_id, attach_id; force=true)
                 println("🔓 $result")
                 add_message_to_history!("System", "/decrystalize: $result", false)
