@@ -1070,10 +1070,18 @@ const RELAY_CONF_JITTER_SIGMA = 0.05
 # constants so tuning is centralized and meaning is documented.
 #
 #   CHEAP_SCAN_THRESHOLD  — bidirectional scan for short signals (≤3 tokens).
-#                            Loose because short patterns have lower discrimination.
+#                            High because short patterns have LOW discrimination
+#                            on overlap math — a 0.3 floor lets a single fuzzy
+#                            character span trigger a "match," which causes
+#                            unrelated lobes to all fire on short inputs and
+#                            produces routing-by-coinflip on the resulting
+#                            0.55-0.57 plateau. 0.6 means the cheap scan only
+#                            says "yes" when most of the short pattern is
+#                            actually present in the input. Cheap stays cheap;
+#                            it just stops rubber-stamping non-matches.
 #   MEDIUM_SCAN_THRESHOLD — standard medium-resolution scan.
 #   HIGH_SCAN_THRESHOLD   — full high-resolution scan; strict acceptance.
-const CHEAP_SCAN_THRESHOLD  = 0.3
+const CHEAP_SCAN_THRESHOLD  = 0.6
 const MEDIUM_SCAN_THRESHOLD = 0.4
 const HIGH_SCAN_THRESHOLD   = 0.5
 
@@ -2621,11 +2629,19 @@ Pass 1 — Drop-table expansion (same lobe co-activation):
   Drop-table neighbors inherit 80% of activating node confidence.
 
 Pass 2 — Lobe cascade expansion (cross-lobe bridge activation):
-  When a primary node lives in a lobe, cascade into ALL other lobes
-  that share at least one node pattern token with the input.
-  Cascade threshold: 0.15 (soft gate).
+  When a primary node lives in a lobe, cascade into other lobes —
+  but ONLY inject a non-primary lobe's node if its own pattern signal
+  shares at least one token with the input (within scan tolerance).
+  This is the "share at least one node pattern token with the input"
+  rule the original cascade design promised but never enforced.
+  Without this gate, every lobe got its full node set injected at the
+  cascade discount whenever ANY primary fired loudly — flooding the
+  vote pool with semantically unrelated nodes from every domain and
+  collapsing routing to coinflip-on-a-flat-plateau. The gate keeps
+  cross-lobe talk alive (genuinely overlapping queries still cascade)
+  while killing the indiscriminate flood.
+  Cascade threshold: 0.15 (soft gate on cascade_conf).
   Cascade confidence: 60% of the highest primary confidence (cross-lobe discount).
-  This prevents isolated lobe silos when a query spans multiple domains.
 """
 function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
     primary_results = scan_specimens(input_text)
@@ -2633,6 +2649,21 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     if isempty(primary_results)
         return primary_results
     end
+
+    # GRUG: Pre-compute input signal once for cascade token-overlap gate (PASS 2).
+    # Cascade gate compares each candidate node's signal against this. Cheap to
+    # build (already done inside scan_specimens, but we need it again here).
+    cascade_input_signal = try
+        words_to_signal(input_text)
+    catch
+        Float64[]  # GRUG: empty input → no cascade overlap possible, gate fails closed
+    end
+
+    # GRUG: Tolerance matches cheap_scan default. A cascade candidate counts as
+    # "sharing a token" with the input only if at least one of its signal floats
+    # falls within this band of any input float. This is the same equality
+    # criterion the matcher itself uses, so the gate is mathematically aligned.
+    cascade_overlap_tol = 0.1
 
     # GRUG: Track which IDs are already in the result set to avoid duplicates
     already_included = Set(r[1] for r in primary_results)
@@ -2703,6 +2734,32 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                         cascade_node = lock(() -> get(NODE_MAP, node_id, nothing), NODE_LOCK)
                         isnothing(cascade_node) && continue
                         cascade_node.is_grave && continue  # GRUG: Dead nodes don't cascade!
+
+                        # GRUG: TOKEN-OVERLAP GATE — only cascade if this node's
+                        # pattern actually shares a token with the input. Without
+                        # this, every lobe's full node set floods in at cascade_conf
+                        # regardless of relevance, collapsing routing to coinflip.
+                        # Image nodes have non-text signals — skip them; they fire
+                        # only on image inputs in their own path.
+                        if cascade_node.is_image_node
+                            continue
+                        end
+                        if isempty(cascade_input_signal) || isempty(cascade_node.signal)
+                            continue
+                        end
+                        has_overlap = false
+                        for ns in cascade_node.signal
+                            for is in cascade_input_signal
+                                if abs(ns - is) <= cascade_overlap_tol
+                                    has_overlap = true
+                                    break
+                                end
+                            end
+                            has_overlap && break
+                        end
+                        if !has_overlap
+                            continue  # GRUG: No shared token → no cascade injection.
+                        end
 
                         push!(expanded, (node_id, cascade_conf, false, user_triples, cascade_node.relational_patterns))
                         push!(already_included, node_id)
