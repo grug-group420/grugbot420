@@ -15,14 +15,14 @@
 - SMELL-003 Hopfield dead-code block removed
 - SMELL-004 Magic scan thresholds promoted to named constants
 - Default specimen built (`grug-binary/default.specimen.gz`, 20 nodes / 7 lobes)
-- Hardcore boot test: 0–2/10 silent (down from 8/10)
+- **CRYSTALIZE engine + CLI** (`/crystalize`, `/decrystalize`) — sticky attachments
+- **Latch partner cap 8–16 per-node** — `Node.max_neighbors` rolled at construction
+- Hardcore retest after CRYSTALIZE + latch cap: **10/10, 10/10, 9/10** Grug replies (1 silent across 30 missions)
 
 ## Remaining from user's spec (this turn)
-1. **CRYSTALIZE tag for attached nodes** — manual + auto-from-semantic-truth
-2. **Latch partner cap 8–16** — verify or implement randomly-rolled per-node cap with UNLINKABLE flag
 3. **Chatter mode rewrite** — vote-copy not pattern-copy; group hash table; 100–400 round-robin window; per-node 1h cooldown; 1 vote-swap per event; semantic-gated swap; jitter weights; NONJITTER carve-out for low-conf votes on strong nodes
 4. **Phagy idle role** — group-id hygiene + UNLINKABLE-clear-on-graved-in-group
 5. **Action tone predictor** — dynamic only on semantically complex inputs
-6. **Hardcore retest** — confirm the orchestrator + remaining changes still hit 0/10 silent
-7. **Commit grouped (BUG-NNN per commit)** + push to github.com/grug-group420/grugbot420
-8. **Tell user to revoke PAT**
+6. **Auto-crystalize-sweep wiring** — call `auto_crystalize_sweep!()` from idle/chatter loop
+7. **Push to github.com/grug-group420/grugbot420** with PAT
+8. **Tell user to revoke PAT** after push
