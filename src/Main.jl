@@ -7,6 +7,15 @@ if !isdefined(@__MODULE__, :CoinFlipHeader)
     using .CoinFlipHeader
 end
 
+# GRUG: LobeOrchestrator — averages-curve lobe selection (replaces the
+# v7.18 hard mute gate). engine.jl references LobeOrchestrator inside
+# scan_and_expand, so this must be in scope BEFORE engine.jl is included.
+# Guard against double-include for the package-level path.
+if !isdefined(@__MODULE__, :LobeOrchestrator)
+    include("LobeOrchestrator.jl")
+    using .LobeOrchestrator
+end
+
 # GRUG: Include engine after macro is alive. Engine need coinflip!
 # Engine.jl now includes patternscanner.jl, ImageSDF.jl and EyeSystem.jl internally.
 include("engine.jl")
@@ -38,18 +47,24 @@ if !isdefined(@__MODULE__, :Thesaurus)
     using .Thesaurus
 end
 
-# GRUG: Bring the Lobe partitioning system into the cave!
-# GRUG: Guard against double-include if Lobe already loaded by caller.
-if !isdefined(@__MODULE__, :Lobe)
-    include("Lobe.jl")
-    using .Lobe
-end
-
-# GRUG: Bring the LobeTable hash storage system into the cave!
-# GRUG: Guard against double-include if LobeTable already loaded by caller.
+# GRUG: LobeTable MUST be included BEFORE Lobe.jl. Lobe.jl uses LobeTable
+# functions (create_lobe_table!, node_ref_put!, etc.) and if Lobe.jl includes
+# its own copy of LobeTable.jl into its submodule scope, you end up with TWO
+# separate LobeTable instances at runtime — one inside Lobe, one inside Main —
+# with separate registries that don't see each other's tables. That was a real
+# bug (see plans/semantic_plugins/QOL_SWEEP_2025.md BUG-002). Single source of
+# truth: include LobeTable here, then Lobe.jl pulls it from the parent scope.
 if !isdefined(@__MODULE__, :LobeTable)
     include("LobeTable.jl")
     using .LobeTable
+end
+
+# GRUG: Bring the Lobe partitioning system into the cave!
+# GRUG: Guard against double-include if Lobe already loaded by caller.
+# Lobe expects LobeTable to already be in the parent module's scope.
+if !isdefined(@__MODULE__, :Lobe)
+    include("Lobe.jl")
+    using .Lobe
 end
 
 # GRUG: Bring the BrainStem winner-take-all dispatcher into the cave!
@@ -1553,7 +1568,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         if !isempty(mission_tokens)
             # Walk MESSAGE_HISTORY for pinned entries; pick the first
             # topical one (pinned memory is small — linear scan fine).
-            lock(MESSAGE_LOCK) do
+            lock(MESSAGE_HISTORY_LOCK) do
                 for m in MESSAGE_HISTORY
                     if m.pinned
                         pin_tokens = Set(_tokenize_for_relevance(m.text))
@@ -1638,25 +1653,16 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
     println(payload_io, "AIML Memory Bank:")
     println(payload_io, memory_str)
-    # GRUG v7.18: Lobe topicality gate telemetry — show which lobes the gate
-    # muted for THIS mission and which nodes were reinstated via semantic
-    # bridge (dynamic triple / required_relation / /nodeAttach).
+    # GRUG: Lobe Curve telemetry — replaces the old "Muted Lobes / Bridged Nodes"
+    # readout. Shows base_avg × top_avg = score per lobe, with 👑 marking the
+    # winner and ↗ marking pass-through runners-up. See LobeOrchestrator.jl.
     try
-        muted_lobes = _LAST_MUTED_LOBES[]
-        bridged     = _LAST_BRIDGED_NODES[]
-        if isempty(muted_lobes)
-            println(payload_io, "Muted Lobes: None")
-        else
-            println(payload_io, "Muted Lobes: [$(join(muted_lobes, ", "))]")
-        end
-        if isempty(bridged)
-            println(payload_io, "Bridged Nodes: None")
-        else
-            bridged_str = join(["$(nid)@$(lid)($(reason))" for (nid, lid, reason) in bridged], ", ")
-            println(payload_io, "Bridged Nodes: [$bridged_str]")
+        println(payload_io, LobeOrchestrator.last_summary())
+        if !isempty(LobeOrchestrator.LAST_PASSTHROUGH[])
+            println(payload_io, "Passthrough Lobes: [$(join(LobeOrchestrator.LAST_PASSTHROUGH[], ", "))]")
         end
     catch e
-        println(payload_io, "Muted Lobes: <telemetry error: $e>")
+        println(payload_io, "Lobe Curve: <telemetry error: $e>")
     end
     print(payload_io, "=========================================")
     return String(take!(payload_io))
@@ -1854,7 +1860,11 @@ System Online. Grug waiting at cave entrance for instructions.
 Primary  : /mission <input>                    (text or image binary)
 Feedback : /wrong                              (penalize last response voters)
 Explicit : /explicit <cmd> [<node_id>] <input>
-Grow     : /grow <single_line_json_packet>
+Grow     : /grow <lobe_id> <json_packet>      (plant node(s) into a lobe)
+         :   • <lobe_id> is required — use `-` for unassigned pool
+         :   • Single node: {"pattern":"...","action_packet":"...","data":{...}}
+         :   • Multi node:  {"nodes":[{...},{...}]}
+         :   • `data.system_prompt` defaults to "Grug speaks plainly." if absent
 Rules    : /addRule <rule text> [prob=0.0-1.0]
            Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
                  {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
@@ -1868,7 +1878,7 @@ Verbs    : /addVerb <verb> <class>             (add verb to relation class)
          : /listVerbs                          (show all verb classes + synonyms)
 Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
          : /connectLobes <id_a> <id_b>         (connect two lobes)
-         : /lobeGrow <lobe_id> <json_packet>   (grow node into specific lobe)
+         : /lobeGrow <lobe_id> <json_packet>   (DEPRECATED — alias for /grow)
          : /lobes                              (list all lobes + node counts)
          : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
          : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
@@ -3629,11 +3639,26 @@ end
 # CAVE POPULATION & CLI LOOP
 # ==============================================================================
 
-try
+"""
+_plant_inline_boot_seeds()
+
+Hardcoded minimal boot seeds. Used as a fallback when no default specimen
+file is present. Creates the `default` lobe and three foundational nodes
+covering greeting, reasoning, and survival/causal-analysis archetypes.
+"""
+function _plant_inline_boot_seeds()
     println("Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...")
+
+    # BUG-009: Auto-create the `default` lobe at boot. All boot seeds register
+    # into it, so they are no longer floaters in the unassigned pool. The lobe
+    # subject is intentionally generic so the topicality gate keeps it eligible
+    # for almost any conversation.
+    Lobe.create_lobe!("default", "general thinking reasoning conversation greeting")
+    println("  + lobe `default` created (subject: general thinking reasoning conversation greeting)")
+
     greet_ctx    = Dict{String, Any}("system_prompt" => "Highly polite greeting protocols active.")
     reason_ctx   = Dict{String, Any}("system_prompt" => "Cold logical analysis engine active.")
-    
+
     # GRUG: Relation dictionary to guard the gate!
     relational_ctx = Dict{String, Any}(
         "system_prompt"      => "Causal relational analysis active.",
@@ -3643,18 +3668,62 @@ try
 
     # GRUG: Seed nodes use pipe-delimited action packets with inline negatives per action.
     # Format: "action[neg1, neg2]^weight | action2[neg3]^weight | action3^weight"
-    create_node("hello hi greeting mornin",
+    boot_id_1 = create_node("hello hi greeting mornin",
         "greet[dont frown, dont insult]^3 | welcome[dont be rude]^2 | smile^1",
         greet_ctx, String[])
 
-    create_node("think ponder reason calculate",
+    boot_id_2 = create_node("think ponder reason calculate",
         "reason[dont guess, dont hallucinate]^4 | analyze[dont assume]^3 | ponder^1",
         reason_ctx, String[])
 
     # GRUG: Node that demands verb "hits". Will hard-reject "rock hits grug" via anti-match!
-    create_node("grug hits rock and makes fire",
+    boot_id_3 = create_node("grug hits rock and makes fire",
         "analyze[dont panic]^5 | ponder^2",
         relational_ctx, String[])
+
+    # BUG-009: Register all boot seeds into the `default` lobe so they vote with
+    # a real lobe context instead of the legacy "unassigned" special case.
+    for nid in (boot_id_1, boot_id_2, boot_id_3)
+        Lobe.add_node_to_lobe!("default", nid)
+    end
+    println("  + 3 boot seeds registered into `default` lobe")
+end
+
+try
+    # ============================================================
+    # DEFAULT SPECIMEN AUTO-LOAD (BUG-009 + ship-with-grug)
+    # ============================================================
+    # If `grug-binary/default.specimen.gz` (or env-overridden path) exists and
+    # auto-load is not disabled by `GRUG_NO_AUTOLOAD=1`, restore from it.
+    # Otherwise plant a minimal hardcoded boot-seed set so grug can talk on
+    # first run with zero setup. The auto-load gives newcomers a 20-node /
+    # 7-lobe brain out of the box; the hardcoded fallback guarantees grug
+    # never starts empty.
+    default_specimen_path = get(ENV, "GRUG_DEFAULT_SPECIMEN",
+                                 joinpath(@__DIR__, "..", "grug-binary", "default.specimen.gz"))
+    autoload_disabled = get(ENV, "GRUG_NO_AUTOLOAD", "") == "1"
+
+    if !autoload_disabled && isfile(default_specimen_path)
+        println("🧠 Default specimen detected at $(default_specimen_path) — auto-loading...")
+        try
+            summary = load_specimen_from_file!(default_specimen_path)
+            println("  ✅ Default specimen restored.")
+            # Show abbreviated summary (first 6 lines)
+            for ln in Iterators.take(split(summary, '\n'), 6)
+                println("    $ln")
+            end
+            println("  (Set GRUG_NO_AUTOLOAD=1 to skip this on next boot.)")
+        catch e
+            println("⚠️  Default specimen failed to load: $e")
+            println("   Falling back to inline boot seeds.")
+            _plant_inline_boot_seeds()
+        end
+    else
+        if autoload_disabled
+            println("ℹ️  GRUG_NO_AUTOLOAD=1 — skipping default specimen auto-load.")
+        end
+        _plant_inline_boot_seeds()
+    end
 catch e
     println("!!! FATAL: Grug failed to plant initial seeds in cave !!!")
     Base.show_backtrace(stdout, catch_backtrace())
@@ -3877,7 +3946,7 @@ function run_cli()
             m_aimlcycle   = match(r"^/aimlCycle\s*$",     line)
             m_aimlphagy   = match(r"^/aimlPhagy\s*$",     line)
             m_explicit    = match(r"^/explicit\s+([a-zA-Z0-9_]+)\s+\[(.+?)\]\s+(.+)", line)
-            m_grow        = match(r"^/grow\s+(.+)"s,      line)
+            m_grow        = match(r"^/grow\s+(\S+)\s+(.+)"s,      line)
             m_rule        = match(r"^/addRule\s+(.+)"s,   line)
             m_pin         = match(r"^/pin\s+(.+)"s,       line)
             m_nodes       = match(r"^/nodes\s*$",          line)
@@ -4164,33 +4233,51 @@ elseif !isnothing(m_right)
                 add_message_to_history!("System", digest, false)
                 
             elseif !isnothing(m_grow)
-                # GRUG: /grow - plant new nodes from JSON packet.
-                # Regex pre-screens JSON for image binary patterns before parsing.
-                json_text = String(m_grow.captures[1])
-                add_message_to_history!("System", "/grow [JSON MAP PACKET]", false)
+                # GRUG QoL-2025 BUG-008: /grow <lobe_id> <json_packet>
+                # Unified single-command growth path. Every node has a lobe
+                # home — no more "unassigned pool" mystery.
+                #
+                # Accepts BOTH packet shapes:
+                #   /grow lobeid {"pattern":"...", "action_packet":"...", "data":{...}}
+                #   /grow lobeid {"nodes":[ {...}, {...} ]}
+                #
+                # `<lobe_id>` may be the literal `-` (dash) to mean "no lobe,
+                # legacy unassigned pool". Useful for boot seeds and tests.
+                target_lobe_raw = String(m_grow.captures[1])
+                json_text       = String(m_grow.captures[2])
+                add_message_to_history!("System", "/grow $target_lobe_raw [JSON MAP PACKET]", false)
 
                 # GRUG: IMMUNE SYSTEM GATE — scan grow input before touching anything!
                 # /grow is a CRITICAL command (modifies node population). Full immune scan.
                 immune_passed = immune_gate("/grow", json_text; is_critical=true)
 
                 if immune_passed
-                    println("--> Grug unpacking JSON node seeds...")
+                    target_lobe = (target_lobe_raw == "-") ? nothing : target_lobe_raw
 
-                    # GRUG: Check if the grow packet contains image binary data.
-                    # If pattern field has image binary, flag it as image node automatically.
-                    is_img, img_sig = maybe_convert_image_input(json_text)
-                    if is_img
-                        println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
-                        # GRUG: The JSON node grower in Engine.jl handles is_image_node flag.
-                        # Image binary in pattern will be stored as SDF signal.
-                        # Caller must set "is_image_node": true in the JSON for this to work.
+                    # GRUG: If a real lobe was named, it must exist.
+                    if !isnothing(target_lobe) && !haskey(Lobe.LOBE_REGISTRY, target_lobe)
+                        println("⚠  /grow: lobe '$target_lobe' does not exist. Use /newLobe first, or pass `-` for the unassigned pool.")
+                    elseif !isnothing(target_lobe) && Lobe.lobe_is_full(target_lobe)
+                        println("!!! LOBE FULL: Lobe '$target_lobe' has reached its node cap. Cannot grow more nodes! Use /newLobe to add a new lobe. !!!")
+                    else
+                        println("--> Grug unpacking JSON node seeds for lobe '$(isnothing(target_lobe) ? "-" : target_lobe)'...")
+
+                        # GRUG: Check if the grow packet contains image binary data.
+                        # If pattern field has image binary, flag it as image node automatically.
+                        is_img, img_sig = maybe_convert_image_input(json_text)
+                        if is_img
+                            println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
+                        end
+
+                        try
+                            new_ids = grow_nodes_from_packet(json_text; target_lobe=target_lobe)
+                            success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes into lobe '$(isnothing(target_lobe) ? "-" : target_lobe)': [$(join(new_ids, ", "))]"
+                            println(success_msg)
+                            add_message_to_history!("System", success_msg, false)
+                        catch e
+                            println("!!! ERROR in /grow: $e !!!")
+                        end
                     end
-
-                    new_ids = grow_nodes_from_packet(json_text)
-
-                    success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes: [$(join(new_ids, ", "))]"
-                    println(success_msg)
-                    add_message_to_history!("System", success_msg, false)
                 end
 
             elseif !isnothing(m_rule)
@@ -4293,10 +4380,34 @@ elseif !isnothing(m_right)
 
             elseif !isnothing(m_addverb)
                 # GRUG: /addVerb <verb> <class> - add a new verb to a relation class at runtime.
-                # User must create the class first with /addRelationClass if it is new.
-                # Example: /addVerb triggers causal
-                verb_word  = String(m_addverb.captures[1])
-                verb_class = String(m_addverb.captures[2])
+                # BUG-005: Accept either order (verb first OR class first). The
+                # registered class is detectable, the verb is whatever's left.
+                # Example: /addVerb triggers causal   AND   /addVerb causal triggers
+                arg1 = String(m_addverb.captures[1])
+                arg2 = String(m_addverb.captures[2])
+                known_classes = SemanticVerbs.get_relation_classes()
+                arg1_is_class = arg1 in known_classes
+                arg2_is_class = arg2 in known_classes
+                if arg1_is_class && !arg2_is_class
+                    verb_class, verb_word = arg1, arg2  # class-first order
+                elseif arg2_is_class && !arg1_is_class
+                    verb_word, verb_class = arg1, arg2  # verb-first (canonical)
+                elseif arg1_is_class && arg2_is_class
+                    # Both args are registered classes — ambiguous. Default to
+                    # canonical order and warn the user.
+                    verb_word, verb_class = arg1, arg2
+                    println("⚠️  /addVerb: both '$(arg1)' and '$(arg2)' are registered classes. " *
+                            "Defaulting to verb='$(verb_word)' class='$(verb_class)'. " *
+                            "Reorder explicitly to disambiguate.")
+                else
+                    # Neither arg is a registered class — use canonical order
+                    # and warn that the class is unknown.
+                    verb_word, verb_class = arg1, arg2
+                    known_list = join(known_classes, ", ")
+                    println("⚠️  /addVerb: class '$(verb_class)' is not registered. " *
+                            "Run /addRelationClass $(verb_class) first, " *
+                            "or check spelling. Known classes: $(known_list)")
+                end
                 # GRUG: IMMUNE GATE — verb registry is stored structure!
                 if !immune_gate("/addVerb", verb_word * " " * verb_class; is_critical=false)
                     println("⛔ /addVerb blocked by immune system.")
@@ -4356,6 +4467,13 @@ elseif !isnothing(m_right)
                 # Example: /newLobe language "natural language processing"
                 lobe_id_new  = String(m_newlobe.captures[1])
                 lobe_subject = String(strip(m_newlobe.captures[2]))
+                # GRUG QoL-2025: Warn if subject contains `_` or `-`. The topicality
+                # gate normalizes these to spaces (see engine.jl _compute_lobe_topicality)
+                # but the user probably MEANT to type spaces. Loud warning beats silent
+                # surprise. Don't reject — engine handles it — just inform.
+                if occursin('_', lobe_subject) || occursin('-', lobe_subject)
+                    println("⚠  /newLobe: subject contains '_' or '-'. These are normalized to spaces during topicality matching, but you probably wanted plain space-separated keywords. Consider: '/newLobe $lobe_id_new $(replace(lobe_subject, '_' => ' ', '-' => ' '))'")
+                end
                 # GRUG: IMMUNE GATE — lobe creation is stored structure!
                 if !immune_gate("/newLobe", lobe_id_new * " " * lobe_subject; is_critical=false)
                     println("⛔ /newLobe blocked by immune system.")
@@ -4384,46 +4502,27 @@ elseif !isnothing(m_right)
                 end
 
             elseif !isnothing(m_lobegrow)
-                # GRUG: /lobeGrow <lobe_id> <json_packet> - grow a node directly into a lobe.
-                # JSON must have: pattern, action_packet. Optional: data, drop_table.
-                # Example: /lobeGrow language {"pattern":"hello","action_packet":"{...}"}
+                # GRUG QoL-2025 BUG-008: /lobeGrow is now a deprecated alias
+                # for /grow <lobe_id> <packet>. We route through the unified
+                # grow_nodes_from_packet code path so there's only ONE place
+                # where node creation + lobe attach happens. The deprecation
+                # warning surfaces once per call so users notice and migrate.
                 target_lobe_id = String(m_lobegrow.captures[1])
                 lobe_json      = String(strip(m_lobegrow.captures[2]))
+                println("⚠  /lobeGrow is deprecated. Use: /grow $target_lobe_id <packet>")
 
-                # GRUG: IMMUNE SYSTEM GATE — scan lobeGrow input before touching anything!
                 lobegrow_immune_passed = immune_gate("/lobeGrow", lobe_json; is_critical=true)
 
                 if !lobegrow_immune_passed
-                    # GRUG: Immune system said no. Skip growth.
+                    # immune said no
                 elseif !haskey(Lobe.LOBE_REGISTRY, target_lobe_id)
-                    println("\u26a0  /lobeGrow: Lobe '$(target_lobe_id)' does not exist. Use /newLobe first.")
+                    println("⚠  /lobeGrow: Lobe '$(target_lobe_id)' does not exist. Use /newLobe first.")
                 elseif Lobe.lobe_is_full(target_lobe_id)
                     println("!!! LOBE FULL: Lobe '$(target_lobe_id)' has reached its node cap. Cannot grow more nodes! Use /newLobe to add a new lobe. !!!")
                 else
                     try
-                        packet = JSON.parse(lobe_json)
-                        if !haskey(packet, "pattern") || !haskey(packet, "action_packet")
-                            println("\u26a0  /lobeGrow: JSON must have 'pattern' and 'action_packet' fields.")
-                        else
-                            json_data  = Dict{String,Any}(string(k) => v for (k,v) in get(packet, "data", Dict()))
-                            drop_table = haskey(packet, "drop_table") && packet["drop_table"] isa AbstractVector ?
-                                         String[string(x) for x in packet["drop_table"]] : String[]
-                            new_id = create_node(
-                                packet["pattern"],
-                                packet["action_packet"],
-                                json_data,
-                                drop_table
-                            )
-                            # GRUG: Pass alive_count to exclude graves from cap check!
-                            # GRUG say: dead nodes are memory, not bloat. Cap is for living.
-                            alive_in_lobe = count_alive_nodes_in_lobe(target_lobe_id)
-                            Lobe.add_node_to_lobe!(target_lobe_id, new_id; alive_count=alive_in_lobe)
-                            # GRUG: Convert JSON data and drop table into lobe's hash table chunks.
-                            # Flat dict and flat vector become O(1) pattern-activated storage.
-                            json_count = LobeTable.json_to_table_chunk!(target_lobe_id, new_id, json_data)
-                            drop_count = LobeTable.drop_table_to_chunk!(target_lobe_id, new_id, drop_table)
-                            println("\U0001f331 Node '$(new_id)' grown into lobe '$(target_lobe_id)'. json_fields=$json_count drop_links=$drop_count")
-                        end
+                        new_ids = grow_nodes_from_packet(lobe_json; target_lobe=target_lobe_id)
+                        println("🌱 Grew $(length(new_ids)) node(s) into lobe '$(target_lobe_id)': [$(join(new_ids, ", "))]")
                     catch e
                         ctx = e isa LobeTable.LobeTableError ? " [ctx: $(e.context)]" :
                               e isa Lobe.LobeError ? " [ctx: $(e.context)]" : ""

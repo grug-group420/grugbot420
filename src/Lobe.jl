@@ -8,11 +8,16 @@
 
 module Lobe
 
-# GRUG: Load LobeTable before anything else. Lobe needs table ops at creation time.
-if !isdefined(@__MODULE__, :LobeTable)
-    include("LobeTable.jl")
-    using .LobeTable
-end
+# GRUG QoL-2025: LobeTable is included by the PARENT module (Main.jl or
+# GrugBot420.jl) BEFORE this file is included. We must NOT include it again
+# here — that would create a second LobeTable submodule scoped under Lobe,
+# with a separate LOBE_TABLE_REGISTRY that the parent's /lobeGrow code can't
+# see. Instead, reach up to the parent and import.
+#
+# Why parentmodule(@__MODULE__): when this `module Lobe` block is evaluated
+# inside `Main.jl`'s `include("Lobe.jl")`, parentmodule is Main (or whatever
+# wrapper module loaded us). LobeTable lives there.
+const LobeTable = parentmodule(@__MODULE__).LobeTable
 
 # ============================================================================
 # ERROR TYPES - GRUG hate silent failures!

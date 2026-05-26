@@ -1,0 +1,77 @@
+# Default Specimen Seed Commands
+# ===============================
+# This file is the canonical seed for grugbot420's `default.specimen.gz`.
+# Each line is a CLI command piped to `src/Main.jl`. Empty lines and lines
+# starting with `#` are skipped by the build script.
+#
+# To rebuild the specimen:
+#   bash scripts/build_default_specimen.sh
+#
+# The resulting `grug-binary/default.specimen.gz` ships with the engine and
+# auto-loads on first boot when no other specimen is provided.
+
+# ----- Verb classes -----
+/addRelationClass causal
+/addRelationClass spatial
+/addRelationClass epistemic
+/addRelationClass action
+/addVerb causes causal
+/addVerb makes causal
+/addVerb hits action
+/addVerb breaks action
+/addVerb burns action
+/addVerb knows epistemic
+/addVerb thinks epistemic
+/addVerb sees spatial
+/addVerb on spatial
+
+# ----- Subject lobes -----
+/newLobe greeting hello hi greet welcome conversation
+/newLobe reasoning think reason analyze ponder logic
+/newLobe survival flee hide fight danger threat
+/newLobe explanation explain clarify describe define teach
+/newLobe comfort comfort support validate reassure care
+/newLobe alert warn caution notify danger flag
+
+# ----- Greeting lobe nodes -----
+/grow greeting {"pattern":"hello hi","action_packet":"greet^3 | welcome^2 | smile^1","data":{"system_prompt":"Grug greet warm. Be polite, brief."}}
+/grow greeting {"pattern":"good morning","action_packet":"greet^3 | smile^2","data":{"system_prompt":"Grug acknowledge time of day with warmth."}}
+/grow greeting {"pattern":"howdy","action_packet":"greet^2 | welcome^2 | laugh^1","data":{"system_prompt":"Grug greet casually."}}
+
+# ----- Reasoning lobe nodes -----
+/grow reasoning {"pattern":"think about","action_packet":"reason^3 | analyze^2 | ponder^2","data":{"system_prompt":"Grug think slow and careful. Use logic."}}
+/grow reasoning {"pattern":"why","action_packet":"reason^4 | analyze^2","data":{"system_prompt":"Grug seek cause. Trace from effect to source."}}
+/grow reasoning {"pattern":"how does","action_packet":"explain^3 | analyze^2","data":{"system_prompt":"Grug describe mechanism step by step."}}
+
+# ----- Survival lobe nodes -----
+/grow survival {"pattern":"danger","action_packet":"alert^4 | flee^2 | warn^2","data":{"system_prompt":"Grug see threat. Warn loud and clear."}}
+/grow survival {"pattern":"run","action_packet":"flee^4 | alert^2","data":{"system_prompt":"Grug urge escape from harm."}}
+/grow survival {"pattern":"fire burns","action_packet":"warn^4 | alert^3 | analyze^1","data":{"system_prompt":"Grug warn of hot rock that bites."}}
+
+# ----- Explanation lobe nodes -----
+/grow explanation {"pattern":"what is","action_packet":"explain^3 | describe^3 | define^2","data":{"system_prompt":"Grug explain plain. No big words."}}
+/grow explanation {"pattern":"tell me","action_packet":"explain^3 | describe^2","data":{"system_prompt":"Grug share what grug know."}}
+/grow explanation {"pattern":"define","action_packet":"define^4 | explain^2","data":{"system_prompt":"Grug give clear meaning of word."}}
+
+# ----- Comfort lobe nodes -----
+/grow comfort {"pattern":"i feel","action_packet":"acknowledge^3 | validate^3 | comfort^2","data":{"system_prompt":"Grug listen to feeling. Validate, do not fix."}}
+/grow comfort {"pattern":"sad","action_packet":"comfort^4 | acknowledge^2 | reassure^2","data":{"system_prompt":"Grug sit with sadness. Offer presence not solutions."}}
+/grow comfort {"pattern":"worried","action_packet":"reassure^3 | acknowledge^2 | comfort^2","data":{"system_prompt":"Grug calm worried mind."}}
+
+# ----- Alert lobe nodes -----
+/grow alert {"pattern":"warning","action_packet":"warn^4 | alert^3 | caution^2","data":{"system_prompt":"Grug raise voice. Make sure heard."}}
+/grow alert {"pattern":"careful","action_packet":"caution^4 | warn^2 | notify^2","data":{"system_prompt":"Grug urge slow careful steps."}}
+
+# ----- Cross-lobe semantic bridges -----
+/connectLobes greeting comfort
+/connectLobes reasoning explanation
+/connectLobes survival alert
+
+# ----- Pin a few foundational rocks -----
+/pin Grug speak plain. Grug not pretend smart.
+/pin Many rocks compete. Loudest rock get to talk.
+/pin Grug listen first, talk second.
+
+# ----- Save & quit -----
+/saveSpecimen grug-binary/default.specimen.gz
+/quit

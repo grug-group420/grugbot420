@@ -1041,294 +1041,19 @@ const MAX_ATTACHMENTS = 4
 # Magnitude is small (sigma=0.05) so it nudges but never dominates.
 const RELAY_CONF_JITTER_SIGMA = 0.05
 
-# ==============================================================================
-# v7.18 — LOBE TOPICALITY GATE + SEMANTIC-BRIDGE EXCEPTION
-# ==============================================================================
-# GRUG: Lobes with data unrelated to the mission should NOT vote. Their nodes
-# are muted before vote collection. A muted node may be REINSTATED (at half
-# weight) only if a semantic bridge exists. Bridges are NOT raw keyword
-# overlap — they are:
-#   1. Relational-triple overlap with the mission's DYNAMIC relational triples
-#      (extracted live via extract_dynamic_relational_triples).
-#   2. A required_relation verb that is also used by a node in an eligible lobe.
-#   3. A /nodeAttach attachment pointing to a node in an eligible lobe.
-# Raw pattern-keyword overlap does NOT unmute a lobe or its nodes.
 
-# GRUG: Topicality floor — a lobe's (thesaurus-expanded subject) must share at
-# least this fraction of tokens with the mission (also thesaurus-expanded) to
-# be eligible. Tuned low enough that domain-adjacent lobes still fire, high
-# enough to mute cooking when user asks about physics.
-const LOBE_TOPICALITY_FLOOR = 0.15
+# SMELL-004: Pattern-scan acceptance thresholds. These were inline magic
+# numbers at the cheap/medium/high scan dispatch site. Promoted to named
+# constants so tuning is centralized and meaning is documented.
+#
+#   CHEAP_SCAN_THRESHOLD  — bidirectional scan for short signals (≤3 tokens).
+#                            Loose because short patterns have lower discrimination.
+#   MEDIUM_SCAN_THRESHOLD — standard medium-resolution scan.
+#   HIGH_SCAN_THRESHOLD   — full high-resolution scan; strict acceptance.
+const CHEAP_SCAN_THRESHOLD  = 0.3
+const MEDIUM_SCAN_THRESHOLD = 0.4
+const HIGH_SCAN_THRESHOLD   = 0.5
 
-# GRUG: Bridged-node confidence discount. Muted-lobe nodes that prove a
-# semantic bridge vote at half strength — their opinion is heard but it does
-# not win primary.
-const BRIDGED_NODE_CONF_WEIGHT = 0.5
-
-# GRUG: Telemetry for the scaffold debug block. Populated every scan_and_expand
-# call. Read by Main.jl when it builds the AIML payload.
-const _LAST_MUTED_LOBES    = Ref{Vector{String}}(String[])
-const _LAST_BRIDGED_NODES  = Ref{Vector{Tuple{String, String, String}}}(Tuple{String,String,String}[])
-# Tuple format: (node_id, lobe_id, bridge_reason)
-
-"""
-    _compute_lobe_topicality(subject, mission_expanded_tokens) -> Float64
-
-GRUG: Fraction of (thesaurus-expanded) lobe subject tokens that appear in the
-(thesaurus-expanded) mission token set. Returns 0.0 if subject is empty.
-"""
-function _compute_lobe_topicality(subject::String, mission_expanded::Set{String})::Float64
-    if isempty(strip(subject))
-        return 0.0
-    end
-    # Expand the subject through the same thesaurus gate used for missions.
-    subject_expanded = try
-        Thesaurus.thesaurus_gate_filter(subject)
-    catch
-        Set(lowercase.(filter(!isempty, map(strip, split(subject)))))
-    end
-    if isempty(subject_expanded) || isempty(mission_expanded)
-        return 0.0
-    end
-    hits = length(intersect(subject_expanded, mission_expanded))
-    if hits == 0
-        return 0.0
-    end
-    # GRUG: Use the SMALLER side as denominator so a short mission isn't
-    # penalised when it only carries one topical token (e.g. "gravity
-    # problem" hits "physics gravity motion force" at 1/4 subject = 0.25,
-    # 1/2 mission = 0.5 — we take the higher signal). This matches the
-    # intuition that one strong keyword is enough to wake a small lobe,
-    # even if the lobe has many other tokens.
-    denom = min(length(subject_expanded), length(mission_expanded))
-    return Float64(hits) / Float64(denom)
-end
-
-"""
-    _compute_muted_lobes(mission_text) -> (eligible, muted, eligible_node_ids, eligible_verbs)
-
-GRUG: Partition LOBE_REGISTRY into eligible (topical) and muted (off-topic)
-sets. A lobe is eligible ONLY if its (thesaurus-expanded) subject overlaps
-the (thesaurus-expanded) mission above LOBE_TOPICALITY_FLOOR.
-
-CRITICAL (v7.18 user directive): raw pattern-scan hits do NOT auto-unmute a
-lobe. If a cooking node's pattern happens to lexically match a physics
-mission, the cooking lobe stays muted — the node must cross a semantic
-bridge (dynamic triple, required_relation, /nodeAttach) to vote.
-
-Returns the union of node_ids inside eligible lobes and the union of
-required_relation verbs used by those nodes (needed for verb-bridge checks).
-"""
-function _compute_muted_lobes(mission_text::String)::Tuple{Set{String}, Set{String}, Set{String}, Set{String}}
-    eligible = Set{String}()
-    muted    = Set{String}()
-    eligible_node_ids = Set{String}()
-    eligible_verbs    = Set{String}()
-
-    if !(isdefined(@__MODULE__, :Lobe))
-        return (eligible, muted, eligible_node_ids, eligible_verbs)
-    end
-
-    # GRUG: Thesaurus-expand the mission once, up-front.
-    mission_expanded = try
-        Thesaurus.thesaurus_gate_filter(mission_text)
-    catch
-        Set(lowercase.(filter(!isempty, map(strip, split(mission_text)))))
-    end
-
-    all_lobe_ids = try
-        Lobe.get_lobe_ids()
-    catch
-        String[]
-    end
-
-    for lobe_id in all_lobe_ids
-        topic = try
-            rec = Lobe.get_lobe(lobe_id)
-            _compute_lobe_topicality(rec.subject, mission_expanded)
-        catch
-            0.0
-        end
-        if topic >= LOBE_TOPICALITY_FLOOR
-            push!(eligible, lobe_id)
-        else
-            push!(muted, lobe_id)
-        end
-    end
-
-    # GRUG: Collect node ids + required_relation verbs from eligible lobes.
-    for lobe_id in eligible
-        try
-            rec = Lobe.get_lobe(lobe_id)
-            for nid in rec.node_ids
-                push!(eligible_node_ids, nid)
-                node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
-                isnothing(node) && continue
-                for v in node.required_relations
-                    push!(eligible_verbs, lowercase(strip(v)))
-                end
-            end
-        catch
-            continue
-        end
-    end
-
-    return (eligible, muted, eligible_node_ids, eligible_verbs)
-end
-
-"""
-    _node_has_semantic_bridge(node, dyn_verbs, eligible_verbs, eligible_node_ids) -> (ok::Bool, reason::String)
-
-GRUG: A node in a muted lobe is bridged into voting if ANY of:
-  1. Its relational_patterns has a verb that also appears in the mission's
-     DYNAMIC relational triples (extract_dynamic_relational_triples output).
-  2. Its required_relations verb also appears on a node in an eligible lobe.
-  3. It is attached (ATTACHMENT_MAP) to a node in an eligible lobe, OR an
-     eligible-lobe node is attached to it. Either direction counts as a bridge.
-
-Returns (true, reason) if bridged, (false, "") otherwise.
-"""
-function _node_has_semantic_bridge(node,
-                                   dyn_verbs::Set{String},
-                                   eligible_verbs::Set{String},
-                                   eligible_node_ids::Set{String})::Tuple{Bool, String}
-    # --- Bridge 1: dynamic-triple verb overlap --------------------------------
-    for trip in node.relational_patterns
-        vlow = lowercase(strip(trip.relation))
-        if vlow in dyn_verbs
-            return (true, "dyn_triple:$(vlow)")
-        end
-    end
-
-    # --- Bridge 2: required_relation shared with eligible-lobe node -----------
-    for v in node.required_relations
-        vlow = lowercase(strip(v))
-        if vlow in eligible_verbs
-            return (true, "verb_bridge:$(vlow)")
-        end
-    end
-
-    # --- Bridge 3: attachment to/from eligible-lobe node ----------------------
-    # GRUG: Early-return from inside a `lock do ... end` closure only returns
-    # from the closure, not from _node_has_semantic_bridge. Collect the result
-    # into a local under the lock, then return AFTER the lock releases.
-    attach_result = try
-        lock(ATTACHMENT_LOCK) do
-            # This node attaches TO an eligible node?
-            if haskey(ATTACHMENT_MAP, node.id)
-                for att in ATTACHMENT_MAP[node.id]
-                    if att.node_id in eligible_node_ids
-                        return (true, "attach_out:$(att.node_id)")
-                    end
-                end
-            end
-            # An eligible node attaches TO this node?
-            for (target_id, atts) in ATTACHMENT_MAP
-                if target_id in eligible_node_ids
-                    for att in atts
-                        if att.node_id == node.id
-                            return (true, "attach_in:$(target_id)")
-                        end
-                    end
-                end
-            end
-            return (false, "")
-        end
-    catch
-        (false, "")
-    end
-    return attach_result
-end
-
-"""
-    apply_lobe_topicality_gate!(mission_text, expanded) -> Vector
-
-GRUG: v7.18 main entry point. Given the raw expanded vote pool, filter out
-muted-lobe nodes that have no semantic bridge, and discount bridged nodes to
-BRIDGED_NODE_CONF_WEIGHT * confidence. Populates the telemetry Refs so Main.jl
-can surface them in the scaffold debug block.
-"""
-function apply_lobe_topicality_gate!(mission_text::String,
-                                     expanded::Vector)::Vector
-    # GRUG: Reset telemetry at entry so repeated calls don't accumulate.
-    _LAST_MUTED_LOBES[]   = String[]
-    _LAST_BRIDGED_NODES[] = Tuple{String,String,String}[]
-
-    if !(isdefined(@__MODULE__, :Lobe)) || isempty(expanded)
-        return expanded
-    end
-
-    eligible, muted, eligible_node_ids, eligible_verbs =
-        _compute_muted_lobes(mission_text)
-
-    # GRUG: Record muted lobes for telemetry regardless of outcome.
-    _LAST_MUTED_LOBES[] = sort(collect(muted))
-
-    if isempty(muted)
-        return expanded  # Nothing to gate.
-    end
-
-    # GRUG: Extract dynamic relational triples from the mission (live).
-    # Mode 3 = high-res scan — catches compound subjects/objects and chains.
-    dyn_verbs = Set{String}()
-    try
-        dyn_trips = extract_dynamic_relational_triples(mission_text, 3)
-        for t in dyn_trips
-            push!(dyn_verbs, lowercase(strip(t.relation)))
-        end
-    catch e
-        @warn "[v7.18] extract_dynamic_relational_triples failed in gate (continuing without dyn bridge): $e"
-    end
-
-    gated = eltype(expanded)[]
-    bridged_accum = Tuple{String,String,String}[]
-
-    for entry in expanded
-        nid = entry[1]
-        lobe_id = Lobe.find_lobe_for_node(nid)
-
-        # GRUG: Node with no lobe (orphan) — keep it, no gate applies.
-        if isnothing(lobe_id)
-            push!(gated, entry)
-            continue
-        end
-
-        # GRUG: Node in eligible lobe — keep at full weight.
-        if lobe_id in eligible
-            push!(gated, entry)
-            continue
-        end
-
-        # GRUG: Node in muted lobe — check for semantic bridge.
-        node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
-        if isnothing(node)
-            continue  # vanished; skip silently
-        end
-
-        bridged, reason = _node_has_semantic_bridge(
-            node, dyn_verbs, eligible_verbs, eligible_node_ids
-        )
-        if bridged
-            # GRUG: Reinstate at half weight. entry is a tuple; rebuild with
-            # reduced confidence.
-            id_, conf_, antimatch_, u_trips_, n_trips_ = entry
-            discounted = (id_, conf_ * BRIDGED_NODE_CONF_WEIGHT,
-                          antimatch_, u_trips_, n_trips_)
-            push!(gated, discounted)
-            push!(bridged_accum, (nid, lobe_id, reason))
-        end
-        # else: muted + no bridge -> drop.
-    end
-
-    _LAST_BRIDGED_NODES[] = bridged_accum
-
-    # GRUG: Loud console trace so operator sees the gate working.
-    if !isempty(muted) || !isempty(bridged_accum)
-        println("[v7.18] 🔇 Lobe topicality gate: muted=$(length(muted)) eligible=$(length(eligible)) bridged=$(length(bridged_accum)) dropped=$(length(expanded) - length(gated))")
-    end
-
-    return gated
-end
 
 """
 attach_node!(target_id::String, attach_id::String, pattern::String)::String
@@ -2439,40 +2164,14 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
     end
 
-    # GRUG: HOPFIELD FAST-PATH CHECK - DISABLED
-    # ==============================================================================
-    # The Hopfield cache has been DISABLED. Pattern bind phase is blazing fast even
-    # without caching, and the Hopfield system introduces unnecessary complexity.
-    # Hopfield caching should only be used for RIDICULOUSLY LARGE lobe sizes
-    # (50,000+ nodes per lobe) where memory access becomes a bottleneck.
-    # Current lobe architecture with 1000 node cap per cycle makes this obsolete.
+    # GRUG: HOPFIELD FAST-PATH — REMOVED (SMELL-003 cleanup)
     # ============================================================================
-    #
-    # OLD CODE (DISABLED):
-    # input_hash    = hopfield_input_hash(input_text)
-    # cached_ids    = hopfield_lookup(input_hash)
-    #
-    # if !isnothing(cached_ids)
-    #     println("[ENGINE] ⚡  Hopfield cache hit for input hash $(input_hash). Firing $(length(cached_ids)) precached nodes.")
-    #     lock(NODE_LOCK) do
-    #         for id in cached_ids
-    #             if haskey(NODE_MAP, id)
-    #                 node = NODE_MAP[id]
-    #                 # GRUG: Even cached nodes must not be grave!
-    #                 if node.is_grave
-    #                     continue
-    #                 end
-    #                 # GRUG: Cached nodes still go through strength biased coinflip
-    #                 if !strength_biased_scan_coinflip(node)
-    #                     continue
-    #                 end
-    #                 # GRUG: Use stored confidence from cache (represented as HOPFIELD_STORE_THRESHOLD)
-    #                 push!(all_valid_specimens, (id, HOPFIELD_STORE_THRESHOLD, false, user_triples, node.relational_patterns))
-    #             end
-    #         end
-    #     end
-    #     return all_valid_specimens
-    # end
+    # The Hopfield cache fast-path was disabled and left as a 30-line comment
+    # block. Removed during the QoL sweep — git history preserves the original.
+    # If you need to re-enable familiar-input caching for very large lobes
+    # (50k+ nodes per lobe), reintroduce a minimal lookup here. Current 1000-
+    # node-per-cycle cap makes this unnecessary.
+    # ============================================================================
 
     # GRUG: SCAN NODES - Already have scan_mode from earlier (deterministic selection)
     # scan_mode was computed before relational extraction to decide extraction strategy
@@ -2533,10 +2232,24 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
 
         # GRUG: Image nodes use SDF signal, not text signal. Skip size check for them.
+        # BUG-004: When pattern is longer than user input, the original code
+        # SILENTLY skipped the node. Now we downgrade to cheap bidirectional
+        # scan instead — the bidirectional scan handles short-input-vs-long-pattern
+        # by matching on the shorter side. We also tag this so we log it once
+        # per node lifetime (not on every fire — that would spam).
+        long_pattern_short_input = false
         if !node.is_image_node
-            # Grug check: Is user signal too small to hold node pattern? Skip safely.
             if length(target_signal) < length(node.signal)
-                return nothing
+                long_pattern_short_input = true
+                # One-shot warning per node: only the first time this fires.
+                if !get(node.json_data, "_long_pattern_warn_emitted", false)
+                    @warn "[ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan." node_id=node.id pattern_len=length(node.signal) input_len=length(target_signal)
+                    try
+                        node.json_data["_long_pattern_warn_emitted"] = true
+                    catch
+                        # data might be read-only in some paths — silent ok
+                    end
+                end
             end
         end
 
@@ -2552,20 +2265,39 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             # GRUG: SELECTIVE PATTERN SCAN — downgrade scan tier for simple patterns.
             effective_mode = _effective_scan_mode(scan_mode, node.signal)
 
+            # BUG-004: If pattern is longer than input, FORCE cheap bidirectional
+            # scan regardless of complexity tier. Higher tiers assume input ≥ pattern.
+            if long_pattern_short_input
+                effective_mode = 1
+            end
+
             if effective_mode == 1
                 # GRUG: BIDIRECTIONAL CHEAP SCAN — simple patterns (≤3 signal elements)
                 # v7.20: pass per-node NONJITTER opt-out so anchor / calibration /
                 # canonical-form nodes return bit-stable confidence. Tag lives in
                 # node.required_relations (see is_nonjitter / set_nonjitter! above).
-                _, token_conf = _bidirectional_cheap_scan(
-                    target_signal, node.signal;
-                    threshold=0.3,
-                    nonjitter=is_nonjitter(node)
-                )
+                #
+                # BUG-004: When pattern is longer than input, swap arg roles so
+                # the (smaller) input acts as the pattern and the (larger) node
+                # signal acts as the target. The cheap scan loops `(length(target)
+                # - pat_len + 1)` and would otherwise have an empty range.
+                if long_pattern_short_input
+                    _, token_conf = _bidirectional_cheap_scan(
+                        node.signal, target_signal;
+                        threshold=CHEAP_SCAN_THRESHOLD,
+                        nonjitter=is_nonjitter(node)
+                    )
+                else
+                    _, token_conf = _bidirectional_cheap_scan(
+                        target_signal, node.signal;
+                        threshold=CHEAP_SCAN_THRESHOLD,
+                        nonjitter=is_nonjitter(node)
+                    )
+                end
             elseif effective_mode == 2
-                _, token_conf = medium_scan(target_signal, node.signal; threshold=0.4)
+                _, token_conf = medium_scan(target_signal, node.signal; threshold=MEDIUM_SCAN_THRESHOLD)
             else
-                _, token_conf = high_res_scan(target_signal, node.signal; threshold=0.5)
+                _, token_conf = high_res_scan(target_signal, node.signal; threshold=HIGH_SCAN_THRESHOLD)
             end
         catch e
             if e isa PatternNotFoundError
@@ -2820,16 +2552,33 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         println("[ENGINE] 🔗  Attachment relay pass added $(length(relay_additions)) node(s) to expanded set.")
     end
 
-    # ── v7.18 FINAL PASS: Lobe Topicality Gate + Semantic-Bridge Exception ──
-    # GRUG: After all expansion passes, filter out muted-lobe nodes that have
-    # no semantic bridge, and discount bridged nodes to half weight.
-    # This is the engine-level fix for cross-domain leakage: if the user asks
-    # about physics, cooking nodes never get to vote unless they share a
-    # dynamic relational triple verb, a required_relation, or a /nodeAttach.
+    # ── LOBE CURVE — averages-based selection (replaces the v7.18 hard mute) ──
+    # GRUG: After all expansion passes, group entries by lobe and compute the
+    # base_avg × top_avg curve. Winner lobe goes first; runners-up that pass
+    # the multi-lobe threshold (score >= MIN_PASS_THROUGH_SCORE AND >=
+    # MIN_WINNING_VOTES_PER_LOBE hard-selected votes) fire after. Lobes that
+    # don't clear are dropped from the firing list. Cross-domain leakage is
+    # naturally prevented because off-topic lobes will have low confidence
+    # averages even if they lexically match a few tokens. No hard subject-
+    # token muting needed. See plans/semantic_plugins/QOL_SWEEP_2025.md
+    # "BUG-011 rewrite" for the architectural reasoning.
     expanded = try
-        apply_lobe_topicality_gate!(input_text, expanded)
+        if isempty(expanded)
+            expanded
+        else
+            orders = LobeOrchestrator.score_lobes(expanded, Lobe.find_lobe_for_node)
+            if isempty(orders)
+                # No lobe cleared (would only happen with totally empty pool).
+                # Return empty — downstream prints "Cave is silent" cleanly.
+                eltype(expanded)[]
+            else
+                # Loud trace so operators see the curve at work.
+                println("[ORCHESTRATOR] 🎯 ", LobeOrchestrator.last_summary())
+                LobeOrchestrator.flatten_in_fire_order(orders)
+            end
+        end
     catch e
-        @warn "[v7.18] lobe topicality gate FAILED (continuing with unfiltered pool): $e"
+        @warn "[ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): $e"
         expanded
     end
 
@@ -2996,37 +2745,131 @@ end
 # ==============================================================================
 
 """
-grow_nodes_from_packet(json_str::String)::Vector{String}
+grow_nodes_from_packet(json_str::String; target_lobe::Union{String,Nothing}=nothing,
+                                          default_system_prompt::String="Grug speaks plainly.")::Vector{String}
 
 GRUG: Parse a JSON packet and grow new nodes from it.
+
+Supports BOTH packet shapes (QoL-2025 unification):
+  - Multi-node:  `{"nodes":[{...}, {...}]}`
+  - Single-node: `{"pattern":"...", "action_packet":"...", "data":{...}}`
+
+Per-node fields accepted:
+  - `pattern`         (required) — text or image binary descriptor
+  - `action_packet`   (required) — pipe-separated `name^weight` entries
+  - `data` OR `json_data` — node-internal metadata Dict
+                            (BOTH keys accepted; `data` is the new canonical
+                            spelling; `json_data` kept for back-compat)
+  - `drop_table`      (optional) — co-activation neighbor ID list
+  - `is_image_node`   (optional) — flag for image-binary nodes
+
+If `target_lobe` is provided and exists, every grown node is added to that
+lobe (Lobe.add_node_to_lobe! + LobeTable.json_to_table_chunk!) so the
+topicality gate sees them. If `target_lobe` is `nothing`, nodes go to the
+unassigned pool (legacy behavior).
+
+If `data` does not include a `system_prompt` field, `default_system_prompt`
+is injected. AIML synthesis requires it; missing it crashes voting with
+`FATAL: Node dictionary missing 'system_prompt'!` (see QOL_SWEEP_2025 BUG-010).
+
 Supports `is_image_node` flag in the JSON for image node creation.
 If `is_image_node` is true, `pattern` field is treated as image binary descriptor.
 """
-function grow_nodes_from_packet(json_str::String)::Vector{String}
+function grow_nodes_from_packet(json_str::String;
+                                target_lobe::Union{String,Nothing}=nothing,
+                                default_system_prompt::String="Grug speaks plainly.")::Vector{String}
     if strip(json_str) == "" error("!!! FATAL: Cannot grow from empty JSON string !!!") end
     packet = try JSON.parse(json_str) catch e error("!!! FATAL: JSON parser dead: $e !!!") end
-    
-    if !haskey(packet, "nodes")
-        error("!!! FATAL: JSON packet missing 'nodes' array! !!!")
+
+    # GRUG QoL-2025: Accept either {"nodes":[...]} or a single node dict.
+    nodes_arr = if haskey(packet, "nodes")
+        packet["nodes"]
+    elseif haskey(packet, "pattern") && haskey(packet, "action_packet")
+        [packet]  # treat the packet itself as a single-node entry
+    else
+        error("!!! FATAL: /grow JSON packet must have either 'nodes' array or top-level 'pattern' + 'action_packet'. !!!")
     end
-    
-    nodes_arr = packet["nodes"]
-    
+
     validated = Vector{Tuple{String,String,Dict{String,Any},Vector{String},Bool}}()
     for n in nodes_arr
         pattern      = String(n["pattern"])
         action_packet = String(n["action_packet"])
-        json_data    = Dict{String, Any}(string(k) => v for (k, v) in n["json_data"])
-        drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ? 
+
+        # GRUG QoL-2025: Accept both `data` and `json_data` keys for the
+        # node-metadata field. They are the same thing under different
+        # historic names — `/grow` originally used `json_data`,
+        # `/lobeGrow` used `data`. Now: `data` preferred, `json_data` accepted.
+        # If both present, prefer `data` and warn.
+        raw_data = if haskey(n, "data") && haskey(n, "json_data")
+            @warn "[ENGINE] grow_nodes_from_packet: node has BOTH 'data' and 'json_data'; using 'data' and ignoring 'json_data'."
+            n["data"]
+        elseif haskey(n, "data")
+            n["data"]
+        elseif haskey(n, "json_data")
+            n["json_data"]
+        else
+            Dict()
+        end
+        json_data = Dict{String, Any}(string(k) => v for (k, v) in raw_data)
+
+        # GRUG QoL-2025 BUG-010: Inject default system_prompt if missing.
+        # AIML synthesis hard-fails without it; quietly defaulting is
+        # friendlier than letting the user discover the requirement at
+        # vote time.
+        if !haskey(json_data, "system_prompt") || isempty(strip(string(get(json_data, "system_prompt", ""))))
+            json_data["system_prompt"] = default_system_prompt
+        end
+
+        drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ?
                        String[string(x) for x in n["drop_table"]] : String[]
         # GRUG NEW: Check for is_image_node flag in JSON packet
         is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
+
+        # GRUG QoL-2025 BUG-007: Validate every action name against COMMANDS
+        # at grow time, not vote time. Surfaces typos at the seed step where
+        # they can be fixed, not 50 missions later in a stack trace.
+        for entry in split(action_packet, '|')
+            # Strip leading/trailing whitespace, drop optional [neg1, neg2]
+            # bracketed inhibitions, then split on `^` to get the action name.
+            cleaned = strip(entry)
+            isempty(cleaned) && continue
+            no_brackets = replace(cleaned, r"\[[^\]]*\]" => "")
+            action_name = strip(split(no_brackets, '^')[1])
+            isempty(action_name) && continue
+            if !haskey(COMMANDS, action_name)
+                valid_actions = sort(collect(keys(COMMANDS)))
+                valid_list = join(valid_actions, ", ")
+                error("!!! FATAL: action_packet contains unknown action '$action_name'. " *
+                      "Valid actions: $valid_list. " *
+                      "(see plans/semantic_plugins/QOL_SWEEP_2025.md BUG-007) !!!")
+            end
+        end
+
         push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
     end
 
     new_ids = String[]
     for (p, a, j, d, is_img) in validated
-        push!(new_ids, create_node(p, a, j, d; is_image_node=is_img))
+        nid = create_node(p, a, j, d; is_image_node=is_img)
+        push!(new_ids, nid)
+
+        # GRUG QoL-2025 BUG-008: If a target lobe was specified, route the
+        # node into it AND register its json_data in the lobe table so the
+        # topicality gate can reason about it.
+        if !isnothing(target_lobe) && isdefined(@__MODULE__, :Lobe)
+            try
+                if haskey(Lobe.LOBE_REGISTRY, target_lobe)
+                    alive = count_alive_nodes_in_lobe(target_lobe)
+                    Lobe.add_node_to_lobe!(target_lobe, nid; alive_count=alive)
+                    LobeTable.json_to_table_chunk!(target_lobe, nid, j)
+                    LobeTable.drop_table_to_chunk!(target_lobe, nid, d)
+                else
+                    @warn "[ENGINE] grow_nodes_from_packet: target_lobe '$target_lobe' does not exist; node '$nid' grown into unassigned pool."
+                end
+            catch e
+                @warn "[ENGINE] grow_nodes_from_packet: failed to attach node '$nid' to lobe '$target_lobe': $e"
+            end
+        end
     end
     return new_ids
 end

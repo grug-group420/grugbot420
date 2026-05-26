@@ -43,6 +43,13 @@ using .LobeTable
 include("Lobe.jl")
 using .Lobe
 
+# GRUG: LobeOrchestrator — averages-curve lobe selection (replaces the
+# v7.18 hard mute gate). Must be loaded before engine.jl which references it
+# in scan_and_expand. See plans/semantic_plugins/QOL_SWEEP_2025.md "BUG-011
+# rewrite" for the spec.
+include("LobeOrchestrator.jl")
+using .LobeOrchestrator
+
 include("BrainStem.jl")
 using .BrainStem
 
