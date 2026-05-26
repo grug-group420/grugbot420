@@ -1278,66 +1278,57 @@ long_winner_prob  = p_long.action_distribution[ActionTonePredictor.ACTION_QUERY]
 @assert abs(short_winner_prob - long_winner_prob) < 0.4 "FAIL: Length invariance broken — short=$(round(short_winner_prob,digits=3)) vs long=$(round(long_winner_prob,digits=3))"
 println("  ✓ Length invariance: short_query_prob=$(round(short_winner_prob, digits=3)), long_query_prob=$(round(long_winner_prob, digits=3))")
 
-# --- 43c: Trajectory buffer records entries ---
+# --- 43c (v7.21a): Per-query semantics — buffer does NOT accumulate ---
+# GRUG: Pre-v7.21a the trajectory buffer accumulated one entry per
+# predict_action_tone call. v7.21a moved damping to a per-query model:
+# the predictor no longer writes to the buffer during normal operation.
+# The buffer stays alive in the API for specimen save/load and config
+# tests, but it is no longer a session-spanning accumulator.
 ActionTonePredictor.reset_trajectory!()
 for _ in 1:5
     ActionTonePredictor.predict_action_tone("hello world", test_verbs_traj)
 end
 state = ActionTonePredictor.get_trajectory_state()
-centroid_a, centroid_t, gini_a, gini_t, buf_len = state
-@assert buf_len == 5 "FAIL: Expected 5 trajectory entries, got $buf_len"
-@assert abs(sum(values(centroid_a)) - 1.0) < 1e-9 "FAIL: Action centroid should sum to 1.0"
-@assert abs(sum(values(centroid_t)) - 1.0) < 1e-9 "FAIL: Tone centroid should sum to 1.0"
-println("  ✓ Trajectory buffer: $buf_len entries, action_gini=$(round(gini_a, digits=3)), tone_gini=$(round(gini_t, digits=3))")
+_, _, _, _, buf_len = state
+@assert buf_len == 0 "FAIL (v7.21a): predict_action_tone must not write to trajectory buffer, got $buf_len entries"
+println("  ✓ Per-query semantics (v7.21a): buffer stays at 0 across 5 predictions")
 
-# --- 43d: Lorenz damping triggers on concentrated trajectory ---
-# GRUG: Slam the trajectory with 16 identical ESCALATE predictions.
-# This should push the action Gini above threshold (0.72).
-# The 17th prediction should have trajectory_damped=true.
+# --- 43d (v7.21a): Per-query Gini damping fires on a concentrated CURRENT curve ---
+# GRUG: Pre-v7.21a damping fired when the buffer's centroid Gini exceeded
+# threshold (history-based). v7.21a damping fires when the CURRENT query's
+# distribution is itself concentrated (per-query). This catches the same
+# attractor avoidance need without the cross-query bleed problem.
 ActionTonePredictor.reset_trajectory!()
-# Use aggressive config for testing — low threshold, strong damping
 ActionTonePredictor.set_trajectory_config!(ActionTonePredictor.TrajectoryConfig(
-    16,    # buffer_size
-    3600.0, # decay_halflife (long — don't let entries decay during test)
-    0.50,  # gini_threshold (lower for easier triggering)
+    16,    # buffer_size  (kept for API compat; unused in per-query path)
+    3600.0, # decay_halflife (unused in per-query path)
+    0.50,  # gini_threshold (lower = easier triggering for the test)
     0.40,  # damping_strength
     1.5    # softmax_temperature
 ))
-# Fill buffer with ESCALATE-heavy inputs
-for _ in 1:16
-    ActionTonePredictor.predict_action_tone("STOP NOW!!! CRITICAL EMERGENCY!!!", test_verbs_traj)
-end
-# Check Gini is high
-state2 = ActionTonePredictor.get_trajectory_state()
-_, _, gini_a2, _, buf_len2 = state2
-@assert buf_len2 == 16 "FAIL: Expected 16 entries, got $buf_len2"
-@assert gini_a2 > 0.3 "FAIL: After 16 identical ESCALATE inputs, action Gini should be high, got $(round(gini_a2, digits=3))"
-println("  ✓ Concentrated trajectory: gini_action=$(round(gini_a2, digits=3)) after 16 ESCALATE inputs")
+# GRUG: A heavily QUERY-concentrated single input — many "?" and query
+# markers — should produce a current-query distribution with a high Gini
+# coefficient and trigger damping on THIS prediction (not after 16).
+p_damped = ActionTonePredictor.predict_action_tone(
+    "what why how when where which what why how when?",
+    test_verbs_traj
+)
+@assert p_damped.trajectory_damped == true "FAIL (v7.21a): per-query damping should fire on a heavily concentrated current curve!"
+println("  ✓ Per-query damping fires on concentrated current prediction (trajectory_damped=true)")
 
-# GRUG: Now send a prediction and check if damping was applied.
-p_damped = ActionTonePredictor.predict_action_tone("STOP NOW!!! CRITICAL EMERGENCY!!!", test_verbs_traj)
-@assert p_damped.trajectory_damped == true "FAIL: Expected trajectory_damped=true after concentrated trajectory!"
-println("  ✓ Lorenz damping triggered on 17th prediction (trajectory_damped=true)")
-
-# --- 43e: Diverse trajectory does NOT trigger damping ---
+# --- 43e (v7.21a): Balanced current curve does NOT trigger damping ---
+# GRUG: A single mild input with no marker concentration should produce
+# a low-Gini distribution — no damping. This is the per-query analog of
+# the old "diverse trajectory" check: we look at THIS prediction's shape,
+# not at history.
 ActionTonePredictor.reset_trajectory!()
 ActionTonePredictor.set_trajectory_config!(ActionTonePredictor.TrajectoryConfig(
-    16, 3600.0, 0.72, 0.25, 1.5  # default-ish config
+    16, 3600.0, 0.72, 0.25, 1.5  # default-ish config — stricter Gini gate
 ))
-diverse_inputs = [
-    "what causes this?",           # QUERY
-    "run the tests",               # COMMAND
-    "this is wrong and broken",    # NEGATE
-    "maybe it could work",         # SPECULATE
-    "the system is running fine",  # ASSERT
-    "STOP NOW!!!",                 # ESCALATE
-]
-for inp in diverse_inputs
-    ActionTonePredictor.predict_action_tone(inp, test_verbs_traj)
-end
-p_diverse = ActionTonePredictor.predict_action_tone("explain the results", test_verbs_traj)
-@assert p_diverse.trajectory_damped == false "FAIL: Diverse trajectory should NOT trigger damping!"
-println("  ✓ Diverse trajectory: no damping triggered (trajectory_damped=false)")
+# Mild balanced input: a verb but no excess punctuation, no caps storm.
+p_balanced = ActionTonePredictor.predict_action_tone("explain the results please", test_verbs_traj)
+@assert p_balanced.trajectory_damped == false "FAIL (v7.21a): balanced current curve should NOT trigger per-query damping!"
+println("  ✓ Balanced current curve: no per-query damping (trajectory_damped=false)")
 
 # --- 43f: Trajectory config validation — bad values should FATAL ---
 # GRUG: Use Ref{Bool} to avoid Julia soft-scope ambiguity in top-level try/catch.

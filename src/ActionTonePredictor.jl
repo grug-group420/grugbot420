@@ -331,6 +331,36 @@ const LOW_SIGNAL_THRESHOLD = 0.5
 # has run out of road.
 const FALLBACK_DAMP_THRESHOLD = 0.4
 
+# GRUG v7.21a: CURVE SNAP-BACK JITTER ENVELOPE.
+# Bounded multiplicative noise applied to each family's post-softmax mass
+# before Gini damping. Same biology principle as the substrate-level
+# slight_jitter: identical inputs must not produce bit-identical curves.
+# 0.03 = ±3% per family. Small enough that a clear winner stays the winner
+# on real signals; loud enough that the curve shape is never twice the same.
+# Tunable. If brainstorm mode wants louder curves we'll widen this in v7.21b.
+const CURVE_JITTER_ENVELOPE = 0.03
+
+# GRUG v7.21a: TONE → ACTION PRIOR.
+# Tone runs FIRST. The observed tone biases which action families are even
+# plausible BEFORE action lexicon scoring runs. This is the load-bearing
+# reorder: emotional read of the room precedes and conditions the action
+# decision, instead of action and tone being scored independently and
+# emotional coherence being a post-hoc check.
+#
+# Each entry is (tone_family) => Dict(action_family => additive_prior).
+# The prior is added to action_scores BEFORE softmax, so it shifts the
+# distribution proportionally rather than overriding marker evidence.
+# Magnitudes are deliberately moderate (0.4–0.8) — strong enough to tilt
+# ambiguous inputs, weak enough that a clear action marker still wins.
+const TONE_ACTION_PRIOR = Dict{Symbol, Dict{Symbol, Float64}}(
+    :TONE_HOSTILE     => Dict(:ACTION_NEGATE => 0.7, :ACTION_QUERY => 0.4, :ACTION_ASSERT => -0.3),
+    :TONE_CURIOUS     => Dict(:ACTION_QUERY => 0.7, :ACTION_SPECULATE => 0.4),
+    :TONE_URGENT      => Dict(:ACTION_COMMAND => 0.6, :ACTION_ESCALATE => 0.5, :ACTION_SPECULATE => -0.3),
+    :TONE_REFLECTIVE  => Dict(:ACTION_SPECULATE => 0.7, :ACTION_QUERY => 0.3, :ACTION_COMMAND => -0.3),
+    :TONE_DECLARATIVE => Dict(:ACTION_ASSERT => 0.5),
+    :TONE_NEUTRAL     => Dict{Symbol, Float64}()   # neutral tone = no prior tilt
+)
+
 # GRUG: Build a character-bigram fingerprint from a set of marker words.
 # Returns Dict{String, Int} of bigram → count. Pure helper; called once
 # per family at module load. Uses 2-char windows over the lowercased word
@@ -551,6 +581,52 @@ function _softmax_normalize(scores::Dict{K, Float64}, temperature::Float64) wher
     end
 
     return Dict(k => v / total for (k, v) in exp_scores)
+end
+
+# ==============================================================================
+# CURVE SNAP-BACK JITTER (v7.21a)
+# ==============================================================================
+# GRUG: Bounded multiplicative micro-noise on a probability distribution,
+# followed by re-normalization to preserve the sum-to-1 invariant.
+#
+# Same biology principle as the per-window slight_jitter inside cheap_scan:
+# identical inputs must NOT produce bit-identical curves. The world is
+# noisy; the system's curves should be noisy in the same bounded way.
+#
+# Mutates `dist` in place. `envelope` is the per-family multiplicative
+# bound: each value is multiplied by (1 + ε) where ε ∈ [-envelope, +envelope]
+# uniform. After the noise pass, the dict is re-normalized so values still
+# sum to 1.0.
+#
+# Why multiplicative not additive: additive noise can flip small values
+# negative, breaking the probability invariant. Multiplicative noise scales
+# with current mass, so a 0.01 family stays a tiny family (becomes 0.0097
+# to 0.0103) while a 0.6 family gets the proportionally larger absolute
+# wiggle it deserves. Re-normalization at the end folds out any small drift.
+# ==============================================================================
+function _jitter_curve!(dist::Dict{K, Float64}; envelope::Float64=CURVE_JITTER_ENVELOPE) where K
+    if envelope <= 0.0
+        return dist  # no-op for non-positive envelope
+    end
+
+    # GRUG: Apply per-family multiplicative noise.
+    for (k, v) in dist
+        eps = (rand() * 2.0 - 1.0) * envelope   # uniform in [-envelope, +envelope]
+        dist[k] = max(0.0, v * (1.0 + eps))
+    end
+
+    # GRUG: Re-normalize. If the noise drove everything to zero (impossible
+    # in practice unless envelope is grossly misconfigured), fall back to
+    # uniform to preserve the sum-to-1 invariant.
+    total = sum(values(dist))
+    if total <= 0.0 || !isfinite(total)
+        n = length(dist)
+        for k in keys(dist); dist[k] = 1.0 / n; end
+        return dist
+    end
+
+    for k in keys(dist); dist[k] /= total; end
+    return dist
 end
 
 # ==============================================================================
@@ -829,7 +905,90 @@ function predict_action_tone(
     end
 
     # ------------------------------------------------------------------
-    # STEP 1: Score action families (raw accumulation — same as before)
+    # STEP 0 (v7.21a): SHARED SIGNALS — used by both tone and action.
+    # GRUG: caps_words and excl_count were originally computed inside the
+    # action block. Now that tone runs FIRST, they need to be available
+    # before tone scoring (caps and excl are tonal signals as much as
+    # actional ones — a HOSTILE tone benefits from the same caps/excl
+    # data the ESCALATE action does).
+    # ------------------------------------------------------------------
+    caps_words = count(
+        t -> length(t) >= 3 && t == uppercase(t) && isletter(t[1]),
+        tokens_raw
+    )
+    excl_count       = count(c -> c == '!', input_text)
+    q_marker_present = contains(input_text, "?") ||
+                       any(t -> t in QUERY_MARKERS, tokens_clean)
+    input_low        = lowercase(input_text)
+
+    # ------------------------------------------------------------------
+    # STEP 1 (v7.21a): TONE FIRST — tone is the observer; it runs before
+    # action so the observed tone can condition which action families are
+    # even plausible. This is the load-bearing reorder for emotional
+    # coherence: the affective read of the room precedes the action
+    # decision, not the other way around.
+    # ------------------------------------------------------------------
+    tone_scores = Dict{ToneFamily, Float64}(
+        TONE_HOSTILE     => 0.0,
+        TONE_CURIOUS     => 0.0,
+        TONE_DECLARATIVE => 0.0,
+        TONE_URGENT      => 0.0,
+        TONE_NEUTRAL     => 0.0,
+        TONE_REFLECTIVE  => 0.0
+    )
+
+    for tok in tokens_clean
+        tok in HOSTILE_MARKERS    && (tone_scores[TONE_HOSTILE]    += 1.0)
+        tok in URGENT_MARKERS     && (tone_scores[TONE_URGENT]     += 1.0)
+        tok in SPECULATE_MARKERS  && (tone_scores[TONE_REFLECTIVE] += 0.6)
+        tok in QUERY_MARKERS      && (tone_scores[TONE_CURIOUS]    += 0.7)
+        tok in REFLECTIVE_MARKERS && (tone_scores[TONE_REFLECTIVE] += 0.5)
+    end
+
+    if caps_words >= 2
+        tone_scores[TONE_HOSTILE] += 0.5
+        tone_scores[TONE_URGENT]  += 0.5
+    end
+
+    if excl_count >= 2
+        # GRUG: Multi-bang is an urgency signal in its own right.
+        tone_scores[TONE_URGENT] += 0.4
+    end
+
+    for phrase in REFLECTIVE_PHRASES
+        if contains(input_low, phrase)
+            tone_scores[TONE_REFLECTIVE] += 0.8
+        end
+    end
+
+    # GRUG v7.21a: The old code boosted CURIOUS when ACTION_QUERY > 0.5 AND
+    # HOSTILE < 0.5. With tone-first ordering action_scores doesn't exist
+    # yet, so we use the raw `q_marker_present` signal directly. Same
+    # semantics: question markers without hostility = curious.
+    if q_marker_present && tone_scores[TONE_HOSTILE] < 0.5
+        tone_scores[TONE_CURIOUS] += 0.6
+    end
+
+    # GRUG: No strong tone signal? Default to NEUTRAL.
+    total_tone_signal = sum(values(tone_scores))
+    if total_tone_signal < 0.4
+        tone_scores[TONE_NEUTRAL] += 1.0
+    end
+
+    # GRUG v7.21a: OBSERVED TONE (raw, pre-softmax). This is what
+    # conditions the action prior. We use raw argmax rather than the
+    # post-softmax winner because softmax is length-invariant smoothing
+    # and we want the *strongest raw evidence* to drive the prior — even
+    # a small tone signal should tilt the action prior slightly. Ties
+    # break to NEUTRAL since the Dict preserves insertion order and
+    # NEUTRAL was inserted with mass 0.0 before the default boost.
+    observed_tone = argmax(tone_scores)
+
+    # ------------------------------------------------------------------
+    # STEP 2 (v7.21a): ACTION — runs AFTER tone, with tone-derived prior
+    # folded in BEFORE marker scoring. The prior moderately tilts which
+    # action families are plausible given the observed tone; marker
+    # evidence then competes against (or reinforces) that tilt.
     # ------------------------------------------------------------------
     action_scores = Dict{ActionFamily, Float64}(
         ACTION_ASSERT    => 0.0,
@@ -840,22 +999,36 @@ function predict_action_tone(
         ACTION_ESCALATE  => 0.0
     )
 
+    # GRUG v7.21a: Fold tone→action prior. The prior keys are Symbols (so
+    # the const can be declared at compile time without enum dependencies);
+    # we look up by Symbol(observed_tone) here.
+    tone_prior = get(TONE_ACTION_PRIOR, Symbol(observed_tone), Dict{Symbol,Float64}())
+    for (action_sym, bias) in tone_prior
+        # GRUG: Map Symbol → enum value. We only have six action families,
+        # so a small if-ladder is faster than building a lookup table.
+        action_fam = action_sym === :ACTION_ASSERT    ? ACTION_ASSERT    :
+                     action_sym === :ACTION_QUERY     ? ACTION_QUERY     :
+                     action_sym === :ACTION_COMMAND   ? ACTION_COMMAND   :
+                     action_sym === :ACTION_NEGATE    ? ACTION_NEGATE    :
+                     action_sym === :ACTION_SPECULATE ? ACTION_SPECULATE :
+                     action_sym === :ACTION_ESCALATE  ? ACTION_ESCALATE  :
+                     nothing
+        if action_fam !== nothing
+            action_scores[action_fam] += bias
+        end
+    end
+
     # GRUG: "?" is the strongest query signal. Check raw input, not tokens.
     if contains(input_text, "?")
         action_scores[ACTION_QUERY] += 1.5
     end
 
     # GRUG: ALL CAPS words (3+ chars, starts with letter) = escalation signal.
-    caps_words = count(
-        t -> length(t) >= 3 && t == uppercase(t) && isletter(t[1]),
-        tokens_raw
-    )
     if caps_words > 0
         action_scores[ACTION_ESCALATE] += Float64(caps_words) * 0.8
     end
 
     # GRUG: Each exclamation mark adds escalation weight.
-    excl_count = count(c -> c == '!', input_text)
     if excl_count > 0
         action_scores[ACTION_ESCALATE] += Float64(excl_count) * 0.5
     end
@@ -905,47 +1078,11 @@ function predict_action_tone(
         end
     end
 
-    # ------------------------------------------------------------------
-    # STEP 2: Score tone families (raw accumulation — same as before)
-    # ------------------------------------------------------------------
-    tone_scores = Dict{ToneFamily, Float64}(
-        TONE_HOSTILE     => 0.0,
-        TONE_CURIOUS     => 0.0,
-        TONE_DECLARATIVE => 0.0,
-        TONE_URGENT      => 0.0,
-        TONE_NEUTRAL     => 0.0,
-        TONE_REFLECTIVE  => 0.0
-    )
-
-    for tok in tokens_clean
-        tok in HOSTILE_MARKERS   && (tone_scores[TONE_HOSTILE]    += 1.0)
-        tok in URGENT_MARKERS    && (tone_scores[TONE_URGENT]     += 1.0)
-        tok in SPECULATE_MARKERS && (tone_scores[TONE_REFLECTIVE] += 0.6)
-        tok in QUERY_MARKERS     && (tone_scores[TONE_CURIOUS]    += 0.7)
-        tok in REFLECTIVE_MARKERS && (tone_scores[TONE_REFLECTIVE] += 0.5)
-    end
-
-    if caps_words >= 2
-        tone_scores[TONE_HOSTILE] += 0.5
-        tone_scores[TONE_URGENT]  += 0.5
-    end
-
-    input_low = lowercase(input_text)
-    for phrase in REFLECTIVE_PHRASES
-        if contains(input_low, phrase)
-            tone_scores[TONE_REFLECTIVE] += 0.8
-        end
-    end
-
-    if action_scores[ACTION_QUERY] > 0.5 && tone_scores[TONE_HOSTILE] < 0.5
-        tone_scores[TONE_CURIOUS] += 0.6
-    end
-
-    # GRUG: No strong tone signal? Default to NEUTRAL.
-    total_tone_signal = sum(values(tone_scores))
-    if total_tone_signal < 0.4
-        tone_scores[TONE_NEUTRAL] += 1.0
-    end
+    # GRUG v7.21a: Tone scoring used to live here as STEP 2; it now runs
+    # FIRST (see STEP 1 above) so the observed tone can condition the
+    # action prior. This block is intentionally empty — tone_scores has
+    # already been built and the tone→action prior has already been
+    # folded into action_scores.
 
     # ------------------------------------------------------------------
     # STEP 3: Softmax normalization — raw scores → probability distributions
@@ -960,46 +1097,78 @@ function predict_action_tone(
     tone_dist   = _softmax_normalize(tone_scores,   config.softmax_temperature)
 
     # ------------------------------------------------------------------
-    # STEP 4: Trajectory damping — Lorenz attractor avoidance
-    # GRUG: Check the trajectory centroid's Gini coefficient. If the system
-    # has been locked into one action/tone family, apply entropy-restoring
-    # damping to the CURRENT prediction (not the history).
+    # STEP 3.5 (v7.21a): CURVE SNAP-BACK JITTER
+    # GRUG: Apply bounded multiplicative micro-noise to each family's
+    # post-softmax mass, then re-normalize. Same biological principle as
+    # the per-window slight_jitter in cheap_scan: identical inputs must
+    # not produce bit-identical curves. The envelope is small enough that
+    # winner-family identity is preserved on real signals (a clear winner
+    # stays the winner) but the curve shape is never twice the same.
+    #
+    # Applied BEFORE Gini damping so the damper sees the jittered curve —
+    # we want the noise to participate in the concentration check, not be
+    # smoothed back out by it.
+    # ------------------------------------------------------------------
+    _jitter_curve!(action_dist; envelope=CURVE_JITTER_ENVELOPE)
+    _jitter_curve!(tone_dist;   envelope=CURVE_JITTER_ENVELOPE)
+
+    # ------------------------------------------------------------------
+    # STEP 4 (v7.21a): PER-QUERY GINI DAMPING — no cross-query memory
+    # GRUG: The old code computed a centroid from a 16-turn ring buffer
+    # with 120s halflife and damped the current prediction against THAT
+    # centroid. Result: five questions in the same family loaded the
+    # centroid, and query six got damped because of historical mass — the
+    # system over-normalized, suppressing clean signal because of past
+    # concentration.
+    #
+    # v7.21a: damping fires on the CURRENT query's distribution directly.
+    # If THIS query is itself heavily concentrated (one family > Gini
+    # threshold of mass), entropy-restoring damping spreads mass to
+    # underrepresented categories. No history. No bleed. The curve fires,
+    # damps if it must, then snaps back — nothing persists between calls.
+    #
+    # The trajectory buffer stays alive as an empty (or test-injected)
+    # vector for API/specimen compatibility; predict_action_tone simply
+    # does not read from it or write to it during normal operation.
+    # `reset_trajectory!`, `get_trajectory_state`, `set_trajectory_config!`,
+    # and `TrajectoryConfig` keep working — only the IN-LINE accumulation
+    # behavior is gone. Tests asserting buffer-zero-after-reset still pass.
     # ------------------------------------------------------------------
     trajectory_damped = false
 
-    lock(_trajectory_lock) do
-        now = time()
+    # GRUG: Build a "self-centroid" from the current query's distribution —
+    # this lets _apply_lorenz_damping run unchanged. Conceptually: the
+    # centroid the damper compares against is just the prediction itself,
+    # so we're asking "is THIS prediction concentrated enough to need
+    # entropy restoration?" rather than "has the conversation been
+    # concentrated?".
+    self_action = copy(action_dist)
+    self_tone   = copy(tone_dist)
+    gini_a = _gini_coefficient(collect(values(self_action)))
+    gini_t = _gini_coefficient(collect(values(self_tone)))
 
-        if !isempty(_trajectory_buffer)
-            centroid_a, centroid_t = _compute_trajectory_centroid(now, config)
-            gini_a = _gini_coefficient(collect(values(centroid_a)))
-            gini_t = _gini_coefficient(collect(values(centroid_t)))
-
-            # GRUG: Damp action distribution if action trajectory is concentrated.
-            action_dist_new, damped_a = _apply_lorenz_damping(action_dist, centroid_a, gini_a, config)
-            if damped_a
-                for (k, v) in action_dist_new; action_dist[k] = v; end
-            end
-
-            # GRUG: Damp tone distribution if tone trajectory is concentrated.
-            tone_dist_new, damped_t = _apply_lorenz_damping(tone_dist, centroid_t, gini_t, config)
-            if damped_t
-                for (k, v) in tone_dist_new; tone_dist[k] = v; end
-            end
-
-            trajectory_damped = damped_a || damped_t
-
-            if trajectory_damped
-                @info "[PREDICTOR] 🌀 Lorenz damping active — " *
-                      "action_gini=$(round(gini_a, digits=3)), " *
-                      "tone_gini=$(round(gini_t, digits=3))"
-            end
-        end
-
-        # GRUG: Record this prediction in the trajectory buffer (post-damping).
-        # We record the damped distribution because that's what the system actually used.
-        _push_trajectory_entry!(copy(action_dist), copy(tone_dist), now)
+    action_dist_new, damped_a = _apply_lorenz_damping(action_dist, self_action, gini_a, config)
+    if damped_a
+        for (k, v) in action_dist_new; action_dist[k] = v; end
     end
+
+    tone_dist_new, damped_t = _apply_lorenz_damping(tone_dist, self_tone, gini_t, config)
+    if damped_t
+        for (k, v) in tone_dist_new; tone_dist[k] = v; end
+    end
+
+    trajectory_damped = damped_a || damped_t
+
+    if trajectory_damped
+        @info "[PREDICTOR] 🌀 Per-query Gini damping active — " *
+              "action_gini=$(round(gini_a, digits=3)), " *
+              "tone_gini=$(round(gini_t, digits=3))"
+    end
+
+    # GRUG v7.21a: NOTE — _push_trajectory_entry! is intentionally NOT called.
+    # Per-query semantics means nothing persists between predictions. The
+    # trajectory buffer stays at whatever the test/specimen layer left it
+    # at; predict_action_tone is no longer a writer.
 
     # ------------------------------------------------------------------
     # STEP 5: Pick winners from (possibly damped) normalized distributions
