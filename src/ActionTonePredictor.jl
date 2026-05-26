@@ -48,7 +48,8 @@ using Random
 export ActionFamily, ToneFamily, PredictionResult,
        predict_action_tone, apply_prediction_to_arousal!,
        get_action_weight_multiplier, format_prediction_summary,
-       reset_trajectory!, get_trajectory_state, TrajectoryConfig
+       reset_trajectory!, get_trajectory_state, TrajectoryConfig,
+       LAST_PREDICTION
 
 # ==============================================================================
 # ENUM TYPES
@@ -89,6 +90,13 @@ struct PredictionResult
     tone_distribution   ::Dict{ToneFamily, Float64}    # Normalized tone probabilities
     trajectory_damped   ::Bool   # True if Lorenz damping was applied this prediction
 end
+
+# GRUG: Last prediction stash. Set by predict_action_tone after a successful
+# prediction so downstream consumers (vote orchestrator's matching-dimension
+# scorer) can read the same prediction without re-running classification.
+# Cleared to nothing on module init; never NaN'd in place — a fresh Ref each
+# call keeps the read race-free without a lock.
+const LAST_PREDICTION = Ref{Union{Nothing, PredictionResult}}(nothing)
 
 # ==============================================================================
 # TRAJECTORY CONFIGURATION
@@ -820,7 +828,7 @@ function predict_action_tone(
     # GRUG: Scale weight by confidence. Low confidence = stay near 1.0 (minimal skew).
     scaled_weight = 1.0 + (base_weight - 1.0) * action_confidence
 
-    return PredictionResult(
+    result = PredictionResult(
         predicted_action,
         predicted_tone,
         action_confidence,
@@ -833,6 +841,11 @@ function predict_action_tone(
         tone_dist,
         trajectory_damped
     )
+
+    # GRUG: Stash for downstream consumers (vote orchestrator scoring,
+    # diagnostic readers) so they don't have to re-run classification.
+    LAST_PREDICTION[] = result
+    return result
 end
 
 # ==============================================================================
@@ -909,25 +922,55 @@ end
 
 # GRUG: Internal keyword alignment check — does this action name sound like the
 # predicted action family? Substring match on known keywords per family.
+#
+# The keyword lists are intentionally broad: they cover the canonical
+# action-family verbs PLUS the cave-vocabulary verbs we expect to see in
+# action_packet entries on real specimen nodes. The vote orchestrator uses
+# this as a soft "matching knob" — a hit boosts a candidate's composite
+# score, a miss does not penalize. So generosity is fine here.
 function _action_name_aligns(action_name::String, family::ActionFamily)::Bool
     if family == ACTION_QUERY
+        # interrogative / sense-making / inspection verbs
         return any(kw -> contains(action_name, kw),
-                   ["query", "answer", "respond", "explain", "describe", "tell", "info"])
+                   ["query", "ask", "answer", "respond", "explain", "describe",
+                    "tell", "info", "elaborate", "clarify", "define",
+                    "analyze", "analyse", "examine", "inspect", "study",
+                    "reason", "ponder", "think", "consider", "wonder",
+                    "investigate", "explore", "review", "look", "check",
+                    "calculate", "compute", "evaluate", "assess"])
     elseif family == ACTION_COMMAND
+        # imperative / build / make / fix / move verbs
         return any(kw -> contains(action_name, kw),
-                   ["execute", "run", "do", "action", "command", "perform", "trigger"])
+                   ["execute", "run", "do", "action", "command", "perform",
+                    "trigger", "make", "build", "craft", "forge", "shape",
+                    "fix", "mend", "repair", "patch", "restore",
+                    "plan", "prepare", "setup", "set", "configure",
+                    "move", "go", "fetch", "get", "bring", "carry",
+                    "find", "seek", "hunt", "track", "gather", "collect",
+                    "use", "apply", "wield", "operate"])
     elseif family == ACTION_NEGATE
         return any(kw -> contains(action_name, kw),
-                   ["negate", "deny", "reject", "contra", "refute", "wrong"])
+                   ["negate", "deny", "reject", "contra", "refute", "wrong",
+                    "no", "not", "never", "stop", "halt", "block", "forbid",
+                    "cancel", "abort", "dismiss"])
     elseif family == ACTION_ASSERT
         return any(kw -> contains(action_name, kw),
-                   ["assert", "state", "declare", "confirm", "affirm", "say"])
+                   ["assert", "state", "declare", "confirm", "affirm", "say",
+                    "claim", "report", "announce", "proclaim", "note",
+                    "observe", "recall", "remember", "remind", "recount",
+                    "log", "record"])
     elseif family == ACTION_SPECULATE
         return any(kw -> contains(action_name, kw),
-                   ["speculate", "predict", "infer", "hypothe", "guess", "maybe"])
+                   ["speculate", "predict", "infer", "hypothe", "guess",
+                    "maybe", "suppose", "imagine", "envision", "dream",
+                    "wonder", "muse", "theorize", "estimate", "forecast",
+                    "anticipate", "expect"])
     elseif family == ACTION_ESCALATE
         return any(kw -> contains(action_name, kw),
-                   ["alert", "warn", "escalate", "urgent", "critical", "flag"])
+                   ["alert", "warn", "escalate", "urgent", "critical", "flag",
+                    "danger", "threat", "fear", "scare", "flee", "hide",
+                    "run", "evade", "avoid", "shout", "yell", "panic",
+                    "emergency", "caution", "watch"])
     end
     return false
 end

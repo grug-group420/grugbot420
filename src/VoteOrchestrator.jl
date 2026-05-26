@@ -81,6 +81,43 @@ const AIML_TOP_TIER_WINDOW = 0.05
 const AIML_SUBTOP_BASE_PROB  = 0.20
 const AIML_SUBTOP_BONUS_PROB = 0.70
 
+# ============================================================================
+# COMPOSITE VOTE-SCORING KNOBS (vote-pick stage matching dimensions)
+# ============================================================================
+# GRUG: The vote orchestrator used to rank candidates on raw confidence alone
+# (one knob, one dimension). That meant two candidates with confidence 0.6 were
+# treated identically even when one came from the consensus-winner lobe and
+# the other was an isolated cross-lobe leaker, or one had strong relational
+# alignment with the input triples and the other had none.
+#
+# COMPOSITE SCORE: a vote's final ranking is its base confidence multiplied
+# by (1 + Σᵢ Wᵢ * sᵢ) where sᵢ ∈ [0,1] is each per-vote signal and Wᵢ is the
+# global weight knob below. Each signal is optional — passing NaN means
+# "skip this dimension for this candidate". Weights set to 0 disable a knob
+# without removing the plumbing. Total bonus is capped at +VOTE_BONUS_CAP so
+# no single vote can 10x itself out of contention.
+#
+# All weights live HERE so tuning is one-stop; production runs can tweak the
+# constants without code surgery elsewhere.
+# ----------------------------------------------------------------------------
+const VOTE_W_LOBE_ALIGNMENT     = 0.40   # in winner lobe (1.0) vs passthrough (~0.5) vs orphan (0.0)
+const VOTE_W_RELATIONAL_MATCH   = 0.50   # input/node triple overlap fraction
+const VOTE_W_RECENCY_BONUS      = 0.15   # node fired/voted recently (warm rocks)
+const VOTE_W_ACTION_TONE_ALIGN  = 0.25   # action_packet matches predicted family
+const VOTE_W_ANTI_MATCH_PENALTY = 1.00   # subtractive — strong demotion for stance-violators
+const VOTE_W_PEAK_DOMINANCE     = 0.20   # vote conf vs lobe mean — clear within-lobe winners
+
+# GRUG: Cap on cumulative positive bonus. Anti-match penalty is NOT capped —
+# it's a hard demotion signal that should be allowed to push a vote below
+# threshold. Positive bonuses sum up to this; beyond it, additional signals
+# don't compound. Default 1.5 means a fully-aligned vote can score up to
+# 2.5x its raw confidence.
+const VOTE_BONUS_CAP = 1.5
+
+# GRUG: Floor on composite score. Anti-match could in principle drive the
+# score arbitrarily negative; clamp at 0 so we don't break sort stability.
+const VOTE_SCORE_FLOOR = 0.0
+
 # GRUG: Default timeout for DONE signal (seconds). If orchestrator waits this
 # long without hearing DONE from all lobes, scream loud with timeout error.
 const DONE_SIGNAL_TIMEOUT_S = 30.0
@@ -532,23 +569,85 @@ end
 GRUG: Input to select_aiml_votes. Must carry at least node_id, confidence,
 and strength. VoteOrchestrator doesn't know about engine's Vote type, so
 this wrapper keeps the module decoupled. Caller builds these from Vote structs.
+
+OPTIONAL SCORING SIGNALS (all default to NaN = "skip this dimension"):
+  lobe_alignment       in [0,1] — 1.0 if vote is from the winner lobe, ~0.5
+                                  if from a passthrough lobe, 0.0 if orphan
+  relational_match     in [0,1] — fraction of input triples this node's
+                                  required_relations satisfied
+  recency_bonus        in [0,1] — 1.0 if fired this cycle, decays with age
+  action_tone_align    in [0,1] — 1.0 if action_packet aligns with the
+                                  predicted action family, 0.0 if misaligned
+  anti_match_score     in [0,1] — 1.0 if anti-match detected (stance violator)
+  peak_dominance       in [0,1] — vote's confidence relative to its lobe's
+                                  mean confidence (clear within-lobe winner)
+
+Each NaN signal is silently skipped in composite scoring. This keeps the
+struct backward-compatible — a caller that doesn't compute a signal just
+leaves it NaN and it's as if that knob were turned off for that candidate.
 """
 struct VoteCandidate
     node_id::String
     confidence::Float64
     strength::Float64        # GRUG: Node strength (0.0 to STRENGTH_CAP, usually 10.0)
     strength_cap::Float64    # GRUG: Cap used for normalization (default 10.0)
+    # ---- optional matching dimensions (NaN = unknown / skip) -------------
+    lobe_alignment::Float64
+    relational_match::Float64
+    recency_bonus::Float64
+    action_tone_align::Float64
+    anti_match_score::Float64
+    peak_dominance::Float64
 end
 
 function VoteCandidate(node_id::String, confidence::Float64, strength::Float64;
-                       strength_cap::Float64 = 10.0)
+                       strength_cap::Float64 = 10.0,
+                       lobe_alignment::Float64    = NaN,
+                       relational_match::Float64  = NaN,
+                       recency_bonus::Float64     = NaN,
+                       action_tone_align::Float64 = NaN,
+                       anti_match_score::Float64  = NaN,
+                       peak_dominance::Float64    = NaN)
     if isempty(strip(node_id))
         throw_vo_error("VoteCandidate node_id cannot be empty", "VoteCandidate")
     end
     if strength_cap <= 0
         throw_vo_error("VoteCandidate strength_cap must be positive, got $strength_cap", "VoteCandidate")
     end
-    return VoteCandidate(node_id, confidence, strength, strength_cap)
+    return VoteCandidate(node_id, confidence, strength, strength_cap,
+                         lobe_alignment, relational_match, recency_bonus,
+                         action_tone_align, anti_match_score, peak_dominance)
+end
+
+"""
+    composite_vote_score(vc::VoteCandidate)::Float64
+
+GRUG: Combine raw confidence with all available matching dimensions to
+produce the final ranking score. Knobs come from the VOTE_W_* constants.
+NaN signals are ignored (zero contribution). Total positive bonus is
+capped at VOTE_BONUS_CAP; anti-match penalty subtracts after capping.
+Result is clamped at VOTE_SCORE_FLOOR (default 0.0) for sort stability.
+"""
+function composite_vote_score(vc::VoteCandidate)::Float64
+    bonus_pos  = 0.0
+    penalty    = 0.0
+
+    # GRUG: Each helper applies a weight only if the signal is finite.
+    _add(s, w) = (isfinite(s) ? s * w : 0.0)
+
+    bonus_pos += _add(vc.lobe_alignment,    VOTE_W_LOBE_ALIGNMENT)
+    bonus_pos += _add(vc.relational_match,  VOTE_W_RELATIONAL_MATCH)
+    bonus_pos += _add(vc.recency_bonus,     VOTE_W_RECENCY_BONUS)
+    bonus_pos += _add(vc.action_tone_align, VOTE_W_ACTION_TONE_ALIGN)
+    bonus_pos += _add(vc.peak_dominance,    VOTE_W_PEAK_DOMINANCE)
+
+    penalty   += _add(vc.anti_match_score,  VOTE_W_ANTI_MATCH_PENALTY)
+
+    bonus_pos = min(bonus_pos, VOTE_BONUS_CAP)
+
+    # GRUG: multiplicative gain on positive bonus, additive demotion on penalty
+    score = vc.confidence * (1.0 + bonus_pos) - vc.confidence * penalty
+    return max(VOTE_SCORE_FLOOR, score)
 end
 
 """
@@ -596,32 +695,40 @@ function select_aiml_votes(candidates::Vector{VoteCandidate};
         throw_vo_error("top_window must be >= 0, got $top_window", "select_aiml_votes")
     end
 
-    # GRUG: First pass — filter by threshold. Everything below is auto-rejected.
-    above_threshold = VoteCandidate[]
+    # GRUG: Compute composite score per candidate ONCE. Threshold and top-tier
+    # comparisons all use composite, not raw confidence — the composite IS the
+    # vote's final standing once all matching dimensions are folded in.
+    # Pair (vc, score) so we can sort/filter without recomputing.
+    scored = [(vc, composite_vote_score(vc)) for vc in candidates]
+
+    # GRUG: First pass — filter by threshold against composite. Anything below
+    # the bar is auto-rejected. Note: a candidate whose RAW confidence was
+    # above threshold but whose COMPOSITE drops below (e.g. anti-match
+    # penalty) gets correctly rejected here. Conversely, a vote whose raw
+    # confidence was just below threshold can be lifted past it by strong
+    # matching-dimension bonuses.
+    above_threshold = Tuple{VoteCandidate, Float64}[]
     rejected        = VoteCandidate[]
-    for vc in candidates
-        if vc.confidence >= threshold
-            push!(above_threshold, vc)
+    for (vc, sc) in scored
+        if sc >= threshold
+            push!(above_threshold, (vc, sc))
         else
             push!(rejected, vc)
         end
     end
 
     if isempty(above_threshold)
-        # GRUG: Nothing passed threshold. AIML has no voice. Not a fatal error
-        # at this layer — caller decides what to do (often: degrade gracefully).
         return (VoteCandidate[], VoteCandidate[], rejected)
     end
 
-    # GRUG: Find max confidence among threshold-passers.
-    max_conf = maximum(vc.confidence for vc in above_threshold)
+    # GRUG: Find max composite score among threshold-passers.
+    max_score = maximum(sc for (_, sc) in above_threshold)
 
-    # GRUG: Top tier = within top_window of max. Selected directly, no coinflip.
-    # Sub-top tier = below top but >= threshold. Coinflip with strength bias.
+    # GRUG: Top tier = within top_window of max composite. Selected directly.
     top_tier    = VoteCandidate[]
     subtop_tier = VoteCandidate[]
-    for vc in above_threshold
-        if vc.confidence >= max_conf - top_window
+    for (vc, sc) in above_threshold
+        if sc >= max_score - top_window
             push!(top_tier, vc)
         else
             push!(subtop_tier, vc)
@@ -649,6 +756,10 @@ export VoteOrchestratorError, TaskTimeoutError
 export ACTIVE_FIRE_CAP, FIRE_BATCH_SIZE
 export AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
+export VOTE_W_LOBE_ALIGNMENT, VOTE_W_RELATIONAL_MATCH, VOTE_W_RECENCY_BONUS
+export VOTE_W_ACTION_TONE_ALIGN, VOTE_W_ANTI_MATCH_PENALTY, VOTE_W_PEAK_DOMINANCE
+export VOTE_BONUS_CAP, VOTE_SCORE_FLOOR
+export composite_vote_score
 export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
 
 # Task dispatch (with timeouts)

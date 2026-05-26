@@ -1109,6 +1109,34 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # --------------------------------------------------------------------------
     # GRUG: Convert engine votes -> VoteCandidate with node strength pulled
     # from NODE_MAP. Done under one lock pass for efficiency.
+    #
+    # MATCHING-DIMENSIONS PLUMBING: We also compute the per-vote signals
+    # that feed VoteOrchestrator.composite_vote_score:
+    #   - lobe_alignment: 1.0 if vote's node is in winner-lobe, 0.5 if
+    #                     passthrough, 0.0 otherwise
+    #   - relational_match: how much of the input's user_triples this
+    #                       node's node_triples covered
+    #   - action_tone_align: 1.0 if action_packet aligns with predicted
+    #                        family, 0.0 if not, NaN if predictor inactive
+    #   - anti_match_score: 1.0 if vote.antimatch (hard demotion)
+    #   - peak_dominance: vote conf vs the lobe's mean conf (a within-lobe
+    #                     winner is more trustworthy than one tied with
+    #                     weak siblings)
+    # All optional — NaN means "skip this knob for this candidate".
+    winner_lobe = LobeOrchestrator.LAST_WINNER[]
+    passthrough_lobes = Set(LobeOrchestrator.LAST_PASSTHROUGH[])
+    # Build a lobe_id -> base_avg map so we can compute peak_dominance.
+    lobe_base_map = Dict{String, Float64}()
+    for (lid, base_avg, _, _, _) in LobeOrchestrator.LAST_LOBE_SCORES[]
+        lobe_base_map[lid] = base_avg
+    end
+    # Action-tone prediction (last computed by scan_specimens)
+    last_pred = try
+        ActionTonePredictor.LAST_PREDICTION[]
+    catch
+        nothing
+    end
+
     vote_candidates = VoteOrchestrator.VoteCandidate[]
     candidate_to_vote = Dict{String, Vote}()
     lock(NODE_LOCK) do
@@ -1120,8 +1148,80 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 @warn "[ORCHESTRATOR] ⚠ Vote for missing node '$(v.node_id)' dropped."
                 continue
             end
+
+            # ---- compute optional matching-dimension signals -------------
+            node_lobe = try
+                Lobe.find_lobe_for_node(v.node_id)
+            catch
+                nothing
+            end
+
+            lobe_align = if isnothing(node_lobe)
+                0.0
+            elseif node_lobe == winner_lobe
+                1.0
+            elseif node_lobe in passthrough_lobes
+                0.5
+            else
+                0.0
+            end
+
+            # Relational match: of the user_triples extracted from input,
+            # how many showed up in this node's node_triples? Honest count.
+            rel_match = if isempty(v.user_triples)
+                NaN  # no ground truth — skip this dimension
+            else
+                user_keys = Set((t.subject, t.relation, t.object) for t in v.user_triples)
+                node_keys = Set((t.subject, t.relation, t.object) for t in v.node_triples)
+                shared = length(intersect(user_keys, node_keys))
+                clamp(shared / max(1, length(user_keys)), 0.0, 1.0)
+            end
+
+            # Action-tone alignment: ask predictor whether this node's
+            # action_packet is in the predicted family.
+            tone_align = if isnothing(last_pred)
+                NaN
+            else
+                try
+                    w = ActionTonePredictor.get_action_weight_multiplier(last_pred, v.action)
+                    # Multiplier is action_weight (>1) when aligned, suppression
+                    # factor (<1) when not, 1.0 when prediction too weak.
+                    # Map to [0,1]: aligned -> 1.0, neutral -> 0.5, suppressed -> 0.0
+                    if w > 1.0
+                        1.0
+                    elseif w < 1.0
+                        0.0
+                    else
+                        0.5
+                    end
+                catch
+                    NaN
+                end
+            end
+
+            anti_score = v.antimatch ? 1.0 : 0.0
+
+            peak_dom = if !isnothing(node_lobe) && haskey(lobe_base_map, node_lobe)
+                base = lobe_base_map[node_lobe]
+                # Ratio of this vote's conf to lobe mean — clamped to [0,1].
+                # 1.0 means this vote is at or above its lobe's average,
+                # below means it's weaker than lobe siblings.
+                base > 0 ? clamp(v.confidence / max(base, 1e-6), 0.0, 1.0) : NaN
+            else
+                NaN
+            end
+
             push!(vote_candidates, VoteOrchestrator.VoteCandidate(
-                v.node_id, v.confidence, node.strength; strength_cap = STRENGTH_CAP
+                v.node_id, v.confidence, node.strength;
+                strength_cap      = STRENGTH_CAP,
+                lobe_alignment    = lobe_align,
+                relational_match  = rel_match,
+                action_tone_align = tone_align,
+                anti_match_score  = anti_score,
+                peak_dominance    = peak_dom,
+                # recency_bonus left NaN — Node struct lacks last_fire_cycle
+                # so we can't compute honest recency without adding tracking.
+                # Knob is plumbed; fill in when the field exists.
             ))
             candidate_to_vote[v.node_id] = v
         end
