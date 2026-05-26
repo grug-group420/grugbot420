@@ -1,0 +1,31 @@
+{
+  "total_predictions": 89,
+  "frame_distribution": {
+    "contemplative/basic": 17,
+    "imperative/basic": 23,
+    "exploratory/basic": 20,
+    "imperative/rel": 7,
+    "contemplative/rel": 7,
+    "de-escalating/rel": 10,
+    "terse/basic": 5
+  },
+  "action_dist": {
+    "SPECULATE": 24,
+    "COMMAND": 30,
+    "QUERY": 22,
+    "NEGATE": 12,
+    "ESCALATE": 1
+  },
+  "tone_dist": {
+    "NEUTRAL": 47,
+    "CURIOUS": 18,
+    "URGENT": 7,
+    "REFLECTIVE": 7,
+    "HOSTILE": 10
+  },
+  "rel_pct": 27.0,
+  "fallback_count": 42,
+  "incoherent_count": 0,
+  "errors": 0,
+  "warnings": 4
+}

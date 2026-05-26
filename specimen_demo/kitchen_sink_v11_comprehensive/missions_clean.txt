@@ -1,0 +1,146 @@
+/loadSpecimen /workspace/grug_test/kitchen_sink_v11_comprehensive/kitchen_sink.specimen.gz
+/lobes
+/listVerbs
+/status
+/arousal 0.3
+/thesaurus happy | sad
+/thesaurus tool | weapon
+/thesaurus quick | swift
+/nodeAttach greeting node_3 node_4 "morning hello"
+/nodeAttach greeting node_3 node_5 "casual hello"
+/nodeAttach reasoning node_6 node_7 "why think"
+/nodeAttach reasoning node_6 node_8 "think mechanism"
+/nodeAttach survival node_10 node_11 "danger run"
+/nodeAttach survival node_10 node_12 "danger fire"
+/nodeAttach comfort node_18 node_19 "feel sad"
+/nodeAttach comfort node_18 node_20 "feel worried"
+/nodeAttach comfort node_18 node_21 "feel lonely"
+/nodeAttach planning node_33 node_34 "should plan"
+/nodeAttach planning node_33 node_35 "should next"
+/nodeAttach nature node_36 node_37 "sky river"
+/nodeAttach craft node_39 node_40 "tool build"
+/attachments
+/crystalize comfort node_18 node_19
+/crystalize survival node_10 node_12
+/crystalize craft node_39 node_40
+/attachments
+/mission hello
+/right
+/mission hello
+/mission hello
+/right
+/mission good morning
+/right
+/mission howdy partner
+/mission what is fire
+/right
+/mission tell me about rocks
+/mission why does fire burn
+/right
+/mission how does a hammer work
+/mission what causes the storm to rumble
+/mission danger ahead
+/right
+/mission run from the wolf now
+/mission fire burns my hand
+/right
+/mission watch out for the cliff
+/mission STOP that immediately
+/mission perhaps the river bends near the old tree
+/mission maybe we should wait for dawn
+/right
+/mission i wonder if the storm will come tonight
+/mission could be the wolves are hungry this season
+/mission you stupid wrong garbage
+/mission this is broken and useless
+/mission everything you do is bad
+/mission terrible idea
+/mission why is this stupid garbage broken?
+/mission what kind of idiot designed this?
+/mission what why how when where which what why how when?
+/mission STOP STOP STOP NOW NOW NOW DANGER DANGER DANGER!!!
+/mission i feel sad today
+/right
+/mission i feel worried about tomorrow
+/mission i feel lonely in the cave
+/right
+/mission i did it i made fire
+/mission victory over the bear
+/mission thank you for the food
+/right
+/mission should we move camp
+/right
+/mission plan to hunt at dawn
+/mission next step in the trap
+/mission the sky looks dark
+/mission the river is high
+/right
+/mission make a tool from this stone
+/right
+/mission build a shelter before night
+/arousal 0.8
+/mission danger danger predator near
+/right
+/arousal 0.2
+/mission tell me a calm story
+/mission why
+/mission tree
+/mission sad
+/mission boom
+/wrong
+/mission STOP
+/mission tell me about the rocks
+/mission tell me about the rocks
+/mission tell me about the rocks
+/mission hello again old friend
+/right
+/mission this random nonsense input lkjasdf qwerty zxcv
+/mission xqzwvbn
+/mission blarg flim flam
+/mission tell me about fire and stone
+/mission what is the difference between hammer and stone
+/mission why does the river flow downhill
+/mission could you explain how fire makes warm
+/mission perhaps there is a path through the forest
+/mission STOP STOP STOP DANGER
+/mission watch out
+/mission run now
+/arousal 0.7
+/mission warning predator at the edge
+/mission fire spreads quick
+/arousal 0.3
+/mission i feel scared and alone
+/mission i feel angry at the tribe
+/mission you never listen to grug
+/mission i did it i caught the fish
+/mission victory at last
+/mission thank you for teaching me
+/mission tell me again about the river
+/mission what is fire what is water what is sky
+/mission perhaps maybe could be might be
+/mission grug hits rock and makes fire
+/mission rock hits grug and grug yells
+/mission the cave is dark and cold
+/mission the wolf howls in the night
+/mission do you know about the stars
+/mission can you teach me about hunting
+/mission should we sleep now
+/mission plan the morning hunt
+/mission next step is sharpening
+/mission grug wants quiet now
+/arousal 0.5
+/mission tell me a story about the river bending past the old tree
+/mission this is broken
+/mission this is broken
+/mission this is broken
+/mission everything is wrong wrong wrong
+/right
+/mission perhaps tomorrow will be calmer
+/decrystalize comfort node_18 node_19
+/attachments
+/nodeDetach planning node_33 node_34
+/attachments
+/saveSpecimen /workspace/grug_test/kitchen_sink_v11_comprehensive/kitchen_sink_post_run.specimen.gz
+/lobes
+/status
+/quit
