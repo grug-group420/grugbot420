@@ -2090,6 +2090,30 @@ function create_node(
 
     rels = extract_relational_triples(pattern)
 
+    # GRUG v7.21c-1: Allow nodes to declare auxiliary triples that aren't
+    # extractable from the pattern itself. Use case: a node like `"i feel"`
+    # has only 2 tokens (no verb-flanked triple available from the pattern),
+    # but the seed author knows the conceptual triples are
+    # ("feeling", "felt_by", "person"). data["aux_triples"] is a vector of
+    # 3-element [subject, relation, object] entries that get merged in here.
+    if haskey(data, "aux_triples") && isa(data["aux_triples"], AbstractVector)
+        for t in data["aux_triples"]
+            if isa(t, AbstractVector) && length(t) >= 3
+                push!(rels, RelationalTriple(
+                    String(t[1]),
+                    String(t[2]),
+                    String(t[3]),
+                ))
+            elseif isa(t, AbstractDict)
+                push!(rels, RelationalTriple(
+                    String(get(t, "subject", "")),
+                    String(get(t, "relation", "")),
+                    String(get(t, "object",  "")),
+                ))
+            end
+        end
+    end
+
     # GRUG: Bake word rocks into signal immediately!
     # For image nodes, signal will be set after SDF conversion. Use empty placeholder.
     node_signal = is_image_node ? Float64[] : words_to_signal(pattern)

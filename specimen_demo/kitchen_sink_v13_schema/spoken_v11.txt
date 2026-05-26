@@ -1,0 +1,194 @@
+# v11: 64 mission/reply pairs
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Hello — here is what matters: hello hi.
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Hello — here is what matters: hello hi.
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Hello — here is what matters: hello hi.
+
+- mission : 'good morning'
+  reply   : [Grug acknowledge time of day with warmth] Hello — here is what matters: good morning.
+
+- mission : 'howdy partner'
+  reply   : [Grug greet casually] Hello — here is what matters: howdy.
+
+- mission : 'what is fire'
+  reply   : [Grug explain plain] Here is the picture: what is.
+
+- mission : 'tell me about rocks'
+  reply   : [Grug share what grug know] Here is the picture: say me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'why does fire burn'
+  reply   : [Grug seek cause] Thinking it through: why. Pinned note: Hot rock burn. Soft skin remember.
+
+- mission : 'how does a hammer work'
+  reply   : [Grug talk about hitting-rock-with-handle] Here is the picture: hammer.
+
+- mission : 'what causes the storm to rumble'
+  reply   : [Grug explain plain] Here is the picture: what is.
+
+- mission : 'danger ahead'
+  reply   : [Grug see threat] A caution: danger.
+
+- mission : 'run from the wolf now'
+  reply   : [Grug urge escape from harm] A caution: run.
+
+- mission : 'fire burns my hand'
+  reply   : [Grug warn of hot rock that bites] A caution: fire burns.
+
+- mission : 'watch out for the cliff'
+  reply   : [Grug point at incoming thing] A caution: watch out.
+
+- mission : 'perhaps the river bends near the old tree'
+  reply   : [Grug know tree make shade, nut, wood for fire] Here is the picture: tree. A companion frame: river.
+
+- mission : 'maybe we should wait for dawn'
+  reply   : [Grug weigh path forward] Thinking it through: should we.
+
+- mission : 'why is this stupid garbage broken?'
+  reply   : [Grug seek cause] Thinking it through: why.
+
+- mission : 'what kind of idiot designed this?'
+  reply   : [Grug explain plain] Here is the picture: what is.
+
+- mission : 'what why how when where which what why how when?'
+  reply   : [Grug seek cause] Thinking it through: why. A companion frame: how does.
+
+- mission : 'STOP STOP STOP NOW NOW NOW DANGER DANGER DANGER!!!'
+  reply   : [Grug see threat] A caution: danger.
+
+- mission : 'i feel sad today'
+  reply   : [Grug listen to feeling] To acknowledge what matters here: i feel.
+
+- mission : 'i feel worried about tomorrow'
+  reply   : [Grug sit with sadness] To acknowledge what matters here: downcast. A companion frame: i feel.
+
+- mission : 'i feel lonely in the cave'
+  reply   : [Grug listen to feeling] To acknowledge what matters here: i feel.
+
+- mission : 'i did it i made fire'
+  reply   : [Grug warn of hot rock that bites] A caution: fire burns.
+
+- mission : 'victory over the bear'
+  reply   : [Grug celebrate with loud good noise] Hello — here is what matters: victory.
+
+- mission : 'thank you for the food'
+  reply   : [Grug receive thanks with grace] To acknowledge what matters here: thank you.
+
+- mission : 'should we move camp'
+  reply   : [Grug name what come after] Here is the picture: next step. A companion frame: should we.
+
+- mission : 'plan to hunt at dawn'
+  reply   : [Grug sketch path in dirt] Thinking it through: proposal to.
+
+- mission : 'next step in the trap'
+  reply   : [Grug name what come after] Here is the picture: next step.
+
+- mission : 'the sky looks dark'
+  reply   : [Grug look up] Here is the picture: the sky.
+
+- mission : 'the river is high'
+  reply   : [Grug know water move and life depend on it] Here is the picture: river.
+
+- mission : 'make a tool from this stone'
+  reply   : [Grug stack and bind] Here is the picture: form. A companion frame: craft a tool.
+
+- mission : 'build a shelter before night'
+  reply   : [Grug stack and bind] Here is the picture: produce.
+
+- mission : 'danger danger predator near'
+  reply   : [Grug urge escape from harm] A concern worth raising: sprint.
+
+- mission : 'tell me a calm story'
+  reply   : [Grug share what grug know] Here is the picture: converse me.
+
+- mission : 'why'
+  reply   : [Grug seek cause] Thinking it through: why.
+
+- mission : 'tree'
+  reply   : [Grug know tree make shade, nut, wood for fire] Here is the picture: tree.
+
+- mission : 'sad'
+  reply   : [Grug sit with sadness] To acknowledge what matters here: dejected.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: chat me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: chat me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: chat me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'hello again old friend'
+  reply   : [Grug greet warm] Hello — here is what matters: hello hi.
+
+- mission : 'tell me about fire and stone'
+  reply   : [Grug share what grug know] Here is the picture: converse me.
+
+- mission : 'what is the difference between hammer and stone'
+  reply   : [Grug explain plain] Here is the picture: what is.
+
+- mission : 'why does the river flow downhill'
+  reply   : [Grug know water move and life depend on it] Here is the picture: river.
+
+- mission : 'could you explain how fire makes warm'
+  reply   : [Grug describe mechanism step by step] Thinking it through: how does.
+
+- mission : 'STOP STOP STOP DANGER'
+  reply   : [Grug see threat] A caution: danger.
+
+- mission : 'watch out'
+  reply   : [Grug point at incoming thing] A caution: look out.
+
+- mission : 'run now'
+  reply   : [Grug urge escape from harm] A concern worth raising: jog.
+
+- mission : 'warning predator at the edge'
+  reply   : [Grug raise voice] A caution: warning.
+
+- mission : 'fire spreads quick'
+  reply   : [Grug warn of hot rock that bites] A caution: fire burns.
+
+- mission : 'i feel scared and alone'
+  reply   : [Grug sit with sadness] To acknowledge what matters here: dejected. A companion frame: i feel.
+
+- mission : 'i feel angry at the tribe'
+  reply   : [Grug sit with sadness] To acknowledge what matters here: unhappy. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'victory at last'
+  reply   : [Grug celebrate with loud good noise] Hello — here is what matters: victory.
+
+- mission : 'thank you for teaching me'
+  reply   : [Grug receive thanks with grace] Hello — here is what matters: thank you.
+
+- mission : 'tell me again about the river'
+  reply   : [Grug know water move and life depend on it] Here is the picture: river.
+
+- mission : 'what is fire what is water what is sky'
+  reply   : [Grug look up] To acknowledge what matters here: the sky.
+
+- mission : 'grug hits rock and makes fire'
+  reply   : [Causal relational analysis active] Thinking it through: grug hits rock and makes fire. The link is clear: grug hits rock. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'do you know about the stars'
+  reply   : [Grug seek cause] Thinking it through: why.
+
+- mission : 'can you teach me about hunting'
+  reply   : [Grug try] Here is the picture: can you.
+
+- mission : 'should we sleep now'
+  reply   : [Grug weigh path forward] Thinking it through: should we.
+
+- mission : 'plan the morning hunt'
+  reply   : [Grug sketch path in dirt] Thinking it through: approach to.
+
+- mission : 'next step is sharpening'
+  reply   : [Grug name what come after] Thinking it through: next step.
+
+- mission : 'tell me a story about the river bending past the old tree'
+  reply   : [Grug know water move and life depend on it] Here is the picture: river. A companion frame: tree.
+

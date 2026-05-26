@@ -1701,11 +1701,36 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     node_drop_table = String[]
     node_required = String[]
     node_triples_obj = RelationalTriple[]
+    # GRUG v7.21c-1: New scaffold knobs read from winning_node.json_data.
+    # All three default to safe no-ops when absent so seeds don't have to
+    # be exhaustively beefed up to keep working.
+    node_voice_register      = ""             # "warm" / "terse" / "casual" / "plain" / "formal"
+    node_noun_anchors        = String[]        # nouns this node's prose is "about"
+    node_companion_node_pref = String[]        # preferred companion-frame node ids
     if winning_node !== nothing
         node_pattern     = winning_node.pattern
         node_drop_table  = [lowercase(strip(w)) for w in winning_node.drop_table]
         node_required    = [lowercase(strip(r)) for r in winning_node.required_relations]
         node_triples_obj = winning_node.relational_patterns
+        # GRUG v7.21c-1: Read new json_data knobs. Each is optional; absent
+        # = empty/no-op, never an error.
+        node_voice_register = let raw = get(winning_node.json_data, "voice_register", "")
+            raw isa AbstractString ? lowercase(strip(String(raw))) : ""
+        end
+        node_noun_anchors = let raw = get(winning_node.json_data, "noun_anchors", String[])
+            if raw isa AbstractVector
+                String[lowercase(strip(String(x))) for x in raw if !isempty(strip(string(x)))]
+            else
+                String[]
+            end
+        end
+        node_companion_node_pref = let raw = get(winning_node.json_data, "companion_node_pref", String[])
+            if raw isa AbstractVector
+                String[String(x) for x in raw if !isempty(strip(string(x)))]
+            else
+                String[]
+            end
+        end
     else
         @error "[MAIN v7.16 synthesis] winning node $(primary_vote.node_id) vanished between vote and synthesis — reply will be minimal."
     end
@@ -1802,13 +1827,44 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
 
     skeleton = isempty(frame_skeleton) ? action_skeleton : frame_skeleton
 
+    # GRUG v7.21c-1: voice_register override on the skeleton.
+    # The frame picks the *shape* of the reply (warm opener, terse no-support,
+    # etc.); the register modulates the *texture* (formal expands contractions,
+    # casual lowers verbosity, terse strips fillers). Register is per-node;
+    # frame is per-judgement. They compose: a `terse` register on a `warm`
+    # frame produces "Hello — {CLAIM}." (no SUPPORT, but warm opener kept).
+    if !isempty(node_voice_register)
+        if node_voice_register == "terse"
+            # Strip everything after {CLAIM} except a single period — drops
+            # SUPPORT entirely. Honors the seed's "say less" instruction.
+            skeleton = replace(skeleton, r"\{CLAIM\}\.?\{SUPPORT\}" => "{CLAIM}.")
+            skeleton = replace(skeleton, r"\{CLAIM\}\.\{SUPPORT\}"  => "{CLAIM}.")
+        elseif node_voice_register == "formal"
+            # Stretch the support hyphen-em to a colon for a more formal cadence.
+            skeleton = replace(skeleton, " — " => ": ")
+        end
+        # "warm" / "casual" / "plain" don't tilt the skeleton; they only
+        # affect downstream synonym swap weighting (future work). Leaving
+        # them as no-ops here keeps registry forward-compatible.
+    end
+
     # --- CLAIM construction (Fix A) ------------------------------------
-    # Priority order:
-    #   1. system_prompt body (the seeded grug-voice answer)
-    #   2. node_pattern       (legacy v7.16 behavior)
-    #   3. mission-quoted fallback (last resort, never emit empty)
+    # GRUG v7.21c-1: Priority order extended to include noun_anchors:
+    #   1. system_prompt body  (the seeded grug-voice answer)
+    #   2. node_pattern        (legacy v7.16 fallback)
+    #   3. noun_anchors[1]     (NEW — wraps a single noun in its PPT-shape
+    #                           when pattern is short and body is empty;
+    #                           prevents bare-noun CLAIMs like "hammer.")
+    #   4. mission-quoted fallback (last resort)
     claim_raw = if !isempty(voice_body)
         voice_body
+    elseif !isempty(node_pattern) && length(split(node_pattern)) >= 2
+        # Pattern has at least 2 words — use it directly.
+        node_pattern
+    elseif !isempty(node_noun_anchors)
+        # Pattern is bare (1 word) AND body is empty — wrap the top
+        # anchor in a minimal sentence. Frame skeleton will still apply.
+        "the $(node_noun_anchors[1])"
     elseif !isempty(node_pattern)
         node_pattern
     else
@@ -1850,7 +1906,19 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # body is available — this keeps companion clauses from echoing
     # trigger-tokens like "i feel" / "why" the way they did in v7.16.
     if !isempty(tied_alternatives)
+        # GRUG v7.21c-1: If the winning node declared `companion_node_pref`,
+        # prefer the first alt whose node_id appears in that list. Falls
+        # back to the legacy "first tied alternative" heuristic when none
+        # match (or when no preference list is configured).
         companion = tied_alternatives[1]
+        if !isempty(node_companion_node_pref)
+            for alt in tied_alternatives
+                if alt.node_id in node_companion_node_pref
+                    companion = alt
+                    break
+                end
+            end
+        end
         comp_node = lock(() -> get(NODE_MAP, companion.node_id, nothing), NODE_LOCK)
         if comp_node !== nothing
             comp_sp = String(get(comp_node.json_data, "system_prompt", ""))
@@ -3278,7 +3346,8 @@ function load_specimen_from_file!(filepath::String)::String
                         "lobes", "node_to_lobe_idx", "lobe_tables",
                         "verb_registry", "thesaurus_seeds", "inhibitions",
                         "arousal", "eye_state", "id_counters", "last_voters", "brainstem", "attachments",
-                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system", "_meta"])
+                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system", "_meta",
+                        "chatter_groups", "chatter_cooldowns"])
     for key in keys(specimen)
         if !(key in allowed_keys)
             push!(validation_errors, "Unknown top-level key '$key'")

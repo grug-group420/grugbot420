@@ -11,6 +11,8 @@ Manifest.toml
 !grugbot420_comprehensive.specimen.gz
 # Exception: ship the default specimen that auto-loads on first boot
 !grug-binary/default.specimen.gz
+# Exception: ship kitchen-sink demo specimens
+!specimen_demo/**/*.specimen.gz
 
 # OS artifacts
 .DS_Store
