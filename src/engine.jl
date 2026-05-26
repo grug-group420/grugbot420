@@ -45,6 +45,15 @@ if !isdefined(@__MODULE__, :ActionTonePredictor)
     using .ActionTonePredictor
 end
 
+# GRUG v7.21b-2: TonalJudge — token bag + common-sense judge that picks
+# scaffold frame hints. Sits between predictor and scaffold. b-2 is
+# plumbing-only (judge runs and surfaces [FRAME=...] but does not yet
+# alter generate_aiml_payload — that's b-3).
+if !isdefined(@__MODULE__, :TonalJudge)
+    include("TonalJudge.jl")
+    using .TonalJudge
+end
+
 # GRUG: Bring the Vote Orchestrator (parallel 1000-cap fire + unique Task dispatch + threshold vote picker).
 # GRUG: Guard against double-include if VoteOrchestrator already loaded by caller.
 if !isdefined(@__MODULE__, :VoteOrchestrator)

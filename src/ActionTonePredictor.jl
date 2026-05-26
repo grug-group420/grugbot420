@@ -147,7 +147,7 @@ const _TONAL_OBSERVATION = Ref{NamedTuple{
 }}((
     last_tone = TONE_NEUTRAL,
     last_action = ACTION_ASSERT,
-    last_arousal = 0.5,
+    last_arousal = 0.0,
     last_emotional_coherence = 0.5,
     ts = 0.0
 ))
@@ -211,9 +211,9 @@ function reset_tonal_observation!()
     _TONAL_OBSERVATION[] = (
         last_tone = TONE_NEUTRAL,
         last_action = ACTION_ASSERT,
-        last_arousal = 0.5,
+        last_arousal = 0.0,                    # GRUG: 0 nudge = "no prior observation"
         last_emotional_coherence = 0.5,
-        ts = 0.0
+        ts = 0.0                               # GRUG: ts==0.0 is the "never observed" sentinel
     )
     return nothing
 end

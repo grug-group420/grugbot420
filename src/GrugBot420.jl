@@ -37,6 +37,9 @@ using .SemanticVerbs
 include("ActionTonePredictor.jl")
 using .ActionTonePredictor
 
+include("TonalJudge.jl")
+using .TonalJudge
+
 include("LobeTable.jl")
 using .LobeTable
 
