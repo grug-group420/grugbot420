@@ -129,6 +129,15 @@ const CONTEXT_COIN_P_CEIL        = 0.95   # Maximum coinflip p even at intensity
 const CONTEXT_FEEDBACK_RIGHT_DELTA = 0.5  # /right bonus to last-selected messages
 const CONTEXT_FEEDBACK_WRONG_DELTA = -0.5 # /wrong penalty to last-selected messages
 
+# GRUG v7.18: VOTES-REQUEST-CONTEXT GATE — confidence safety net.
+# When no participating node opts into context via json_data["wants_context"],
+# we still pull Fresh Memory if the primary vote is below this trust floor.
+# A genuinely uncertain cave benefits from prior signal even if the winning
+# stance didn't ask for it. SURE votes at or above the floor stay grounded
+# in the current vote alone — that's how coherence is preserved over a
+# long conversation.
+const CONTEXT_TRUST_FLOOR        = 0.45
+
 # GRUG v7.13: Two-stage Fresh Memory gate — threshold-then-coinflip.
 # AIML never sees anything below the threshold, so 10k-message caves do
 # not explode the coinflip pool. The threshold auto-tunes each cycle so
@@ -908,7 +917,7 @@ function auto_tune_intensity_threshold(unpinned::Vector{ChatMessage})::Tuple{Flo
 end
 
 """
-extract_aiml_memory_context()::String
+extract_aiml_memory_context() -> NamedTuple{(:pinned, :fresh, :full, :threshold_note, :fresh_count, :pinned_count)}
 
 GRUG v7.13: Chief Orchestrator reads the memory wall with a two-stage
 Fresh Memory gate:
@@ -926,14 +935,34 @@ Fresh Memory gate:
   4. Selected message ids are cached in LAST_SELECTED_MSG_IDS so
      /right and /wrong can reinforce/punish them.
 
+GRUG v7.18: Returns both memory halves separately so the speech-facing
+path (rule {MEMORY} substitution) can drop the fresh tail when the
+action-tone predictor's MemoryPullPolicy says the current vote doesn't
+need conversational continuity. Telemetry still uses the `:full` field
+so operators see the complete memory bank in debug output.
+
+NamedTuple fields:
+  - pinned         : "Deep Memory (Pinned): ..." block
+  - fresh          : "Fresh Memory [...] (Recent): ..." block
+  - full           : pinned + "\\n" + fresh (legacy combined view)
+  - threshold_note : auto-tuned cutoff snapshot ("threshold=X eligible=N")
+  - fresh_count    : number of unpinned messages selected this cycle
+  - pinned_count   : number of pinned messages surfaced
+
 This layer scales: threshold tuning is a single O(N) pass per binary-
 search step (≤12 steps), then the coinflip only touches ≤~MAX survivors,
 never all N stored messages. NO SILENT FAILURES.
 """
-function extract_aiml_memory_context()::String
+function extract_aiml_memory_context()
     total_msgs = length(MESSAGE_HISTORY)
     if total_msgs == 0
-        return "Memory Cave: [EMPTY]"
+        empty_block = "Memory Cave: [EMPTY]"
+        return (pinned = empty_block,
+                fresh  = empty_block,
+                full   = empty_block,
+                threshold_note = "empty",
+                fresh_count = 0,
+                pinned_count = 0)
     end
 
     pinned_msgs = String[]
@@ -1034,7 +1063,21 @@ function extract_aiml_memory_context()::String
 
         # GRUG v7.13: Fresh Memory header carries the auto-tuned cutoff
         # so downstream log consumers can see the two-stage gate at work.
-        return "Deep Memory (Pinned): $pinned_str\nFresh Memory [$threshold_note] (Recent): $recent_str"
+        # GRUG v7.18: Return both halves separately so the speech-facing
+        # path can drop the fresh tail when the action-tone predictor
+        # says the current vote doesn't need it. The legacy `full_str`
+        # is preserved for telemetry — operators always see the whole
+        # memory bank in debug output, but the {MEMORY} rule substitution
+        # uses only what the policy allows.
+        pinned_block = "Deep Memory (Pinned): $pinned_str"
+        fresh_block  = "Fresh Memory [$threshold_note] (Recent): $recent_str"
+        full_block   = "$pinned_block\n$fresh_block"
+        return (pinned = pinned_block,
+                fresh  = fresh_block,
+                full   = full_block,
+                threshold_note = threshold_note,
+                fresh_count = length(recent_msgs),
+                pinned_count = length(pinned_msgs))
     catch e
         error("!!! FATAL: Chief Orchestrator failed to read memory wall: $e !!!")
     end
@@ -1310,8 +1353,8 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
 
     system_prompt = context["system_prompt"]
     neg_str       = isempty(primary_vote.negatives) ? "None" : join(primary_vote.negatives, ", ")
-    
-    memory_str = extract_aiml_memory_context()
+
+    memory_ctx = extract_aiml_memory_context()
     lobe_str  = extract_lobe_aware_context(all_votes)
 
     sure_str   = join([v.action for v in sure_votes], ", ")
@@ -1323,6 +1366,62 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     vote_certainty = isempty(tied_alternatives) ? "SURE" : "UNSURE"
     tied_alt_str = isempty(tied_alternatives) ? "None" :
         join(["$(v.node_id)($(v.action),conf=$(round(v.confidence, digits=2)))" for v in tied_alternatives], ", ")
+
+    # GRUG v7.18: VOTES-REQUEST-CONTEXT GATE.
+    # ------------------------------------------------------------------
+    # The previous design always pulled Fresh Memory into the {MEMORY}
+    # rule substitution, which dragged a tail of intensity-flagged user
+    # messages into every scaffold and rotted coherence over long
+    # conversations. Action-tone family was tried as the gate, but the
+    # right level is the NODE itself — each node knows whether its
+    # stance benefits from continuity. A "validate the heart hurt"
+    # comfort node KNOWS it wants the prior emotional thread; a fresh
+    # "warm fire welcome friend" greeting node KNOWS it doesn't.
+    #
+    # CONTRACT: nodes opt in via `json_data["wants_context"] = true`
+    # at growth time. The orchestrator OR's all participating votes —
+    # if ANY contributing vote requests context, fresh memory is pulled.
+    # Default is FALSE: silence is grounding, noise must be earned.
+    #
+    # SAFETY NETS (independent of node flags):
+    #   * UNSURE vote (ties at top)         → pull fresh
+    #   * primary confidence < trust floor  → pull fresh
+    # These cover the "cave is genuinely uncertain" case where context
+    # helps disambiguate even if no node asked for it.
+    # ------------------------------------------------------------------
+    requesting_nodes = String[]
+    lock(NODE_LOCK) do
+        for v in all_votes
+            n = get(NODE_MAP, v.node_id, nothing)
+            isnothing(n) && continue
+            if get(n.json_data, "wants_context", false) === true
+                push!(requesting_nodes, v.node_id)
+            end
+        end
+    end
+
+    pull_fresh_reason = ""
+    pull_fresh = if !isempty(requesting_nodes)
+        pull_fresh_reason = "node(s) requested context: " * join(requesting_nodes, ", ")
+        true
+    elseif vote_certainty == "UNSURE"
+        pull_fresh_reason = "vote certainty=UNSURE — context helps disambiguate"
+        true
+    elseif primary_vote.confidence < CONTEXT_TRUST_FLOOR
+        pull_fresh_reason = "primary confidence=$(round(primary_vote.confidence, digits=2)) < trust floor $(CONTEXT_TRUST_FLOOR)"
+        true
+    else
+        pull_fresh_reason = "SURE vote (conf=$(round(primary_vote.confidence, digits=2))) and no node requested context — fresh memory withheld"
+        false
+    end
+
+    memory_str_for_speech = if pull_fresh
+        memory_ctx.full
+    else
+        # GRUG: Pinned anchors stay (cheap, principled, operator-curated);
+        # fresh tail drops. Telemetry still sees the full bank below.
+        memory_ctx.pinned * "\nFresh Memory: <withheld — $(pull_fresh_reason)>"
+    end
 
     # GRUG: Read rule board. Swap shape-shifter words for real context chunks.
     # NOW STOCHASTIC: each rule fires based on its fire_probability.
@@ -1345,7 +1444,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             processed = replace(processed, "{ALL_ACTIONS}"    => join([v.action for v in all_votes], ", "))
             processed = replace(processed, "{CONFIDENCE}"     => string(round(primary_vote.confidence, digits=2)))
             processed = replace(processed, "{NODE_ID}"        => primary_vote.node_id)
-            processed = replace(processed, "{MEMORY}"         => memory_str)
+            processed = replace(processed, "{MEMORY}"         => memory_str_for_speech)
             # GRUG v7.15: strip the "Lobe Context: " prefix so rules that
             # say "Stay inside the {LOBE_CONTEXT} frame" don't render as
             # "Stay inside the Lobe Context: [cooking...] frame".
@@ -1752,7 +1851,11 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
     println(payload_io, "AIML Memory Bank:")
-    println(payload_io, memory_str)
+    # GRUG v7.18: Telemetry always shows the full memory bank so operators
+    # can see what was available, plus the gate decision so they can see
+    # what the speech path actually used.
+    println(payload_io, memory_ctx.full)
+    println(payload_io, "Memory-Pull Policy: pull_fresh=$(pull_fresh) — $(pull_fresh_reason)")
     # GRUG: Lobe Curve telemetry — replaces the old "Muted Lobes / Bridged Nodes"
     # readout. Shows base_avg × top_avg = score per lobe, with 👑 marking the
     # winner and ↗ marking pass-through runners-up. See LobeOrchestrator.jl.
