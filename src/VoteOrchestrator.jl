@@ -61,8 +61,16 @@ const ACTIVE_FIRE_CAP = 1000
 const FIRE_BATCH_SIZE = 64
 
 # GRUG: Positive confidence threshold. Votes below this are ignored by AIML.
+# Set high enough to drop pattern-mismatch noise (typical mismatch confidence
+# clusters at 0.05-0.25) while keeping legitimate semantic matches (0.38+).
+# Empirically calibrated from the kitchen-sink specimen run: 36 votes at 0.1,
+# 12 at 0.05, scattered 0.19-0.24 are all pattern-collision noise; the lowest
+# legitimate semantic family in that distribution clusters at 0.38, so 0.35
+# is the cleanest cut. Sub-threshold votes don't get coinflipped — they're
+# rejected outright. A safety fallback in run_orchestrator picks the highest
+# rejected vote if NOTHING passes, so the cave never freezes silent.
 # Raw token+rel confidence floor for "this rock has real opinion".
-const AIML_CONFIDENCE_THRESHOLD = 0.15
+const AIML_CONFIDENCE_THRESHOLD = 0.35
 
 # GRUG: How close to max confidence to be "top". Votes within this window of
 # the max confidence are the "top tier" and ALWAYS picked. No coinflip.
