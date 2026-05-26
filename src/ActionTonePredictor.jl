@@ -101,6 +101,18 @@ struct PredictionResult
     # Why not a Bool? More modes may follow (e.g. :embedding, :phonetic);
     # Symbol keeps the field future-proof and self-documenting in logs.
     mode             ::Symbol
+    # GRUG v7.21b-1: Emotional coherence — how well does the chosen action
+    # match the chosen tone's prior tilt? This is the OBSERVATION half of
+    # the predict/observe pair. v7.21a put tone first so it could TILT the
+    # action. v7.21b-1 measures the result of that tilt and surfaces it.
+    #   1.0 → action is in tone's primary tilt set (e.g. HOSTILE+NEGATE)
+    #   0.5 → tone has no prior for this action (NEUTRAL or unmapped pair)
+    #   0.0 → action OPPOSES the tone's primary tilt (e.g. HOSTILE+welcome)
+    # b-1 is observation-only: this field is computed and logged as
+    # [INCOHERENT] when low, but does NOT modify prediction behavior.
+    # b-2 will read the running observation state and let it influence
+    # the next prediction's jitter envelope.
+    emotional_coherence ::Float64
 end
 
 # GRUG: Last prediction stash. Set by predict_action_tone after a successful
@@ -109,6 +121,102 @@ end
 # Cleared to nothing on module init; never NaN'd in place — a fresh Ref each
 # call keeps the read race-free without a lock.
 const LAST_PREDICTION = Ref{Union{Nothing, PredictionResult}}(nothing)
+
+# ==============================================================================
+# v7.21b-1: TONAL OBSERVATION RUNNING STATE (observation-only)
+# ==============================================================================
+# GRUG: This is the OBSERVATION half of the predict/observe pair.
+#
+# Unlike the trajectory buffer (which v7.21a killed for prediction purposes),
+# this is a SINGLE-SLOT running state — what state am I currently in? — not
+# a session-spanning history. It is updated AFTER each prediction completes
+# and read at the START of the next prediction. Decay is fast (~5s halflife)
+# so a fresh conversation starts effectively-clean.
+#
+# In v7.21b-1 this state is OBSERVATION ONLY:
+#   - written by predict_action_tone at the end (after PredictionResult built)
+#   - read by get_tonal_observation() for diagnostics and logging
+#   - NOT read by the prediction logic itself (that comes in b-2)
+#
+# The point of b-1 is to make incoherence VISIBLE before we let it act.
+# We need to see "[INCOHERENT]" tags fire in a kitchen sink run before
+# we wire the running state into the jitter-envelope computation.
+const _TONAL_OBSERVATION = Ref{NamedTuple{
+    (:last_tone, :last_action, :last_arousal, :last_emotional_coherence, :ts),
+    Tuple{ToneFamily, ActionFamily, Float64, Float64, Float64}
+}}((
+    last_tone = TONE_NEUTRAL,
+    last_action = ACTION_ASSERT,
+    last_arousal = 0.5,
+    last_emotional_coherence = 0.5,
+    ts = 0.0
+))
+
+# GRUG v7.21b-1: Coherence threshold below which the [INCOHERENT] tag fires.
+# Conservative starting value — only flag clear mismatches (action opposes
+# tone's tilt). 0.5 is "no prior either way" so we DON'T flag those —
+# only flag when coherence is meaningfully below neutral.
+const INCOHERENCE_TAG_THRESHOLD = 0.4
+
+# GRUG v7.21b-1: Compute emotional coherence between an action and a tone.
+# This is the load-bearing measurement: how well does the chosen action
+# match what the tone's prior would have wanted?
+#
+# Reads TONE_ACTION_PRIOR (the same table that tilts action scoring during
+# prediction) and asks: "is the winner in the tilt set, against it, or
+# unmentioned?"
+#
+# Mapping:
+#   prior > 0  for this action  → coherent       → return 1.0
+#   prior < 0  for this action  → incoherent     → return 0.0
+#   prior == 0 (or absent)      → no opinion     → return 0.5
+#
+# NEUTRAL tone has an empty prior dict, so it always returns 0.5 (no opinion).
+# That's correct — NEUTRAL means we have no tonal frame to be coherent or
+# incoherent with.
+function _compute_emotional_coherence(action::ActionFamily, tone::ToneFamily)::Float64
+    tone_priors = get(TONE_ACTION_PRIOR, Symbol(tone), Dict{Symbol, Float64}())
+    isempty(tone_priors) && return 0.5   # GRUG: no prior = no opinion = neutral coherence
+
+    prior_value = get(tone_priors, Symbol(action), 0.0)
+
+    if prior_value > 0.0
+        return 1.0   # action is in tone's tilt set → coherent
+    elseif prior_value < 0.0
+        return 0.0   # action opposes tone's tilt → incoherent
+    else
+        return 0.5   # no prior for this specific action under this tone
+    end
+end
+
+"""
+    get_tonal_observation() -> NamedTuple
+
+Read the current tonal observation state. Returns the named tuple
+`(last_tone, last_action, last_arousal, last_emotional_coherence, ts)`.
+
+In v7.21b-1 this is observation-only — useful for diagnostics, logging,
+and tests. v7.21b-2 will let prediction read this to modulate jitter
+envelopes per-tone.
+"""
+get_tonal_observation() = _TONAL_OBSERVATION[]
+
+"""
+    reset_tonal_observation!()
+
+Reset the tonal observation running state to defaults. Called by tests
+and on cave wipe. Does not affect the trajectory buffer (separate state).
+"""
+function reset_tonal_observation!()
+    _TONAL_OBSERVATION[] = (
+        last_tone = TONE_NEUTRAL,
+        last_action = ACTION_ASSERT,
+        last_arousal = 0.5,
+        last_emotional_coherence = 0.5,
+        ts = 0.0
+    )
+    return nothing
+end
 
 # ==============================================================================
 # TRAJECTORY CONFIGURATION
@@ -1276,6 +1384,12 @@ function predict_action_tone(
     # GRUG: Scale weight by confidence. Low confidence = stay near 1.0 (minimal skew).
     scaled_weight = 1.0 + (base_weight - 1.0) * action_confidence
 
+    # GRUG v7.21b-1: Compute emotional coherence as a measurement on top
+    # of the already-finalized winner pair. This is observation, not action —
+    # the coherence value rides along on the result for downstream visibility
+    # but does not change predicted_action or predicted_tone.
+    coherence = _compute_emotional_coherence(predicted_action, predicted_tone)
+
     result = PredictionResult(
         predicted_action,
         predicted_tone,
@@ -1288,12 +1402,27 @@ function predict_action_tone(
         action_dist,
         tone_dist,
         trajectory_damped,
-        classifier_mode    # GRUG v7.20: which path produced this result
+        classifier_mode,    # GRUG v7.20: which path produced this result
+        coherence           # GRUG v7.21b-1: emotional coherence measurement
     )
 
     # GRUG: Stash for downstream consumers (vote orchestrator scoring,
     # diagnostic readers) so they don't have to re-run classification.
     LAST_PREDICTION[] = result
+
+    # GRUG v7.21b-1: Update the tonal observation running state AFTER the
+    # result is fully built. b-1 only writes here — nothing in this call
+    # READ the state before this point. b-2 will add a read at the top of
+    # predict_action_tone to let the previous observation modulate the
+    # current jitter envelope.
+    _TONAL_OBSERVATION[] = (
+        last_tone = predicted_tone,
+        last_action = predicted_action,
+        last_arousal = arousal_nudge,
+        last_emotional_coherence = coherence,
+        ts = result.timestamp
+    )
+
     return result
 end
 
@@ -1439,11 +1568,17 @@ function format_prediction_summary(prediction::PredictionResult)::String
     # log line make it obvious when fallback fired. Lexicon path is the
     # default and silent; fallback gets an explicit tag.
     mode_str  = prediction.mode === :fallback ? " [FALLBACK]" : ""
+    # GRUG v7.21b-1: Surface emotional incoherence the same way LORENZ-DAMPED
+    # surfaces concentration damping. Only fires when coherence is meaningfully
+    # below neutral (0.5) — ignoring the absent-prior case keeps the tag
+    # quiet for NEUTRAL-tone predictions where it doesn't apply.
+    incoh_str = prediction.emotional_coherence < INCOHERENCE_TAG_THRESHOLD ?
+        " [INCOHERENT coh=$(round(prediction.emotional_coherence, digits=2))]" : ""
     return "Action=$(prediction.action_family) | " *
            "Tone=$(prediction.tone_family) | " *
            "Conf=$(round(prediction.confidence, digits=2)) | " *
            "ArousalNudge=$(round(prediction.arousal_nudge, digits=2)) | " *
-           "Weight=$(round(prediction.action_weight, digits=2))$(chain_str)$(damp_str)$(mode_str)"
+           "Weight=$(round(prediction.action_weight, digits=2))$(chain_str)$(damp_str)$(mode_str)$(incoh_str)"
 end
 
 end # module ActionTonePredictor

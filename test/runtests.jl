@@ -45,6 +45,7 @@ const ALL_TESTS = [
     "test_chatter_v2.jl",
     "test_v7_20.jl",
     "test_v7_21a.jl",
+    "test_v7_21b1.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
