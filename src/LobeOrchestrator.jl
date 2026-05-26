@@ -138,7 +138,20 @@ function _compute_lobe_score(entries::AbstractVector)::Tuple{Float64, Float64, F
     sorted = sort(confs; rev = true)
     top_avg = mean(@view sorted[1:k])
 
-    score = base_avg * top_avg
+    # GRUG: PEAK-DOMINATED LOBE FIX.
+    # The averages curve (base_avg * top_avg) penalizes lobes that have one
+    # overwhelmingly strong node alongside weak siblings — the weak ones drag
+    # the average down even when the peak is decisive (e.g. node_88 scoring
+    # 0.949 alongside two 0.17 cousins gets averaged to ~0.4, losing to a
+    # consensus-mid lobe with three nodes at 0.6). We take max(curve, peak^2)
+    # so a single dominating node lifts its lobe to its peak's geometric tier.
+    # Squaring keeps the score on the same scale as base*top (both ∈ [0,1]),
+    # and the max() guarantees consensus lobes still win when their curve is
+    # higher than any singleton peak elsewhere.
+    peak = sorted[1]
+    curve = base_avg * top_avg
+    score = max(curve, peak * peak)
+
     hard_count = count(c -> c >= HARD_SELECTION_CONF_THRESHOLD, confs)
     return (base_avg, top_avg, score, hard_count)
 end

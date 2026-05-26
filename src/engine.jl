@@ -1085,6 +1085,26 @@ const CHEAP_SCAN_THRESHOLD  = 0.6
 const MEDIUM_SCAN_THRESHOLD = 0.4
 const HIGH_SCAN_THRESHOLD   = 0.5
 
+# GRUG: STOPWORDS — closed-class function words that overlap nearly everything.
+# Used by the literal-token pre-gate in fire_one() to distinguish "shared
+# content word" (real lexical hit) from "shared stop-word" (noise). A pattern
+# that overlaps the input only on tokens like `the`, `for`, `a` is not a real
+# lexical hit and should not bypass the coinflip — those overlaps are statistical
+# noise, not semantic signal. Compact list focused on grug-tier prose; keep
+# function-only (no nouns or verbs).
+const STOPWORDS = Set([
+    "a", "an", "the",
+    "i", "you", "we", "he", "she", "it", "they", "me", "us", "him", "her", "them",
+    "my", "your", "our", "his", "their", "its",
+    "is", "am", "are", "was", "were", "be", "been", "being",
+    "do", "does", "did", "have", "has", "had",
+    "to", "of", "in", "on", "at", "for", "with", "by", "from", "as",
+    "and", "or", "but", "if", "so", "than", "then",
+    "this", "that", "these", "those",
+    "not", "no",
+    "up", "down",
+])
+
 
 """
 attach_node!(target_id::String, attach_id::String, pattern::String)::String
@@ -2488,23 +2508,44 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         #   text node + empty pattern      → coinflip as before.
         #   image node                     → coinflip as before (uses SDF signal,
         #                                    different match path entirely).
+        # GRUG: STOPWORDS — closed-class words that match almost anything.
+        # The float-hash scanner cannot distinguish "shared stop-word" from
+        # "shared content-word", so a node that only collides with the input
+        # on `the` or `for` will get the same hash-window similarity boost
+        # as a node that genuinely shares `cliff`. We exclude stop-words from
+        # the literal-hit decision: if the ONLY shared tokens are stop-words,
+        # the node falls back to coinflip-gated scanning like an OOV node.
+        # Content overlap still grants literal_hit and bypasses the coinflip.
         literal_hit = false
         literal_jaccard = 0.0
         if !node.is_image_node && !isempty(node.pattern)
             pattern_token_set = Set(split(lowercase(strip(node.pattern))))
             if !isempty(pattern_token_set) && !isempty(input_token_set)
                 shared = intersect(pattern_token_set, input_token_set)
-                if isempty(shared)
-                    # No shared token → no real lexical hit → reject.
+                # GRUG: Strip stop-words from the shared set for the gate decision.
+                # Pattern AND input both lose stop-words from the union for Jaccard
+                # so a single content-word match scores reasonably (e.g. "cliff"
+                # in "watch out for the cliff" vs "beware the cliff edge" gives
+                # content-Jaccard = 1/4 = 0.25 instead of full-Jaccard = 1/8).
+                shared_content = Set(t for t in shared if !(t in STOPWORDS))
+                if isempty(shared_content)
+                    # No CONTENT token in common → not a real lexical hit. Don't
+                    # grant the literal bypass; let coinflip decide. Still allow
+                    # the scan to run if coinflip passes (image-node behavior).
+                    literal_hit = false
+                    # We still know there's *some* overlap (stop-word). Reject
+                    # outright like the original gate did when shared was empty:
+                    # patterns sharing only stop-words with the input are noise.
                     return nothing
                 else
-                    # Shared token → guaranteed entry, skip coinflip.
-                    # Compute Jaccard once so the scanner-fallback path below
-                    # can use it as a literal-hit floor when the float scanner
-                    # rejects on noise-dominated windows.
                     literal_hit = true
-                    union_size = length(union(pattern_token_set, input_token_set))
-                    literal_jaccard = length(shared) / max(1, union_size)
+                    pat_content = Set(t for t in pattern_token_set if !(t in STOPWORDS))
+                    inp_content = Set(t for t in input_token_set if !(t in STOPWORDS))
+                    union_content = union(pat_content, inp_content)
+                    union_size = isempty(union_content) ?
+                        length(union(pattern_token_set, input_token_set)) :
+                        length(union_content)
+                    literal_jaccard = length(shared_content) / max(1, union_size)
                 end
             end
         end
@@ -2618,6 +2659,24 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             end
         end
 
+        # GRUG: LITERAL-JACCARD BLEND.
+        # The float-hash scanner produces unreliable inflation when only stop
+        # words or hash collisions happen to align — it can score 0.5 for a
+        # pattern that genuinely shares only one content token. Now that the
+        # literal-token pre-gate guarantees real content overlap, we blend the
+        # scanner's output with the content-Jaccard so the final score reflects
+        # actual lexical overlap rather than hash noise.
+        #
+        # final = JACCARD_BLEND_W * jaccard + (1 - JACCARD_BLEND_W) * cheap_scan
+        # The blend is only applied when literal_hit fired AND we got a real
+        # cheap_scan number (not the Jaccard fallback path above). Jaccard is
+        # already honest by construction; the scanner is the noisy one.
+        if literal_hit && token_conf > 0.0
+            JACCARD_BLEND_W = 0.6
+            blended = JACCARD_BLEND_W * literal_jaccard + (1.0 - JACCARD_BLEND_W) * token_conf
+            token_conf = blended
+        end
+
         # 2. Relational Matcher (Dialectical)
         rel_conf, is_antimatch = evaluate_relational_dialectics(
             user_triples, node.relational_patterns, node.required_relations, node.relation_weights
@@ -2649,6 +2708,13 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             # If cap reached, skip — hard cap applies to ALL fire paths.
             if !VoteOrchestrator.try_claim_fire_slot!(fc)
                 return nothing
+            end
+            # GRUG DEBUG: gated diagnostic for fire trace.
+            if get(ENV, "GRUG_DEBUG_FIRE", "") != ""
+                try
+                    @info "[FIRE] $(node.id) pat='$(node.pattern)' act='$(node.action_packet)' tok=$(round(token_conf,digits=3)) rel=$(round(rel_conf,digits=3)) conf=$(round(confidence,digits=3)) lit=$(literal_hit) jac=$(round(literal_jaccard,digits=3))"
+                catch
+                end
             end
             return (id, confidence, is_antimatch, user_triples, node.relational_patterns)
         end
@@ -2730,20 +2796,18 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         return primary_results
     end
 
-    # GRUG: Pre-compute input signal once for cascade token-overlap gate (PASS 2).
-    # Cascade gate compares each candidate node's signal against this. Cheap to
-    # build (already done inside scan_specimens, but we need it again here).
-    cascade_input_signal = try
-        words_to_signal(input_text)
+    # GRUG: Pre-compute input CONTENT TOKEN SET once for cascade overlap gate.
+    # We compare cascade-candidate nodes' pattern-token sets against this set
+    # (CONTENT tokens only, stop-words stripped) to decide whether a cross-lobe
+    # node's pattern is genuinely related to the input. The original gate used
+    # signal-hash bands, which suffer the same hash-collision noise as the
+    # primary scanner — every "the/for/a" overlap let cross-lobe garbage in.
+    # Switching to content tokens makes the gate semantically honest.
+    cascade_input_tokens = try
+        Set(t for t in split(lowercase(strip(input_text))) if !(t in STOPWORDS))
     catch
-        Float64[]  # GRUG: empty input → no cascade overlap possible, gate fails closed
+        Set{SubString{String}}()
     end
-
-    # GRUG: Tolerance matches cheap_scan default. A cascade candidate counts as
-    # "sharing a token" with the input only if at least one of its signal floats
-    # falls within this band of any input float. This is the same equality
-    # criterion the matcher itself uses, so the gate is mathematically aligned.
-    cascade_overlap_tol = 0.1
 
     # GRUG: Track which IDs are already in the result set to avoid duplicates
     already_included = Set(r[1] for r in primary_results)
@@ -2815,30 +2879,25 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                         isnothing(cascade_node) && continue
                         cascade_node.is_grave && continue  # GRUG: Dead nodes don't cascade!
 
-                        # GRUG: TOKEN-OVERLAP GATE — only cascade if this node's
-                        # pattern actually shares a token with the input. Without
-                        # this, every lobe's full node set floods in at cascade_conf
-                        # regardless of relevance, collapsing routing to coinflip.
-                        # Image nodes have non-text signals — skip them; they fire
-                        # only on image inputs in their own path.
+                        # GRUG: CONTENT-TOKEN OVERLAP GATE — only cascade if this
+                        # node's pattern shares at least one CONTENT token (non
+                        # stop-word) with the input. The original gate compared
+                        # signal-hash bands and leaked through every "the/for/a"
+                        # collision, flooding routing with cross-lobe noise.
+                        # Switching to content tokens makes the gate honest.
                         if cascade_node.is_image_node
                             continue
                         end
-                        if isempty(cascade_input_signal) || isempty(cascade_node.signal)
+                        if isempty(cascade_input_tokens) || isempty(cascade_node.pattern)
                             continue
                         end
-                        has_overlap = false
-                        for ns in cascade_node.signal
-                            for is in cascade_input_signal
-                                if abs(ns - is) <= cascade_overlap_tol
-                                    has_overlap = true
-                                    break
-                                end
-                            end
-                            has_overlap && break
+                        cand_tokens = Set(t for t in split(lowercase(strip(cascade_node.pattern)))
+                                          if !(t in STOPWORDS))
+                        if isempty(cand_tokens)
+                            continue
                         end
-                        if !has_overlap
-                            continue  # GRUG: No shared token → no cascade injection.
+                        if isempty(intersect(cand_tokens, cascade_input_tokens))
+                            continue  # GRUG: No shared content token → skip.
                         end
 
                         push!(expanded, (node_id, cascade_conf, false, user_triples, cascade_node.relational_patterns))
