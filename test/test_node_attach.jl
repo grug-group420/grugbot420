@@ -628,7 +628,7 @@ end
             nid, "SDF:image:4x4", sig, "image_action",
             Dict{String, Any}(), String[], 1.0,
             RelationalTriple[], String[], Dict{String, Float64}(),
-            5.0, true, String[], false, false, "",
+            5.0, true, String[], false, 12, false, "",
             Float64[], time(), hash("SDF:image:4x4"), false, false, false, 0.0
         )
         NODE_MAP[nid] = node
@@ -711,7 +711,7 @@ end
             nid, "SDF:image:4x4", sig, "image_action",
             Dict{String, Any}(), String[], 1.0,
             RelationalTriple[], String[], Dict{String, Float64}(),
-            5.0, true, String[], false, false, "",
+            5.0, true, String[], false, 12, false, "",
             Float64[], time(), hash("SDF:image:4x4"), false, false, false, 0.0
         )
         NODE_MAP[nid] = node

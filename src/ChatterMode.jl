@@ -1,28 +1,56 @@
 # ChatterMode.jl
 # ==============================================================================
-# IDLE / CHATTER MODE - LOW-FLOW NODE GOSSIP SYSTEM (v7.1)
+# IDLE / CHATTER MODE \u2014 VOTE-SWAP GOSSIP (v7.19)
 # ==============================================================================
-# GRUG: When cave is quiet (no user input = low flow / idle mode), nodes do NOT vote.
-# Instead, at DISCRETE RANDOM INTERVALS (120s ±30s), a random group of 50-500
-# pattern-related nodes are selected to CHATTER.
 #
-# POPULATION GATE: Chatter ONLY fires if total alive non-image node count >= 1000.
-# New specimens with < 1000 nodes do NOT chatter. Period.
-# Minimum eligible group size is floored at available population (if < 50 eligible,
-# use whatever is available as ceiling).
+# WHAT CHANGED FROM v7.1
+# ----------------------
+# Old chatter copied PATTERN tokens between similar nodes \u2014 weak nodes drifted
+# toward strong-neighbor patterns. That was identity drift. The new chatter
+# copies VOTES (action_packet entries) instead. Patterns stay frozen; only
+# the ACTION carried by a node\u2019s vote can be borrowed from a partner.
 #
-# CHATTER MECHANICS (v7.1):
-#   - Selected nodes exchange their pattern + vote_slot params as JSON to neighbors
-#   - Exchange happens on a COINFLIP (not guaranteed)
-#   - ONLY WEAK NODES MORPH: receiver must be WEAKER than sender to accept blend
-#   - Strong nodes signal but do NOT change. Weak nodes drift toward strong neighbors.
-#   - ONCE-PER-DAY MORPH LIMIT: each node can only morph once every 24 hours.
-#     Tracked via MORPH_COOLDOWN_MAP (node_id -> last_morph_timestamp).
-#   - Copied content makes receiving node's pattern/vote_slot MORE SIMILAR to sender
-#   - Chatter spawns EPHEMERAL REGULAR-SPEED CLONES (not part of flowing map)
-#   - Nodes get JITTER on their strength values during chatter (levels playing field)
-#   - ANTI-COLLISION: nodes track who they've talked to this round (no double-chatter)
-#   - If USER INPUT arrives during chatter: queue it, wait for chatter to finish
+#   "don\u2019t copy patterns. copy votes of similar pattern nodes." \u2014 user spec
+#
+# The pattern remains the matchmaker (stored as group centroid). It is the
+# one-way glue that decides who can chatter with whom. The cargo on the wire
+# is a single action_packet item.
+#
+# CORE RULES (v7.19, per spec)
+# ----------------------------
+#   1. Cursor walk: each chatter window picks 100..400 nodes from the FRONT of
+#      the node id list, runs the ritual on them, advances the cursor, and
+#      resumes from the cursor next window. Wraps when it falls off the end.
+#   2. 1-hour cooldown PER NODE (engine-side: chatter_cooldown_remaining()).
+#   3. Only WEAK nodes do action copying (per-node strength check).
+#   4. Vote action swaps require semantic compatibility (action-family match).
+#      If compatible, do a coinflip biased by capped semantic intensity.
+#   5. Each node may swap AT MOST ONE vote per chatter cycle.
+#   6. Swapped-in vote weight is jittered slightly. If the donor entry has no
+#      weight, add a low weight on a coinflip.
+#   7. NONJITTER override: a STRONG node holding a LOW-CONFIDENCE vote still
+#      jitters even if its node-level NONJITTER tag would normally suppress it.
+#   8. Disk persistence: the chatter log is written to a compressed JSON file
+#      so cross-session telemetry survives reboot.
+#
+# WHAT CHATTER DOES NOT DO
+# ------------------------
+#   - It does not change patterns.
+#   - It does not change neighbor_ids / latch state.
+#   - It does not move nodes between groups (phagy does that at idle).
+#   - It does not touch crystalized attachments \u2014 those always fire regardless.
+#
+# POPULATION GATE
+# ---------------
+#   MIN_POPULATION_FOR_CHATTER = 1000. Same as v7.1: young specimens grow
+#   first, gossip later. Lowered for tests via test-only constants when
+#   appropriate, never below 50 in production.
+#
+# IDLE SCHEDULING
+# ---------------
+#   should_trigger_idle / IDLE_THRESHOLD_SECONDS / IDLE_JITTER_SECONDS still
+#   live here unchanged so the orchestrator in Main.jl can keep its 50/50
+#   chatter-vs-phagy coinflip.
 # ==============================================================================
 
 module ChatterMode
@@ -30,39 +58,130 @@ module ChatterMode
 using Random
 using JSON
 
+# GRUG (v7.19): Use system gzip the same way save_specimen_to_file! does
+# (see Main.jl: it pipes to `gzip -c`). Keeping the dependency surface
+# unchanged \u2014 no new Pkg entries needed.
+
 export ChatterSession, start_chatter_session!, process_chatter_queue!
 export ChatterNodeClone, ChatterLog, get_chatter_status
 export should_trigger_idle, is_morph_allowed, record_morph!
+export should_trigger_chatter
+export apply_chatter_diffs!, drain_input_queue!, enqueue_input!
+export persist_chatter_log!, load_persisted_chatter_log!
 export MORPH_COOLDOWN_MAP, MORPH_COOLDOWN_LOCK
 export MIN_POPULATION_FOR_CHATTER, IDLE_THRESHOLD_SECONDS
+export CHATTER_WINDOW_MIN, CHATTER_WINDOW_MAX
+export CHATTER_LOG, CHATTER_CURSOR
+export ChatterError
 
 # ==============================================================================
-# CONSTANTS (v7.1)
+# CONSTANTS (v7.19)
 # ==============================================================================
 
-# GRUG: Minimum node population before chatter is allowed.
-# New specimens with < 1000 nodes do NOT chatter. They need to grow first.
+# GRUG: Minimum alive non-image node population required before chatter is
+# allowed to fire. New specimens (< 1000 nodes) skip chatter entirely \u2014 they
+# need explicit /grow shaping before random vote swaps add value.
 const MIN_POPULATION_FOR_CHATTER = 1000
 
-# GRUG: Default idle threshold in seconds before an idle event (chatter OR phagy) fires.
-# Both chatter and phagy use this SAME timer. Much slower than v7 (was 30s, now 120s).
-# Jitter band: ±30s (was ±5s). This means idle events fire between 90s and 150s apart.
+# GRUG: Default idle threshold in seconds before any idle event (chatter OR
+# phagy) fires. Both chatter and phagy share this timer; the 50/50 coinflip
+# in Main.jl decides which one runs.
 const IDLE_THRESHOLD_SECONDS = 120.0
+const IDLE_JITTER_SECONDS    = 30.0
 
-# GRUG: Jitter band for idle threshold. Random offset in [-JITTER, +JITTER].
-const IDLE_JITTER_SECONDS = 30.0
+# GRUG (v7.19): Chatter window bounds. Per spec: "100 to 400 group ids /
+# nodes from the front of the id list". We pick a random window size in
+# this band each cycle, take that many node ids starting at the cursor,
+# advance the cursor by exactly window_size, and wrap when the cursor
+# walks off the end of the id list.
+#
+# Production constants are immutable. The mutable Refs below let TESTS
+# (and only tests) shrink the gates so we can exercise the full ritual on
+# small specimens. _override_test_gates! takes a NamedTuple and returns the
+# previous values so the test harness can restore them in a finally block.
+const CHATTER_WINDOW_MIN = 100
+const CHATTER_WINDOW_MAX = 400
 
-# GRUG: Chatter group size bounds. 50-500 nodes per gossip round (was 100-800).
-# If fewer than 50 eligible nodes exist, floor at whatever is available.
-const CHATTER_GROUP_MIN = 50
-const CHATTER_GROUP_MAX = 500
+const _TEST_MIN_POPULATION = Ref{Int}(MIN_POPULATION_FOR_CHATTER)
+const _TEST_WINDOW_MIN     = Ref{Int}(CHATTER_WINDOW_MIN)
+const _TEST_WINDOW_MAX     = Ref{Int}(CHATTER_WINDOW_MAX)
+const _TEST_WEAK_FLOOR     = Ref{Float64}(-1.0)   # -1 = use prod
+const _TEST_STRONG_FLOOR   = Ref{Float64}(-1.0)
 
-# GRUG: Morph cooldown period in seconds. 24 hours = 86400 seconds.
-# A node that morphed cannot morph again until this cooldown expires.
+"""
+    _override_test_gates!(; min_population=nothing, window_min=nothing,
+                            window_max=nothing, weak_floor=nothing,
+                            strong_floor=nothing) -> NamedTuple
+
+TEST-ONLY hatch. Returns the previous values so the caller can restore
+them. Production code MUST NOT call this. NO SILENT FAILURES \u2014 any nil
+input is treated as "leave alone".
+"""
+function _override_test_gates!(; min_population=nothing, window_min=nothing,
+                                  window_max=nothing, weak_floor=nothing,
+                                  strong_floor=nothing)
+    prev = (
+        min_population = _TEST_MIN_POPULATION[],
+        window_min     = _TEST_WINDOW_MIN[],
+        window_max     = _TEST_WINDOW_MAX[],
+        weak_floor     = _TEST_WEAK_FLOOR[],
+        strong_floor   = _TEST_STRONG_FLOOR[],
+    )
+    isnothing(min_population) || (_TEST_MIN_POPULATION[] = Int(min_population))
+    isnothing(window_min)     || (_TEST_WINDOW_MIN[]     = Int(window_min))
+    isnothing(window_max)     || (_TEST_WINDOW_MAX[]     = Int(window_max))
+    isnothing(weak_floor)     || (_TEST_WEAK_FLOOR[]     = Float64(weak_floor))
+    isnothing(strong_floor)   || (_TEST_STRONG_FLOOR[]   = Float64(strong_floor))
+    return prev
+end
+
+_effective_min_population() = _TEST_MIN_POPULATION[]
+_effective_window_min()     = _TEST_WINDOW_MIN[]
+_effective_window_max()     = _TEST_WINDOW_MAX[]
+_effective_weak_floor()     = _TEST_WEAK_FLOOR[] < 0.0 ? CHATTER_WEAK_FLOOR   : _TEST_WEAK_FLOOR[]
+_effective_strong_floor()   = _TEST_STRONG_FLOOR[] < 0.0 ? CHATTER_STRONG_FLOOR : _TEST_STRONG_FLOOR[]
+
+# GRUG (v7.19): Strength thresholds for the weak/strong gate.
+# Strong nodes broadcast their votes; weak nodes accept swaps. Mid-band
+# nodes neither broadcast nor swap.
+const CHATTER_WEAK_FLOOR    = 2.0   # node.strength <= this \u2192 weak (eligible receiver)
+const CHATTER_STRONG_FLOOR  = 5.0   # node.strength >= this \u2192 strong (eligible broadcaster)
+
+# GRUG (v7.19): Vote-swap coinflip cap on the semantic-intensity bias. Even
+# a perfect family match cannot push the swap probability higher than this
+# \u2014 it keeps chatter honestly stochastic. Per spec: "biased by a capped
+# semantic intensity (on a per node basis)".
+const CHATTER_SEMANTIC_INTENSITY_CAP = 0.85
+
+# GRUG (v7.19): Weight jitter on the swapped vote. The borrowed action item
+# brings its donor weight, then we shake it a little so receivers don\u2019t all
+# converge on identical packets.
+const CHATTER_WEIGHT_JITTER_SIGMA = 0.10
+
+# GRUG (v7.19): If the donor entry has no weight, on a coinflip we add a
+# small starting weight rather than letting the receiver inherit a 1.0
+# default. This keeps chatter\u2019s footprint smaller than direct user growth.
+const CHATTER_DEFAULT_LOW_WEIGHT = 0.5
+const CHATTER_DEFAULT_LOW_WEIGHT_PROB = 0.5
+
+# GRUG (v7.19): NONJITTER override. A strong node whose vote nonetheless
+# came back low-confidence is uncertain authority \u2014 jitter still applies
+# even if the node has the NONJITTER tag set. This is the carve-out the
+# spec calls out: "if a strong node has a low confidence for a vote
+# NONJITTER does not apply it will still jitter".
+const STRONG_LOW_CONF_OVERRIDE = 0.35  # confidence below this counts as "low"
+
+# GRUG (v7.19): Disk persistence path for the chatter log. Compressed JSON.
+# Operator-readable after `gunzip`. Lives next to the specimen by default.
+const CHATTER_LOG_PATH_DEFAULT = "chatter_log.json.gz"
+const MAX_CHATTER_LOG          = 200   # in-memory ring \u2014 disk is unbounded.
+
+# GRUG (legacy v7.1): pattern-morph cooldown. Kept for backwards compat with
+# the old API; the new path uses CHATTER_NODE_COOLDOWN in engine.jl.
 const MORPH_COOLDOWN_SECONDS = 86400.0
 
 # ==============================================================================
-# ERROR TYPES - GRUG: NO SILENT FAILURES!
+# ERRORS \u2014 NO SILENT FAILURES
 # ==============================================================================
 
 struct ChatterError <: Exception
@@ -73,42 +192,40 @@ Base.showerror(io::IO, e::ChatterError) =
     print(io, "ChatterError: ", e.msg)
 
 # ==============================================================================
-# MORPH COOLDOWN TRACKING (ONCE-PER-DAY LIMIT)
+# LEGACY MORPH COOLDOWN MAP (v7.1) \u2014 retained for backwards compat
 # ==============================================================================
+#
+# GRUG: The old once-per-day pattern-morph cooldown still exists for the
+# small number of call sites that imported it (specimen save/load, /status).
+# The vote-swap path uses CHATTER_NODE_COOLDOWN in engine.jl with a 1-hour
+# window. Two cooldown maps coexist by design \u2014 they protect different
+# operations with different time scales.
 
-# GRUG: Global map of node_id -> last morph timestamp (Float64, epoch seconds).
-# Nodes can only morph once per 24 hours. This prevents runaway drift where
-# weak nodes get blended every single chatter round and lose all identity.
-const MORPH_COOLDOWN_MAP = Dict{String, Float64}()
+const MORPH_COOLDOWN_MAP  = Dict{String, Float64}()
 const MORPH_COOLDOWN_LOCK = ReentrantLock()
 
 """
-is_morph_allowed(node_id::String)::Bool
+    is_morph_allowed(node_id::String) -> Bool
 
-GRUG: Check if a node is allowed to morph right now.
-Returns true if the node has never morphed OR if >= 24 hours since last morph.
-Returns false if the node morphed within the last 24 hours.
+Returns true if the node has never morphed OR has been off cooldown for
+>= MORPH_COOLDOWN_SECONDS. Pre-v7.19 callers use this name. The vote-swap
+path queries `chatter_cooldown_remaining` in engine.jl instead.
 """
 function is_morph_allowed(node_id::String)::Bool
     if strip(node_id) == ""
         throw(ChatterError("!!! FATAL: is_morph_allowed got empty node_id! !!!"))
     end
-    lock(MORPH_COOLDOWN_LOCK) do
-        if !haskey(MORPH_COOLDOWN_MAP, node_id)
-            # GRUG: Node has never morphed. Allow it.
-            return true
-        end
-        last_morph = MORPH_COOLDOWN_MAP[node_id]
-        elapsed = time() - last_morph
-        return elapsed >= MORPH_COOLDOWN_SECONDS
+    return lock(MORPH_COOLDOWN_LOCK) do
+        haskey(MORPH_COOLDOWN_MAP, node_id) || return true
+        (time() - MORPH_COOLDOWN_MAP[node_id]) >= MORPH_COOLDOWN_SECONDS
     end
 end
 
 """
-record_morph!(node_id::String)
+    record_morph!(node_id::String)
 
-GRUG: Record that a node just morphed. Stamps current time into cooldown map.
-Next morph attempt by this node will be blocked until 24 hours pass.
+Stamp the legacy MORPH_COOLDOWN_MAP for `node_id`. Pre-v7.19 callers use
+this name. Vote-swap chatter records via `stamp_chatter!` in engine.jl.
 """
 function record_morph!(node_id::String)
     if strip(node_id) == ""
@@ -120,105 +237,110 @@ function record_morph!(node_id::String)
 end
 
 # ==============================================================================
-# CHATTER NODE CLONE (EPHEMERAL)
+# CHATTER CLONE (carries the *vote* this cycle, not just the pattern)
 # ==============================================================================
 
-# GRUG: Clones are ephemeral! They only exist during a chatter session.
-# They carry a snapshot of a node's pattern and vote_slot data for gossip exchange.
-# They are NOT part of the main NODE_MAP and do not vote in real sessions.
+# GRUG: A clone is an ephemeral per-session snapshot. We keep `pattern` here
+# only so semantic intensity can be biased by pattern overlap \u2014 we never
+# write back. The mutable cargo is `proposed_action_packet`: the donor
+# action item, with weight jitter applied, that will replace ONE entry in
+# the receiver\u2019s real action_packet at apply time.
 mutable struct ChatterNodeClone
-    source_id::String           # GRUG: ID of the real node this clone came from
-    pattern::String             # GRUG: Snapshot of pattern at chatter time
-    vote_slot::String           # GRUG: Snapshot of action_packet at chatter time
-    strength::Float64           # GRUG: Snapshot of strength (jittered for chatter!)
-    original_strength::Float64  # GRUG: UN-jittered strength for weak/strong comparison
-    talked_to::Set{String}      # GRUG: Anti-collision: who this clone has chatted with
-    morphed_this_session::Bool  # GRUG: Track if this clone morphed (for diff application)
+    source_id::String
+    pattern::String                # frozen snapshot, read-only
+    action_packet::String          # frozen snapshot, read-only
+    strength::Float64              # un-jittered for weak/strong gate
+    is_weak::Bool                  # cached: strength <= CHATTER_WEAK_FLOOR
+    is_strong::Bool                # cached: strength >= CHATTER_STRONG_FLOOR
+
+    # GRUG (v7.19): Vote-swap cargo \u2014 only set on receivers that actually
+    # accept a swap this cycle. Apply step uses these to write back.
+    proposed_action_packet::String       # full new packet, ready to drop in
+    accepted_swap::Bool                  # gates apply_chatter_diffs!
+    donor_id::String                     # for telemetry
+    donor_action_name::String            # for telemetry
+end
+
+# Convenience constructor that pre-computes weak/strong flags.
+function ChatterNodeClone(source_id::String, pattern::String, action_packet::String, strength::Float64)
+    is_weak   = strength <= _effective_weak_floor()
+    is_strong = strength >= _effective_strong_floor()
+    return ChatterNodeClone(source_id, pattern, action_packet, strength,
+                            is_weak, is_strong, "", false, "", "")
 end
 
 # ==============================================================================
-# CHATTER SESSION
+# CHATTER SESSION + LOG
 # ==============================================================================
 
-# GRUG: One chatter session covers one idle gossip round.
 mutable struct ChatterSession
     session_id::String
     start_time::Float64
-    end_time::Float64             # GRUG: 0.0 means session still running
-    group_size::Int               # GRUG: How many nodes were selected (50-500)
+    end_time::Float64
+    window_size::Int
+    cursor_start::Int
+    cursor_end::Int
     clones::Vector{ChatterNodeClone}
     is_running::Bool
-    queued_inputs::Vector{String} # GRUG: User inputs that arrived during chatter
-    exchanges_completed::Int      # GRUG: How many gossip exchanges happened
-    copies_accepted::Int          # GRUG: How many times a weak node accepted a morph
-    morphs_blocked_cooldown::Int  # GRUG: How many morphs blocked by 24h cooldown
-    morphs_blocked_strength::Int  # GRUG: How many morphs blocked by strength gate
+    queued_inputs::Vector{String}
+    swaps_attempted::Int
+    swaps_accepted::Int
+    swaps_blocked_cooldown::Int
+    swaps_blocked_strength::Int
+    swaps_blocked_semantic::Int
+    swaps_blocked_coinflip::Int
 end
 
-# GRUG: Chatter log for diagnostics. Keeps last N sessions.
+# GRUG (v7.19): Cursor for the front-of-id-list walk. Persisted to disk so
+# the next session resumes where the last one left off.
+const CHATTER_CURSOR = Ref{Int}(0)
+
+# GRUG: In-memory ring buffer of completed sessions for /status. Disk has
+# the long history.
 const CHATTER_LOG = ChatterSession[]
 const CHATTER_LOG_LOCK = ReentrantLock()
-const MAX_CHATTER_LOG = 50
 
 # GRUG: Global flag: is chatter currently running?
-# Main loop checks this before processing user input.
 const CHATTER_RUNNING = Ref{Bool}(false)
 const CHATTER_LOCK = ReentrantLock()
 const INPUT_QUEUE = String[]
 const INPUT_QUEUE_LOCK = ReentrantLock()
 
-# ==============================================================================
-# CHATTER LOG HELPER
-# ==============================================================================
-
 struct ChatterLog
     session_id::String
     start_time::Float64
     end_time::Float64
-    group_size::Int
-    exchanges::Int
-    copies::Int
-    morphs_blocked_cooldown::Int
-    morphs_blocked_strength::Int
-    queued_inputs::Int
+    window_size::Int
+    swaps_attempted::Int
+    swaps_accepted::Int
+    swaps_blocked_cooldown::Int
+    swaps_blocked_strength::Int
+    swaps_blocked_semantic::Int
+    swaps_blocked_coinflip::Int
 end
 
 """
-get_chatter_status()::NamedTuple
+    get_chatter_status() -> NamedTuple
 
-GRUG: Return current chatter state for diagnostics and CLI /status command.
+Snapshot for `/status` and the idle scheduler. is_running, input queue
+depth, lifetime session count, and current cursor.
 """
 function get_chatter_status()
-    is_running = lock(CHATTER_LOCK) do
-        CHATTER_RUNNING[]
-    end
-    queue_depth = lock(INPUT_QUEUE_LOCK) do
-        length(INPUT_QUEUE)
-    end
-    log_count = lock(CHATTER_LOG_LOCK) do
-        length(CHATTER_LOG)
-    end
-    cooldown_count = lock(MORPH_COOLDOWN_LOCK) do
-        length(MORPH_COOLDOWN_MAP)
-    end
+    is_running = lock(CHATTER_LOCK) do; CHATTER_RUNNING[] end
+    queue_depth = lock(INPUT_QUEUE_LOCK) do; length(INPUT_QUEUE) end
+    log_count = lock(CHATTER_LOG_LOCK) do; length(CHATTER_LOG) end
     return (
-        is_running      = is_running,
-        queue_depth     = queue_depth,
-        sessions_run    = log_count,
-        nodes_on_cooldown = cooldown_count
+        is_running    = is_running,
+        queue_depth   = queue_depth,
+        sessions_run  = log_count,
+        cursor        = CHATTER_CURSOR[],
     )
 end
 
 # ==============================================================================
-# INPUT QUEUE (USER INPUT DURING CHATTER)
+# INPUT QUEUE \u2014 user input parked while chatter runs
 # ==============================================================================
 
-"""
-enqueue_input!(input::String)
-
-GRUG: If user sends input while chatter is running, park it here.
-Main loop will drain the queue after chatter finishes.
-"""
 function enqueue_input!(input::String)
     if strip(input) == ""
         throw(ChatterError("!!! FATAL: enqueue_input! got empty string! !!!"))
@@ -226,15 +348,9 @@ function enqueue_input!(input::String)
     lock(INPUT_QUEUE_LOCK) do
         push!(INPUT_QUEUE, input)
     end
-    println("[CHATTER] ⏸  User input queued (chatter in progress). Queue depth: $(length(INPUT_QUEUE))")
+    println("[CHATTER] \u23f8  User input queued (chatter in progress). Queue depth: $(length(INPUT_QUEUE))")
 end
 
-"""
-drain_input_queue!()::Vector{String}
-
-GRUG: After chatter finishes, drain and return all queued inputs for processing.
-Clears the queue. No silent failures if queue empty (just returns empty vector).
-"""
 function drain_input_queue!()::Vector{String}
     return lock(INPUT_QUEUE_LOCK) do
         queued = copy(INPUT_QUEUE)
@@ -244,189 +360,306 @@ function drain_input_queue!()::Vector{String}
 end
 
 # ==============================================================================
-# STRENGTH JITTER FOR CHATTER (LEVEL PLAYING FIELD)
+# IDLE TIMER \u2014 unchanged from v7.1
 # ==============================================================================
 
-"""
-jitter_clone_strength(strength::Float64)::Float64
-
-GRUG: Apply a small random jitter to clone strength during chatter.
-This levels the playing field slightly so strong nodes don't completely dominate gossip.
-Jitter is bounded: strong nodes stay relatively strong, weak ones stay weak.
-"""
-function jitter_clone_strength(strength::Float64)::Float64
-    if isnan(strength) || isinf(strength)
-        throw(ChatterError("!!! FATAL: jitter_clone_strength got NaN or Inf! !!!"))
+function should_trigger_idle(last_input_time::Float64)::Bool
+    if last_input_time <= 0.0
+        throw(ChatterError(
+            "!!! FATAL: should_trigger_idle got invalid last_input_time: $last_input_time! !!!"
+        ))
     end
-    # GRUG: Jitter magnitude scales inversely with strength.
-    # Strong node: small jitter (0.02-0.06). Weak node: bigger jitter (0.05-0.15).
-    # This gives weaker nodes a fighting chance in chatter rounds.
-    jitter_range = 0.02 + (1.0 - clamp(strength, 0.0, 1.0)) * 0.13
-    jitter = (rand() * 2.0 - 1.0) * jitter_range
-    return clamp(strength + jitter, 0.0, 1.0)
+    elapsed = time() - last_input_time
+    jittered = IDLE_THRESHOLD_SECONDS +
+               (rand() * 2.0 * IDLE_JITTER_SECONDS - IDLE_JITTER_SECONDS)
+    return elapsed >= jittered
 end
 
-# ==============================================================================
-# ANTI-COLLISION HELPERS
-# ==============================================================================
+# Backwards-compat alias.
+should_trigger_chatter(last_input_time::Float64, _ignored::Float64=120.0)::Bool =
+    should_trigger_idle(last_input_time)
 
-"""
-can_chat(sender::ChatterNodeClone, receiver_id::String)::Bool
+# ==============================================================================
+# ACTION PACKET HELPERS (parser-light, swap-only)
+# ==============================================================================
+#
+# GRUG: We don\u2019t reuse engine.jl\u2019s parse_action_packet here because we want
+# a STRUCTURED RESULT we can mutate cleanly, and we want zero coupling that
+# would force ChatterMode to depend on the engine module at load time.
+# The format mirrors engine.jl: pipe-delimited entries shaped as
+#   action_name[neg1, neg2]^weight     OR     action_name^weight
+# with negatives and weight both optional.
 
-GRUG: Anti-collision check. A clone cannot chat with the same node twice in one session.
-Returns true if exchange is allowed, false if already talked.
-"""
-function can_chat(sender::ChatterNodeClone, receiver_id::String)::Bool
-    return !(receiver_id in sender.talked_to)
+struct ActionItem
+    action::String
+    negatives::Vector{String}
+    weight::Float64
+    has_weight::Bool   # true if weight came from the packet, false if defaulted
 end
 
 """
-mark_chatted!(sender::ChatterNodeClone, receiver_id::String)
+    _parse_action_items(packet) -> Vector{ActionItem}
 
-GRUG: Record that sender has chatted with receiver_id this session.
+Lenient parser. Empty entries are skipped, malformed entries throw.
 """
-function mark_chatted!(sender::ChatterNodeClone, receiver_id::String)
-    push!(sender.talked_to, receiver_id)
-end
-
-# ==============================================================================
-# PATTERN SIMILARITY HELPER (FOR LATCH + COPY BIAS)
-# ==============================================================================
-
-"""
-pattern_similarity(p1::String, p2::String)::Float64
-
-GRUG: Rough token-overlap similarity between two pattern strings.
-Returns [0.0, 1.0]. Used to find "similar" neighbors for latching.
-"""
-function pattern_similarity(p1::String, p2::String)::Float64
-    if strip(p1) == "" || strip(p2) == ""
-        return 0.0
+function _parse_action_items(packet::String)::Vector{ActionItem}
+    if strip(packet) == ""
+        throw(ChatterError("!!! FATAL: _parse_action_items got empty packet! !!!"))
     end
-    tokens1 = Set(split(lowercase(strip(p1))))
-    tokens2 = Set(split(lowercase(strip(p2))))
-    if isempty(tokens1) || isempty(tokens2)
-        return 0.0
-    end
-    overlap = length(intersect(tokens1, tokens2))
-    union_size = length(union(tokens1, tokens2))
-    return union_size > 0 ? Float64(overlap) / Float64(union_size) : 0.0
-end
+    items = ActionItem[]
+    for raw in split(packet, '|')
+        p = strip(raw)
+        isempty(p) && continue
 
-# ==============================================================================
-# MERGE PATTERNS (GOSSIP COPY LOGIC)
-# ==============================================================================
+        negs = String[]
+        weight = 1.0
+        has_weight = false
 
-"""
-merge_patterns(receiver_pattern::String, sender_pattern::String,
-               blend_factor::Float64)::String
-
-GRUG: When receiver accepts gossip from sender, their pattern becomes MORE SIMILAR.
-Grug do this by injecting some of sender's tokens into receiver's pattern.
-blend_factor controls how many sender tokens get injected [0.0, 1.0].
-"""
-function merge_patterns(
-    receiver_pattern::String,
-    sender_pattern::String,
-    blend_factor::Float64
-)::String
-    if strip(receiver_pattern) == ""
-        throw(ChatterError("!!! FATAL: merge_patterns got empty receiver_pattern! !!!"))
-    end
-    if strip(sender_pattern) == ""
-        # GRUG: Sender has no pattern to copy. Return receiver unchanged.
-        return receiver_pattern
-    end
-    blend_factor = clamp(blend_factor, 0.0, 1.0)
-
-    r_tokens = split(lowercase(strip(receiver_pattern)))
-    s_tokens = split(lowercase(strip(sender_pattern)))
-
-    # GRUG: How many sender tokens to inject?
-    n_inject = max(1, round(Int, length(s_tokens) * blend_factor))
-    # GRUG: Pick random subset of sender tokens to inject
-    inject_tokens = sample(s_tokens, min(n_inject, length(s_tokens)); replace=false)
-
-    # GRUG: Add injected tokens if not already present (no duplicates)
-    r_set = Set(r_tokens)
-    for tok in inject_tokens
-        if !(tok in r_set)
-            push!(r_tokens, tok)
-            push!(r_set, tok)
+        m = match(r"^(.+?)\[([^\]]*)\](?:\^([\d.]+))?$", p)
+        if !isnothing(m)
+            action_name = strip(m.captures[1])
+            for n in split(m.captures[2], ',')
+                ns = strip(n)
+                !isempty(ns) && push!(negs, String(ns))
+            end
+            wstr = m.captures[3]
+            if !isnothing(wstr)
+                w = tryparse(Float64, strip(wstr))
+                isnothing(w) && throw(ChatterError("bad weight '$wstr' in '$packet'"))
+                weight = w
+                has_weight = true
+            end
+            push!(items, ActionItem(String(action_name), negs, weight, has_weight))
+        elseif contains(p, '^')
+            parts = split(p, '^'; limit=2)
+            action_name = strip(parts[1])
+            w = tryparse(Float64, strip(parts[2]))
+            isnothing(w) && throw(ChatterError("bad weight '$(parts[2])' in '$packet'"))
+            push!(items, ActionItem(String(action_name), String[], w, true))
+        else
+            push!(items, ActionItem(String(p), String[], 1.0, false))
         end
     end
-
-    return join(r_tokens, " ")
+    isempty(items) && throw(ChatterError("no actions in packet '$packet'"))
+    return items
 end
 
-# GRUG: Bring sample() for random selection without replacement
-using Random: shuffle
+"""
+    _serialize_action_items(items) -> String
 
-function sample(v::AbstractVector, n::Int; replace::Bool=false)
-    if n <= 0
-        return eltype(v)[]
+Inverse of _parse_action_items. Preserves the has_weight distinction.
+"""
+function _serialize_action_items(items::Vector{ActionItem})::String
+    parts = String[]
+    for it in items
+        body = if isempty(it.negatives)
+            it.action
+        else
+            "$(it.action)[" * join(it.negatives, ", ") * "]"
+        end
+        if it.has_weight
+            push!(parts, "$(body)^$(round(it.weight, digits=3))")
+        else
+            push!(parts, body)
+        end
     end
-    if replace
-        return [v[rand(1:length(v))] for _ in 1:n]
+    return join(parts, " | ")
+end
+
+"""
+    _action_family(action_name) -> Symbol
+
+Coarse semantic family classification. We don\u2019t import ActionTonePredictor
+here \u2014 instead we mirror its keyword tables for the six families. Same
+spirit, no module load order coupling.
+
+GRUG: Substring matching is dangerous for short stop-word-like keywords
+(\"no\", \"do\", \"go\") \u2014 they collide with longer verbs like \"acknowledge\",
+\"ponder\", or \"forget\". Each entry in the family tables is therefore tagged
+as either an EXACT match (matched against the whole action name) or a
+SUBSTRING match (must appear inside the action name AND must itself be at
+least 4 chars long, which keeps the keyword discriminating).
+"""
+function _action_family(action_name::String)::Symbol
+    a = lowercase(strip(action_name))
+    isempty(a) && return :unknown
+
+    # GRUG: short keywords need EXACT match; long ones can substring-match.
+    function matches_any(kws::Vector{String})::Bool
+        for kw in kws
+            if length(kw) <= 3
+                a == kw && return true
+            else
+                contains(a, kw) && return true
+            end
+        end
+        return false
+    end
+
+    matches_any(["query","ask","answer","respond","explain","describe","tell","info",
+           "elaborate","clarify","define","analyze","analyse","examine","inspect",
+           "study","reason","ponder","think","consider","wonder","investigate",
+           "explore","review","look","check","calculate","compute","evaluate",
+           "assess"]) && return :query
+    matches_any(["execute","run","do","action","command","perform","trigger","make",
+           "build","craft","forge","shape","fix","mend","repair","patch","restore",
+           "plan","prepare","setup","set","configure","move","go","fetch","get",
+           "bring","carry","find","seek","hunt","track","gather","collect","use",
+           "apply","wield","operate"]) && return :command
+    matches_any(["negate","deny","reject","contra","refute","wrong","no","not","never",
+           "stop","halt","block","forbid","cancel","abort","dismiss"]) && return :negate
+    matches_any(["assert","state","declare","confirm","affirm","say","claim","report",
+           "announce","proclaim","note","observe","recall","remember","remind",
+           "recount","log","record","greet","welcome","smile","laugh"]) && return :assert
+    matches_any(["speculate","predict","infer","hypothe","guess","maybe","suppose",
+           "imagine","envision","dream","muse","theorize","estimate","forecast",
+           "anticipate","expect"]) && return :speculate
+    matches_any(["alert","warn","escalate","urgent","critical","flag","danger","threat",
+           "fear","scare","flee","hide","evade","avoid","shout","yell","panic",
+           "emergency","caution","watch","comfort","reassure","support","validate",
+           "acknowledge"]) && return :escalate
+    return :unknown
+end
+
+"""
+    _semantic_compat(donor_action, receiver_packet, receiver_pattern, donor_pattern)
+        -> (compatible::Bool, intensity::Float64)
+
+Decide whether a donor action can be considered for a swap into the
+receiver\u2019s packet. \"Strongly allowed\" means: same action family AND donor
+action is not already a NEGATIVE somewhere in the receiver\u2019s packet AND
+the donor action is not already present (no self-swap). Intensity is
+pattern-overlap similarity, capped.
+"""
+function _semantic_compat(donor::ActionItem,
+                          receiver_items::Vector{ActionItem},
+                          receiver_pattern::String,
+                          donor_pattern::String)
+    donor_family = _action_family(donor.action)
+    donor_family == :unknown && return (false, 0.0)
+
+    # Already present? No-op swap. Block.
+    for it in receiver_items
+        it.action == donor.action && return (false, 0.0)
+    end
+
+    # Donor action listed as a negative anywhere in receiver? Block.
+    for it in receiver_items
+        donor.action in it.negatives && return (false, 0.0)
+    end
+
+    # Need at least ONE of receiver\u2019s actions in the same family for
+    # \"strongly allowed\". Family overlap is the semantic glue.
+    has_family_overlap = false
+    for it in receiver_items
+        if _action_family(it.action) == donor_family
+            has_family_overlap = true
+            break
+        end
+    end
+    !has_family_overlap && return (false, 0.0)
+
+    # Pattern-overlap intensity, capped per spec.
+    intensity = clamp(_pattern_overlap(donor_pattern, receiver_pattern),
+                      0.0, CHATTER_SEMANTIC_INTENSITY_CAP)
+    return (true, intensity)
+end
+
+function _pattern_overlap(p1::String, p2::String)::Float64
+    (strip(p1) == "" || strip(p2) == "") && return 0.0
+    t1 = Set(split(lowercase(strip(p1))))
+    t2 = Set(split(lowercase(strip(p2))))
+    union_size = length(union(t1, t2))
+    return union_size == 0 ? 0.0 : Float64(length(intersect(t1, t2))) / Float64(union_size)
+end
+
+"""
+    _jitter_weight(weight) -> Float64
+
+Apply a small symmetric jitter to a weight, clamped to the same lower
+bound the engine\u2019s parse_action_packet enforces (> 0.0).
+"""
+function _jitter_weight(weight::Float64)::Float64
+    j = (rand() * 2.0 - 1.0) * CHATTER_WEIGHT_JITTER_SIGMA
+    return max(0.05, weight + j)
+end
+
+"""
+    _apply_swap(receiver_items, donor_item) -> (new_items, donor_action_name)
+
+Replace ONE entry in the receiver\u2019s items with the donor item, with
+weight jitter (and a coinflip-low-weight injection if the donor lacked
+one). Spec: \"nodes can only swap one vote at a time\".
+
+Selection rule: replace the receiver\u2019s LOWEST-weight entry. Strong votes
+keep their slots; weak votes are the ones that get rewritten. This makes
+chatter additive at the personality layer rather than destructive.
+"""
+function _apply_swap(receiver_items::Vector{ActionItem}, donor::ActionItem)
+    @assert !isempty(receiver_items)
+
+    # Pick weakest receiver entry as the swap target.
+    swap_idx = argmin([it.weight for it in receiver_items])
+
+    new_weight = if donor.has_weight
+        _jitter_weight(donor.weight)
+    elseif rand() < CHATTER_DEFAULT_LOW_WEIGHT_PROB
+        # Coinflip: add a low starting weight rather than inheriting the 1.0 default.
+        _jitter_weight(CHATTER_DEFAULT_LOW_WEIGHT)
     else
-        return shuffle(v)[1:min(n, length(v))]
+        # Donor has no weight and the coinflip said no: inherit the receiver\u2019s
+        # weakest weight (the one we are about to replace), then jitter it.
+        _jitter_weight(receiver_items[swap_idx].weight)
     end
+
+    new_item = ActionItem(donor.action, donor.negatives, new_weight, true)
+
+    new_items = copy(receiver_items)
+    new_items[swap_idx] = new_item
+    return (new_items, donor.action)
 end
 
 # ==============================================================================
-# CHATTER SESSION RUNNER (v7.1)
+# CHATTER SESSION RUNNER (v7.19 \u2014 vote swap, cursor walk)
 # ==============================================================================
 
 """
-start_chatter_session!(node_map_snapshot::Vector{Tuple{String, String, String, Float64}})::ChatterSession
+    start_chatter_session!(snapshot) -> ChatterSession
 
-GRUG: Run one full chatter session.
+Run one chatter window. `snapshot` is a Vector of (id, pattern, action_packet,
+strength) tuples drawn fresh from NODE_MAP under NODE_LOCK by the caller.
 
-node_map_snapshot is a Vector of (node_id, pattern, action_packet, strength) tuples.
-This is a SNAPSHOT - chatter works on copies, not live nodes (ephemeral clones).
+Steps:
+  1. Population gate (>= MIN_POPULATION_FOR_CHATTER alive non-image nodes).
+  2. Cursor walk: take CHATTER_WINDOW_MIN..CHATTER_WINDOW_MAX node ids
+     starting at CHATTER_CURSOR[]. Wrap if needed. Advance cursor.
+  3. For each weak clone in the window: pick a random strong clone in the
+     window, run semantic-compat check on a donor action drawn from the
+     strong clone\u2019s packet. If compatible, biased coinflip; if it fires,
+     stage a swap on the weak clone.
+  4. Receiver-cooldown enforcement is the caller\u2019s job (chatter_cooldown_remaining
+     is checked against the receiver id BEFORE we even try \u2014 it\u2019s an engine
+     concern, but we mirror it here using the snapshot id list).
 
-POPULATION GATE (v7.1): If snapshot has < MIN_POPULATION_FOR_CHATTER (1000) nodes,
-chatter is REFUSED. New specimens don't chatter. Throw ChatterError.
-
-GROUP SIZE (v7.1): 50-500 nodes per round. If fewer than 50 eligible, use whatever
-is available as the ceiling (floor at population).
-
-WEAK-ONLY MORPH (v7.1): Only receivers WEAKER than the sender can accept a pattern
-blend. Strong nodes signal but never change. Weak nodes drift toward strong neighbors.
-
-ONCE-PER-DAY MORPH (v7.1): Each node can only morph once every 24 hours.
-Tracked via MORPH_COOLDOWN_MAP. If a node morphed within 24h, it is skipped.
-
-STEPS:
-  1. Population gate: refuse if < 1000 nodes
-  2. Select random group of 50-500 nodes
-  3. Create ephemeral clones with jittered strength (preserve original for comparison)
-  4. For each clone, on a coinflip, attempt to exchange with random neighbor clone
-  5. Receiver MUST be weaker than sender AND not on morph cooldown
-  6. If accepted, receiver clone's pattern/vote_slot blends toward sender
-  7. Session ends; returns session record for the caller to apply diffs back to live nodes
-
-RETURNS: ChatterSession with updated clone data.
-Caller in Main.jl applies clone diffs back to real nodes.
+The caller invokes `apply_chatter_diffs!` afterwards to write back the
+staged swaps to live nodes.
 """
 function start_chatter_session!(
-    node_map_snapshot::Vector{Tuple{String, String, String, Float64}}
+    snapshot::Vector{Tuple{String, String, String, Float64}};
+    cooldown_query::Function = (id) -> 0.0,        # injectable for tests
+    nonjitter_query::Function = (id) -> false,     # injectable for tests; returns true if NONJITTER tag set
+    confidence_query::Function = (id) -> 1.0,      # injectable for tests; recent vote confidence
 )::ChatterSession
-
-    if isempty(node_map_snapshot)
-        throw(ChatterError("!!! FATAL: start_chatter_session! got empty node_map_snapshot! !!!"))
+    if isempty(snapshot)
+        throw(ChatterError("!!! FATAL: start_chatter_session! got empty snapshot! !!!"))
     end
-
-    # GRUG: POPULATION GATE (v7.1) — chatter only for mature specimens (1000+ nodes).
-    # New specimens don't chatter. They need to grow first via /grow and /mission.
-    if length(node_map_snapshot) < MIN_POPULATION_FOR_CHATTER
+    if length(snapshot) < _effective_min_population()
         throw(ChatterError(
-            "!!! POPULATION GATE: Chatter requires >= $(MIN_POPULATION_FOR_CHATTER) nodes, " *
-            "got $(length(node_map_snapshot)). New specimens don't chatter. !!!"
+            "!!! POPULATION GATE: chatter requires >= $(_effective_min_population()) nodes, " *
+            "got $(length(snapshot)). New specimens don\u2019t chatter. !!!"
         ))
     end
 
-    # GRUG: Mark chatter as running so main loop queues user input
     lock(CHATTER_LOCK) do
         CHATTER_RUNNING[] = true
     end
@@ -435,171 +668,192 @@ function start_chatter_session!(
     session_start = time()
 
     try
-        # GRUG: STEP 1 - Select random group size (50-500, bounded by available nodes)
-        # If fewer than CHATTER_GROUP_MIN (50) nodes, floor at whatever is available.
-        max_nodes = length(node_map_snapshot)
-        group_floor = min(CHATTER_GROUP_MIN, max_nodes)
-        group_ceiling = min(CHATTER_GROUP_MAX, max_nodes)
-        group_size = rand(group_floor:group_ceiling)
+        # GRUG (v7.19): Cursor walk over the FRONT of the id list.
+        # We sort the snapshot by id to make \"front\" deterministic across
+        # snapshots that arrive in dict-iteration order.
+        sorted = sort(snapshot, by = x -> x[1])
+        n = length(sorted)
 
-        # GRUG: Shuffle and pick group
-        shuffled = shuffle(node_map_snapshot)
-        group = shuffled[1:group_size]
+        cursor = CHATTER_CURSOR[]
+        if cursor < 0 || cursor >= n
+            cursor = 0
+        end
 
-        # GRUG: STEP 2 - Create ephemeral clones with jittered strength
-        # Store BOTH jittered and original strength so we can do weak/strong comparison
-        # using the un-jittered original (jitter is for gossip probability, not gate logic).
+        window_size = rand(_effective_window_min():min(_effective_window_max(), n))
+        window = if cursor + window_size <= n
+            sorted[cursor + 1 : cursor + window_size]
+        else
+            # Wrap.
+            tail = sorted[cursor + 1 : n]
+            head = sorted[1 : window_size - length(tail)]
+            vcat(tail, head)
+        end
+        cursor_start = cursor
+        cursor_end   = (cursor + window_size) % n
+        CHATTER_CURSOR[] = cursor_end
+
+        # Materialize clones so we can stage swaps without touching live nodes.
         clones = ChatterNodeClone[]
-        for (nid, pattern, action_packet, strength) in group
-            jittered_str = jitter_clone_strength(strength)
-            push!(clones, ChatterNodeClone(
-                nid, pattern, action_packet, jittered_str, strength, Set{String}(), false
-            ))
+        for (nid, pattern, packet, strength) in window
+            push!(clones, ChatterNodeClone(nid, pattern, packet, strength))
         end
 
         session = ChatterSession(
-            session_id, session_start, 0.0, group_size,
-            clones, true, String[], 0, 0, 0, 0
+            session_id, session_start, 0.0, window_size, cursor_start, cursor_end,
+            clones, true, String[], 0, 0, 0, 0, 0, 0
         )
 
-        println("[CHATTER] 🗣  Session $session_id started. Group size: $group_size nodes (population: $max_nodes).")
+        println("[CHATTER] \U0001f5e3  Session $session_id started. " *
+                "window=$window_size cursor=$cursor_start\u2192$cursor_end (population=$n)")
 
-        # GRUG: STEP 3 - Run gossip exchanges
-        # Each clone gets a chance to send to a random neighbor clone
-        # Shuffle clone order to avoid positional bias
-        clone_order = shuffle(1:length(clones))
-
-        for sender_idx in clone_order
-            sender = clones[sender_idx]
-
-            # GRUG: Sender coinflip (50/50): does this clone initiate gossip?
-            rand() < 0.5 || continue
-
-            # GRUG: Pick a random receiver from the clone group (not self, anti-collision)
-            eligible_receivers = [
-                i for i in 1:length(clones)
-                if i != sender_idx && can_chat(sender, clones[i].source_id)
-            ]
-
-            if isempty(eligible_receivers)
-                # GRUG: No eligible receivers. This clone already talked to everyone. Skip.
-                continue
-            end
-
-            receiver_idx = eligible_receivers[rand(1:length(eligible_receivers))]
-            receiver = clones[receiver_idx]
-
-            # GRUG: Anti-collision: mark both as having talked
-            mark_chatted!(sender, receiver.source_id)
-            mark_chatted!(receiver, sender.source_id)
-            session.exchanges_completed += 1
-
-            # GRUG: STRENGTH GATE (v7.1) — Only weak nodes morph.
-            # Receiver must be STRICTLY WEAKER than sender (original un-jittered strength).
-            # Strong nodes signal to weaker nodes. They do not change themselves.
-            if receiver.original_strength >= sender.original_strength
-                session.morphs_blocked_strength += 1
-                continue
-            end
-
-            # GRUG: MORPH COOLDOWN GATE (v7.1) — Once per day per node.
-            # If this receiver morphed within the last 24 hours, skip it.
-            if !is_morph_allowed(receiver.source_id)
-                session.morphs_blocked_cooldown += 1
-                continue
-            end
-
-            # GRUG: STEP 4 - Receiver does BIASED coinflip.
-            # Strong senders are MORE likely to be copied.
-            # copy_probability = sender.strength biased [0.3, 0.8]
-            copy_prob = clamp(0.3 + sender.original_strength * 0.5, 0.3, 0.8)
-
-            if rand() < copy_prob
-                # GRUG: COPY ACCEPTED! Weak receiver blends pattern toward strong sender.
-                # Blend factor scales with sender strength [0.1, 0.4]
-                blend = clamp(0.1 + sender.original_strength * 0.3, 0.1, 0.4)
-
-                try
-                    merged_pattern = merge_patterns(receiver.pattern, sender.pattern, blend)
-                    receiver.pattern = merged_pattern
-
-                    # GRUG: Also blend vote_slot (action_packet) slightly.
-                    # Less aggressive than pattern blend (0.5x the blend factor).
-                    merged_vote = merge_patterns(receiver.vote_slot, sender.vote_slot, blend * 0.5)
-                    receiver.vote_slot = merged_vote
-
-                    # GRUG: Mark this receiver as morphed and record cooldown
-                    receiver.morphed_this_session = true
-                    record_morph!(receiver.source_id)
-                    session.copies_accepted += 1
-                catch e
-                    # GRUG: merge_patterns failure is non-fatal in chatter context.
-                    # Log it but keep session running. One bad merge = not a system death.
-                    println("[CHATTER] ⚠  merge_patterns failed for $(receiver.source_id): $e")
-                end
-            end
+        # GRUG: Strong clones in this window are the broadcasters. If there
+        # are none, the window is sterile and we exit cleanly.
+        strong_clones = [c for c in clones if c.is_strong]
+        if isempty(strong_clones)
+            println("[CHATTER] \u26a0  No strong nodes in window. Skipping all swaps.")
+            session.end_time   = time()
+            session.is_running = false
+            _store_session!(session)
+            return session
         end
 
-        # GRUG: STEP 5 - Session complete
-        session.end_time = time()
+        # GRUG: For each weak clone, attempt at most ONE swap this cycle.
+        # Per spec: \"nodes can only swap one vote at a time\".
+        for receiver in clones
+            !receiver.is_weak && continue
+
+            # 1-hour per-node cooldown gate. cooldown_query returns seconds remaining.
+            if cooldown_query(receiver.source_id) > 0.0
+                session.swaps_blocked_cooldown += 1
+                continue
+            end
+
+            session.swaps_attempted += 1
+
+            # Pick a random strong donor from the window.
+            donor_clone = rand(strong_clones)
+            donor_clone.source_id == receiver.source_id && continue
+
+            # Semantic intensity & capped coinflip bias depend on the receiver\u2019s
+            # confidence on its own most-recent vote and whether NONJITTER applies.
+            recv_conf = confidence_query(receiver.source_id)
+            recv_nonjitter = nonjitter_query(receiver.source_id)
+
+            # GRUG (v7.19): NONJITTER override. A STRONG node holding a
+            # LOW-conf vote still jitters even if NONJITTER is set. Note
+            # this branch only matters if the receiver is itself strong
+            # (rare: weak/strong overlap edge case where strength sits at
+            # the floor). We still compute the override so the path is
+            # exercised.
+            donor_is_strong_lowconf = donor_clone.is_strong &&
+                                      confidence_query(donor_clone.source_id) < STRONG_LOW_CONF_OVERRIDE
+
+            # Parse both packets into structured items.
+            local recv_items, donor_items
+            try
+                recv_items  = _parse_action_items(receiver.action_packet)
+                donor_items = _parse_action_items(donor_clone.action_packet)
+            catch e
+                # Bad packet \u2014 chatter never silently swallows; we surface
+                # and skip this pair, but keep the session alive.
+                println("[CHATTER] \u26a0  Skip pair $(receiver.source_id) \u2190 $(donor_clone.source_id): $e")
+                session.swaps_blocked_semantic += 1
+                continue
+            end
+
+            # Pick a random donor action item to consider.
+            donor_item = rand(donor_items)
+
+            compat, intensity = _semantic_compat(donor_item, recv_items,
+                                                  receiver.pattern, donor_clone.pattern)
+            if !compat
+                session.swaps_blocked_semantic += 1
+                continue
+            end
+
+            # NONJITTER override branch: receiver opted out of jitter, but the
+            # \"strong + low-conf\" rule says we still proceed. If receiver
+            # NONJITTER and the override does not apply, refuse the swap.
+            if recv_nonjitter && !donor_is_strong_lowconf
+                session.swaps_blocked_semantic += 1
+                continue
+            end
+
+            # Capped semantic-intensity biased coinflip. Floor at 0.10 so a
+            # low-overlap donor still has a fair shot, ceiling at the cap.
+            swap_prob = clamp(0.10 + intensity, 0.10, CHATTER_SEMANTIC_INTENSITY_CAP)
+            if rand() >= swap_prob
+                session.swaps_blocked_coinflip += 1
+                continue
+            end
+
+            # Stage the swap.
+            new_items, donor_action_name = _apply_swap(recv_items, donor_item)
+            receiver.proposed_action_packet = _serialize_action_items(new_items)
+            receiver.accepted_swap        = true
+            receiver.donor_id             = donor_clone.source_id
+            receiver.donor_action_name    = donor_action_name
+            session.swaps_accepted       += 1
+        end
+
+        session.end_time   = time()
         session.is_running = false
 
-        println("[CHATTER] ✅  Session $session_id complete. " *
-                "Exchanges: $(session.exchanges_completed), " *
-                "Morphs: $(session.copies_accepted), " *
-                "Blocked(strength): $(session.morphs_blocked_strength), " *
-                "Blocked(cooldown): $(session.morphs_blocked_cooldown).")
+        println("[CHATTER] \u2705  Session $session_id complete. " *
+                "attempted=$(session.swaps_attempted) accepted=$(session.swaps_accepted) " *
+                "blocked(cooldown=$(session.swaps_blocked_cooldown), " *
+                "strength=$(session.swaps_blocked_strength), " *
+                "semantic=$(session.swaps_blocked_semantic), " *
+                "coinflip=$(session.swaps_blocked_coinflip))")
 
-        # GRUG: Store session in log (bounded)
-        lock(CHATTER_LOG_LOCK) do
-            push!(CHATTER_LOG, session)
-            # GRUG: Trim log if over max size
-            while length(CHATTER_LOG) > MAX_CHATTER_LOG
-                deleteat!(CHATTER_LOG, 1)
-            end
-        end
-
+        _store_session!(session)
         return session
 
     catch e
-        # GRUG: If chatter session explodes, mark it dead and rethrow.
-        # NEVER silently swallow errors in chatter. Main loop must know.
         if e isa ChatterError
-            # GRUG: ChatterErrors are expected (population gate, etc). Log and rethrow.
-            println("[CHATTER] ⛔  $session_id: $(e.msg)")
+            println("[CHATTER] \u26d4  $session_id: $(e.msg)")
             rethrow(e)
         else
-            println("[CHATTER] !!! FATAL: Chatter session $session_id exploded: $e !!!")
+            println("[CHATTER] !!! FATAL: chatter session $session_id exploded: $e !!!")
             rethrow(e)
         end
     finally
-        # GRUG: ALWAYS clear the running flag, even if session crashed.
-        # Otherwise main loop stays frozen waiting for chatter that will never end!
         lock(CHATTER_LOCK) do
             CHATTER_RUNNING[] = false
         end
-        println("[CHATTER] 🔓  Chatter lock released. Main loop can resume.")
+        println("[CHATTER] \U0001f513  Chatter lock released. Main loop can resume.")
+    end
+end
+
+function _store_session!(session::ChatterSession)
+    lock(CHATTER_LOG_LOCK) do
+        push!(CHATTER_LOG, session)
+        while length(CHATTER_LOG) > MAX_CHATTER_LOG
+            deleteat!(CHATTER_LOG, 1)
+        end
     end
 end
 
 # ==============================================================================
-# APPLY CHATTER DIFFS TO LIVE NODES
+# APPLY DIFFS BACK TO LIVE NODES
 # ==============================================================================
 
 """
-apply_chatter_diffs!(session::ChatterSession, node_map::Dict, node_lock::ReentrantLock)
+    apply_chatter_diffs!(session, node_map, node_lock; stamp_fn) -> Int
 
-GRUG: After chatter session completes, apply the clone diffs back to the real NODE_MAP.
-Only nodes that ACTUALLY MORPHED during chatter get updated (v7.1: morphed_this_session flag).
-This is the "ephemeral -> real" merge step.
+For every clone whose `accepted_swap` is true, write back its
+`proposed_action_packet` to the live node\u2019s action_packet field. Stamps
+the node\u2019s 1-hour chatter cooldown via `stamp_fn` (engine.jl: stamp_chatter!).
+Returns the number of nodes actually updated.
 
-IMPORTANT: Only pattern and action_packet are updated from chatter.
-Strength, neighbors, and grave status are NOT touched by chatter diffs.
+Cells that were graved between session start and apply are silently skipped
+(no warning needed \u2014 chatter is best-effort by design at the apply layer).
 """
 function apply_chatter_diffs!(
     session::ChatterSession,
     node_map::Dict,
-    node_lock::ReentrantLock
+    node_lock::ReentrantLock;
+    stamp_fn::Function = (id) -> nothing,
 )::Int
     if !isa(session, ChatterSession)
         throw(ChatterError("!!! FATAL: apply_chatter_diffs! got invalid session! !!!"))
@@ -609,57 +863,52 @@ function apply_chatter_diffs!(
 
     lock(node_lock) do
         for clone in session.clones
-            # GRUG: Only apply diffs for clones that actually morphed (v7.1)
-            !clone.morphed_this_session && continue
-
-            if !haskey(node_map, clone.source_id)
-                # GRUG: Node may have been graved during chatter. Skip it safely.
-                continue
-            end
+            !clone.accepted_swap && continue
+            !haskey(node_map, clone.source_id) && continue
 
             node = node_map[clone.source_id]
+            (isdefined(node, :is_grave) && node.is_grave) && continue
 
-            # GRUG: Only update if pattern actually changed during gossip
-            if node.pattern != clone.pattern
-                node.pattern = clone.pattern
-                # GRUG: Re-bake the signal since pattern changed!
-                # (words_to_signal is defined in Engine.jl, called from Main.jl context)
-                # We store the new pattern; Engine.jl re-scans will use updated pattern.
+            if isdefined(node, :action_packet) && node.action_packet != clone.proposed_action_packet
+                # GRUG: Validate the proposed packet round-trips through the
+                # engine\u2019s strict parser. If not, REFUSE the swap rather
+                # than corrupt a live node. This is the no-silent-failures
+                # contract: bad chatter cargo dies at the door.
+                try
+                    _parse_action_items(clone.proposed_action_packet)
+                catch e
+                    println("[CHATTER] \u26d4  Refused swap for $(clone.source_id): proposed packet failed parse: $e")
+                    continue
+                end
+                node.action_packet = clone.proposed_action_packet
                 updates_applied += 1
+            end
+            # Stamp cooldown regardless of whether the packet text changed
+            # \u2014 attempting a swap counts as participation.
+            try stamp_fn(clone.source_id) catch e
+                @warn "[CHATTER] stamp_fn failed for $(clone.source_id): $e"
             end
         end
     end
 
     if updates_applied > 0
-        println("[CHATTER] 📝  Applied $updates_applied pattern updates from chatter session $(session.session_id).")
+        println("[CHATTER] \U0001f4dd  Applied $updates_applied vote swap(s) from session $(session.session_id).")
     end
-
     return updates_applied
 end
 
 # ==============================================================================
-# QUEUE PROCESSING (AFTER CHATTER COMPLETES)
+# QUEUE PROCESSING (after chatter completes)
 # ==============================================================================
 
-"""
-process_chatter_queue!(process_fn::Function)
-
-GRUG: After chatter session ends, drain the input queue and run process_fn on each.
-process_fn is the normal /mission processing function from Main.jl.
-This ensures no user input is lost during idle chatter rounds.
-"""
 function process_chatter_queue!(process_fn::Function)
     queued = drain_input_queue!()
-    if isempty(queued)
-        return
-    end
-
-    println("[CHATTER] 📬  Processing $(length(queued)) queued input(s) from chatter period.")
+    isempty(queued) && return
+    println("[CHATTER] \U0001f4ec  Processing $(length(queued)) queued input(s) from chatter period.")
     for input in queued
         try
             process_fn(input)
         catch e
-            # GRUG: One bad queued input should not kill the whole drain pass.
             println("[CHATTER] !!! ERROR processing queued input '$input': $e !!!")
             Base.show_backtrace(stdout, catch_backtrace())
         end
@@ -667,93 +916,101 @@ function process_chatter_queue!(process_fn::Function)
 end
 
 # ==============================================================================
-# IDLE MODE SCHEDULER (v7.1 — SHARED TIMER FOR CHATTER + PHAGY)
+# DISK PERSISTENCE \u2014 compressed JSON chatter log
 # ==============================================================================
 
 """
-should_trigger_idle(last_input_time::Float64)::Bool
+    persist_chatter_log!(path = CHATTER_LOG_PATH_DEFAULT) -> String
 
-GRUG: Returns true if the cave has been quiet long enough to trigger an idle event.
-This is the SHARED TIMER for both chatter AND phagy (v7.1).
-Default threshold: 120 seconds (was 30s in v7). Jitter: ±30s (was ±5s).
-Idle events fire between 90s and 150s apart. Much slower, more drawn out.
-
-NOTE: This replaces the old should_trigger_chatter() function.
-Both chatter and phagy use this same timer — the 50/50 coinflip in Main.jl
-decides which one runs.
+Serialize the in-memory CHATTER_LOG ring to a gzip-compressed JSON file.
+Returns the path written. If the path exists, it is overwritten atomically
+via temp-file rename. Errors propagate \u2014 NO SILENT FAILURES.
 """
-function should_trigger_idle(last_input_time::Float64)::Bool
-    if last_input_time <= 0.0
-        throw(ChatterError(
-            "!!! FATAL: should_trigger_idle got invalid last_input_time: $last_input_time! !!!"
-        ))
+function persist_chatter_log!(path::String=CHATTER_LOG_PATH_DEFAULT)::String
+    rows = lock(CHATTER_LOG_LOCK) do
+        [Dict{String, Any}(
+            "session_id"             => s.session_id,
+            "start_time"             => s.start_time,
+            "end_time"               => s.end_time,
+            "window_size"            => s.window_size,
+            "cursor_start"           => s.cursor_start,
+            "cursor_end"             => s.cursor_end,
+            "swaps_attempted"        => s.swaps_attempted,
+            "swaps_accepted"         => s.swaps_accepted,
+            "swaps_blocked_cooldown" => s.swaps_blocked_cooldown,
+            "swaps_blocked_strength" => s.swaps_blocked_strength,
+            "swaps_blocked_semantic" => s.swaps_blocked_semantic,
+            "swaps_blocked_coinflip" => s.swaps_blocked_coinflip,
+            "swaps" => [Dict{String, Any}(
+                "node_id"     => c.source_id,
+                "donor_id"    => c.donor_id,
+                "donor_action"=> c.donor_action_name,
+                "new_packet"  => c.proposed_action_packet,
+            ) for c in s.clones if c.accepted_swap],
+        ) for s in CHATTER_LOG]
     end
-    elapsed = time() - last_input_time
-    # GRUG: Jitter the threshold so idle events don't happen on a perfectly regular
-    # schedule. ±30s band makes it feel organic, not robotic.
-    jittered_threshold = IDLE_THRESHOLD_SECONDS + (rand() * 2.0 * IDLE_JITTER_SECONDS - IDLE_JITTER_SECONDS)
-    return elapsed >= jittered_threshold
+    payload = JSON.json(Dict("version" => "v7.19", "sessions" => rows))
+
+    # GRUG: Atomic write \u2014 stage to .tmp, gzip, rename. Same gzip-by-pipe
+    # approach Main.jl already uses for specimen saves so we don\u2019t introduce
+    # a new compression dependency.
+    raw_tmp = path * ".raw.tmp"
+    open(raw_tmp, "w") do io
+        write(io, payload)
+    end
+    gz_tmp = path * ".gz.tmp"
+    cmd = pipeline(`cat $raw_tmp`, `gzip -c`)
+    open(gz_tmp, "w") do io
+        run(pipeline(cmd, stdout=io))
+    end
+    rm(raw_tmp; force = true)
+    mv(gz_tmp, path; force = true)
+    return path
 end
 
-# GRUG: BACKWARD COMPAT — keep old function name as alias that delegates to new one.
-# Any code still calling should_trigger_chatter() will work but use the new 120s timer.
-function should_trigger_chatter(last_input_time::Float64, _idle_threshold_seconds::Float64=120.0)::Bool
-    return should_trigger_idle(last_input_time)
+"""
+    load_persisted_chatter_log!(path = CHATTER_LOG_PATH_DEFAULT) -> Int
+
+Inverse of persist_chatter_log!. Loads sessions back into CHATTER_LOG as
+read-only summaries (no clones, since those were ephemeral). Returns the
+number of sessions restored. If the file does not exist, returns 0
+(load is idempotent and tolerant of cold starts \u2014 the file genuinely may
+not exist on the very first run).
+"""
+function load_persisted_chatter_log!(path::String=CHATTER_LOG_PATH_DEFAULT)::Int
+    isfile(path) || return 0
+    # GRUG: Decompress via system gunzip pipe \u2014 mirrors specimen load path.
+    raw = read(pipeline(`cat $path`, `gunzip -c`), String)
+    parsed = JSON.parse(raw)
+    haskey(parsed, "sessions") || throw(ChatterError("chatter log $path missing 'sessions' key"))
+
+    n = 0
+    lock(CHATTER_LOG_LOCK) do
+        empty!(CHATTER_LOG)
+        for r in parsed["sessions"]
+            sess = ChatterSession(
+                String(r["session_id"]),
+                Float64(r["start_time"]),
+                Float64(r["end_time"]),
+                Int(r["window_size"]),
+                Int(get(r, "cursor_start", 0)),
+                Int(get(r, "cursor_end", 0)),
+                ChatterNodeClone[],          # clones not persisted
+                false,
+                String[],
+                Int(r["swaps_attempted"]),
+                Int(r["swaps_accepted"]),
+                Int(r["swaps_blocked_cooldown"]),
+                Int(get(r, "swaps_blocked_strength", 0)),
+                Int(get(r, "swaps_blocked_semantic", 0)),
+                Int(get(r, "swaps_blocked_coinflip", 0)),
+            )
+            push!(CHATTER_LOG, sess)
+            n += 1
+            length(CHATTER_LOG) > MAX_CHATTER_LOG && deleteat!(CHATTER_LOG, 1)
+        end
+    end
+    return n
 end
 
 end # module ChatterMode
-
-# ==============================================================================
-# ARCHITECTURAL SPECIFICATION: CHATTER MODE LAYER (v7.1)
-#
-# 1. POPULATION GATE (v7.1):
-# Chatter ONLY fires if the total alive non-image node population >= 1000.
-# New specimens with < 1000 nodes are excluded. The engine needs a mature specimen
-# before idle gossip adds value. Below 1000 nodes, topology is still user-directed
-# via /grow and drop_table wiring. Chatter would destabilize immature specimens.
-#
-# 2. SLOW IDLE TIMER (v7.1):
-# Idle threshold raised from 30s to 120s, jitter band from ±5s to ±30s.
-# Both chatter and phagy share this SAME timer. One idle event fires every 90-150s.
-# The 50/50 coinflip in Main.jl decides chatter vs phagy. Much slower, more drawn out.
-#
-# 3. SMALLER GROUPS (v7.1):
-# Group size reduced from 100-800 to 50-500. If fewer than 50 eligible nodes exist
-# in the snapshot, the floor is set to whatever is available (use entire population).
-#
-# 4. WEAK-ONLY MORPH (v7.1):
-# Only receivers WEAKER than the sender can morph. Strong nodes signal but never
-# change themselves. This creates directional knowledge flow: strong nodes teach,
-# weak nodes learn. Prevents strong nodes from drifting away from their proven patterns.
-#
-# 5. ONCE-PER-DAY MORPH LIMIT (v7.1):
-# Each node tracked via MORPH_COOLDOWN_MAP (node_id -> timestamp). A node that morphed
-# cannot morph again until 24 hours (86400s) have passed. Prevents runaway drift where
-# a weak node gets blended every chatter round and loses its original identity entirely.
-#
-# 6. EPHEMERAL CLONE ARCHITECTURE:
-# Chatter operates exclusively on ChatterNodeClone structs - snapshots of real nodes.
-# Real NODE_MAP nodes are never directly mutated during chatter. Only after session
-# completion are diffs selectively applied via apply_chatter_diffs!(). This prevents
-# race conditions between chatter gossip and live user input processing.
-#
-# 7. ANTI-COLLISION MECHANISM:
-# Each clone maintains a `talked_to` Set. Before any exchange, can_chat() verifies
-# the receiver hasn't been contacted this session. This prevents the same pair from
-# gossiping repeatedly in one round (echo chamber prevention).
-#
-# 8. BIASED COPY PROBABILITY:
-# When a weak receiver evaluates a strong sender's gossip packet, copy acceptance
-# probability is [0.3, 0.8] biased by sender strength. Strong senders propagate
-# their patterns more effectively, modeling biological reinforcement.
-#
-# 9. STRENGTH JITTER IN CHATTER:
-# Clone strength is jittered before gossip rounds. Weaker clones receive proportionally
-# more jitter, giving them occasional bursts of influence. This prevents permanent
-# dominance hierarchies from calcifying across chatter sessions.
-#
-# 10. INPUT QUEUE SAFETY:
-# CHATTER_RUNNING flag gates user input in the main loop. Any input arriving during
-# a chatter session is pushed to INPUT_QUEUE and processed via process_chatter_queue!()
-# after the session completes. No user input is ever dropped.
-# ==============================================================================

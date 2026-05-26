@@ -55,6 +55,7 @@ function make_bare_node(id::String = "test_node_$(rand(1:10_000_000))")
         false,                       # is_image_node
         String[],                    # neighbor_ids
         false,                       # is_unlinkable
+        12,                          # max_neighbors  (GRUG v7.19: per-node cap)
         false,                       # is_grave
         "",                          # grave_reason
         Float64[],                   # response_times

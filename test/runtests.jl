@@ -34,10 +34,15 @@ const ALL_TESTS = [
     "test_aiml_jitter.jl",
     "test_brainstorm_jitter.jl",
     "test_context_intensity.jl",
-    "test_lobe_topicality_gate.jl",
     "test_big_number_small_number_coherence.jl",
+    # GRUG v7.19: test_lobe_topicality_gate.jl is disabled - the underlying
+    # _LAST_MUTED_LOBES telemetry was removed in an earlier refactor and the
+    # test references an API surface that no longer exists. Re-enable when
+    # the topicality gate is re-introduced or the test is rewritten.
+    # "test_lobe_topicality_gate.jl",
     "test_nonjitter_tag.jl",
     "test_strength_solidify.jl",
+    "test_chatter_v2.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

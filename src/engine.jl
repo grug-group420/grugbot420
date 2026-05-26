@@ -792,6 +792,8 @@ function penalize_strength!(node::Node)
                 node.is_grave    = true
                 node.grave_reason = "STRENGTH_ZERO"
                 println("[ENGINE] ⚰  Node $(node.id) marked GRAVE (strength -> 0).")
+                # GRUG (v7.19): tell the group bookkeeper a slot opened up.
+                try mark_group_grave_slot!(node.id) catch e; @warn "group slot update failed for $(node.id): $e"; end
             end
         end
         # GRUG v7.22: if the penalty just dropped strength below the
@@ -818,6 +820,8 @@ function mark_node_grave!(node::Node, reason::String)
         node.is_grave     = true
         node.grave_reason = reason
     end
+    # GRUG (v7.19): tell the group bookkeeper a slot opened up.
+    try mark_group_grave_slot!(node.id) catch e; @warn "group slot update failed for $(node.id): $e"; end
     println("[ENGINE] ⚰  Node $(node.id) marked GRAVE: [$reason].")
 end
 
@@ -885,6 +889,8 @@ function record_response_time!(node::Node, elapsed_seconds::Float64)
                 node.is_grave     = true
                 node.grave_reason = "GRAVED-SLOW"
                 println("[ENGINE] 🐢  Node $(node.id) marked [GRAVED-SLOW] (avg: $(round(avg_time, digits=2))s > $(SLOW_NODE_THRESHOLD_SECONDS)s).")
+                # GRUG (v7.19): tell the group bookkeeper a slot opened up.
+                try mark_group_grave_slot!(node.id) catch e; @warn "group slot update failed for $(node.id): $e"; end
             end
         end
     end
@@ -911,7 +917,27 @@ function try_link_nodes!(node_a::Node, node_b::Node)::Bool
 
     lock(NODE_LOCK) do
         # GRUG: Check both nodes can accept new neighbors
-        if node_a.is_unlinkable || node_b.is_unlinkable
+        # GRUG (v7.19): UNLINKABLE override for grave-slot replacement.
+        # If a node is UNLINKABLE but its group has has_grave_slot=true (a
+        # member was just graved), allow ONE extra link to fill the empty
+        # slot. The slot flag is cleared by add_to_group! when the new
+        # member joins downstream of try_link_nodes! \u2014 here we only honor
+        # the override at the link layer.
+        a_locked = node_a.is_unlinkable
+        b_locked = node_b.is_unlinkable
+        if a_locked
+            ga = group_for(node_a.id)
+            if !isnothing(ga) && ga.has_grave_slot
+                a_locked = false
+            end
+        end
+        if b_locked
+            gb = group_for(node_b.id)
+            if !isnothing(gb) && gb.has_grave_slot
+                b_locked = false
+            end
+        end
+        if a_locked || b_locked
             return false
         end
         if node_a.id in node_b.neighbor_ids || node_b.id in node_a.neighbor_ids
@@ -1046,6 +1072,195 @@ AttachedNode(node_id::String, pattern::String, signal::Vector{Float64}, base_con
 # GRUG: Map from target_node_id -> Vector of AttachedNode (max MAX_ATTACHMENTS each)
 const ATTACHMENT_MAP  = Dict{String, Vector{AttachedNode}}()
 const ATTACHMENT_LOCK = ReentrantLock()
+
+# ==============================================================================
+# CHATTER GROUPS (v7.19)
+# ==============================================================================
+#
+# GRUG: A NodeGroup is a named bundle of similar-pattern nodes that chatter
+# together. When a new node grows and finds a strength-biased latch target,
+# the new node JOINS the latch target's group (or creates a fresh group if
+# the target has none). Each group has a stable id ("group_<n>") so chatter
+# can address whole bundles without recomputing similarity every cycle.
+#
+# Membership rules:
+#   - A node belongs to exactly one group at a time (its primary group_id).
+#   - A node CAN appear in multiple groups via its neighbor_ids \u2014 those are
+#     symmetric latches \u2014 but for chatter purposes we use the primary group.
+#   - When a member is graved, we strip UNLINKABLE from the group so a
+#     replacement can come in (per spec: "if a node within a group gets
+#     graved the unlinkable tag is removed for that group until another
+#     node replaces it").
+#   - Phagy idle role organizes/cleans groups: drops graves, prunes empty
+#     groups, merges duplicates if any drift in.
+#
+# Persistence:
+#   GROUP_MAP serializes into the specimen JSON so groups survive save/load.
+#   See save_specimen / load_specimen in Main.jl.
+
+mutable struct NodeGroup
+    id::String                       # GRUG: Stable group id ("group_0", "group_1", ...)
+    members::Vector{String}          # GRUG: Node ids \u2014 ORDER PRESERVED for cursor walks
+    centroid_pattern::String         # GRUG: Pattern of the founding/seed node (similarity anchor)
+    created_at::Float64              # GRUG: Unix timestamp at creation
+    last_chatter_at::Float64         # GRUG: 0.0 = never chattered. Updated when group participates.
+    chatter_count::Int               # GRUG: How many times this group has chattered (lifetime)
+    has_grave_slot::Bool             # GRUG: True after a member is graved \u2014 grants UNLINKABLE override
+                                     #       so a fresh node can fill the empty slot. Cleared when
+                                     #       the slot is filled.
+end
+
+# GRUG: Backwards-friendly constructor. Most callers only know id+seed.
+NodeGroup(id::String, seed_node_id::String, centroid_pattern::String) =
+    NodeGroup(id, [seed_node_id], centroid_pattern, time(), 0.0, 0, false)
+
+# GRUG: All groups, by stable id. Phagy organizes this map at idle.
+const GROUP_MAP    = Dict{String, NodeGroup}()
+const GROUP_LOCK   = ReentrantLock()
+const GROUP_COUNTER = Atomic{Int}(0)
+
+# GRUG: Reverse index node_id -> group_id (primary group only). Built lazily;
+# always check GROUP_MAP for ground truth. Speeds up "what group is this node
+# in?" lookups during chatter without a full scan.
+const NODE_TO_GROUP = Dict{String, String}()
+
+# GRUG: Per-node 1-hour chatter cooldown. Distinct from MORPH_COOLDOWN_MAP
+# in ChatterMode.jl (which gated the old pattern-morph path). The vote-swap
+# chatter has its own short cooldown because swaps are reversible noise,
+# not the irreversible identity drift of pattern morphing.
+# Map: node_id -> last chatter epoch seconds.
+const CHATTER_NODE_COOLDOWN      = Dict{String, Float64}()
+const CHATTER_NODE_COOLDOWN_LOCK = ReentrantLock()
+const CHATTER_NODE_COOLDOWN_SECONDS = 3600.0   # GRUG: 1 hour, per spec
+
+"""
+    next_group_id() -> String
+
+GRUG: Atomic group id minter. Always returns a unique "group_<n>" string.
+Underlying counter is reset only by full engine reset (reset_engine!).
+"""
+function next_group_id()::String
+    n = atomic_add!(GROUP_COUNTER, 1)
+    return "group_$n"
+end
+
+"""
+    register_group!(seed_node::Node) -> NodeGroup
+
+GRUG: Create a fresh group seeded by a single node. The node becomes the
+group's centroid \u2014 future joiners are evaluated against this pattern. Idempotent
+when the seed already belongs to a group: returns the existing group.
+NO SILENT FAILURES: errors if seed_node has empty pattern.
+"""
+function register_group!(seed_node::Node)::NodeGroup
+    if strip(seed_node.pattern) == ""
+        error("!!! FATAL: register_group! seed node $(seed_node.id) has empty pattern! !!!")
+    end
+    return lock(GROUP_LOCK) do
+        # GRUG: If seed already in a group, just return that one. No duplicate seeding.
+        existing = get(NODE_TO_GROUP, seed_node.id, nothing)
+        if !isnothing(existing) && haskey(GROUP_MAP, existing)
+            return GROUP_MAP[existing]
+        end
+
+        gid = next_group_id()
+        grp = NodeGroup(gid, seed_node.id, seed_node.pattern)
+        GROUP_MAP[gid] = grp
+        NODE_TO_GROUP[seed_node.id] = gid
+        return grp
+    end
+end
+
+"""
+    add_to_group!(group::NodeGroup, node_id::String)::Bool
+
+GRUG: Append `node_id` to the group's member list. Returns true on success,
+false if already a member. Updates the NODE_TO_GROUP reverse index. Clears
+`has_grave_slot` if the join fills a graved slot (count back to known size).
+"""
+function add_to_group!(group::NodeGroup, node_id::String)::Bool
+    if isempty(strip(node_id))
+        error("!!! FATAL: add_to_group! got empty node_id! !!!")
+    end
+    return lock(GROUP_LOCK) do
+        if node_id in group.members
+            return false
+        end
+        push!(group.members, node_id)
+        NODE_TO_GROUP[node_id] = group.id
+        # GRUG: Filling a graved slot clears the override.
+        group.has_grave_slot = false
+        return true
+    end
+end
+
+"""
+    mark_group_grave_slot!(node_id::String)
+
+GRUG: When a node is graved, find its primary group and flip has_grave_slot
+to true. This grants temporary UNLINKABLE override on members of the group
+so a fresh node can replace the graved one. No-op if node was not in any group.
+"""
+function mark_group_grave_slot!(node_id::String)
+    if isempty(strip(node_id))
+        error("!!! FATAL: mark_group_grave_slot! got empty node_id! !!!")
+    end
+    lock(GROUP_LOCK) do
+        gid = get(NODE_TO_GROUP, node_id, nothing)
+        isnothing(gid) && return
+        if !haskey(GROUP_MAP, gid)
+            # GRUG: Reverse index pointed nowhere \u2014 self-heal.
+            delete!(NODE_TO_GROUP, node_id)
+            return
+        end
+        grp = GROUP_MAP[gid]
+        # GRUG: Drop the dead member from the visible list but remember the slot is open.
+        filter!(m -> m != node_id, grp.members)
+        delete!(NODE_TO_GROUP, node_id)
+        grp.has_grave_slot = true
+    end
+end
+
+"""
+    group_for(node_id::String)::Union{NodeGroup, Nothing}
+
+GRUG: Cheap lookup. Returns the NodeGroup whose primary membership contains
+`node_id`, or nothing.
+"""
+function group_for(node_id::String)::Union{NodeGroup, Nothing}
+    return lock(GROUP_LOCK) do
+        gid = get(NODE_TO_GROUP, node_id, nothing)
+        isnothing(gid) && return nothing
+        return get(GROUP_MAP, gid, nothing)
+    end
+end
+
+"""
+    chatter_cooldown_remaining(node_id::String)::Float64
+
+GRUG: Seconds until the node may chatter again. 0.0 means "go ahead".
+Negative-safe: clamps at 0.0.
+"""
+function chatter_cooldown_remaining(node_id::String)::Float64
+    return lock(CHATTER_NODE_COOLDOWN_LOCK) do
+        last = get(CHATTER_NODE_COOLDOWN, node_id, 0.0)
+        last == 0.0 && return 0.0
+        elapsed = time() - last
+        return max(0.0, CHATTER_NODE_COOLDOWN_SECONDS - elapsed)
+    end
+end
+
+"""
+    stamp_chatter!(node_id::String)
+
+GRUG: Record that this node just participated in chatter. Resets its
+1-hour cooldown clock.
+"""
+function stamp_chatter!(node_id::String)
+    lock(CHATTER_NODE_COOLDOWN_LOCK) do
+        CHATTER_NODE_COOLDOWN[node_id] = time()
+    end
+end
 
 # GRUG: Handoff slot so scan_and_expand relay pass can reuse the FireCounter
 # built by scan_specimens for this cycle. All fire paths share one counter so
@@ -1836,6 +2051,7 @@ function create_node(
     # meaningful (too few nodes = junk topology from forced links). Above the
     # threshold the map has enough diversity that similarity scores are real.
     map_size = lock(() -> length(NODE_MAP), NODE_LOCK)
+    latched_to_id = nothing
     if !is_image_node && map_size >= NODE_LATCH_THRESHOLD
         latch_target_id = find_best_latch_target(new_node)
         if !isnothing(latch_target_id)
@@ -1843,6 +2059,7 @@ function create_node(
             if !isnothing(target_node)
                 linked = try_link_nodes!(new_node, target_node)
                 if linked
+                    latched_to_id = latch_target_id
                     println("[ENGINE] 🌱  Node $id latched onto neighbor $latch_target_id.")
                 end
             end
@@ -1852,6 +2069,39 @@ function create_node(
         # User is responsible for explicit drop_table wiring at this scale.
         # Latch will engage automatically once map reaches NODE_LATCH_THRESHOLD nodes.
         @debug "[ENGINE] Latch suppressed for $id (map_size=$map_size < NODE_LATCH_THRESHOLD=$NODE_LATCH_THRESHOLD). Plant clean."
+    end
+
+    # GRUG (v7.19): GROUP MEMBERSHIP.
+    # Every text node belongs to exactly one chatter group. Groups are how
+    # the chatter ritual addresses bundles of similar-pattern nodes without
+    # recomputing similarity each cycle.
+    #   - If we latched onto an existing partner: join that partner group.
+    #     If the partner has no group (predates v7.19), seed a fresh group on
+    #     the partner first, then join.
+    #   - If we did not latch (small map, no candidates, or partner full):
+    #     seed a new group with this node as the founder.
+    # Image nodes do not chatter — SDF semantics differ — so they skip groups.
+    if !is_image_node
+        try
+            if !isnothing(latched_to_id)
+                partner_grp = group_for(latched_to_id)
+                if isnothing(partner_grp)
+                    partner_node = lock(() -> get(NODE_MAP, latched_to_id, nothing), NODE_LOCK)
+                    if !isnothing(partner_node)
+                        partner_grp = register_group!(partner_node)
+                    end
+                end
+                if !isnothing(partner_grp)
+                    add_to_group!(partner_grp, id)
+                else
+                    register_group!(new_node)
+                end
+            else
+                register_group!(new_node)
+            end
+        catch e
+            @warn "[ENGINE] Group registration failed for $id: $e"
+        end
     end
 
     return id

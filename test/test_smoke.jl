@@ -143,32 +143,38 @@ println("\n[6] ENGINE - NEIGHBOR LINKING")
 
 # GRUG: Create nodes with deliberately unique/dissimilar patterns so auto-latch
 # does NOT consume any neighbor slots during creation (no token overlap).
-link_nodes = [create_node("zzz_unique_xq7_$i", "reason^1", Dict{String,Any}("system_prompt"=>"lnk"), String[]) for i in 1:6]
+# GRUG v7.19: Per-node cap is rolled in [LATCH_PARTNER_CAP_MIN, LATCH_PARTNER_CAP_MAX]
+# (8-16 by default). We make MAX+1 peer nodes so we always have one extra to test
+# the rejection branch regardless of which cap value the hub rolled.
+n_peers = LATCH_PARTNER_CAP_MAX + 1   # one more than the worst case
+link_nodes = [create_node("zzz_unique_xq7_$i", "reason^1", Dict{String,Any}("system_prompt"=>"lnk"), String[]) for i in 1:(n_peers + 1)]
 hub_node = NODE_MAP[link_nodes[1]]
+hub_cap  = hub_node.max_neighbors  # GRUG: read the per-node cap that was rolled
 
 # GRUG: Reset hub neighbor state cleanly before manual linking test
 lock(NODE_LOCK) do
     empty!(hub_node.neighbor_ids)
     hub_node.is_unlinkable = false
-    for i in 2:6
+    for i in 2:length(link_nodes)
         n = NODE_MAP[link_nodes[i]]
         empty!(n.neighbor_ids)
         n.is_unlinkable = false
     end
 end
 
-# Link 4 neighbors -> should become UNLINKABLE
-for i in 2:5
+# GRUG: Link exactly hub_cap neighbors -> hub should become UNLINKABLE
+for i in 2:(hub_cap + 1)
     linked = try_link_nodes!(hub_node, NODE_MAP[link_nodes[i]])
-    @assert linked "FAIL: Link $i should succeed!"
+    @assert linked "FAIL: Link $(i - 1) should succeed (cap=$(hub_cap))!"
 end
-@assert hub_node.is_unlinkable "FAIL: Node should be UNLINKABLE after 4 neighbors!"
-println("  ✓ UNLINKABLE triggered at $(MAX_NEIGHBORS) neighbors")
+@assert hub_node.is_unlinkable "FAIL: Node should be UNLINKABLE after $(hub_cap) neighbors!"
+println("  ✓ UNLINKABLE triggered at $(hub_cap) neighbors (per-node cap)")
 
-# 5th link attempt should fail
-linked5 = try_link_nodes!(hub_node, NODE_MAP[link_nodes[6]])
-@assert !linked5 "FAIL: 5th link should be rejected (UNLINKABLE)!"
-println("  ✓ 5th link correctly rejected (UNLINKABLE)")
+# GRUG: One more link attempt should be rejected by the UNLINKABLE gate
+extra_idx = hub_cap + 2
+linked_extra = try_link_nodes!(hub_node, NODE_MAP[link_nodes[extra_idx]])
+@assert !linked_extra "FAIL: Over-cap link should be rejected (UNLINKABLE)!"
+println("  ✓ Over-cap link correctly rejected (UNLINKABLE)")
 
 # ==============================================================================
 # 7. ENGINE - Big-O ledger (GRAVED-SLOW)
@@ -254,10 +260,13 @@ chatter_snapshot = [
 full_snapshot = vcat(chatter_snapshot, [("node_pad_$i", "pad pattern $i", "reason^1", rand()*5) for i in 1:1000])
 
 session = ChatterMode.start_chatter_session!(full_snapshot)
-@assert session.group_size >= 50 "FAIL: Group size should be >= 50!"
+# GRUG v7.19: New vote-swap chatter schema (window_size + swaps_*)
+@assert session.window_size >= ChatterMode.CHATTER_WINDOW_MIN "FAIL: window_size below CHATTER_WINDOW_MIN!"
+@assert session.window_size <= ChatterMode.CHATTER_WINDOW_MAX "FAIL: window_size above CHATTER_WINDOW_MAX!"
 @assert session.end_time > session.start_time "FAIL: Session end time should be after start!"
 @assert !session.is_running "FAIL: Session should not be running after completion!"
-println("  ✓ Chatter session complete: group=$(session.group_size), exchanges=$(session.exchanges_completed), copies=$(session.copies_accepted)")
+@assert session.swaps_accepted <= session.swaps_attempted "FAIL: accepted cannot exceed attempted!"
+println("  ✓ Chatter v7.19 session complete: window=$(session.window_size), attempted=$(session.swaps_attempted), accepted=$(session.swaps_accepted)")
 
 # Test input queue
 ChatterMode.enqueue_input!("queued test input")

@@ -3,9 +3,28 @@
 [![CI](https://github.com/grug-group420/grugbot420/actions/workflows/CI.yml/badge.svg)](https://github.com/grug-group420/grugbot420/actions/workflows/CI.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Julia](https://img.shields.io/badge/Julia-1.9%2B-blue.svg)](https://julialang.org)
+[![Version](https://img.shields.io/badge/version-v7.19-brightgreen.svg)](#whats-new-in-v719)
 
 
 A neuromorphic AI engine written in Julia. GrugBot models cognition through competing populations of pattern nodes — not if-else waterfalls, not transformers, not lookup tables. Many rocks compete to be loudest. Loudest rock gets to talk. Sometimes a quiet rock gets lucky (coinflip). That is how Grug think.
+
+---
+
+## What's New in v7.19
+
+**Vote-Swap Chatter Mode** — at idle, weak nodes can adopt vote actions (not patterns) from semantically-similar strong neighbors:
+
+- **Groups** — every new node tries to latch onto a similar-pattern partner via a strength-biased coinflip; each node has its own per-node neighbor cap rolled in `[8, 16]`. When the cap is hit the node becomes `UNLINKABLE`. Each unique partnership cluster gets a stable `group_id` and persists to disk in compressed JSON.
+- **Front-of-list cursor walk** — each chatter cycle picks 100–400 nodes from the front of the id list, swaps at most one vote per node, and resumes from the cursor next cycle.
+- **1-hour per-node cooldown** — distinct from the legacy 24-hour pattern-morph cooldown.
+- **Semantic gates** — vote swaps only fire when receiver and donor share an action family (ASSERT / ESCALATE / NEGATE / QUERY / COMMAND), the donor isn't already in the receiver's vote list, and isn't in the receiver's negatives.
+- **Capped semantic-intensity coinflip** — bias is clamped at `0.85` so even tight matches still get a chance to fail.
+- **Vote-weight jitter** — donor weight is jittered slightly on swap; if the donor has no weight, a low one is added on a coinflip.
+- **NONJITTER override** — strong + low-confidence donors still jitter (so high-strength but uncertain votes don't ossify).
+- **CRYSTALIZE attachments** — manual or auto (high relational truth + high strength) attachments always fire, skipping the strength-biased coinflip. Reversible if strength drops.
+- **Grave-slot recovery** — when a group member dies, the group loses `UNLINKABLE` until a replacement latches in.
+
+See [`src/ChatterMode.jl`](src/ChatterMode.jl) and [`test/test_chatter_v2.jl`](test/test_chatter_v2.jl).
 
 ---
 

@@ -207,9 +207,12 @@ end
     N = 500
     for _ in 1:N
         ctx = G.extract_aiml_memory_context()
-        occursin("pinned rock", ctx) && (pinned_hits += 1)
-        occursin("hot hot hot", ctx) && (hot_hits += 1)
-        occursin("cold cold cold", ctx) && (cold_hits += 1)
+        # GRUG v7.19 QoL: extract_aiml_memory_context now returns a NamedTuple
+        # (pinned, fresh, full, ...). Search the .full field for matches.
+        ctx_str = ctx isa AbstractString ? ctx : ctx.full
+        occursin("pinned rock", ctx_str) && (pinned_hits += 1)
+        occursin("hot hot hot", ctx_str) && (hot_hits += 1)
+        occursin("cold cold cold", ctx_str) && (cold_hits += 1)
     end
 
     # Pinned: always in.
@@ -387,13 +390,15 @@ end
 
     Random.seed!(1234)
     ctx = G.extract_aiml_memory_context()
+    # GRUG v7.19 QoL: extract_aiml_memory_context returns NamedTuple now.
+    ctx_str = ctx isa AbstractString ? ctx : ctx.full
     # Pinned always surfaces.
-    @test occursin("PINNED_SIGIL", ctx)
+    @test occursin("PINNED_SIGIL", ctx_str)
     # Threshold note surfaces in the Fresh Memory header.
-    @test occursin("threshold=", ctx)
-    @test occursin("eligible=", ctx)
+    @test occursin("threshold=", ctx_str)
+    @test occursin("eligible=", ctx_str)
     # Count the `(intensity=` markers → one per unpinned surfaced.
-    n_surfaced = count(!isempty, split(ctx, "(intensity="))  - 1
+    n_surfaced = count(!isempty, split(ctx_str, "(intensity="))  - 1
     @test n_surfaced <= G.MAX_FRESH_CONTEXT
     println("  ✓ [I] 10k-msg cave: Fresh Memory surfaced $n_surfaced unpinned (≤ MAX_FRESH_CONTEXT=$(G.MAX_FRESH_CONTEXT)); pinned preserved; threshold note present")
 end

@@ -2888,6 +2888,36 @@ function save_specimen_to_file!(filepath::String)::String
     specimen["attachments"] = attachment_list
 
 
+    # \u2500\u2500 14b. CHATTER GROUPS (v7.19) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    # GRUG: Each NodeGroup is a stable cluster of similar-pattern nodes that
+    # chatter together. Persist them so cursor walks survive save/load and
+    # phagy can keep organizing the same bundles after a reboot.
+    group_list = Dict{String, Any}[]
+    lock(GROUP_LOCK) do
+        for (gid, grp) in sort(collect(GROUP_MAP), by = x -> x[1])
+            push!(group_list, Dict{String, Any}(
+                "id"               => grp.id,
+                "members"          => copy(grp.members),
+                "centroid_pattern" => grp.centroid_pattern,
+                "created_at"       => grp.created_at,
+                "last_chatter_at"  => grp.last_chatter_at,
+                "chatter_count"    => grp.chatter_count,
+                "has_grave_slot"   => grp.has_grave_slot,
+            ))
+        end
+    end
+    specimen["chatter_groups"] = group_list
+
+    # GRUG: Per-node chatter cooldowns piggyback here \u2014 one row per node id.
+    cooldown_list = Dict{String, Any}[]
+    lock(CHATTER_NODE_COOLDOWN_LOCK) do
+        for (nid, ts) in CHATTER_NODE_COOLDOWN
+            push!(cooldown_list, Dict{String, Any}("node_id" => nid, "last_chatter_at" => ts))
+        end
+    end
+    specimen["chatter_cooldowns"] = cooldown_list
+
+
     # ── 15. TRAJECTORY STATE (ActionTonePredictor) ────────────────
     # GRUG: Save the trajectory ring buffer + config knobs.
     # Academic: The trajectory buffer tracks the system's path through
@@ -3216,6 +3246,17 @@ function load_specimen_from_file!(filepath::String)::String
     # Wipe attachments (relational fire system)
     lock(ATTACHMENT_LOCK) do
         empty!(ATTACHMENT_MAP)
+    end
+
+    # GRUG (v7.19): Wipe chatter groups and per-node chatter cooldowns.
+    # Specimen brings its own group state (or none for pre-v7.19 saves).
+    lock(GROUP_LOCK) do
+        empty!(GROUP_MAP)
+        empty!(NODE_TO_GROUP)
+    end
+    GROUP_COUNTER[] = 0
+    lock(CHATTER_NODE_COOLDOWN_LOCK) do
+        empty!(CHATTER_NODE_COOLDOWN)
     end
 
 
@@ -3676,6 +3717,67 @@ function load_specimen_from_file!(filepath::String)::String
         println("  🔗 Attachments restored ($n_attachments)")
     end
 
+    # ── 4.14b CHATTER GROUPS (v7.19) ────────────────────────
+    # GRUG: Restore NodeGroup state and per-node chatter cooldowns.
+    # Backwards-compat: pre-v7.19 specimens have no chatter_groups field, so
+    # we leave GROUP_MAP empty — the next /grow will seed groups organically.
+    n_groups = 0
+    if haskey(specimen, "chatter_groups") && isa(specimen["chatter_groups"], AbstractVector)
+        lock(GROUP_LOCK) do
+            for gentry in specimen["chatter_groups"]
+                try
+                    gid     = String(gentry["id"])
+                    members = String.(get(gentry, "members", String[]))
+                    centroid = String(get(gentry, "centroid_pattern", ""))
+                    created  = Float64(get(gentry, "created_at", time()))
+                    last_ct  = Float64(get(gentry, "last_chatter_at", 0.0))
+                    ccount   = Int(get(gentry, "chatter_count", 0))
+                    grave_slot = Bool(get(gentry, "has_grave_slot", false))
+
+                    grp = NodeGroup(gid, members, centroid, created, last_ct, ccount, grave_slot)
+                    GROUP_MAP[gid] = grp
+                    for m in members
+                        NODE_TO_GROUP[m] = gid
+                    end
+                    if startswith(gid, "group_")
+                        try
+                            n = parse(Int, gid[7:end])
+                            if n >= GROUP_COUNTER[]
+                                GROUP_COUNTER[] = n + 1
+                            end
+                        catch
+                            # Non-numeric suffix — leave counter alone.
+                        end
+                    end
+                    n_groups += 1
+                catch e
+                    @warn "loadSpecimen: skipping bad chatter_groups entry: $e"
+                end
+            end
+        end
+        counts["chatter_groups"] = n_groups
+        println("  🗣  Chatter groups restored ($n_groups)")
+    end
+
+    if haskey(specimen, "chatter_cooldowns") && isa(specimen["chatter_cooldowns"], AbstractVector)
+        n_cd = 0
+        lock(CHATTER_NODE_COOLDOWN_LOCK) do
+            for cd in specimen["chatter_cooldowns"]
+                try
+                    nid = String(cd["node_id"])
+                    ts  = Float64(cd["last_chatter_at"])
+                    CHATTER_NODE_COOLDOWN[nid] = ts
+                    n_cd += 1
+                catch e
+                    @warn "loadSpecimen: skipping bad chatter_cooldowns entry: $e"
+                end
+            end
+        end
+        if n_cd > 0
+            println("  ⏱  Chatter cooldowns restored ($n_cd)")
+        end
+    end
+
 
     # ── 4.15 TRAJECTORY STATE (ActionTonePredictor) ───────────────
     # GRUG: Restore the trajectory ring buffer and config from specimen.
@@ -4032,8 +4134,28 @@ function maybe_run_idle()
         println("[IDLE] 🪙  Coinflip → CHATTER. Starting gossip round ($(length(snapshot)) eligible nodes)...")
 
         try
-            session = ChatterMode.start_chatter_session!(snapshot)
-            ChatterMode.apply_chatter_diffs!(session, NODE_MAP, NODE_LOCK)
+            session = ChatterMode.start_chatter_session!(
+                snapshot;
+                cooldown_query   = (id) -> chatter_cooldown_remaining(id),
+                nonjitter_query  = (id) -> begin
+                    n = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+                    isnothing(n) ? false : get(n.json_data, "nonjitter", false) === true
+                end,
+                confidence_query = (id) -> begin
+                    # GRUG (v7.19): Use the node\u2019s strength as a stable proxy
+                    # for vote confidence here \u2014 it survives between sessions
+                    # and is the same signal the strong/weak classifier uses.
+                    n = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+                    isnothing(n) ? 0.0 : clamp(n.strength / 10.0, 0.0, 1.0)
+                end,
+            )
+            ChatterMode.apply_chatter_diffs!(session, NODE_MAP, NODE_LOCK;
+                                             stamp_fn = stamp_chatter!)
+            try
+                ChatterMode.persist_chatter_log!()
+            catch e
+                @warn "[IDLE:CHATTER] persist_chatter_log! failed: $e"
+            end
         catch e
             if e isa ChatterMode.ChatterError
                 # GRUG: ChatterErrors are expected (population gate, etc). Log and continue.

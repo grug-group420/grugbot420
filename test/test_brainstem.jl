@@ -2,6 +2,12 @@
 # GRUG say: winner-take-all dispatcher needs hard testing.
 # GRUG say: test dispatch, propagation, decay, fault isolation, tie-breaking, error paths.
 
+# GRUG v7.19 QoL: Lobe.jl pulls LobeTable from its parent module. Include
+# LobeTable first when this test runs standalone or it will error with
+# `UndefVarError: LobeTable not defined`.
+if !isdefined(Main, :LobeTable)
+    include("../src/LobeTable.jl")
+end
 if !isdefined(Main, :Lobe)
     include("../src/Lobe.jl")
 end

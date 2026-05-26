@@ -2,6 +2,13 @@
 # GRUG say: no tests = no trust. Every feature needs a rock thrown at it.
 # GRUG say: test O(1) reverse index, capacity enforcement, lobe_grow!, and all error paths.
 
+# GRUG v7.19 QoL: Lobe.jl reaches up to the parent module for LobeTable.
+# When this test runs as a standalone script, Main is the parent and must
+# already have LobeTable defined; otherwise Lobe.jl errors with
+# `UndefVarError: LobeTable not defined`. Include LobeTable first.
+if !isdefined(Main, :LobeTable)
+    include("../src/LobeTable.jl")
+end
 if !isdefined(Main, :Lobe)
     include("../src/Lobe.jl")
 end
