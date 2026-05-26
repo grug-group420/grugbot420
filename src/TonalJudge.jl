@@ -60,6 +60,8 @@ export Token, TokenCategory, FrameHint, JudgementMode,
        build_reading_from_prediction, pick_mode, judge,
        frame_hint_for_action, frame_hint_label,
        get_last_judgement, reset_last_judgement!,
+       set_frame_match_weights!, get_frame_match_weights,
+       compute_frame_match_multiplier,
        INCOHERENCE_TAG_THRESHOLD_LOCAL
 
 # ==============================================================================
@@ -441,6 +443,128 @@ get_last_judgement() = LAST_JUDGEMENT[]
 function reset_last_judgement!()
     LAST_JUDGEMENT[] = nothing
     return nothing
+end
+
+# ==============================================================================
+# v7.21b-3b: FRAME-MATCH MULTIPLIER  (orchestration quorum field, plug-matching)
+# ==============================================================================
+#
+# Per the user direction:
+#
+#   "AIML is an orchestration quorum field. It just needs matching plugs."
+#   "A mismatch should act as inhibitor. In a meta kind of way. It's not
+#    doing nothing. It adds a certain richness."
+#   Decision (c): "inhibit fires ONLY under relational mode (basic mode =
+#                 no inhibit, lift still works on both modes)."
+#
+# Each node may declare a list of `frame_hints` in its `json_data`:
+#
+#     "frame_hints": ["de_escalating", "terse"]
+#
+# These are the "plugs" the node exposes. At vote time we pull the current
+# `LAST_JUDGEMENT` and compare its `frame_hint` against the node's plug list:
+#
+#   match     -> LIFT_MULTIPLIER  (default 1.20)  -- always applies, both modes
+#   no plugs  -> NEUTRAL          (1.0)           -- back-compat for legacy nodes
+#   mismatch  -> INHIBIT_MULTIPLIER (0.85)        -- ONLY under RELATIONAL mode;
+#                                                   under BASIC it stays 1.0 so
+#                                                   the 76% basic-mode majority
+#                                                   doesn't quietly suppress
+#                                                   nodes that just happened to
+#                                                   wear a wrong-shaped plug.
+#
+# The multiplier is applied at the END of `composite_vote_score` (after the
+# additive bonuses and anti-match penalty). This keeps it as a clean
+# orthogonal dimension: tone-as-tilt at the orchestration layer, mirroring
+# tone-as-tilt at the prediction layer.
+#
+# Multipliers ship as `Ref` (configurable at runtime, tunable from data) NOT
+# `const`, so kitchen-sink runs and prod can dial without code surgery.
+# ==============================================================================
+
+const _FRAME_LIFT_MULTIPLIER    = Ref{Float64}(1.20)
+const _FRAME_INHIBIT_MULTIPLIER = Ref{Float64}(0.85)
+
+"""
+    set_frame_match_weights!(; lift::Float64=1.20, inhibit::Float64=0.85)
+
+Tune the frame-match multipliers at runtime.
+
+`lift` must be >= 1.0 (a match should never demote).
+`inhibit` must be in (0, 1] (a mismatch should never amplify).
+Pass either kwarg alone to tweak just one knob.
+
+Returns the new (lift, inhibit) tuple.
+"""
+function set_frame_match_weights!(; lift::Union{Nothing,Float64}=nothing,
+                                    inhibit::Union{Nothing,Float64}=nothing)
+    if lift !== nothing
+        lift < 1.0 && error("set_frame_match_weights!: lift must be >= 1.0, got $lift")
+        _FRAME_LIFT_MULTIPLIER[] = lift
+    end
+    if inhibit !== nothing
+        (inhibit <= 0.0 || inhibit > 1.0) &&
+            error("set_frame_match_weights!: inhibit must be in (0, 1], got $inhibit")
+        _FRAME_INHIBIT_MULTIPLIER[] = inhibit
+    end
+    return (_FRAME_LIFT_MULTIPLIER[], _FRAME_INHIBIT_MULTIPLIER[])
+end
+
+"""
+    get_frame_match_weights() -> (lift, inhibit)
+
+Read the current multipliers. Mostly for diagnostics and tests.
+"""
+get_frame_match_weights() = (_FRAME_LIFT_MULTIPLIER[], _FRAME_INHIBIT_MULTIPLIER[])
+
+"""
+    compute_frame_match_multiplier(node_frame_hints, judgement) -> Float64
+
+GRUG: This is the plug-matching step. Given a node's declared `frame_hints`
+list (as `Vector{String}`, may be empty) and the current `TonalJudgement`
+(may be `nothing`), return the multiplicative factor applied to the
+node's vote score.
+
+Decision table:
+
+    judgement is nothing                        -> 1.0  (no judge, no opinion)
+    node_frame_hints is empty                   -> 1.0  (no plugs declared = neutral)
+    judgement.frame_hint label IN node_hints    -> LIFT
+    judgement.frame_hint label NOT IN node_hints AND mode == RELATIONAL -> INHIBIT
+    judgement.frame_hint label NOT IN node_hints AND mode == BASIC      -> 1.0
+                                                                        (gated per
+                                                                         user "(c)")
+
+This is intentionally a pure function so it's trivial to test and reason
+about.  The orchestration layer reads node hints + judgement and calls this.
+"""
+function compute_frame_match_multiplier(node_frame_hints, judgement)::Float64
+    judgement === nothing && return 1.0
+    isempty(node_frame_hints) && return 1.0  # back-compat: legacy nodes pass through
+
+    # GRUG: Normalize labels — case-insensitive, and hyphens/underscores are
+    # interchangeable. The internal `frame_hint_label` uses "de-escalating"
+    # (hyphen, log-grep-friendly) while node JSON tends to write
+    # "de_escalating" (underscore, identifier-friendly). Fold both to the
+    # same canonical form for matching.
+    _canon(s) = replace(lowercase(string(s)), '-' => '_')
+
+    judged_label = _canon(frame_hint_label(judgement.frame_hint))
+
+    matched = any(_canon(h) == judged_label for h in node_frame_hints)
+
+    if matched
+        return _FRAME_LIFT_MULTIPLIER[]
+    end
+
+    # Mismatch path: inhibit fires ONLY under relational mode.  Under basic
+    # mode we leave it at neutral so the cheap autopilot path doesn't silently
+    # suppress mis-plugged nodes.
+    if judgement.mode === RELATIONAL
+        return _FRAME_INHIBIT_MULTIPLIER[]
+    end
+
+    return 1.0
 end
 
 end # module TonalJudge

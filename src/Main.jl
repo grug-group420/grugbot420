@@ -1180,6 +1180,16 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         nothing
     end
 
+    # v7.21b-3b: TonalJudge verdict (last computed by engine after the
+    # prediction). Read once and reuse for every candidate so we don't keep
+    # re-resolving the Ref. Nothing means "no judge ran" -> all multipliers
+    # collapse to 1.0 (pure back-compat).
+    last_judgement = try
+        TonalJudge.get_last_judgement()
+    catch
+        nothing
+    end
+
     vote_candidates = VoteOrchestrator.VoteCandidate[]
     candidate_to_vote = Dict{String, Vote}()
     lock(NODE_LOCK) do
@@ -1254,6 +1264,29 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 NaN
             end
 
+            # v7.21b-3b: Frame-match plug. Read this node's declared
+            # frame_hints (a Vector{String} like ["de_escalating", "terse"])
+            # from json_data and ask TonalJudge what multiplier to apply.
+            # Empty/missing list -> 1.0 (back-compat). Match -> lift. Mismatch
+            # -> inhibit ONLY under RELATIONAL mode (see TonalJudge for the
+            # gating rule).
+            node_hints = let raw = get(node.json_data, "frame_hints", String[])
+                if raw isa Vector
+                    String[lowercase(string(h)) for h in raw]
+                elseif raw isa AbstractString
+                    # tolerate a single-string declaration
+                    String[lowercase(string(raw))]
+                else
+                    String[]
+                end
+            end
+            frame_mult = try
+                TonalJudge.compute_frame_match_multiplier(node_hints, last_judgement)
+            catch e
+                @warn "[ORCHESTRATOR] frame_match_multiplier failed for $(v.node_id): $e (using 1.0)"
+                1.0
+            end
+
             push!(vote_candidates, VoteOrchestrator.VoteCandidate(
                 v.node_id, v.confidence, node.strength;
                 strength_cap      = STRENGTH_CAP,
@@ -1262,6 +1295,7 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 action_tone_align = tone_align,
                 anti_match_score  = anti_score,
                 peak_dominance    = peak_dom,
+                frame_match_multiplier = frame_mult,
                 # recency_bonus left NaN — Node struct lacks last_fire_cycle
                 # so we can't compute honest recency without adding tracking.
                 # Knob is plumbed; fill in when the field exists.

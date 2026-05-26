@@ -598,6 +598,13 @@ struct VoteCandidate
     action_tone_align::Float64
     anti_match_score::Float64
     peak_dominance::Float64
+    # ---- v7.21b-3b: orthogonal multiplicative tilt (1.0 = pass-through) --
+    # GRUG: Frame-match plug from TonalJudge. 1.0 means "no opinion / neutral";
+    # >1.0 lifts a node whose declared frame_hints match the current judgement;
+    # <1.0 inhibits a node whose plugs mismatch UNDER RELATIONAL MODE ONLY.
+    # Computed upstream (in Main.jl) via TonalJudge.compute_frame_match_multiplier
+    # so VoteOrchestrator stays decoupled from the judge module.
+    frame_match_multiplier::Float64
 end
 
 function VoteCandidate(node_id::String, confidence::Float64, strength::Float64;
@@ -607,16 +614,21 @@ function VoteCandidate(node_id::String, confidence::Float64, strength::Float64;
                        recency_bonus::Float64     = NaN,
                        action_tone_align::Float64 = NaN,
                        anti_match_score::Float64  = NaN,
-                       peak_dominance::Float64    = NaN)
+                       peak_dominance::Float64    = NaN,
+                       frame_match_multiplier::Float64 = 1.0)
     if isempty(strip(node_id))
         throw_vo_error("VoteCandidate node_id cannot be empty", "VoteCandidate")
     end
     if strength_cap <= 0
         throw_vo_error("VoteCandidate strength_cap must be positive, got $strength_cap", "VoteCandidate")
     end
+    if !isfinite(frame_match_multiplier) || frame_match_multiplier <= 0
+        throw_vo_error("VoteCandidate frame_match_multiplier must be finite > 0, got $frame_match_multiplier", "VoteCandidate")
+    end
     return VoteCandidate(node_id, confidence, strength, strength_cap,
                          lobe_alignment, relational_match, recency_bonus,
-                         action_tone_align, anti_match_score, peak_dominance)
+                         action_tone_align, anti_match_score, peak_dominance,
+                         frame_match_multiplier)
 end
 
 """
@@ -647,6 +659,15 @@ function composite_vote_score(vc::VoteCandidate)::Float64
 
     # GRUG: multiplicative gain on positive bonus, additive demotion on penalty
     score = vc.confidence * (1.0 + bonus_pos) - vc.confidence * penalty
+
+    # v7.21b-3b: Frame-match multiplier applies LAST as an orthogonal tilt.
+    # 1.0 by default (back-compat). >1.0 lifts plug-matching nodes; <1.0
+    # inhibits mismatched plugs (under RELATIONAL mode only — see
+    # TonalJudge.compute_frame_match_multiplier). This is applied AFTER the
+    # additive bonuses + penalty so it composes cleanly: anti-match still
+    # demotes; the field still tilts.
+    score *= vc.frame_match_multiplier
+
     return max(VOTE_SCORE_FLOOR, score)
 end
 
