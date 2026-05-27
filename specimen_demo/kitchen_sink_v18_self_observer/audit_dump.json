@@ -1,0 +1,17 @@
+{
+  "peeks_global_cap": 0,
+  "peeks_lock_busy": 0,
+  "keys": 15,
+  "peeks_hit": 5,
+  "peeks_miss": 1,
+  "writes_skipped_stochastic": 0,
+  "outstanding_tokens": 0,
+  "writes_reinforced": 0,
+  "peeks_timeout": 0,
+  "peeks_throttle": 2,
+  "peeks_attempted": 8,
+  "writes": 20,
+  "evictions_total_cap": 0,
+  "evictions_per_key": 0,
+  "total_entries": 20
+}

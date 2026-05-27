@@ -1,0 +1,360 @@
+
+==============================================================================
+  PHASE 1 — Construction & smoke
+==============================================================================
+Constructed SubconsciousStore.
+Initial size = 0, keys = 0.
+FUZZY_BUCKETS:
+    just_now           <= 30.0 s
+    recent             <= 300.0 s
+    earlier_today      <= 28800.0 s
+    yesterday_ish      <= 129600.0 s
+    couple_days_ago    <= 345600.0 s
+    a_while_back       <= 1.8144e6 s
+    long_ago           <= Inf s
+[hints @ phase1_smoke]
+    -> 1 hint(s):
+       #1 key="smoke_concept"  tag=lexical  when=just_now  prov=phase1_smoke
+           payload_keys=["note"]
+           payload_str =Dict("note" => "wiring check")
+[audit @ phase1_end]
+    writes                       = 1
+    writes_skipped_stochastic    = 0
+    writes_reinforced            = 0
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    peeks_attempted              = 1
+    peeks_hit                    = 1
+    peeks_miss                   = 0
+    peeks_throttle               = 0
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 0
+    peeks_timeout                = 0
+    total_entries                = 1
+    keys                         = 1
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 2 — Mixed workload across all tag namespaces
+==============================================================================
+
+--- Stochastic writes (p_write=0.6) with full drop-table wiring -----------
+First-pass writes: written=10 skipped=10 of 20
+
+--- Second pass at p_write=1.0 to fill remaining slots & exercise reinforcement 
+
+--- Reinforcement burst — same (key, tag, provenance) repeated 8x ---------
+[audit @ phase2_end]
+    writes                       = 39
+    writes_skipped_stochastic    = 10
+    writes_reinforced            = 18
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    peeks_attempted              = 1
+    peeks_hit                    = 1
+    peeks_miss                   = 0
+    peeks_throttle               = 0
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 0
+    peeks_timeout                = 0
+    total_entries                = 21
+    keys                         = 16
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 3 — Recall behaviors
+==============================================================================
+
+--- 3a. Exact peek on 'kitchen' — should hit, multiple tags present -------
+[hints @ exact:kitchen]
+    -> 3 hint(s):
+       #1 key="kitchen"  tag=relational  when=just_now  prov=no_relations_extracted
+           payload_keys=["input"]
+           payload_str =Dict("input" => "the kitchen")
+           assocs      =["sink", "pan", "stove"]
+       #2 key="kitchen"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["stove", "pan", "sink"]
+       #3 key="kitchen"  tag=timing  when=just_now  prov=slow_response
+           payload_keys=["felt", "op"]
+           payload_str =Dict("felt" => "slow", "op" => "chop")
+           assocs      =["stove", "pan", "sink"]
+
+--- 3b. Exact peek on 'kitchen' filtered to :mood -------------------------
+[hints @ exact:kitchen :mood]
+    -> 1 hint(s):
+       #1 key="kitchen"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["stove", "pan", "sink"]
+
+--- 3c. Exact peek on a key that does not exist ---------------------------
+[hints @ exact:nonexistent]
+    -> nothing (subconscious had no answer / was throttled / locked)
+
+--- 3d. Pattern peek on 'rainy seattle morning coffee' — token overlap on 'morning' & 'coffee' 
+[hints @ pattern:rainy seattle morning coffee]
+    -> 5 hint(s):
+       #1 key="alarm"  tag=timing  when=just_now  prov=token_recurrence
+           payload_keys=["count", "token"]
+           payload_str =Dict("token" => "alarm", "count" => "5")
+           assocs      =["clock", "morning"]
+       #2 key="cup"  tag=lexical  when=just_now  prov=recurring_phrase
+           payload_keys=["phrase"]
+           payload_str =Dict("phrase" => "another cup")
+           assocs      =["coffee", "tea"]
+       #3 key="morning"  tag=meta  when=just_now  prov=probe_attached
+           payload_keys=["probe"]
+           payload_str =Dict("probe" => "daily-cycle")
+           assocs      =["coffee", "alarm"]
+       #4 key="coffee"  tag=mood  when=just_now  prov=mood_drift
+           payload_keys=["from", "to"]
+           payload_str =Dict("to" => "awake", "from" => "sleepy")
+           assocs      =["cup", "morning"]
+       #5 key="tea"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["cup", "kettle"]
+
+--- 3e. Pattern peek with walk_depth=0 — should NOT pull associated keys --
+[hints @ pattern:kitchen walk=0]
+    -> 3 hint(s):
+       #1 key="kitchen"  tag=relational  when=just_now  prov=no_relations_extracted
+           payload_keys=["input"]
+           payload_str =Dict("input" => "the kitchen")
+           assocs      =["sink", "pan", "stove"]
+       #2 key="kitchen"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["stove", "pan", "sink"]
+       #3 key="kitchen"  tag=timing  when=just_now  prov=slow_response
+           payload_keys=["felt", "op"]
+           payload_str =Dict("felt" => "slow", "op" => "chop")
+           assocs      =["stove", "pan", "sink"]
+
+--- 3f. Pattern peek with walk_depth=2 — should reach 'fire' and 'heat' from 'kitchen' 
+[hints @ pattern:kitchen walk=2]
+    -> 12 hint(s):
+       #1 key="kitchen"  tag=relational  when=just_now  prov=no_relations_extracted
+           payload_keys=["input"]
+           payload_str =Dict("input" => "the kitchen")
+           assocs      =["sink", "pan", "stove"]
+       #2 key="stove"  tag=timing  when=just_now  prov=token_recurrence
+           payload_keys=["count", "token"]
+           payload_str =Dict("token" => "stove", "count" => "3")
+           assocs      =["pan", "heat", "fire"]
+       #3 key="stove"  tag=meta  when=just_now  prov=probe_attached
+           payload_keys=["probe"]
+           payload_str =Dict("probe" => "heat-sensor")
+           assocs      =["pan", "heat", "fire"]
+       #4 key="kitchen"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["stove", "pan", "sink"]
+       #5 key="kitchen"  tag=timing  when=just_now  prov=slow_response
+           payload_keys=["felt", "op"]
+           payload_str =Dict("felt" => "slow", "op" => "chop")
+           assocs      =["stove", "pan", "sink"]
+       #6 key="water"  tag=relational  when=just_now  prov=no_relations_extracted
+           payload_keys=["input"]
+           payload_str =Dict("input" => "some water")
+           assocs      =["kettle", "sink"]
+       #7 key="fire"  tag=mood  when=just_now  prov=mood_drift
+           payload_keys=["from", "to"]
+           payload_str =Dict("to" => "alert", "from" => "calm")
+           assocs      =["smoke", "heat"]
+       #8 key="oil"  tag=lexical  when=just_now  prov=recurring_phrase
+           payload_keys=["phrase"]
+           payload_str =Dict("phrase" => "hot oil")
+       #9 key="heat"  tag=mood  when=just_now  prov=mood_drift
+           payload_keys=["from", "to"]
+           payload_str =Dict("to" => "alert", "from" => "calm")
+       #10 key="pan"  tag=meta  when=just_now  prov=probe_attached
+           payload_keys=["probe"]
+           payload_str =Dict("probe" => "surface-temp")
+           assocs      =["stove", "oil"]
+       #11 key="sink"  tag=relational  when=just_now  prov=no_relations_extracted
+           payload_keys=["input"]
+           payload_str =Dict("input" => "the sink")
+           assocs      =["water", "soap"]
+       #12 key="water"  tag=lexical  when=just_now  prov=recurring_phrase
+           payload_keys=["phrase"]
+           payload_str =Dict("phrase" => "running water")
+           assocs      =["sink", "kettle"]
+
+--- 3g. Pattern peek tag-filtered to :mood — only mood fragments survive --
+[hints @ pattern:kitchen tag=:mood]
+    -> 3 hint(s):
+       #1 key="kitchen"  tag=mood  when=just_now  prov=ambient_calm
+           payload_keys=["mood"]
+           payload_str =Dict("mood" => "calm")
+           assocs      =["stove", "pan", "sink"]
+       #2 key="fire"  tag=mood  when=just_now  prov=mood_drift
+           payload_keys=["from", "to"]
+           payload_str =Dict("to" => "alert", "from" => "calm")
+           assocs      =["smoke", "heat"]
+       #3 key="heat"  tag=mood  when=just_now  prov=mood_drift
+           payload_keys=["from", "to"]
+           payload_str =Dict("to" => "alert", "from" => "calm")
+[audit @ phase3_end]
+    writes                       = 39
+    writes_skipped_stochastic    = 10
+    writes_reinforced            = 18
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    peeks_attempted              = 8
+    peeks_hit                    = 7
+    peeks_miss                   = 1
+    peeks_throttle               = 0
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 0
+    peeks_timeout                = 0
+    total_entries                = 21
+    keys                         = 16
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 4 — Throttle and single-reader gate
+==============================================================================
+
+--- 4a. Per-node bucket exhaustion: 6 sequential peeks from one node ------
+burner-1 results: succeeded=3 throttled/none=3  (cap=3, expect 3 ok / 3 none)
+
+--- 4b. Distinct nodes don't share buckets: 6 nodes × 1 peek each ---------
+fresh-* results: succeeded=6 throttled/none=0  (each node has full 3-token bucket)
+
+--- 4c. 64-thread concurrent peek storm — strict single-reader must hold --
+storm results: hit=24 none=40 of 64
+[audit @ phase4_end]
+    writes                       = 39
+    writes_skipped_stochastic    = 10
+    writes_reinforced            = 18
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    peeks_attempted              = 84
+    peeks_hit                    = 40
+    peeks_miss                   = 1
+    peeks_throttle               = 43
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 0
+    peeks_timeout                = 0
+    total_entries                = 21
+    keys                         = 16
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 5 — Reader timeout (manual reader-slot hold)
+==============================================================================
+
+--- 5a. Force the reader slot held; next peek must return nothing ---------
+peek under held lock: nothing (correct)
+[audit @ phase5_end]
+    writes                       = 39
+    writes_skipped_stochastic    = 10
+    writes_reinforced            = 18
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    peeks_attempted              = 85
+    peeks_hit                    = 40
+    peeks_miss                   = 1
+    peeks_throttle               = 43
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 1
+    peeks_timeout                = 0
+    total_entries                = 21
+    keys                         = 16
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 6 — Eviction pressure
+==============================================================================
+
+--- 6a. Per-key cap eviction — flood 'shared_concept' with 60 noise provenances 
+shared_concept bucket length after flood = 32   (cap = 32)
+Vivid (salience=8) entry survived the flood: OK
+
+--- 6b. Global total cap — push above 4096 distinct keys ------------------
+After bulk fill: total_entries = 4096 (must be <= 4096)
+[audit @ phase6_end]
+    writes                       = 4300
+    writes_skipped_stochastic    = 10
+    writes_reinforced            = 18
+    evictions_per_key            = 29
+    evictions_total_cap          = 157
+    peeks_attempted              = 86
+    peeks_hit                    = 41
+    peeks_miss                   = 1
+    peeks_throttle               = 43
+    peeks_global_cap             = 0
+    peeks_lock_busy              = 1
+    peeks_timeout                = 0
+    total_entries                = 4096
+    keys                         = 4060
+    outstanding_tokens           = 0
+
+==============================================================================
+  PHASE 7 — Fuzzy bucket consistency
+==============================================================================
+
+--- 7a. Same query_id ⇒ same fuzzy bucket; new query_id may differ --------
+QID-A peek 1 fuzzy_when = just_now
+QID-A peek 2 fuzzy_when = just_now   (must equal peek 1)
+QID-B peek   fuzzy_when = just_now   (may differ; jittered seed)
+
+==============================================================================
+  PHASE 8 — Structural no-Float64 invariant on live store
+==============================================================================
+
+--- 8a. SubconsciousHint fieldtypes ---------------------------------------
+    key                :: String
+    tag                :: Symbol
+    fuzzy_when         :: Symbol
+    provenance         :: Symbol
+    payload_keys       :: Vector{String}
+    payload_strings    :: Dict{String, String}
+    associations       :: Vector{String}
+
+--- 8b. Runtime return types of every public reader -----------------------
+audit_trail   -> Dict{Symbol, Int64}
+store_size    -> Int64
+key_count     -> Int64
+peek_exact    -> Vector{SubconsciousHint}
+peek_pattern  -> Vector{SubconsciousHint}
+
+--- 8c. Float64 payload values are dropped from surfaced view -------------
+payload_keys (caller can see fragment existed): ["kind", "n", "score"]
+payload_strings (Float64 dropped): Dict("kind" => "thing", "n" => "3")
+
+==============================================================================
+  PHASE 9 — drop_store! and reset_audit!
+==============================================================================
+Before drop_store!: total_entries=4096, keys=4060, writes=4302
+After drop_store!:  total_entries=0, keys=0, writes=4302
+After reset_audit!: writes=0 (must be 0)
+
+==============================================================================
+  PHASE 10 — Final audit dump
+==============================================================================
+Final demo-store audit:
+    evictions_per_key            = 0
+    evictions_total_cap          = 0
+    keys                         = 15
+    outstanding_tokens           = 0
+    peeks_attempted              = 8
+    peeks_global_cap             = 0
+    peeks_hit                    = 5
+    peeks_lock_busy              = 0
+    peeks_miss                   = 1
+    peeks_throttle               = 2
+    peeks_timeout                = 0
+    total_entries                = 20
+    writes                       = 20
+    writes_reinforced            = 0
+    writes_skipped_stochastic    = 0
+Final audit JSON written to: /workspace/grugbot420_repo/specimen_demo/kitchen_sink_v18_self_observer/audit_dump.json
+
+==============================================================================
+  KITCHEN SINK COMPLETE — all phases passed
+==============================================================================
+Timestamp: 2026-05-27 09:56:10
