@@ -218,6 +218,16 @@ const MAX_LEXICON_SIZE::Int = 1024
 #   provenance  — free-form string describing where this entry came from
 #                 (e.g. "engine-default", "specimen:foo.json", "test").
 #                 Used in error messages and audit logs.
+#   promote_at_tokenize
+#               — Stage 1.5 ingest hook. When true, the SigilPromoter front
+#                 door will rewrite raw input tokens that match this sigil's
+#                 shape predicate into the canonical `&name` form, with the
+#                 captured value stashed on a side-channel bindings list.
+#                 Default false. Only :lambda and :macro classes meaningfully
+#                 use this flag (a :tag has no value to capture, a reserved
+#                 class is gated out of pattern resolution anyway). The flag
+#                 is purely additive — patterns and pattern-bind confidence
+#                 do not consult it; only the front-door promoter does.
 #
 # All fields are immutable. Updating an entry means re-registering it, which
 # (by default) throws on collision unless the caller passes overwrite=true.
@@ -234,6 +244,7 @@ struct SigilEntry
     params::Union{Nothing,Dict{String,Any}}
     expansion::Union{Nothing,Vector{Any}}  # Stage 6 reserved.
     provenance::String
+    promote_at_tokenize::Bool              # Stage 1.5 ingest hook. Default false.
 end
 
 """
@@ -278,6 +289,11 @@ Optional keyword args:
   - `expansion::Union{Nothing,AbstractVector}=nothing` — RESERVED for :procedure.
   - `provenance::AbstractString="unspecified"` — origin tag for audit.
   - `overwrite::Bool=false` — if true, replace existing entry; else throw on collision.
+  - `promote_at_tokenize::Bool=false` — Stage 1.5 ingest hook. When true, the
+    front-door promoter rewrites raw input tokens matching this sigil's shape
+    predicate (for :lambda) or lexicon membership (for :macro) into the
+    canonical `&name` form. Only meaningful for :lambda and :macro classes;
+    setting it on :tag or any reserved class throws SigilConfigError.
 
 Returns the newly-registered SigilEntry.
 """
@@ -292,6 +308,7 @@ function register_sigil!(
     expansion::Union{Nothing,AbstractVector}=nothing,
     provenance::AbstractString="unspecified",
     overwrite::Bool=false,
+    promote_at_tokenize::Bool=false,
 )::SigilEntry
     # GRUG: name validation — present, non-empty, matches name regex.
     nm = String(name)
@@ -368,6 +385,16 @@ function register_sigil!(
         exp_clean = Vector{Any}(expansion)
     end
 
+    # GRUG: promote_at_tokenize gating. The front-door promoter only knows how
+    # to capture values for :lambda (shape predicate) and :macro (lexicon
+    # membership). Setting the flag on a :tag (no value) or a reserved class
+    # (gated out of pattern resolution) is a programmer error.
+    if promote_at_tokenize && !(class in (:lambda, :macro))
+        throw(SigilConfigError(
+            "promote_at_tokenize=true is only valid for :lambda and :macro classes (got class :$class for &$nm)",
+            "promote_at_tokenize"))
+    end
+
     # GRUG: registry size cap.
     if length(table.entries) >= MAX_REGISTRY_ENTRIES && !haskey(table.entries, nm)
         throw(SigilConfigError(
@@ -394,6 +421,7 @@ function register_sigil!(
         params_clean,
         exp_clean,
         String(provenance),
+        promote_at_tokenize,
     )
     table.entries[nm] = entry
     return entry
@@ -679,6 +707,12 @@ Stage 1 ships:
   &rest  — :lambda, sigil_type=:slurp,  applies_at=:match. Slurps remaining tokens.
   &noun  — :macro,  lexicon=[],         applies_at=:bind.  Specimen-overridable list.
 
+Stage 1.5 adds:
+  &op    — :lambda, sigil_type=:op,     applies_at=:match. Matches a math operator
+           from the closed set {+, -, *, /, =, <, >, %, ^}. promote_at_tokenize=true.
+  &n     gets promote_at_tokenize=true so the front-door promoter rewrites bare
+         numeric tokens into &n with the value bound on the side-channel.
+
 Specimens that want a populated `&noun` lexicon merge a specimen-level
 registry on top using `merge_registry!`.
 """
@@ -690,7 +724,8 @@ function default_registry()::SigilTable
         class=:lambda,
         applies_at=:match,
         sigil_type=:number,
-        provenance="engine-default")
+        provenance="engine-default",
+        promote_at_tokenize=true)
 
     register_sigil!(t;
         name="word",
@@ -712,6 +747,14 @@ function default_registry()::SigilTable
         applies_at=:bind,
         lexicon=String[],
         provenance="engine-default")
+
+    register_sigil!(t;
+        name="op",
+        class=:lambda,
+        applies_at=:match,
+        sigil_type=:op,
+        provenance="engine-default",
+        promote_at_tokenize=true)
 
     return t
 end

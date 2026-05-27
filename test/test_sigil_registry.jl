@@ -274,6 +274,45 @@ using .SigilRegistry
     end
 
     # ==========================================================================
+    @testset "register_sigil! — promote_at_tokenize validation" begin
+        t = SigilTable("promote-test")
+
+        # Valid on :lambda.
+        e_l = register_sigil!(t;
+            name="num", class=:lambda, applies_at=:match,
+            sigil_type=:number, promote_at_tokenize=true)
+        @test e_l.promote_at_tokenize === true
+
+        # Valid on :macro.
+        e_m = register_sigil!(t;
+            name="col", class=:macro, applies_at=:bind,
+            lexicon=["red"], promote_at_tokenize=true)
+        @test e_m.promote_at_tokenize === true
+
+        # Default false when not specified.
+        e_d = register_sigil!(t;
+            name="def", class=:tag, applies_at=:bind)
+        @test e_d.promote_at_tokenize === false
+
+        # REJECTED on :tag (no value to capture).
+        @test_throws SigilConfigError register_sigil!(t;
+            name="bad_tag", class=:tag, applies_at=:bind,
+            promote_at_tokenize=true)
+
+        # REJECTED on reserved classes (gated out of pattern resolution
+        # anyway; setting promote on them is a programmer error).
+        @test_throws SigilConfigError register_sigil!(t;
+            name="bad_glue", class=:glue, applies_at=:bind,
+            promote_at_tokenize=true)
+        @test_throws SigilConfigError register_sigil!(t;
+            name="bad_proc", class=:procedure, applies_at=:bind,
+            promote_at_tokenize=true)
+        @test_throws SigilConfigError register_sigil!(t;
+            name="bad_fun", class=:functor, applies_at=:bind,
+            promote_at_tokenize=true)
+    end
+
+    # ==========================================================================
     @testset "register_sigil! — registry size cap" begin
         t = SigilTable("test")
 
@@ -489,17 +528,21 @@ using .SigilRegistry
     @testset "default_registry — exact contents + provenance" begin
         t = default_registry()
         @test t.label == "engine-default"
-        @test length(t.entries) == 4
+        # Stage 1.5 added &op; default registry now ships 5 entries.
+        @test length(t.entries) == 5
 
         e_n = lookup_sigil(t, "n")
         @test e_n.class === :lambda
         @test e_n.applies_at === :match
         @test e_n.sigil_type === :number
         @test e_n.provenance == "engine-default"
+        # Stage 1.5: &n is promoted at tokenize time.
+        @test e_n.promote_at_tokenize === true
 
         e_w = lookup_sigil(t, "word")
         @test e_w.class === :lambda
         @test e_w.sigil_type === :word
+        @test e_w.promote_at_tokenize === false  # words are not auto-promoted
 
         e_r = lookup_sigil(t, "rest")
         @test e_r.class === :lambda
@@ -510,6 +553,13 @@ using .SigilRegistry
         @test e_noun.applies_at === :bind
         @test e_noun.lexicon == String[]   # specimen-overridable
         @test e_noun.sigil_type === nothing
+
+        # Stage 1.5: &op is the new math-operator lambda, promoted at tokenize.
+        e_op = lookup_sigil(t, "op")
+        @test e_op.class === :lambda
+        @test e_op.applies_at === :match
+        @test e_op.sigil_type === :op
+        @test e_op.promote_at_tokenize === true
 
         # Two fresh defaults are independent objects (no shared state).
         t2 = default_registry()
@@ -584,10 +634,11 @@ using .SigilRegistry
         # this assertion fires.
         @test isstructtype(SigilEntry)
         @test !ismutabletype(SigilEntry)
-        # Fields are exactly the 8 we locked in.
+        # Fields are exactly the 9 we locked in (Stage 1.5 added promote_at_tokenize).
         fns = fieldnames(SigilEntry)
         @test fns == (:name, :class, :applies_at, :sigil_type,
-                      :lexicon, :params, :expansion, :provenance)
+                      :lexicon, :params, :expansion, :provenance,
+                      :promote_at_tokenize)
     end
 
 end

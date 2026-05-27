@@ -69,6 +69,78 @@ if !isdefined(@__MODULE__, :RelationalJitter)
     using .RelationalJitter
 end
 
+# GRUG: SigilRegistry — Stage 1 sigil kernel. Same defensive include pattern
+# as siblings above so engine.jl runs standalone (test_comprehensive etc.)
+# AND inside GrugBot420.jl (where it's already loaded by the package init).
+if !isdefined(@__MODULE__, :SigilRegistry)
+    include("SigilRegistry.jl")
+    using .SigilRegistry
+end
+
+# GRUG: SigilPromoter — Stage 1.5a front-door input promoter. Two-layer:
+# Layer 1 thesaurus canonicalization ("two plus two" -> "2 + 2"), Layer 2
+# registry shape promotion ("2 + 2" -> "&n &op &n"). MUST come after
+# SigilRegistry because it does `using ..SigilRegistry`.
+if !isdefined(@__MODULE__, :SigilPromoter)
+    include("SigilPromoter.jl")
+    using .SigilPromoter
+end
+
+# ==============================================================================
+# FRONT-DOOR SIGIL TABLE (Stage 1.5a)
+# ==============================================================================
+# GRUG: One stable engine-default SigilTable shared by every scan_and_expand
+# call. Built once at module init and held const so per-call promotion never
+# re-allocates the table. Specimens that want to extend the registry merge
+# their entries in via merge_registry! at specimen-load time; the front-door
+# promoter still consults THIS table for shape predicates because it is the
+# union of engine defaults plus any specimen extensions registered later.
+#
+# IMPORTANT: this is a SigilTable, which is mutable internally (its dicts
+# grow when register_sigil! / merge_registry! is called). We treat the
+# binding as const because we never reassign the variable; we only mutate
+# the table in place. That matches how the matcher already treats other
+# global lobe registries.
+const _ENGINE_SIGIL_TABLE::SigilRegistry.SigilTable = SigilRegistry.default_registry()
+
+# GRUG: Task-local handoff for the bindings produced by promote_input.
+# scan_and_expand stashes these here so downstream phases (vote, ATP) can
+# read them without changing return-tuple shapes. Stage 1.5a writes; Stage
+# 1.5b reads (ATP arithmetic dispatch). Default empty so non-promoted text
+# paths see a defined-but-empty side-channel.
+const _PROMOTION_BINDINGS_KEY::Symbol = :grugbot420_sigil_promotion_bindings
+const _PROMOTION_REWRITTEN_KEY::Symbol = :grugbot420_sigil_promotion_rewritten
+
+"""
+    current_promotion_bindings() -> Vector{SigilPromoter.SigilBinding}
+
+Return the bindings produced by the most recent `scan_and_expand` call on
+the current task, or an empty vector if none. Read-only accessor for
+downstream phases (vote / ATP) to consume the side-channel.
+"""
+function current_promotion_bindings()::Vector{SigilPromoter.SigilBinding}
+    val = get(task_local_storage(), _PROMOTION_BINDINGS_KEY, nothing)
+    isnothing(val) && return SigilPromoter.SigilBinding[]
+    # GRUG: defensive type assertion — if some other code clobbered the key
+    # with the wrong type we want to know loudly rather than crash deeper in.
+    if !(val isa Vector{SigilPromoter.SigilBinding})
+        error("FATAL: task-local promotion bindings have wrong type: $(typeof(val))")
+    end
+    return val
+end
+
+"""
+    current_promotion_rewritten() -> Union{String,Nothing}
+
+Return the rewritten input string from the most recent `scan_and_expand`
+call on the current task (the string that was actually fed to the matcher),
+or `nothing` if no promotion has run on this task. Useful for telemetry
+and round-trip assertions.
+"""
+function current_promotion_rewritten()::Union{String,Nothing}
+    return get(task_local_storage(), _PROMOTION_REWRITTEN_KEY, nothing)
+end
+
 # ==============================================================================
 # SENSORY CONVERSION (TEXT TO SIGNAL)
 # ==============================================================================
@@ -3205,7 +3277,39 @@ Pass 2 — Lobe cascade expansion (cross-lobe bridge activation):
   Cascade confidence: 60% of the highest primary confidence (cross-lobe discount).
 """
 function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
-    primary_results = scan_specimens(input_text)
+    # ──────────────────────────────────────────────────────────────────────
+    # STAGE 1.5a — FRONT-DOOR SIGIL PROMOTION
+    # ──────────────────────────────────────────────────────────────────────
+    # GRUG: Before anything else, run the input through the SigilPromoter.
+    # Two layers:
+    #   Layer 1 — thesaurus canonicalization ("two plus two" -> "2 + 2")
+    #   Layer 2 — registry shape promotion   ("2 + 2"        -> "&n &op &n")
+    # The matcher downstream just compares strings; pre-rewriting collapses
+    # many surface variants of the same shape onto ONE pattern bucket. For
+    # pure-text inputs (no digits, no math words) the rewrite is a no-op
+    # confidence-equivalence guarantee; existing tests are unaffected.
+    #
+    # The bindings (position-keyed Vector{SigilBinding}) get stashed into
+    # task-local storage so downstream phases (vote, ATP) can read them
+    # without changing the scan_and_expand return-tuple shape. ATP arithmetic
+    # dispatch (Stage 1.5b) reads from current_promotion_bindings().
+    #
+    # No silent failures: if the promoter raises, we let it propagate. The
+    # alternative (catch + fall back to raw input) would mask configuration
+    # bugs in specimen-level registries, exactly the kind of thing we need
+    # to surface loudly.
+    promoted_text, promotion_bindings = SigilPromoter.promote_input(
+        _ENGINE_SIGIL_TABLE, input_text)
+
+    # GRUG: Stash on the current task. Each scan_and_expand call OVERWRITES
+    # any prior binding so stale state from a previous input never leaks.
+    task_local_storage(_PROMOTION_BINDINGS_KEY, promotion_bindings)
+    task_local_storage(_PROMOTION_REWRITTEN_KEY, promoted_text)
+
+    # GRUG: From here on, scan_specimens and the cascade gates see the
+    # PROMOTED text, not the raw text. That is the whole point — one shape,
+    # one node.
+    primary_results = scan_specimens(promoted_text)
 
     if isempty(primary_results)
         return primary_results
@@ -3218,8 +3322,12 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     # signal-hash bands, which suffer the same hash-collision noise as the
     # primary scanner — every "the/for/a" overlap let cross-lobe garbage in.
     # Switching to content tokens makes the gate semantically honest.
+    #
+    # NOTE: we use the PROMOTED text here for the same reason the primary
+    # scanner does — cascade gates need to see the same token universe the
+    # matcher does, otherwise sigil tokens (&n, &op) wouldn't gate properly.
     cascade_input_tokens = try
-        Set(t for t in split(lowercase(strip(input_text))) if !(t in STOPWORDS))
+        Set(t for t in split(lowercase(strip(promoted_text))) if !(t in STOPWORDS))
     catch
         Set{SubString{String}}()
     end

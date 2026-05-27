@@ -1,0 +1,132 @@
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.55 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.5 | ArousalNudge=0.0 | Weight=1.3 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.56 | ArousalNudge=0.0 | Weight=1.34 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_NEUTRAL | Conf=0.25 | ArousalNudge=0.0 | Weight=1.05 [FALLBACK] [FRAME=contemplative/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+[ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_NEUTRAL | Conf=1.0 | ArousalNudge=0.0 | Weight=1.2 [FALLBACK] [FRAME=contemplative/basic]
+
+==============================================================================
+  STAGE 1.5a SIGIL PROMOTER — END-TO-END COMPRESSION DEMO
+==============================================================================
+  · repo root: /workspace/grugbot420_repo/
+  · date:      2026-05-27T12:16:17.294
+  · julia:     1.10.4
+
+==============================================================================
+  PHASE 1 — STANDALONE PROMOTER REWRITE
+==============================================================================
+  · registry: 5 entries — &n, &noun, &op, &rest, &word
+  ✓ variant 1 sets canonical: 'what is 2 + 2' → 'what is &n &op &n'
+  ·   binding: pos=2 name=&n value=2 class=:lambda
+  ·   binding: pos=3 name=&op value="+" class=:lambda
+  ·   binding: pos=4 name=&n value=2 class=:lambda
+  ✓ variant 2: 'what is 2+2' → identical canonical rewrite + bindings
+  ✓ variant 3: 'what is two plus two' → identical canonical rewrite + bindings
+  ✓ variant 4: 'what is 2 plus two' → identical canonical rewrite + bindings
+  ✓ variant 5: 'what is two plus 2' → identical canonical rewrite + bindings
+  ✓ variant 6: 'WHAT is TWO Plus 2' → identical canonical rewrite + bindings
+  ✓ variant 7: '  what is  2  +  2  ' → identical canonical rewrite + bindings
+  ✓ ALL 7 variants collapse to 'what is &n &op &n'
+
+==============================================================================
+  PHASE 2 — IDEMPOTENCY
+==============================================================================
+  ✓ promote(promote(x)) == promote(x):  'what is &n &op &n' (stable)
+  · first-pass bindings:  3
+  · second-pass bindings: 0  (sigil tokens preserved verbatim)
+
+==============================================================================
+  PHASE 3 — CONFIDENCE-EQUIVALENCE (PURE-TEXT FAST PATH)
+==============================================================================
+  ✓ pure-text: 'hello world' → 'hello world'  (no bindings, no drift)
+  ✓ pure-text: 'the cat sat on the mat' → 'the cat sat on the mat'  (no bindings, no drift)
+  ✓ pure-text: 'fire makes grug warm and happy' → 'fire makes grug warm and happy'  (no bindings, no drift)
+  ✓ pure-text: 'sun shine bright today' → 'sun shine bright today'  (no bindings, no drift)
+
+==============================================================================
+  PHASE 4 — ENGINE ROUND-TRIP (POPULATION COMPRESSION)
+==============================================================================
+  ✓ planted math node:  id=node_0  pattern='what is &n &op &n'
+  ✓ planted noise node: id=node_1  pattern='fire makes grug warm'
+  · raw='what is 2 + 2'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='what is 2+2'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='what is two plus two'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='what is 2 plus two'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='what is two plus 2'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='WHAT is TWO Plus 2'
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+  · raw='  what is  2  +  2  '
+        promoted='what is &n &op &n'
+        bindings=[&n=2 &op="+" &n=2]
+        fired=["node_0"]
+
+--- FIRE TALLY ------------------------------------------------------------
+    node_0         7/7 fires   ★ MATH NODE
+  ✓ math node fired on 7/7 surface variants — POPULATION COMPRESSION CONFIRMED
+  ✓ noise node correctly silent on every math input
+
+==============================================================================
+  PHASE 5 — PURE-TEXT INPUTS UNCHANGED
+==============================================================================
+  ✓ pure-text 'fire makes grug warm and happy' → promoted='fire makes grug warm and happy'  bindings=[]  (confidence-equivalence held)
+  ✓ pure-text 'hello world' → promoted='hello world'  bindings=[]  (confidence-equivalence held)
+
+==============================================================================
+  SUMMARY
+==============================================================================
+✅ STAGE 1.5a SIGIL PROMOTER — DEMO PASSED
+
+What was demonstrated end-to-end:
+  • 7 surface variants of "what is 2 + 2" all collapse to
+    the canonical matcher input 'what is &n &op &n'.
+  • Bindings vector preserves position-order capture
+    (3 bindings: &n &op &n ).
+  • promote_input is idempotent — feeding the rewritten string back
+    produces the same string with sigil tokens preserved verbatim.
+  • Confidence-equivalence guarantee: pure-text inputs round-trip
+    with empty bindings and matcher-equivalent rewrite.
+  • A SINGLE math node fires for every surface variant — one node per
+    shape, not one per variant. That is the whole point.
+  • Pure-text inputs flow through unchanged; the math node stays silent.
+
+Stage 1.5b parked: ATP arithmetic dispatch reading from
+current_promotion_bindings(), render-side substitution, compound
+number-words ("twenty-three"), word-form decimals, context-sensitive
+"is" disambiguation.
+

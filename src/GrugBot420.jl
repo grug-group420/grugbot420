@@ -123,6 +123,21 @@ using .SelfObserver
 include("SigilRegistry.jl")
 using .SigilRegistry
 
+# GRUG: SigilPromoter — Stage 1.5a front-door input promoter. Two-pass:
+# Layer 1 canonicalizes tokens via closed number-word and op-word maps
+# ("two plus two" -> "2 + 2"); Layer 2 walks registry sigils with
+# promote_at_tokenize=true and rewrites canonical tokens into &n / &op /
+# specimen-defined macros. Returns (rewritten_string, bindings_vector)
+# where bindings ride as a side-channel — ATP and the Stage 3 evaluator
+# consume them, the matcher and confidence math NEVER see them.
+# This is the population-compression mechanic: many surface variants of
+# the same shape collapse to one canonical matcher input, so one node per
+# shape is enough instead of one node per variant. NO SILENT FAILURES.
+# Idempotent. Fast path on no-promotable input. See plans/sigil_architecture/
+# STAGE_1_5A.md for the locked-in scope.
+include("SigilPromoter.jl")
+using .SigilPromoter
+
 include("engine.jl")
 include("Main.jl")
 
@@ -224,5 +239,19 @@ export resolve_sigils_in_pattern, parse_sigil_token
 export default_registry, merge_registry!
 export SIGIL_CLASSES, SIGIL_APPLIES_AT, SIGIL_PREFIX
 export SIGIL_NAME_REGEX, SIGIL_TOKEN_REGEX
+
+# GRUG: SigilPromoter exports — Stage 1.5a front-door input promoter.
+# `promote_input(table, raw)` is the single public entry point; it returns
+# `(rewritten_string, bindings::Vector{SigilBinding})`. `bindings_by_name`
+# offers a name-keyed view for consumers that don't care about absolute
+# position. Closed canonical maps (NUMBER_WORD_MAP, OP_WORD_MAP, OP_SYMBOL_SET)
+# are exported for callers that want to inspect or extend them at registry-
+# build time. Error types follow the same shape as SigilRegistry: typed
+# throws on bad input, no silent fallbacks.
+export SigilPromoter
+export SigilBinding
+export PromoterError, PromoterArgumentError, PromoterConfigError
+export promote_input, bindings_by_name, canonicalize_token
+export NUMBER_WORD_MAP, OP_WORD_MAP, OP_SYMBOL_SET, NUMBER_TOKEN_REGEX
 
 end # module GrugBot420
