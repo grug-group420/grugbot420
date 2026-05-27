@@ -1935,7 +1935,36 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     action_str = String(primary_vote.action)
     action_is_prose = length(split(action_str)) >= 2 && length(action_str) >= 8
 
-    claim_raw = if action_is_prose
+    # =================================================================
+    # GRUG Stage 2: ARITHMETIC COMPUTATION — if sigils captured math
+    # in the user input, actually COMPUTE the result and make it the
+    # claim. This is the bridge: sigils are macros, and macros MUST
+    # expand to their computed value. "what is 2+2" → "2 plus 2 equals 4",
+    # NOT "Execute the calculation".
+    # =================================================================
+    arithmetic_result = nothing
+    arithmetic_reply = ""
+    try
+        bindings = current_promotion_bindings()
+        if ArithmeticEngine.has_math_bindings(bindings)
+            arithmetic_result = ArithmeticEngine.compute_arithmetic(bindings)
+            if arithmetic_result.error === nothing
+                arithmetic_reply = ArithmeticEngine.format_arithmetic_reply(arithmetic_result)
+                @info "[MAIN Stage 2] Arithmetic computed: $(arithmetic_result.expression) = $(arithmetic_result.answer_str)"
+            else
+                @warn "[MAIN Stage 2] Arithmetic computation failed: $(arithmetic_result.error)"
+            end
+        end
+    catch e
+        @warn "[MAIN Stage 2] Arithmetic engine error (non-fatal, falling back to normal claim): $e"
+    end
+
+    claim_raw = if !isempty(arithmetic_reply)
+        # GRUG: ARITHMETIC WINS. The computed answer IS the claim.
+        # Priority 0 — above everything else. When math is present,
+        # the answer is the math, not the node pattern or voice body.
+        arithmetic_reply
+    elseif action_is_prose
         action_str                                # NEW v7.21c-2 top priority
     elseif !isempty(voice_body)
         voice_body
@@ -2125,6 +2154,29 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     println(payload_io, "User Triples: $u_triples")
     println(payload_io, "Node Triples: $n_triples")
     println(payload_io, "Anti-Match Detected: $(primary_vote.antimatch)")
+    # GRUG Stage 2: Arithmetic computation telemetry — shows whether
+    # sigil-captured math was actually computed this cycle.
+    if arithmetic_result !== nothing
+        println(payload_io, "Arithmetic Computed: $(arithmetic_result.expression) = $(arithmetic_result.answer_str)")
+        println(payload_io, "  Steps: $(length(arithmetic_result.steps))")
+        for (i, step) in enumerate(arithmetic_result.steps)
+            println(payload_io, "    Step $i: $(step.lhs) $(step.operator) $(step.rhs) = $(step.result)")
+        end
+        if arithmetic_result.error !== nothing
+            println(payload_io, "  Error: $(arithmetic_result.error)")
+        end
+    else
+        try
+            bindings = current_promotion_bindings()
+            if ArithmeticEngine.has_math_bindings(bindings)
+                println(payload_io, "Arithmetic: math bindings present but computation was not run")
+            else
+                println(payload_io, "Arithmetic: no math bindings this cycle")
+            end
+        catch
+            println(payload_io, "Arithmetic: <telemetry error>")
+        end
+    end
     if !isempty(tied_alternatives)
         println(payload_io, "Tied Alternatives (not selected):")
         for tv in tied_alternatives

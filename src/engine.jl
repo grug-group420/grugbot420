@@ -86,6 +86,15 @@ if !isdefined(@__MODULE__, :SigilPromoter)
     using .SigilPromoter
 end
 
+# GRUG: ArithmeticEngine — Stage 2 arithmetic evaluator. Reads the bindings
+# that SigilPromoter stashed in task-local storage and actually COMPUTES the
+# result (2+2=4, not "Execute the calculation"). MUST come after SigilPromoter
+# because it does `using ..SigilPromoter`.
+if !isdefined(@__MODULE__, :ArithmeticEngine)
+    include("ArithmeticEngine.jl")
+    using .ArithmeticEngine
+end
+
 # ==============================================================================
 # FRONT-DOOR SIGIL TABLE (Stage 1.5a)
 # ==============================================================================

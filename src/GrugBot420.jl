@@ -138,6 +138,14 @@ using .SigilRegistry
 include("SigilPromoter.jl")
 using .SigilPromoter
 
+# GRUG: ArithmeticEngine — Stage 2 arithmetic evaluator. When sigils capture
+# math in user input (&n &op &n), this module reads the bindings and ACTUALLY
+# COMPUTES the result (2+2=4, not "Execute the calculation"). Returns structured
+# ArithmeticResult that the AIML payload builder injects into the reply.
+# MUST come after SigilPromoter because it does `using ..SigilPromoter`.
+include("ArithmeticEngine.jl")
+using .ArithmeticEngine
+
 include("engine.jl")
 include("Main.jl")
 
@@ -259,5 +267,15 @@ export NUMBER_WORD_MAP, OP_WORD_MAP, OP_SYMBOL_SET, NUMBER_TOKEN_REGEX
 # task-local storage). Stage 1.5a-fix-1 added current_promotion_raw to
 # preserve the user's verbatim input alongside the rewritten string.
 export current_promotion_bindings, current_promotion_rewritten, current_promotion_raw
+
+# GRUG: ArithmeticEngine exports — Stage 2 arithmetic evaluator.
+# `compute_arithmetic(bindings)` is the primary entry point; it returns an
+# ArithmeticResult with the computed answer, step-by-step breakdown, and
+# formatted reply string. `format_arithmetic_reply` produces natural-language
+# output like "2 plus 2 equals 4". `has_math_bindings` is a cheap predicate
+# for checking whether bindings contain enough math sigils to attempt evaluation.
+export ArithmeticEngine
+export ArithmeticResult, ComputationStep
+export compute_arithmetic, format_arithmetic_reply, has_math_bindings
 
 end # module GrugBot420
