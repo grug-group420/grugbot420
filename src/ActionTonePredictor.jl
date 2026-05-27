@@ -48,7 +48,11 @@ using Random
 export ActionFamily, ToneFamily, PredictionResult,
        predict_action_tone, apply_prediction_to_arousal!,
        get_action_weight_multiplier, format_prediction_summary,
-       reset_trajectory!, get_trajectory_state, TrajectoryConfig
+       reset_trajectory!, get_trajectory_state, TrajectoryConfig,
+       reset_tonal_buildup!, get_tonal_buildup,
+       TONAL_BUILDUP_INCREMENT, TONAL_BUILDUP_HALFLIFE_S,
+       TONAL_BUILDUP_AROUSAL_GAIN,
+       LORENZ_SNAPBACK_JITTER, LORENZ_SNAPBACK_PULL
 
 # ==============================================================================
 # ENUM TYPES
@@ -147,6 +151,10 @@ function reset_trajectory!()
         empty!(_trajectory_buffer)
         _trajectory_config[] = DEFAULT_TRAJECTORY_CONFIG
     end
+    # GRUG: A full reset also wipes mood. Tests that reset trajectory expect
+    # a completely fresh predictor — leaving build-up around would mean a
+    # ghost mood across "fresh" calls.
+    reset_tonal_buildup!()
     return nothing
 end
 
@@ -568,8 +576,207 @@ function detect_incomplete_chain(
 end
 
 # ==============================================================================
-# CORE PREDICTOR
+# TONAL BUILD-UP + LORENZ SNAP-BACK DYNAMICS  (v7.16+, additive on top of v7.15)
 # ==============================================================================
+# GRUG say: rock that get hit again and again get HOTTER. Not just same temp
+#           every time. But after long quiet, rock COOL DOWN. Rock not stay
+#           hot forever just because once was hit hard.
+# GRUG say: tonal build-up = consecutive same-tone predictions stack arousal
+#           a little each time, capped, with exponential cool-down when tone
+#           changes or time passes. This makes the predictor have MOOD across
+#           a conversation: someone saying angry things twice in a row is
+#           ANGRIER than someone saying one angry thing cold.
+# GRUG say: Lorenz snap-back = on EVERY prediction, after softmax (and after
+#           any heavy damping), shake the curve a tiny bit (±envelope) and
+#           then pull a fraction of the way back toward the uniform baseline.
+#           This is the "jitter and snap" property: identical inputs never
+#           produce bit-identical curves, AND the curve never stays maximally
+#           sharp because there's always a small entropy-restoring tug back
+#           toward uniform every call. Build-up changes the *score*; snap-back
+#           changes the *shape*. They are independent.
+# GRUG say: NO NaN. NO INF. NO SILENT FAILURE. All clamped, all bounded,
+#           all return-on-error to the previous-good distribution.
+#
+# Why this is separate from the trajectory buffer:
+#   - Trajectory buffer is a 16-deep ring with 120s halflife. It is for
+#     LONG-HORIZON attractor avoidance. It triggers Lorenz damping only when
+#     gini > 0.72 (a strong concentration signal across many turns).
+#   - Build-up + snap-back is PER-PREDICTION. It runs every call, cheaply,
+#     and shapes the immediate arousal/curve regardless of trajectory state.
+#   - They are complementary, not redundant. Build-up gives the system
+#     short-term mood. Trajectory damping prevents long-term lock-in.
+#     Snap-back provides bounded per-call entropy + jitter texture.
+# ==============================================================================
+
+# GRUG: Build-up envelope. Each consecutive same-tone prediction adds this
+# fraction of (1.0 - current_buildup) to the buildup accumulator. Saturates
+# toward 1.0 but never reaches it. 0.20 means after 1 hit you're at 0.20,
+# after 2 you're at 0.36, after 3 you're at 0.488, ... reaching ~0.8 at hit 7.
+const TONAL_BUILDUP_INCREMENT = 0.20
+
+# GRUG: Cool-down halflife in seconds. After this many seconds with no
+# matching tone, build-up loses half its value. 30s ≈ a slow paragraph;
+# enough to carry mood across a multi-turn provocation, short enough that
+# leaving the convo and coming back resets effectively.
+const TONAL_BUILDUP_HALFLIFE_S = 30.0
+
+# GRUG: How much build-up bleeds into arousal_nudge. The base nudge from
+# TONE_AROUSAL_NUDGE is a small signed scalar like -0.10..+0.15. Build-up
+# multiplies that signal by (1 + BUILDUP_AROUSAL_GAIN * buildup), so a fully
+# built-up tone pushes arousal up to ~1.6× the cold nudge. Conservative on
+# purpose — we shape, we don't overpower.
+const TONAL_BUILDUP_AROUSAL_GAIN = 0.6
+
+# GRUG: Snap-back jitter envelope. Per-family multiplicative noise applied to
+# the post-damping distribution before the snap pull. ±2.5% per family — small
+# enough that a clear winner stays the winner; loud enough that no two curves
+# are identical. (The matching constant in v7.21a/main is 0.03; we go slightly
+# tighter here because we ALSO do a snap pull after, and combined effect must
+# stay bounded.)
+const LORENZ_SNAPBACK_JITTER = 0.025
+
+# GRUG: Snap-back pull fraction. After jitter, every family is pulled this
+# fraction of the way toward the uniform 1/N baseline. 0.05 is a 5% tug —
+# the curve still has a clear winner, but the entropy floor is enforced
+# every call. This is the per-prediction analog of the long-horizon Lorenz
+# damper: small, always-on, no Gini threshold, no history.
+const LORENZ_SNAPBACK_PULL = 0.05
+
+# GRUG: Single-slot tonal build-up state. NOT a buffer. Just "what mood
+# am I in right now, and when did I last update?". One-tone memory.
+const _TONAL_BUILDUP = Ref{NamedTuple{
+    (:tone, :buildup, :ts),
+    Tuple{Union{Nothing, ToneFamily}, Float64, Float64}
+}}((tone = nothing, buildup = 0.0, ts = 0.0))
+const _TONAL_BUILDUP_LOCK = ReentrantLock()
+
+"""
+    reset_tonal_buildup!()
+
+GRUG: Wipe the build-up accumulator. Called on cave wipe and by tests to
+guarantee a clean slate. Does NOT touch the trajectory buffer or config.
+"""
+function reset_tonal_buildup!()
+    lock(_TONAL_BUILDUP_LOCK) do
+        _TONAL_BUILDUP[] = (tone = nothing, buildup = 0.0, ts = 0.0)
+    end
+    return nothing
+end
+
+"""
+    get_tonal_buildup() -> NamedTuple
+
+GRUG: Read-only snapshot of the build-up state. Returns
+`(tone, buildup, ts)`. `tone === nothing` means "no prior observation".
+`buildup` is in [0.0, 1.0]. Useful for tests and diagnostics.
+"""
+function get_tonal_buildup()
+    lock(_TONAL_BUILDUP_LOCK) do
+        _TONAL_BUILDUP[]
+    end
+end
+
+# GRUG: Update the build-up accumulator given the predicted tone for THIS
+# call. Returns the new buildup value. Internal — predict_action_tone is
+# the only caller. Cool-down is applied first (decay against time), THEN
+# the increment if tone matches the previous, OR the buildup is reset
+# (with the same decay first) if tone changed.
+function _update_tonal_buildup!(predicted_tone::ToneFamily, now::Float64)::Float64
+    lock(_TONAL_BUILDUP_LOCK) do
+        prev = _TONAL_BUILDUP[]
+
+        # GRUG: First call ever — seed with a tiny non-zero so a single
+        # provocation isn't completely flat in the curve, but well below
+        # the second-hit value. 0.05 ≈ a quarter of the first increment.
+        if prev.tone === nothing
+            new_state = (tone = predicted_tone, buildup = 0.05, ts = now)
+            _TONAL_BUILDUP[] = new_state
+            return new_state.buildup
+        end
+
+        # GRUG: Exponential cool-down based on age, ALWAYS applied first.
+        # decayed = old_buildup * 2^(-age / halflife)
+        age = max(0.0, now - prev.ts)
+        decay = exp(-log(2.0) * age / TONAL_BUILDUP_HALFLIFE_S)
+        cooled = prev.buildup * decay
+
+        if predicted_tone == prev.tone
+            # GRUG: Same tone — stack on top of the cooled value.
+            #   new = cooled + increment * (1 - cooled)
+            # This is the saturating-toward-1.0 form. Cap at 0.95 to keep
+            # arousal_nudge bounded (gain × 0.95 ≈ 0.57 multiplier headroom).
+            new_buildup = clamp(cooled + TONAL_BUILDUP_INCREMENT * (1.0 - cooled), 0.0, 0.95)
+            new_state = (tone = predicted_tone, buildup = new_buildup, ts = now)
+            _TONAL_BUILDUP[] = new_state
+            return new_buildup
+        else
+            # GRUG: Tone changed — keep the cooled remnant but seed the new
+            # tone fresh. The cooled value of the OLD tone is dropped
+            # (it doesn't transfer to a different mood) and the new tone
+            # starts at the seed value. This is the "snap back" for mood:
+            # mood doesn't carry across a tone shift.
+            new_state = (tone = predicted_tone, buildup = 0.05, ts = now)
+            _TONAL_BUILDUP[] = new_state
+            return new_state.buildup
+        end
+    end
+end
+
+# GRUG: Apply Lorenz snap-back to a probability distribution IN PLACE.
+# 1. Multiplicative jitter per family: x *= (1 + ε), ε ∈ U[-env, +env].
+# 2. Pull every family `pull` of the way toward uniform: x = (1-pull)*x + pull/N.
+# 3. Renormalize so values sum to 1.0.
+# The effect: identical inputs never produce identical curves (jitter), AND
+# the curve always has a small per-call entropy tug toward uniform (snap).
+# Bounded, fast, idempotent in expectation.
+function _lorenz_snapback!(
+    dist     ::Dict{K, Float64};
+    envelope ::Float64 = LORENZ_SNAPBACK_JITTER,
+    pull     ::Float64 = LORENZ_SNAPBACK_PULL,
+) where K
+    n = length(dist)
+    if n == 0
+        return dist
+    end
+    if envelope < 0.0 || pull < 0.0 || pull > 1.0
+        # GRUG: Caller misuse — refuse silently-bad input loudly.
+        error("!!! FATAL: _lorenz_snapback! got out-of-range envelope=$envelope or pull=$pull !!!")
+    end
+
+    uniform = 1.0 / n
+
+    # GRUG: Step 1 — jitter. Multiplicative, clamped non-negative.
+    if envelope > 0.0
+        for (k, v) in dist
+            ε = (rand() * 2.0 - 1.0) * envelope
+            dist[k] = max(0.0, v * (1.0 + ε))
+        end
+    end
+
+    # GRUG: Step 2 — pull each family toward uniform.
+    if pull > 0.0
+        one_minus_pull = 1.0 - pull
+        for (k, v) in dist
+            dist[k] = one_minus_pull * v + pull * uniform
+        end
+    end
+
+    # GRUG: Step 3 — renormalize. If degenerate (shouldn't happen with
+    # bounded jitter + non-negative pull), fall back to uniform.
+    total = sum(values(dist))
+    if !isfinite(total) || total <= 0.0
+        for k in keys(dist)
+            dist[k] = uniform
+        end
+        return dist
+    end
+    for k in keys(dist)
+        dist[k] /= total
+    end
+    return dist
+end
+
+
 
 """
     predict_action_tone(input_text, all_verbs) -> PredictionResult
@@ -760,6 +967,17 @@ function predict_action_tone(
     end
 
     # ------------------------------------------------------------------
+    # STEP 4.5: LORENZ SNAP-BACK (per-prediction jitter + entropy tug)
+    # GRUG: Always-on, bounded micro-perturbation. Identical inputs never
+    # produce bit-identical curves, AND the curve gets a tiny entropy
+    # restoration on every call — independent of the long-horizon
+    # trajectory damper above. This is the "slight jitter and snap back
+    # every time" property: it runs whether or not Step 4 fired.
+    # ------------------------------------------------------------------
+    _lorenz_snapback!(action_dist)
+    _lorenz_snapback!(tone_dist)
+
+    # ------------------------------------------------------------------
     # STEP 5: Pick winners from (possibly damped) normalized distributions
     # ------------------------------------------------------------------
     predicted_action = argmax(action_dist)
@@ -810,6 +1028,21 @@ function predict_action_tone(
     # GRUG: ESCALATE action adds extra arousal push regardless of tone.
     if predicted_action == ACTION_ESCALATE
         arousal_nudge = clamp(arousal_nudge + 0.20, -1.0, 1.0)
+    end
+
+    # ------------------------------------------------------------------
+    # STEP 7.5: TONAL BUILD-UP (consecutive same-tone arousal escalation)
+    # GRUG: Update the single-slot build-up state for THIS predicted tone,
+    # then multiply the cold arousal nudge by (1 + GAIN * buildup). Same
+    # tone twice in a row gets stronger; tone change resets and the new
+    # tone starts cold; long quiet decays the prior build-up exponentially
+    # (TONAL_BUILDUP_HALFLIFE_S). Sign of the nudge is preserved — if the
+    # cold nudge was negative (e.g. REFLECTIVE), build-up makes it MORE
+    # negative; if positive (URGENT/HOSTILE), MORE positive.
+    # ------------------------------------------------------------------
+    let buildup = _update_tonal_buildup!(predicted_tone, time())
+        gain_factor = 1.0 + TONAL_BUILDUP_AROUSAL_GAIN * buildup
+        arousal_nudge = clamp(arousal_nudge * gain_factor, -1.0, 1.0)
     end
 
     # ------------------------------------------------------------------

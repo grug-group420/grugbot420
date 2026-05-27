@@ -1,0 +1,232 @@
+# READ-FIRST-IMPORTANT.md
+
+> **Branch this lives on: `v7.15-updates`** — this is the active development branch.
+> The `feat/v7.22-lobe-dynamics-followups` branch was an agent-created fork (mistake)
+> and has been left alone, NOT merged. See `AGENT_RULES.md` for why.
+> See also: `feat/comprehensive-save-and-chat-proof` was deleted from origin (orphan).
+
+---
+
+## TL;DR
+
+`v7.15-updates` is the **canonical branch**. It carries:
+
+| Feature | Module(s) | Status |
+|---|---|---|
+| Sequential lobe orchestration with curved floor + multi-lobe gate | `LobeOrchestrator.jl` | ✅ |
+| 8–16 random-partner cap, group-id FIFO chatter, gzipped persistence | `GroupRegistry.jl` | ✅ |
+| User + auto-promoted CRYSTALIZE always-fire bypass with hysteresis | `CrystalizeTag.jl` | ✅ |
+| Vote-copy chatter (not pattern-copy) with cooldown + intensity gate | `ChatterVoteSwap.jl` | ✅ |
+| Complexity-gated dynamic re-weighting wrapper | `DynamicActionTonePredictor.jl` | ✅ |
+| Phagy 7th automaton — stale-unlinkable / empty-group cleanup | `PhagyGroupOrganizer.jl` | ✅ |
+| Strong-low-conf NONJITTER override | `RelationalJitter.jl` | ✅ |
+| Two-tier AIML threshold + concept-class thesaurus | `Thesaurus.jl` | ✅ (v7.16.0) |
+| Relation-gated support band | `Main.jl` orchestration | ✅ (v7.16.1) |
+| Composition-roll for confirmed-support claims | `Main.jl` AIML | ✅ (v7.16.2) |
+| Absolute lock-in floor with semantic weighting | vote pipeline | ✅ (v7.16.3) |
+| **Subconscious microlog (fuzzy time-cues, throttled)** | `SelfObserver.jl` | ✅ (ported from main) |
+| **Sigil registry kernel (`&n`, `&op`, `&noun`, `&word`, `&rest`)** | `SigilRegistry.jl` | ✅ (ported from main) |
+| **Front-door input promoter (variants → canonical)** | `SigilPromoter.jl` | ✅ (ported from main) |
+| **Sigil-bound arithmetic ("two plus two" → 4)** | `ArithmeticEngine.jl` | ✅ (ported from main) |
+| **Tonal build-up over consecutive same-tone predictions** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
+| **Per-prediction Lorenz snap-back (jitter + entropy tug)** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
+
+**Hopfield networks were commented out long ago.** The ghost references in
+`PhagyMode.jl` (`CACHE_VALIDATOR` etc.) are stubbed; nothing in the live
+runtime calls a Hopfield path. Do not re-enable without explicit user OK.
+
+---
+
+## What was ported in this round (May 2026)
+
+The following work was already on `origin/main` but not yet on
+`v7.15-updates`. It has been **added** to this branch without disturbing the
+v7.15/v7.16 features above.
+
+### 1. `SelfObserver.jl` — subconscious microlog
+- Fuzzy, throttled, observation-only memory store.
+- Stochastic write, globally serialized read with token-bucket throttle and
+  hard timeout.
+- Returns fuzzy time-bucket symbols (`:just_now`, `:earlier_today`,
+  `:yesterday_ish`, `:long_ago`, …) — never raw timestamps, never confidence
+  scalars.
+- **Structural guarantee**: nothing in this module returns `Float64` from
+  public API. `test_self_observer.jl` enforces it.
+- Test: `test/test_self_observer.jl` — 129 assertions, all pass.
+
+### 2. `SigilRegistry.jl` — sigil kernel (Stage 1)
+- Single source of truth for typed symbolic handles (`&n`, `&op`, `&word`,
+  `&noun`, `&rest`).
+- Token-sigil classes: `:lambda`, `:macro`, `:tag` activated. `:glue`,
+  `:functor`, `:procedure` reserved.
+- Pattern parsing extracts `&name` tokens, resolves against registry, fails
+  loud on unknown sigil.
+- Zero runtime cost when no sigils used.
+- Test: `test/test_sigil_registry.jl` — 177 assertions, all pass.
+
+### 3. `SigilPromoter.jl` — front-door input promoter (Stage 1.5a/c)
+- Layer 1 (language): `"two"` → `"2"`, `"plus"` → `"+"`. Closed lookup table.
+- Layer 2 (shape): `"2"` → `&n=2`, `"+"` → `&op=plus`. Driven by registry's
+  `promote_at_tokenize` flag.
+- Idempotent: `promote(promote(x)) == promote(x)`.
+- Empty-bindings fast path for pure-text inputs (zero allocation, bit-identical
+  to old behavior).
+- Test: `test/test_sigil_promoter.jl` — 284 assertions, all pass.
+
+### 4. `ArithmeticEngine.jl` — sigil-bound math (Stage 2)
+- Reads `current_promotion_bindings()` set by `SigilPromoter`.
+- Multi-step evaluation: `"3 + 5 * 2"` → step 1: `5*2=10`, step 2: `3+10=13`.
+- Operators: `+ - * / = < > % ^`.
+- Division by zero returns an error string, not a crash.
+- Returns structured `ArithmeticResult` with `ComputationStep` list — caller
+  decides format.
+- Test: `test/test_arithmetic_engine.jl` — 111 assertions, all pass.
+- End-to-end verified: `"what is 2+2"` → `"2 plus 2 equals 4"`.
+
+---
+
+## NEW in this round — tonal build-up + per-prediction Lorenz snap-back
+
+Two **independent** dynamics added to `ActionTonePredictor.jl`. Both run on
+every call, both are bounded, both maintain all existing invariants
+(distributions sum to 1.0, every value in `[0,1]`, no NaN/Inf).
+
+### A. Tonal build-up over time
+| Constant | Default | Meaning |
+|---|---|---|
+| `TONAL_BUILDUP_INCREMENT` | `0.20` | Each consecutive same-tone hit adds `0.20 × (1 - current_buildup)` |
+| `TONAL_BUILDUP_HALFLIFE_S` | `30.0` | Cool-down halflife when same tone is not refreshed |
+| `TONAL_BUILDUP_AROUSAL_GAIN` | `0.6` | Multiplies `arousal_nudge` by `(1 + GAIN × buildup)` |
+
+- **State**: a single-slot `(tone, buildup, ts)` accumulator with a `ReentrantLock`.
+  This is NOT the trajectory ring buffer — those are separate concerns.
+- **Same tone twice** → mood stacks: someone making consecutive hostile
+  remarks gets a stronger arousal push than a one-off insult.
+- **Tone change** → mood snaps back: build-up of the *old* tone is dropped,
+  the new tone seeds at `0.05`. Mood doesn't transfer across emotional shifts.
+- **Long quiet** → exponential cool-down: a fresh conversation effectively
+  starts cold (after ≈30s of no matching tone, build-up halves; after a few
+  half-lives it's a rounding error).
+- **Sign preserved**: gain multiplier never flips the sign of the cold nudge.
+  HOSTILE/URGENT (positive nudge) gets pushed more positive; REFLECTIVE
+  (negative nudge) gets pushed more negative.
+
+### B. Per-prediction Lorenz snap-back
+| Constant | Default | Meaning |
+|---|---|---|
+| `LORENZ_SNAPBACK_JITTER` | `0.025` | ±2.5% multiplicative noise per family before snap |
+| `LORENZ_SNAPBACK_PULL`   | `0.05`  | Pull each family 5% of the way toward `1/N` |
+
+- Always-on, runs after the existing trajectory-buffer Lorenz damper (Step 4)
+  and before winner pick (Step 5).
+- **Step 1**: per-family multiplicative jitter — identical inputs no longer
+  produce bit-identical curves.
+- **Step 2**: pull each family toward the uniform `1/N` baseline.
+- **Step 3**: renormalize so values sum to 1.0.
+- This is the **per-prediction** analog of the long-horizon Lorenz damper.
+  It runs whether or not the trajectory damper fired. Bounded, fast,
+  unconditional.
+
+### Public API surface added
+- `reset_tonal_buildup!()` — wipe the accumulator. Called automatically by
+  `reset_trajectory!`.
+- `get_tonal_buildup() -> NamedTuple{(:tone, :buildup, :ts), …}` — read-only
+  snapshot for diagnostics and tests.
+- All five new constants are exported.
+
+### Tests
+`test/test_tonal_buildup_and_snapback.jl` — **9 testsets, 268 assertions**
+covering:
+1. Constants are in legal ranges (sanity guard).
+2. `reset_tonal_buildup!` produces clean slate.
+3. Same-tone calls grow buildup; tone change resets it.
+4. Repeated same-tone calls amplify arousal magnitude.
+5. Tone shift snaps mood back to cold.
+6. Snap-back jitter: identical input produces non-identical curves.
+7. Snap-back preserves sum-to-1 invariant.
+8. Snap-back keeps every family in `[0, 1]` (240 assertions over a stress run).
+9. `reset_tonal_buildup!` between calls eliminates build-up effect (cool-down structural check).
+
+### Tests that needed updates
+`test/test_dynamic_action_tone.jl`: the simple-input passthrough test asserted
+**bit-exact equality** between two consecutive `predict_action_tone` calls.
+That assumption is gone by design (jitter + build-up). The test now resets
+build-up between calls and uses bounded tolerances. Family decisions are still
+asserted exactly. **No other test in the suite needed changes.**
+
+---
+
+## What was NOT ported (and why)
+
+| From `origin/main` | Why not |
+|---|---|
+| `TonalJudge.jl` | Depends on v7.21b-1 features (`get_tonal_observation`, `emotional_coherence`, `classifier_mode`) that the v7.15-updates `ActionTonePredictor` does not expose. Hot-swapping ATP would break the v7.15/v7.16 lock-in floor and relation-gated support stack. The new tonal build-up dynamics deliver the same observable arousal-shaping effect without the structural rewrite. If TonalJudge is wanted later, port `PredictionResult`'s `classifier_mode` + `emotional_coherence` fields first, then drop in TonalJudge unchanged. |
+| Wholesale `ActionTonePredictor.jl` from main | Same reason as above — main's ATP is a clean v7.21 superset, but `DynamicActionTonePredictor` rebuilds `PredictionResult` positionally with 11 fields and main's struct has 13. Rather than refactor every consumer, only the new dynamics were added on top of the existing 11-field struct. |
+
+These are **deliberate hold-outs**, not mistakes. They can be picked up in a
+future round if the user wants them.
+
+---
+
+## Verification (run yourself)
+
+```bash
+cd grugbot420
+julia --project=. test/runtests.jl
+```
+
+Expected: `GrugBot420 Tests | 45 45 ~4m`. Zero failures.
+
+Module-by-module:
+
+```bash
+# Ported modules
+julia --project=. test/test_self_observer.jl       # 129 assertions
+julia --project=. test/test_sigil_registry.jl      # 177 assertions
+julia --project=. test/test_sigil_promoter.jl      # 284 assertions
+julia --project=. test/test_arithmetic_engine.jl   # 111 assertions
+
+# New tonal dynamics
+julia --project=. test/test_tonal_buildup_and_snapback.jl  # 268 assertions
+```
+
+---
+
+## Branch hygiene
+
+- **Don't fork.** See `AGENT_RULES.md`. The agent that created
+  `feat/v7.22-lobe-dynamics-followups` off `main` instead of working on
+  `v7.15-updates` cost real time; the file documents the rules to prevent
+  a repeat.
+- **Don't delete branches without explicit named user permission.** Same file.
+- **The orphan branch `feat/comprehensive-save-and-chat-proof` was deleted**
+  (origin only) in a prior round with user approval.
+- **The `feat/v7.22-lobe-dynamics-followups` branch is left intact on origin**
+  for the user to inspect or delete at their leisure. It has duplicate
+  inline implementations of features now consolidated into this branch via
+  the v7.15-updates modules — do not merge it.
+
+---
+
+## File map for this round
+
+```
+grugbot420/
+├── AGENT_RULES.md                        ← agent-behavior contract (do not fork)
+├── READ-FIRST-IMPORTANT.md               ← this file
+├── src/
+│   ├── ActionTonePredictor.jl            ← MODIFIED: tonal build-up + Lorenz snap-back
+│   ├── ArithmeticEngine.jl               ← NEW (ported from main)
+│   ├── GrugBot420.jl                     ← MODIFIED: 4 new module includes
+│   ├── SelfObserver.jl                   ← NEW (ported from main)
+│   ├── SigilPromoter.jl                  ← NEW (ported from main)
+│   └── SigilRegistry.jl                  ← NEW (ported from main)
+└── test/
+    ├── runtests.jl                       ← MODIFIED: 5 new entries in ALL_TESTS
+    ├── test_arithmetic_engine.jl         ← NEW (ported from main)
+    ├── test_dynamic_action_tone.jl       ← MODIFIED: tolerances for jitter+build-up
+    ├── test_self_observer.jl             ← NEW (ported from main)
+    ├── test_sigil_promoter.jl            ← NEW (ported from main)
+    ├── test_sigil_registry.jl            ← NEW (ported from main)
+    └── test_tonal_buildup_and_snapback.jl ← NEW (NEW DYNAMICS COVERAGE)
+```

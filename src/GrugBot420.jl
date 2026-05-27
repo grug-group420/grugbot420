@@ -37,6 +37,15 @@ using .SemanticVerbs
 include("ActionTonePredictor.jl")
 using .ActionTonePredictor
 
+# GRUG NOTE: TonalJudge was considered for port from origin/main but it
+# depends on v7.21b-1 features (get_tonal_observation, emotional_coherence,
+# classifier_mode) that the v7.15-updates ActionTonePredictor does not have.
+# Rather than break the v7.15/v7.16 lock-in floor + relation-gated support
+# stack by hot-swapping ATP, the new tonal build-up + per-prediction Lorenz
+# snap-back dynamics are added directly to this branch's ActionTonePredictor.
+# If TonalJudge is wanted later, port the v7.21b-1 emotional-coherence
+# struct fields first.
+
 include("LobeTable.jl")
 using .LobeTable
 
@@ -167,6 +176,35 @@ using .AIMLNodeSystem
 # Must load BEFORE engine.jl so engine can call parallel_fire_batches and FireCounter.
 include("VoteOrchestrator.jl")
 using .VoteOrchestrator
+
+# ────────────────────────────────────────────────────────────────────────────
+# GRUG (port from main): subconscious + sigil + arithmetic stack.
+# Order matters:
+#   SelfObserver       — quiet-thought microlog; observation-only, never
+#                        touches confidence. Used by AIML reply assembly to
+#                        whisper fuzzy time-cues at the end if asked.
+#   SigilRegistry      — Stage 1 sigil kernel (&n, &op, &noun, &word, &rest).
+#                        Pure registry; no engine deps.
+#   SigilPromoter      — Stage 1.5a/c front-door input promoter. Rewrites
+#                        "two plus two" → "what is &n &op &n" before pattern
+#                        matching. Depends on SigilRegistry.
+#   ArithmeticEngine   — Stage 2 sigil-bound math. Reads SigilPromoter
+#                        bindings, computes, returns ComputationStep.
+# All four are additive: zero-cost when inputs don't trigger them; no
+# v7.15/v7.16 module needs to know they exist.
+# ────────────────────────────────────────────────────────────────────────────
+include("SelfObserver.jl")
+using .SelfObserver
+
+include("SigilRegistry.jl")
+using .SigilRegistry
+
+include("SigilPromoter.jl")
+using .SigilPromoter
+
+# ArithmeticEngine MUST come after SigilPromoter (it does `using ..SigilPromoter`).
+include("ArithmeticEngine.jl")
+using .ArithmeticEngine
 
 include("engine.jl")
 include("Main.jl")

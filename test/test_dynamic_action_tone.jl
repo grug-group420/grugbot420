@@ -15,7 +15,8 @@ using GrugBot420: ActionTonePredictor
 using GrugBot420.DynamicActionTonePredictor:
     predict_action_tone_dynamic, compute_semantic_complexity,
     should_use_dynamic_path, DynamicPredictionError, COMPLEXITY_FLOOR
-using GrugBot420.ActionTonePredictor: predict_action_tone, PredictionResult
+using GrugBot420.ActionTonePredictor: predict_action_tone, PredictionResult,
+                                       reset_tonal_buildup!
 
 println("\n" * "=" ^ 60)
 println("GRUG v7.15 DynamicActionTonePredictor TEST SUITE")
@@ -54,21 +55,38 @@ end
 end
 
 # ==============================================================================
-# [3] SIMPLE PATH --- dynamic returns bit-exact base result
+# [3] SIMPLE PATH --- dynamic returns the base result (family-equal; numerics
+#     drift by snap-back jitter + tonal build-up between two consecutive
+#     predict_action_tone calls, which is BY DESIGN as of the v7.16+ tonal
+#     dynamics. The contract is "dynamic adds NO work on simple inputs",
+#     i.e. dynamic must not BOOST or otherwise perturb beyond what calling
+#     the base predictor twice would itself produce.)
 # ==============================================================================
 @testset "predict_action_tone_dynamic: simple input passes through" begin
     input = "what time is it"
     triple_count = 0
 
+    # GRUG: Reset the tonal build-up state between the two calls so each
+    # one starts cold. The remaining drift between `base` and `dyn` is
+    # ONLY the per-call snap-back jitter (±2.5% per family, multiplicative,
+    # then a 5% tug toward uniform), which is bounded.
+    reset_tonal_buildup!()
     base = predict_action_tone(input, TEST_VERBS)
+    reset_tonal_buildup!()
     dyn  = predict_action_tone_dynamic(input, TEST_VERBS, triple_count)
 
+    # Family decisions must agree (jitter is too small to flip a winner).
     @test dyn.action_family    == base.action_family
     @test dyn.tone_family      == base.tone_family
-    @test dyn.confidence       == base.confidence   # bit-exact
-    @test dyn.arousal_nudge    == base.arousal_nudge
-    @test dyn.action_weight    == base.action_weight
     @test dyn.incomplete_chain == base.incomplete_chain
+
+    # Numerics: dynamic's job on a simple input is "no boost". Allow a
+    # generous tolerance so the snap-back jitter envelope and any minor
+    # build-up seed effects don't trip the test, but reject any actual
+    # confidence boost (which would mean the dynamic path mistakenly fired).
+    @test abs(dyn.confidence    - base.confidence)    < 0.10
+    @test abs(dyn.arousal_nudge - base.arousal_nudge) < 0.10
+    @test abs(dyn.action_weight - base.action_weight) < 0.10
 end
 
 # ==============================================================================
@@ -81,21 +99,31 @@ end
     triple_count = 3
     causal_count = 2
 
+    # GRUG: Reset build-up between the two predict calls so neither carries
+    # mood from the other. Per-call snap-back jitter still applies, so the
+    # exact-equality assertion is replaced by a bounded-tolerance one.
+    reset_tonal_buildup!()
     base = predict_action_tone(long, TEST_VERBS)
+    reset_tonal_buildup!()
     dyn  = predict_action_tone_dynamic(long, TEST_VERBS, triple_count;
                                         causal_verb_count = causal_count)
 
     @test dyn.action_family == base.action_family
     @test dyn.tone_family   == base.tone_family
 
-    # GRUG: Boost applied; new confidence >= base; never > 1.0.
-    @test dyn.confidence >= base.confidence
+    # GRUG: Boost applied; new confidence >= base − jitter slop; never > 1.0.
+    # Jitter envelope is ±2.5% per family + 5% snap toward uniform, so on
+    # the confidence-margin (winner − runnerup, scaled by 2.5) the absolute
+    # drift between two calls can be a few percent. We test that the dynamic
+    # boost exists in expectation, not bit-exactly.
+    @test dyn.confidence + 0.05 >= base.confidence
     @test dyn.confidence <= 1.0
 
-    # Expected boost = min(0.30, 5 * 0.05) = 0.25.
+    # Expected boost = min(0.30, 5 * 0.05) = 0.25. Compare with a tolerance
+    # that accommodates the jitter on BOTH `base` and `dyn` independently.
     expected_boost = min(0.30, (triple_count + causal_count) * 0.05)
     expected_conf  = clamp(base.confidence + expected_boost, 0.0, 1.0)
-    @test isapprox(dyn.confidence, expected_conf; atol = 1e-9)
+    @test isapprox(dyn.confidence, expected_conf; atol = 0.05)
 end
 
 # ==============================================================================

@@ -68,6 +68,19 @@ const ALL_TESTS = [
     # >= 0.50, so complex questions with multiple strong+linked peers
     # all lock in together instead of only the top 2 via relative window.
     "test_lockin_floor.jl",
+    # GRUG (ported from main): SelfObserver subconscious microlog,
+    # SigilRegistry kernel + SigilPromoter front-door rewriter +
+    # ArithmeticEngine sigil-bound math. All four are additive on top of
+    # the v7.15/v7.16 stack — none of them touch confidence math or
+    # disturb the existing lock-in / relation-gate tests.
+    "test_self_observer.jl",
+    "test_sigil_registry.jl",
+    "test_sigil_promoter.jl",
+    "test_arithmetic_engine.jl",
+    # GRUG (v7.16+): tonal build-up over consecutive same-tone predictions
+    # + per-prediction Lorenz snap-back jitter. Locks in the new dynamics
+    # added on top of the v7.15-updates ActionTonePredictor.
+    "test_tonal_buildup_and_snapback.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
