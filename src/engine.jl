@@ -153,6 +153,34 @@ function extract_relational_triples(input::String)::Vector{RelationalTriple}
 
     triples = RelationalTriple[]
 
+    # GRUG v7.21c-5: noun-question surface forms.
+    # `what is fire` already works because `is` is a relational verb. But
+    # `tell me about fire` previously produced User Triples: None: `tell` is a
+    # query/tone marker, not a semantic relation, and `about` is a preposition.
+    # That let the built-in generic `tell me` node beat noun-specific aliases.
+    # Preserve the simple adjacency extractor, but first add explicit query
+    # relations for common noun-question surfaces so noun-description nodes get
+    # the same lock-in as `what is <noun>`.
+    for i in 1:length(tokens)
+        tok = String(tokens[i])
+        if tok == "tell"
+            # tell me about fire / tell about fire
+            if i + 3 <= length(tokens) && String(tokens[i+1]) == "me" && String(tokens[i+2]) == "about"
+                obj = String(tokens[i+3])
+                !isempty(obj) && push!(triples, RelationalTriple("tell", "about", obj))
+            elseif i + 2 <= length(tokens) && String(tokens[i+1]) == "about"
+                obj = String(tokens[i+2])
+                !isempty(obj) && push!(triples, RelationalTriple("tell", "about", obj))
+            end
+        elseif tok == "describe" && i + 1 <= length(tokens)
+            obj = String(tokens[i+1])
+            !isempty(obj) && push!(triples, RelationalTriple("describe", "targets", obj))
+        elseif tok == "about" && i > 1 && i < length(tokens) && String(tokens[i-1]) == "what"
+            obj = String(tokens[i+1])
+            !isempty(obj) && push!(triples, RelationalTriple("what", "about", obj))
+        end
+    end
+
     # GRUG QoL FIX: Need at least 3 rocks to make a (Subject, Verb, Object) gear!
     if length(tokens) < 3
         return triples
@@ -419,7 +447,8 @@ end
 const STRENGTH_CAP   = 10.0
 const STRENGTH_FLOOR = 0.0
 
-# GRUG: Nodes with response time averages above this threshold get GRAVED-SLOW.
+# GRUG: Slow-response telemetry threshold. v7.21c-5 side-process isolation:
+# exceeding this threshold logs diagnostics only; it does not grave voters.
 # 24-hour ledger clears daily. Time in seconds.
 const SLOW_NODE_THRESHOLD_SECONDS = 5.0
 const LEDGER_CLEAR_INTERVAL       = 86400.0  # GRUG: 24 hours in seconds
@@ -905,7 +934,8 @@ end
 record_response_time!(node::Node, elapsed_seconds::Float64)
 
 GRUG: Record a response time for this node in its big-O ledger.
-If average response time exceeds SLOW_NODE_THRESHOLD_SECONDS, mark GRAVED-SLOW.
+Side-process isolation rule: timing telemetry must not change vote confidence
+or future vote eligibility. Slow averages are logged, not auto-graved.
 Ledger clears every 24 hours (LEDGER_CLEAR_INTERVAL).
 """
 function mark_node_contributor!(node::Node)
@@ -954,15 +984,14 @@ function record_response_time!(node::Node, elapsed_seconds::Float64)
 
         push!(node.response_times, elapsed_seconds)
 
-        # GRUG: Check average response time. If too slow, node gets yeeted!
+        # GRUG: Check average response time for telemetry only.
+        # v7.21c-5 side-process isolation: response-time side effects must not
+        # grave nodes or alter future vote eligibility. Keep the ledger useful
+        # for diagnostics, but never convert slowness into GRAVED-SLOW here.
         if !isempty(node.response_times)
             avg_time = sum(node.response_times) / length(node.response_times)
-            if avg_time > SLOW_NODE_THRESHOLD_SECONDS && !node.is_grave
-                node.is_grave     = true
-                node.grave_reason = "GRAVED-SLOW"
-                println("[ENGINE] 🐢  Node $(node.id) marked [GRAVED-SLOW] (avg: $(round(avg_time, digits=2))s > $(SLOW_NODE_THRESHOLD_SECONDS)s).")
-                # GRUG (v7.19): tell the group bookkeeper a slot opened up.
-                try mark_group_grave_slot!(node.id) catch e; @warn "group slot update failed for $(node.id): $e"; end
+            if avg_time > SLOW_NODE_THRESHOLD_SECONDS
+                println("[ENGINE] 🐢  Node $(node.id) slow telemetry only (avg: $(round(avg_time, digits=2))s > $(SLOW_NODE_THRESHOLD_SECONDS)s); not graving.")
             end
         end
     end
@@ -2780,12 +2809,11 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
     end
 
-    # GRUG: ACTION+TONE PRE-PREDICTION
-    # Run BEFORE Hopfield check and BEFORE scan so we can pre-weight confidences.
-    # This reads causal chain completeness + surface tone markers.
-    # Returns a PredictionResult that carries arousal_nudge and action_weight multiplier.
-    # If prediction fails for any reason, Grug logs warning and continues without it.
-    # Non-fatal: a nil prediction simply means all confidence weights stay at 1.0.
+    # GRUG: ACTION+TONE PRE-PREDICTION (DIAGNOSTIC ONLY)
+    # Side processes must NEVER affect vote confidence. ActionTonePredictor may
+    # observe, log, and populate LAST_PREDICTION for UI/telemetry, but the scan
+    # score below remains pure core matching: token_conf + rel_conf.
+    # If prediction fails for any reason, Grug logs warning and continues.
     prediction = try
         ActionTonePredictor.predict_action_tone(input_text, SemanticVerbs.get_all_verbs())
     catch e
@@ -3085,18 +3113,10 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
 
         confidence = token_conf + rel_conf
 
-        # GRUG: ACTION+TONE CONFIDENCE PRE-WEIGHTING
-        if !isnothing(prediction) && confidence > 0.0
-            node_action_peek = try
-                positives, _, _ = parse_action_packet(node.action_packet)
-                isempty(positives) ? "" : String(positives[1][1])
-            catch ex
-                @warn "[ENGINE] ⚠ Failed to peek action_packet for node $(node.id): $ex"
-                ""
-            end
-            weight = ActionTonePredictor.get_action_weight_multiplier(prediction, node_action_peek)
-            confidence = confidence * weight
-        end
+        # GRUG v7.21c-5: Side-process isolation.
+        # Do NOT multiply confidence by ActionTonePredictor, TonalJudge, memory,
+        # lobe routing, timing ledgers, or any other auxiliary process. Vote
+        # confidence is the raw result of core node matching only.
 
         if token_conf > 0 || rel_conf > 0
             # GRUG: Node wants to fire. Claim a slot from the shared FireCounter.
@@ -3873,8 +3893,8 @@ end
 #
 # 8. BIG-O RESPONSE TIME LEDGER:
 # Each node tracks its own response time history in a 24-hour rolling ledger.
-# Nodes whose average response time exceeds SLOW_NODE_THRESHOLD_SECONDS are
-# automatically marked [GRAVED-SLOW] and removed from the active voting pool.
+# v7.21c-5 side-process isolation makes this telemetry-only: slow averages
+# are logged but do not change vote confidence or active voting eligibility.
 #
 # 9. NEIGHBOR LINKING (MAX 4 = UNLINKABLE):
 # New nodes latch onto the strongest pattern-similar existing node. Nodes are 

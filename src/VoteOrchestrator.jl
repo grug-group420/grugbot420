@@ -82,23 +82,13 @@ const AIML_SUBTOP_BASE_PROB  = 0.20
 const AIML_SUBTOP_BONUS_PROB = 0.70
 
 # ============================================================================
-# COMPOSITE VOTE-SCORING KNOBS (vote-pick stage matching dimensions)
+# SIDE-PROCESS SCORING KNOBS (DISABLED FOR PRIMARY VOTE CONFIDENCE)
 # ============================================================================
-# GRUG: The vote orchestrator used to rank candidates on raw confidence alone
-# (one knob, one dimension). That meant two candidates with confidence 0.6 were
-# treated identically even when one came from the consensus-winner lobe and
-# the other was an isolated cross-lobe leaker, or one had strong relational
-# alignment with the input triples and the other had none.
-#
-# COMPOSITE SCORE: a vote's final ranking is its base confidence multiplied
-# by (1 + Σᵢ Wᵢ * sᵢ) where sᵢ ∈ [0,1] is each per-vote signal and Wᵢ is the
-# global weight knob below. Each signal is optional — passing NaN means
-# "skip this dimension for this candidate". Weights set to 0 disable a knob
-# without removing the plumbing. Total bonus is capped at +VOTE_BONUS_CAP so
-# no single vote can 10x itself out of contention.
-#
-# All weights live HERE so tuning is one-stop; production runs can tweak the
-# constants without code surgery elsewhere.
+# v7.21c-5 rule: side processes must never affect vote confidences or primary
+# ranking. The optional fields below remain on VoteCandidate for telemetry and
+# backwards-compatible plumbing, but composite_vote_score intentionally ignores
+# them and returns raw core confidence. Core confidence is produced upstream by
+# token/pattern matching plus relational matching only.
 # ----------------------------------------------------------------------------
 const VOTE_W_LOBE_ALIGNMENT     = 0.40   # in winner lobe (1.0) vs passthrough (~0.5) vs orphan (0.0)
 const VOTE_W_RELATIONAL_MATCH   = 0.50   # input/node triple overlap fraction
@@ -598,12 +588,9 @@ struct VoteCandidate
     action_tone_align::Float64
     anti_match_score::Float64
     peak_dominance::Float64
-    # ---- v7.21b-3b: orthogonal multiplicative tilt (1.0 = pass-through) --
-    # GRUG: Frame-match plug from TonalJudge. 1.0 means "no opinion / neutral";
-    # >1.0 lifts a node whose declared frame_hints match the current judgement;
-    # <1.0 inhibits a node whose plugs mismatch UNDER RELATIONAL MODE ONLY.
-    # Computed upstream (in Main.jl) via TonalJudge.compute_frame_match_multiplier
-    # so VoteOrchestrator stays decoupled from the judge module.
+    # ---- v7.21b-3b compatibility field (neutral under v7.21c-5) ---------
+    # Kept for serialized/plumbing compatibility. Side-process isolation means
+    # this field is diagnostic only and composite_vote_score ignores it.
     frame_match_multiplier::Float64
 end
 
@@ -634,41 +621,14 @@ end
 """
     composite_vote_score(vc::VoteCandidate)::Float64
 
-GRUG: Combine raw confidence with all available matching dimensions to
-produce the final ranking score. Knobs come from the VOTE_W_* constants.
-NaN signals are ignored (zero contribution). Total positive bonus is
-capped at VOTE_BONUS_CAP; anti-match penalty subtracts after capping.
-Result is clamped at VOTE_SCORE_FLOOR (default 0.0) for sort stability.
+v7.21c-5 side-process isolation: despite the historical name, primary vote
+ranking now uses raw core confidence only. Optional lobe, tone, frame, recency,
+and peak-dominance fields remain available for diagnostics but do not alter
+confidence or selection. Anti-matches are already filtered before candidates
+are built, so this function is deliberately a pass-through clamp.
 """
 function composite_vote_score(vc::VoteCandidate)::Float64
-    bonus_pos  = 0.0
-    penalty    = 0.0
-
-    # GRUG: Each helper applies a weight only if the signal is finite.
-    _add(s, w) = (isfinite(s) ? s * w : 0.0)
-
-    bonus_pos += _add(vc.lobe_alignment,    VOTE_W_LOBE_ALIGNMENT)
-    bonus_pos += _add(vc.relational_match,  VOTE_W_RELATIONAL_MATCH)
-    bonus_pos += _add(vc.recency_bonus,     VOTE_W_RECENCY_BONUS)
-    bonus_pos += _add(vc.action_tone_align, VOTE_W_ACTION_TONE_ALIGN)
-    bonus_pos += _add(vc.peak_dominance,    VOTE_W_PEAK_DOMINANCE)
-
-    penalty   += _add(vc.anti_match_score,  VOTE_W_ANTI_MATCH_PENALTY)
-
-    bonus_pos = min(bonus_pos, VOTE_BONUS_CAP)
-
-    # GRUG: multiplicative gain on positive bonus, additive demotion on penalty
-    score = vc.confidence * (1.0 + bonus_pos) - vc.confidence * penalty
-
-    # v7.21b-3b: Frame-match multiplier applies LAST as an orthogonal tilt.
-    # 1.0 by default (back-compat). >1.0 lifts plug-matching nodes; <1.0
-    # inhibits mismatched plugs (under RELATIONAL mode only — see
-    # TonalJudge.compute_frame_match_multiplier). This is applied AFTER the
-    # additive bonuses + penalty so it composes cleanly: anti-match still
-    # demotes; the field still tilts.
-    score *= vc.frame_match_multiplier
-
-    return max(VOTE_SCORE_FLOOR, score)
+    return max(VOTE_SCORE_FLOOR, vc.confidence)
 end
 
 """
@@ -716,18 +676,12 @@ function select_aiml_votes(candidates::Vector{VoteCandidate};
         throw_vo_error("top_window must be >= 0, got $top_window", "select_aiml_votes")
     end
 
-    # GRUG: Compute composite score per candidate ONCE. Threshold and top-tier
-    # comparisons all use composite, not raw confidence — the composite IS the
-    # vote's final standing once all matching dimensions are folded in.
-    # Pair (vc, score) so we can sort/filter without recomputing.
+    # GRUG: Compute score per candidate ONCE. v7.21c-5 makes this raw
+    # confidence only; side-process dimensions remain diagnostic and cannot
+    # lift/suppress primary votes.
     scored = [(vc, composite_vote_score(vc)) for vc in candidates]
 
-    # GRUG: First pass — filter by threshold against composite. Anything below
-    # the bar is auto-rejected. Note: a candidate whose RAW confidence was
-    # above threshold but whose COMPOSITE drops below (e.g. anti-match
-    # penalty) gets correctly rejected here. Conversely, a vote whose raw
-    # confidence was just below threshold can be lifted past it by strong
-    # matching-dimension bonuses.
+    # GRUG: First pass — filter by threshold against raw core confidence.
     above_threshold = Tuple{VoteCandidate, Float64}[]
     rejected        = VoteCandidate[]
     for (vc, sc) in scored
@@ -742,10 +696,10 @@ function select_aiml_votes(candidates::Vector{VoteCandidate};
         return (VoteCandidate[], VoteCandidate[], rejected)
     end
 
-    # GRUG: Find max composite score among threshold-passers.
+    # GRUG: Find max raw confidence among threshold-passers.
     max_score = maximum(sc for (_, sc) in above_threshold)
 
-    # GRUG: Top tier = within top_window of max composite. Selected directly.
+    # GRUG: Top tier = within top_window of max raw confidence. Selected directly.
     top_tier    = VoteCandidate[]
     subtop_tier = VoteCandidate[]
     for (vc, sc) in above_threshold

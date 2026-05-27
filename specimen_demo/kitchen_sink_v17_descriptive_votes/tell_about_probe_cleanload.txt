@@ -1,0 +1,7 @@
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission tell me about fire
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission tell me about rocks
+/quit

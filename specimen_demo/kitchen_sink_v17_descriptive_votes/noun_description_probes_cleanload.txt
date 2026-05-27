@@ -1,0 +1,43 @@
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is fire
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is fire
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission describe fire
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission tell me about fire
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is rock
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what are rocks
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission describe rocks
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission tell me about rocks
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is water
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission describe water
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is wolf
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission describe wolf
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission what is food
+/loadSpecimen /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+/arousal 0.3
+/mission describe food
+/quit

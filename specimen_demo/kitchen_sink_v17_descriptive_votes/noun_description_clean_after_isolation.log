@@ -1,0 +1,1964 @@
+WARNING: redefinition of constant GrugBot420.CAUSAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.SPATIAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.TEMPORAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.COMMANDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ID_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_HIT_COUNTS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.GROUP_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.GROUP_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.GROUP_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_TO_GROUP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.CHATTER_NODE_COOLDOWN. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.CHATTER_NODE_COOLDOWN_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_FIRE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.STOPWORDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.AIML_DROP_TABLE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ALLOWED_RULE_TAGS. This may fail, cause incorrect answers, or produce other errors.
+🧠 Default specimen detected at /workspace/grugbot420_repo/src/../grug-binary/default.specimen.gz — auto-loading...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=20, msg=38)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (5 classes, 22 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (7)
+  📋 Lobe tables restored (7)
+  🌱 Nodes restored (20)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (38 total, 3 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 6 lobes)
+  ✅ Default specimen restored.
+    ╔══════════════════════════════════════════════════════════════╗
+    ║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+    ╠══════════════════════════════════════════════════════════════╣
+      📁  File             : /workspace/grugbot420_repo/src/../grug-binary/default.specimen.gz
+      📦  Compressed size  : 12556 bytes
+      📄  JSON size        : 92213 bytes
+  (Set GRUG_NO_AUTOLOAD=1 to skip this on next boot.)
+System Online. Grug waiting at cave entrance for instructions.
+Primary  : /mission <input>                    (text or image binary)
+Feedback : /wrong                              (penalize last response voters)
+Explicit : /explicit <cmd> [<node_id>] <input>
+Grow     : /grow <lobe_id> <json_packet>      (plant node(s) into a lobe)
+         :   • <lobe_id> is required — use `-` for unassigned pool
+         :   • Single node: {"pattern":"...","action_packet":"...","data":{...}}
+         :   • Multi node:  {"nodes":[{...},{...}]}
+         :   • `data.system_prompt` defaults to "Grug speaks plainly." if absent
+Rules    : /addRule <rule text> [prob=0.0-1.0]
+           Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+Memory   : /pin <text>
+Nodes    : /nodes                              (show node map status)
+Status   : /status                             (show chatter + system status)
+Arousal  : /arousal <0.0-1.0>                 (set eye system arousal level)
+Verbs    : /addVerb <verb> <class>             (add verb to relation class)
+         : /addRelationClass <name>            (create new verb class bucket)
+         : /addSynonym <canonical> <alias>     (normalize alias->canonical)
+         : /listVerbs                          (show all verb classes + synonyms)
+Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
+         : /connectLobes <id_a> <id_b>         (connect two lobes)
+         : /lobeGrow <lobe_id> <json_packet>   (DEPRECATED — alias for /grow)
+         : /lobes                              (list all lobes + node counts)
+         : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
+         : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
+Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
+         : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
+NegThes  : /negativeThesaurus add|remove|list|check|flush
+Attach   : /nodeAttach <lobe> <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <lobe> <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <lobe> <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <lobe> <target> <id>         (detach image node from target)
+         : /attachments                         (show all node attachments)
+Crystal  : /crystalize <lobe> <target> <attach>        (💎 mark attachment as sticky/user-locked)
+         : /decrystalize <lobe> <target> <attach>      (🔓 remove sticky flag, restore coinflip)
+Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
+         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Help     : /help                               (full command reference)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  SPECIMEN SEEDING GUIDE (read before /grow)                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Automatic neighbor latching is SUPPRESSED below 1000 nodes.   ║
+║  Below that threshold, YOU control topology via drop_table.     ║
+║                                                                  ║
+║  For a coherent specimen from the start:                        ║
+║  1. Seed ORTHOGONAL archetypes first - distinct semantic poles. ║
+║     Don't plant 50 near-identical nodes up front.               ║
+║  2. Use required_relations as semantic GATES from day one.      ║
+║     Nodes that demand specific verbs won't fire on noise.       ║
+║  3. Name action_packets deliberately - distinct action families ║
+║     give the superposition orchestrator something to work with. ║
+║  4. Wire drop_tables manually for known co-activation pairs.    ║
+║     Don't rely on the latch system to discover semantics.       ║
+║  5. Your first ~100 nodes are the specimen's DNA.               ║
+║     The engine enforces structure at scale (1000+ nodes).       ║
+║     You enforce MEANING at the start.                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.14s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  ↗ knowledge: base=1.646 × top=2.94 = 24.5025 [hard_votes=6]
+  👑 identity: base=1.624 × top=2.939 = 24.5025 [hard_votes=6]
+  ↗ explanation: base=1.552 × top=2.941 = 24.4822 [hard_votes=7]
+  · default: base=2.97 × top=2.97 = 8.8209 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+--> 28 valid votes passed gate... compiling JIT superposition...
+[ORCHESTRATOR] 🎲  TIE DETECTED! 2 rocks at confidence 4.95. Random winner: node_98
+
+🤖 AIML Output Scaffold:
+[Grug describe fire directly] Here is the picture: Grows fast and fire eats dry grass. The link is clear: fire is described. I am not fully locked in — food can heal hunger or hurt belly if rotten, food fills belly and gives strength, food keeps tribe alive tomorrow, wolf fur teeth and hungry eyes, rock is sleeping mountain piece in grug hand, wolf is hunger with legs and song, what is water: water wet life drink, wolf hunts in pack and listens to pack, rock comes from mountain and keeps old memory, water flows downhill and fills bowl, rock patient because it changes slow, fire warms tribe and cooks meat, and explain is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is fire'
+Primary Action: fire eats dry grass and grows fast  (conf=4.95, certainty=UNSURE)
+Sure Actions: [fire eats dry grass and grows fast, fire eats dry grass and grows fast, fire warms tribe and cooks meat]
+Unsure Actions (Coinflip Side-Features): [food can heal hunger or hurt belly if rotten, food fills belly and gives strength, food keeps tribe alive tomorrow, wolf fur teeth and hungry eyes, rock is sleeping mountain piece in grug hand, wolf is hunger with legs and song, what is water: water wet life drink, wolf hunts in pack and listens to pack, rock comes from mountain and keeps old memory, water flows downhill and fills bowl, water flows downhill and fills bowl, rock patient because it changes slow, fire warms tribe and cooks meat, explain]
+Constraints: [cold, wet, stone, dark, clean, silent, freeze, raw, alone, safe, gentle, harmless, starves, slow, still, self-fed, attracts-wolf, loose, wild, instant, water, no-air, always-friend, safe-ignored, tame, moon, empty]
+Winning Node: node_98
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, fire)
+Node Triples: (what, is, fire), (what, is, fire), (fire, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_62 | action=fire eats dry grass and grows fast | conf=4.95 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🪨 node_63 | action=fire warms tribe and cooks meat | conf=4.95 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_92 | action=food can heal hunger or hurt belly if rotten | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_113 | action=food fills belly and gives strength | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_93 | action=food keeps tribe alive tomorrow | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_87 | action=wolf fur teeth and hungry eyes | conf=2.41 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_69 | action=rock is sleeping mountain piece in grug hand | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_86 | action=wolf is hunger with legs and song | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_107 | action=what is water: water wet life drink | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_110 | action=wolf hunts in pack and listens to pack | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_68 | action=rock comes from mountain and keeps old memory | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_80 | action=water flows downhill and fills bowl | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_81 | action=water flows downhill and fills bowl | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_101 | action=rock patient because it changes slow | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_23 | action=fire warms tribe and cooks meat | conf=0.7 | relations=(fire, makes, heat), (fire, cooks, meat), (fire, scares, wolf), (fire, eats, wood)
+  🔸 node_12 | action=explain | conf=0.7 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=5] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'greeting': [node_5] (intensity=0.67) | [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_31] (intensity=0.67) | [System]: /grow explanation [JSON MAP PACKET] (intensity=0.67) | [User]: what is fire (intensity=1.66)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  ↗ knowledge: base=1.646 × top=2.94 = 24.5025 [hard_votes=6]
+  👑 identity: base=1.624 × top=2.939 = 24.5025 [hard_votes=6]
+  ↗ explanation: base=1.552 × top=2.941 = 24.4822 [hard_votes=7]
+  · default: base=2.97 × top=2.97 = 8.8209 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+Passthrough Lobes: [knowledge, explanation]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=1.647 × top=2.941 = 24.5025 [hard_votes=6]
+  ↗ identity: base=1.624 × top=2.94 = 24.4799 [hard_votes=6]
+  ↗ explanation: base=1.551 × top=2.94 = 24.4775 [hard_votes=7]
+  · default: base=2.97 × top=2.97 = 8.8209 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+[ENGINE] 💧 Node node_119 softened (strength=5.0 < 9.0) — NONJITTER tag removed, jitter resumed.
+--> 28 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe fire directly] Here is the picture: Needs food and fire is light that moves. The link is clear: what is fire. I am not fully locked in — food keeps tribe alive tomorrow, food fills belly and gives strength, rock breaks wood and protects cave, water wet and gives drink, what is wolf: wolf pack hunter with teeth, wolf fast predator that smells fear, water feeds fish plant and tribe, water can save thirst or pull grug under, wolf dangerous near dark edge of camp, what is rock: rock hard stone from earth, and fire small sun tribe carries in cave is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is fire'
+Primary Action: fire is light that moves and needs food  (conf=4.95, certainty=UNSURE)
+Sure Actions: [fire is light that moves and needs food, fire bright and makes smoke, fire is light that moves and needs food]
+Unsure Actions (Coinflip Side-Features): [food keeps tribe alive tomorrow, food fills belly and gives strength, food keeps tribe alive tomorrow, rock breaks wood and protects cave, water wet and gives drink, what is wolf: wolf pack hunter with teeth, wolf fast predator that smells fear, water feeds fish plant and tribe, water can save thirst or pull grug under, wolf dangerous near dark edge of camp, rock breaks wood and protects cave, what is rock: rock hard stone from earth, fire small sun tribe carries in cave]
+Constraints: [cold, wet, stone, dark, clean, silent, freeze, raw, alone, safe, gentle, harmless, starves, slow, still, self-fed, attracts-wolf, loose, wild, instant, water, no-air, always-friend, safe-ignored, tame, moon, empty]
+Winning Node: node_62
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, fire)
+Node Triples: (what, is, fire), (what, is, fire), (fire, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_98 | action=fire bright and makes smoke | conf=4.95 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🪨 node_63 | action=fire is light that moves and needs food | conf=4.95 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_113 | action=food keeps tribe alive tomorrow | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_93 | action=food fills belly and gives strength | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_92 | action=food keeps tribe alive tomorrow | conf=2.55 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_68 | action=rock breaks wood and protects cave | conf=2.41 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_81 | action=water wet and gives drink | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_87 | action=what is wolf: wolf pack hunter with teeth | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_110 | action=wolf fast predator that smells fear | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_107 | action=water feeds fish plant and tribe | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_80 | action=water can save thirst or pull grug under | conf=2.4 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_86 | action=wolf dangerous near dark edge of camp | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_69 | action=rock breaks wood and protects cave | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_101 | action=what is rock: rock hard stone from earth | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_23 | action=fire small sun tribe carries in cave | conf=0.7 | relations=(fire, makes, heat), (fire, cooks, meat), (fire, scares, wolf), (fire, eats, wood)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=9] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'planning': [node_49] (intensity=0.67) | [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'nature': [node_54] (intensity=0.67) | [User]: what is fire (intensity=1.72)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=1.647 × top=2.941 = 24.5025 [hard_votes=6]
+  ↗ identity: base=1.624 × top=2.94 = 24.4799 [hard_votes=6]
+  ↗ explanation: base=1.551 × top=2.94 = 24.4775 [hard_votes=7]
+  · default: base=2.97 × top=2.97 = 8.8209 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+Passthrough Lobes: [identity, explanation]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=2.029 × top=2.93 = 24.9866 [hard_votes=7]
+  ↗ identity: base=2.196 × top=3.079 = 24.9776 [hard_votes=6]
+  ↗ explanation: base=2.196 × top=3.08 = 24.9719 [hard_votes=6]
+  · default: base=2.999 × top=2.999 = 8.9952 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe fire directly] Here is the picture: Burns wood and fire hot. The link is clear: describe targets fire. I am not fully locked in — what is food: food thing tribe eats to live, food fills belly and gives strength, water falls as rain and runs as river, water flows downhill and fills bowl, wolf hunts in pack and listens to pack, rock breaks wood and protects cave, rock patient because it changes slow, wolf fur teeth and hungry eyes, rock under foot can help or trip grug, rock can cut when sharp and crush when heavy, wolf is hunger with legs and song, and what is fire: fire hot light that eats wood is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe fire'
+Primary Action: fire hot and burns wood  (conf=5.0, certainty=UNSURE)
+Sure Actions: [fire hot and burns wood, fire hot and burns wood, fire is light that moves and needs food]
+Unsure Actions (Coinflip Side-Features): [what is food: food thing tribe eats to live, food fills belly and gives strength, what is food: food thing tribe eats to live, water falls as rain and runs as river, water falls as rain and runs as river, water flows downhill and fills bowl, wolf hunts in pack and listens to pack, rock breaks wood and protects cave, rock patient because it changes slow, wolf fur teeth and hungry eyes, rock under foot can help or trip grug, rock breaks wood and protects cave, rock can cut when sharp and crush when heavy, wolf is hunger with legs and song, rock patient because it changes slow, what is fire: fire hot light that eats wood]
+Constraints: [cold, wet, stone, dark, clean, silent, freeze, raw, alone, safe, gentle, harmless, starves, slow, still, self-fed, attracts-wolf, loose, wild, instant, water, no-air, always-friend, safe-ignored, tame, moon, empty]
+Winning Node: node_64
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (describe, targets, fire)
+Node Triples: (describe, targets, fire), (describe, targets, fire), (fire, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_99 | action=fire hot and burns wood | conf=5.0 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🪨 node_65 | action=fire is light that moves and needs food | conf=5.0 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_94 | action=what is food: food thing tribe eats to live | conf=2.6 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_114 | action=food fills belly and gives strength | conf=2.6 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_95 | action=what is food: food thing tribe eats to live | conf=2.6 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_83 | action=water falls as rain and runs as river | conf=2.39 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_82 | action=water falls as rain and runs as river | conf=2.38 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_108 | action=water flows downhill and fills bowl | conf=2.38 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_88 | action=wolf hunts in pack and listens to pack | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_74 | action=rock breaks wood and protects cave | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_72 | action=rock patient because it changes slow | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_111 | action=wolf fur teeth and hungry eyes | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_103 | action=rock under foot can help or trip grug | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_104 | action=rock breaks wood and protects cave | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_75 | action=rock can cut when sharp and crush when heavy | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_89 | action=wolf is hunger with legs and song | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_73 | action=rock patient because it changes slow | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_23 | action=what is fire: fire hot light that eats wood | conf=0.7 | relations=(fire, makes, heat), (fire, cooks, meat), (fire, scares, wolf), (fire, eats, wood)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=5] (Recent): [User]: describe fire (intensity=1.26)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=2.029 × top=2.93 = 24.9866 [hard_votes=7]
+  ↗ identity: base=2.196 × top=3.079 = 24.9776 [hard_votes=6]
+  ↗ explanation: base=2.196 × top=3.08 = 24.9719 [hard_votes=6]
+  · default: base=2.999 × top=2.999 = 8.9952 [hard_votes=1]
+  · celebration: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+  · survival: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+Passthrough Lobes: [identity, explanation]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.03s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=2.056 × top=2.982 = 23.3173 [hard_votes=7]
+  ↗ identity: base=2.239 × top=3.102 = 23.3131 [hard_votes=6]
+  ↗ explanation: base=2.056 × top=2.981 = 23.311 [hard_votes=7]
+  · default: base=2.897 × top=2.897 = 8.3942 [hard_votes=1]
+  · celebration: base=0.374 × top=0.374 = 0.1402 [hard_votes=0]
+  · survival: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+  · reasoning: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+--> 26 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe fire directly] Here is the picture: fire hot and burns wood. The link is clear: tell about fire. I am not fully locked in — what is rock: rock hard stone from earth, small rock throw big rock build, food keeps tribe alive tomorrow, food shared tastes better than food alone, rock can cut when sharp and crush when heavy, water feeds fish plant and tribe, what is wolf: wolf pack hunter with teeth, rock hard earth that holds shape, wolf is hunger with legs and song, wolf fur teeth and hungry eyes, explain, and fire warms tribe and cooks meat is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'tell me about fire'
+Primary Action: fire hot and burns wood  (conf=4.83, certainty=UNSURE)
+Sure Actions: [fire hot and burns wood, fire dangerous because it bites skin, fire scares wolf but must stay in ring]
+Unsure Actions (Coinflip Side-Features): [what is rock: rock hard stone from earth, small rock throw big rock build, food keeps tribe alive tomorrow, food shared tastes better than food alone, food shared tastes better than food alone, rock can cut when sharp and crush when heavy, water feeds fish plant and tribe, what is wolf: wolf pack hunter with teeth, rock hard earth that holds shape, wolf is hunger with legs and song, water feeds fish plant and tribe, wolf fur teeth and hungry eyes, rock can cut when sharp and crush when heavy, explain, fire warms tribe and cooks meat]
+Constraints: [cold, wet, stone, dark, clean, silent, freeze, raw, alone, safe, gentle, harmless, starves, slow, still, self-fed, attracts-wolf, loose, wild, instant, water, no-air, always-friend, safe-ignored, tame, moon, empty]
+Winning Node: node_66
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (tell, about, fire)
+Node Triples: (tell, about, fire), (tell, about, fire), (fire, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_100 | action=fire dangerous because it bites skin | conf=4.83 | relations=(tell, about, fire), (tell, about, fire), (fire, is, described)
+  🪨 node_67 | action=fire scares wolf but must stay in ring | conf=4.83 | relations=(tell, about, fire), (tell, about, fire), (fire, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_76 | action=what is rock: rock hard stone from earth | conf=2.55 | relations=(tell, about, rock), (tell, about, rock), (rock, is, described)
+  🔸 node_77 | action=small rock throw big rock build | conf=2.55 | relations=(tell, about, rock), (tell, about, rock), (rock, is, described)
+  🔸 node_96 | action=food keeps tribe alive tomorrow | conf=2.53 | relations=(tell, about, food), (tell, about, food), (food, is, described)
+  🔸 node_97 | action=food shared tastes better than food alone | conf=2.53 | relations=(tell, about, food), (tell, about, food), (food, is, described)
+  🔸 node_115 | action=food shared tastes better than food alone | conf=2.53 | relations=(tell, about, food), (tell, about, food), (food, is, described)
+  🔸 node_78 | action=rock can cut when sharp and crush when heavy | conf=2.5 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+  🔸 node_84 | action=water feeds fish plant and tribe | conf=2.5 | relations=(tell, about, water), (tell, about, water), (water, is, described)
+  🔸 node_90 | action=what is wolf: wolf pack hunter with teeth | conf=2.5 | relations=(tell, about, wolf), (tell, about, wolf), (wolf, is, described)
+  🔸 node_106 | action=rock hard earth that holds shape | conf=2.5 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+  🔸 node_112 | action=wolf is hunger with legs and song | conf=2.5 | relations=(tell, about, wolf), (tell, about, wolf), (wolf, is, described)
+  🔸 node_109 | action=water feeds fish plant and tribe | conf=2.5 | relations=(tell, about, water), (tell, about, water), (water, is, described)
+  🔸 node_91 | action=wolf fur teeth and hungry eyes | conf=2.5 | relations=(tell, about, wolf), (tell, about, wolf), (wolf, is, described)
+  🔸 node_79 | action=rock can cut when sharp and crush when heavy | conf=2.5 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+  🔸 node_13 | action=explain | conf=0.6 | relations=None
+  🔸 node_23 | action=fire warms tribe and cooks meat | conf=0.6 | relations=(fire, makes, heat), (fire, cooks, meat), (fire, scares, wolf), (fire, eats, wood)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=7] (Recent): [System]: /grow greeting [JSON MAP PACKET] (intensity=0.67) | [System]: /grow survival [JSON MAP PACKET] (intensity=0.67) | [User]: tell me about fire (intensity=1.26)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=2.056 × top=2.982 = 23.3173 [hard_votes=7]
+  ↗ identity: base=2.239 × top=3.102 = 23.3131 [hard_votes=6]
+  ↗ explanation: base=2.056 × top=2.981 = 23.311 [hard_votes=7]
+  · default: base=2.897 × top=2.897 = 8.3942 [hard_votes=1]
+  · celebration: base=0.374 × top=0.374 = 0.1402 [hard_votes=0]
+  · survival: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+  · reasoning: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+Passthrough Lobes: [identity, explanation]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 explanation: base=1.468 × top=2.86 = 22.4575 [hard_votes=5]
+  ↗ knowledge: base=1.601 × top=2.86 = 22.4201 [hard_votes=6]
+  ↗ identity: base=1.579 × top=2.858 = 22.4137 [hard_votes=6]
+  · default: base=2.843 × top=2.843 = 8.0847 [hard_votes=1]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+--> 28 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe rock directly] Here is the picture: rock is sleeping mountain piece in grug hand. The link is clear: rock is described. I am not fully locked in — food fills belly and gives strength, fire eats dry grass and grows fast, fire friend when tended enemy when ignored, fire dangerous because it bites skin, what is food: food thing tribe eats to live, water feeds fish plant and tribe, wolf dangerous near dark edge of camp, wolf fur teeth and hungry eyes, what is water: water wet life drink, water falls as rain and runs as river, wolf hunts in pack and listens to pack, rock heavy and useful for tool wall and hammer, name come last after we feel it, and explain is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is rock'
+Primary Action: rock is sleeping mountain piece in grug hand  (conf=4.74, certainty=UNSURE)
+Sure Actions: [rock is sleeping mountain piece in grug hand, rock can cut when sharp and crush when heavy, rock is sleeping mountain piece in grug hand]
+Unsure Actions (Coinflip Side-Features): [food fills belly and gives strength, fire eats dry grass and grows fast, fire friend when tended enemy when ignored, fire dangerous because it bites skin, food fills belly and gives strength, what is food: food thing tribe eats to live, water feeds fish plant and tribe, wolf dangerous near dark edge of camp, wolf fur teeth and hungry eyes, what is water: water wet life drink, water falls as rain and runs as river, wolf hunts in pack and listens to pack, rock heavy and useful for tool wall and hammer, name come last after we feel it, explain]
+Constraints: [soft, liquid, drifting, light, useless, weak, young, forgetful, sky, fragile, bends, exposes, dull, harmless, feather, fast, restless, awake, cloud, water, only-small, only-big, no-use, smooth, certain, fire]
+Winning Node: node_69
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, rock)
+Node Triples: (what, is, rock), (what, is, rock), (rock, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_68 | action=rock can cut when sharp and crush when heavy | conf=4.73 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🪨 node_101 | action=rock is sleeping mountain piece in grug hand | conf=4.73 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_92 | action=food fills belly and gives strength | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_63 | action=fire eats dry grass and grows fast | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_98 | action=fire friend when tended enemy when ignored | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_62 | action=fire dangerous because it bites skin | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_93 | action=food fills belly and gives strength | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_113 | action=what is food: food thing tribe eats to live | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_80 | action=water feeds fish plant and tribe | conf=2.38 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_86 | action=wolf dangerous near dark edge of camp | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_87 | action=wolf fur teeth and hungry eyes | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_81 | action=what is water: water wet life drink | conf=2.38 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_107 | action=water falls as rain and runs as river | conf=2.38 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_110 | action=wolf hunts in pack and listens to pack | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_26 | action=rock heavy and useful for tool wall and hammer | conf=0.7 | relations=(rock, builds, wall), (rock, breaks, wood), (rock, sleeps, mountain)
+  🔸 node_36 | action=name come last after we feel it | conf=0.49 | relations=None
+  🔸 node_12 | action=explain | conf=0.48 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=10] (Recent): [User]: what is rock (intensity=1.68)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 explanation: base=1.468 × top=2.86 = 22.4575 [hard_votes=5]
+  ↗ knowledge: base=1.601 × top=2.86 = 22.4201 [hard_votes=6]
+  ↗ identity: base=1.579 × top=2.858 = 22.4137 [hard_votes=6]
+  · default: base=2.843 × top=2.843 = 8.0847 [hard_votes=1]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+Passthrough Lobes: [knowledge, identity]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 identity: base=0.741 × top=1.067 = 14.3646 [hard_votes=2]
+  ↗ explanation: base=0.717 × top=1.1 = 14.3417 [hard_votes=3]
+  · knowledge: base=0.771 × top=1.208 = 14.3325 [hard_votes=1]
+  · planning: base=0.426 × top=0.426 = 0.1815 [hard_votes=0]
+[ENGINE] 💧 Node node_119 softened (strength=5.0 < 9.0) — NONJITTER tag removed, jitter resumed.
+--> 19 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe rock directly] Here is the picture: Hammer, useful for tool wall, and rock heavy. The link is clear: what are rocks. I am not fully locked in — every thing is also brother of other thing, rock heavy and useful for tool wall and hammer, and what is rock: rock hard stone from earth is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what are rocks'
+Primary Action: rock heavy and useful for tool wall and hammer  (conf=3.79, certainty=UNSURE)
+Sure Actions: [rock heavy and useful for tool wall and hammer, rock heavy and useful for tool wall and hammer]
+Unsure Actions (Coinflip Side-Features): [every thing is also brother of other thing, rock heavy and useful for tool wall and hammer, what is rock: rock hard stone from earth]
+Constraints: [soft, liquid, drifting, light, useless, weak, young, forgetful, sky, fragile, bends, exposes, dull, harmless, feather, fast, restless, awake, cloud, water, only-small, only-big, no-use, smooth, certain, fire]
+Winning Node: node_102
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))]
+User Triples: (what, are, rocks)
+Node Triples: (what, are, rocks), (what, are, rock), (rock, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_71 | action=rock heavy and useful for tool wall and hammer | conf=3.79 | relations=(what, are, rocks), (what, are, rock), (rock, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_36 | action=every thing is also brother of other thing | conf=0.5 | relations=None
+  🔸 node_106 | action=rock heavy and useful for tool wall and hammer | conf=0.38 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+  🔸 node_79 | action=what is rock: rock hard stone from earth | conf=0.38 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=8] (Recent): [System]: /grow identity [JSON MAP PACKET] (intensity=0.67) | [User]: what are rocks (intensity=1.75)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 identity: base=0.741 × top=1.067 = 14.3646 [hard_votes=2]
+  ↗ explanation: base=0.717 × top=1.1 = 14.3417 [hard_votes=3]
+  · knowledge: base=0.771 × top=1.208 = 14.3325 [hard_votes=1]
+  · planning: base=0.426 × top=0.426 = 0.1815 [hard_votes=0]
+Passthrough Lobes: [explanation]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 identity: base=2.004 × top=2.696 = 14.331 [hard_votes=6]
+  ↗ explanation: base=2.004 × top=2.696 = 14.3176 [hard_votes=6]
+  ↗ knowledge: base=2.004 × top=2.696 = 14.3169 [hard_votes=6]
+--> 24 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe rock directly] Here is the picture: what is rock: rock hard stone from earth. The link is clear: describe targets rock. I am not fully locked in — water cleans wound and cools fire, fire warms tribe and cooks meat, rock breaks wood and protects cave, wolf fur teeth and hungry eyes, rock patient because it changes slow, wolf hunts in pack and listens to pack, what is fire: fire hot light that eats wood, wolf fears fire and loud tribe, rock is sleeping mountain piece in grug hand, fire bright and makes smoke, and water wet and gives drink is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe rocks'
+Primary Action: what is rock: rock hard stone from earth  (conf=3.79, certainty=UNSURE)
+Sure Actions: [what is rock: rock hard stone from earth, rock under foot can help or trip grug, rock is sleeping mountain piece in grug hand]
+Unsure Actions (Coinflip Side-Features): [water cleans wound and cools fire, fire warms tribe and cooks meat, rock breaks wood and protects cave, wolf fur teeth and hungry eyes, rock patient because it changes slow, wolf hunts in pack and listens to pack, what is fire: fire hot light that eats wood, water cleans wound and cools fire, wolf fears fire and loud tribe, rock is sleeping mountain piece in grug hand, fire bright and makes smoke, water wet and gives drink]
+Constraints: [soft, liquid, drifting, light, useless, weak, young, forgetful, sky, fragile, bends, exposes, dull, harmless, feather, fast, restless, awake, cloud, water, only-small, only-big, no-use, smooth, certain, fire]
+Winning Node: node_104
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (describe, targets, rocks)
+Node Triples: (describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_75 | action=rock under foot can help or trip grug | conf=3.78 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🪨 node_74 | action=rock is sleeping mountain piece in grug hand | conf=3.78 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_108 | action=water cleans wound and cools fire | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_99 | action=fire warms tribe and cooks meat | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_103 | action=rock breaks wood and protects cave | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_111 | action=wolf fur teeth and hungry eyes | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_73 | action=rock patient because it changes slow | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_89 | action=wolf hunts in pack and listens to pack | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_65 | action=what is fire: fire hot light that eats wood | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_83 | action=water cleans wound and cools fire | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_88 | action=wolf fears fire and loud tribe | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_72 | action=rock is sleeping mountain piece in grug hand | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_64 | action=fire bright and makes smoke | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_82 | action=water wet and gives drink | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=9] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'craft': [node_55] (intensity=0.67) | [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'core_rules': [node_125] (intensity=0.67)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 identity: base=2.004 × top=2.696 = 14.331 [hard_votes=6]
+  ↗ explanation: base=2.004 × top=2.696 = 14.3176 [hard_votes=6]
+  ↗ knowledge: base=2.004 × top=2.696 = 14.3169 [hard_votes=6]
+Passthrough Lobes: [explanation, knowledge]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.02s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=2.126 × top=2.845 = 14.6631 [hard_votes=6]
+  ↗ explanation: base=1.957 × top=2.777 = 14.6477 [hard_votes=7]
+  ↗ identity: base=2.125 × top=2.844 = 14.6432 [hard_votes=6]
+  · reasoning: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe rock directly] Here is the picture: rock hard earth that holds shape. The link is clear: tell about rocks. I am not fully locked in — small rock throw big rock build, rock hard earth that holds shape, wolf dangerous near dark edge of camp, what is water: water wet life drink, fire warms tribe and cooks meat, food is meat root fruit and berry, fire starts from spark wood air and patience, what is wolf: wolf pack hunter with teeth, fire is light that moves and needs food, water soft in hand but strong in river, describe, rock heavy and useful for tool wall and hammer, and what is rock: rock hard stone from earth is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'tell me about rocks'
+Primary Action: rock hard earth that holds shape  (conf=3.83, certainty=UNSURE)
+Sure Actions: [rock hard earth that holds shape, what is rock: rock hard stone from earth, rock patient because it changes slow]
+Unsure Actions (Coinflip Side-Features): [small rock throw big rock build, rock hard earth that holds shape, rock hard earth that holds shape, wolf dangerous near dark edge of camp, what is water: water wet life drink, fire warms tribe and cooks meat, food is meat root fruit and berry, fire starts from spark wood air and patience, what is water: water wet life drink, what is wolf: wolf pack hunter with teeth, food is meat root fruit and berry, fire is light that moves and needs food, water soft in hand but strong in river, describe, rock heavy and useful for tool wall and hammer, what is rock: rock hard stone from earth, rock heavy and useful for tool wall and hammer]
+Constraints: [soft, liquid, drifting, light, useless, weak, young, forgetful, sky, fragile, bends, exposes, dull, harmless, feather, fast, restless, awake, cloud, water, only-small, only-big, no-use, smooth, certain, fire]
+Winning Node: node_78
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (tell, about, rocks)
+Node Triples: (tell, about, rocks), (tell, about, rock), (rock, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_79 | action=what is rock: rock hard stone from earth | conf=3.83 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+  🪨 node_106 | action=rock patient because it changes slow | conf=3.83 | relations=(tell, about, rocks), (tell, about, rock), (rock, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_77 | action=small rock throw big rock build | conf=2.56 | relations=(tell, about, rock), (tell, about, rock), (rock, is, described)
+  🔸 node_76 | action=rock hard earth that holds shape | conf=2.55 | relations=(tell, about, rock), (tell, about, rock), (rock, is, described)
+  🔸 node_105 | action=rock hard earth that holds shape | conf=2.55 | relations=(tell, about, rock), (tell, about, rock), (rock, is, described)
+  🔸 node_90 | action=wolf dangerous near dark edge of camp | conf=2.5 | relations=(tell, about, wolf), (tell, about, wolf), (wolf, is, described)
+  🔸 node_84 | action=what is water: water wet life drink | conf=2.5 | relations=(tell, about, water), (tell, about, water), (water, is, described)
+  🔸 node_66 | action=fire warms tribe and cooks meat | conf=2.5 | relations=(tell, about, fire), (tell, about, fire), (fire, is, described)
+  🔸 node_96 | action=food is meat root fruit and berry | conf=2.5 | relations=(tell, about, food), (tell, about, food), (food, is, described)
+  🔸 node_67 | action=fire starts from spark wood air and patience | conf=2.5 | relations=(tell, about, fire), (tell, about, fire), (fire, is, described)
+  🔸 node_85 | action=what is water: water wet life drink | conf=2.5 | relations=(tell, about, water), (tell, about, water), (water, is, described)
+  🔸 node_91 | action=what is wolf: wolf pack hunter with teeth | conf=2.5 | relations=(tell, about, wolf), (tell, about, wolf), (wolf, is, described)
+  🔸 node_97 | action=food is meat root fruit and berry | conf=2.5 | relations=(tell, about, food), (tell, about, food), (food, is, described)
+  🔸 node_100 | action=fire is light that moves and needs food | conf=2.5 | relations=(tell, about, fire), (tell, about, fire), (fire, is, described)
+  🔸 node_109 | action=water soft in hand but strong in river | conf=2.5 | relations=(tell, about, water), (tell, about, water), (water, is, described)
+  🔸 node_13 | action=describe | conf=0.6 | relations=None
+  🔸 node_102 | action=rock heavy and useful for tool wall and hammer | conf=0.38 | relations=(what, are, rocks), (what, are, rock), (rock, is, described)
+  🔸 node_70 | action=what is rock: rock hard stone from earth | conf=0.38 | relations=(what, are, rocks), (what, are, rock), (rock, is, described)
+  🔸 node_71 | action=rock heavy and useful for tool wall and hammer | conf=0.38 | relations=(what, are, rocks), (what, are, rock), (rock, is, described)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=9] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'inquiry': [node_46] (intensity=0.67) | [User]: tell me about rocks (intensity=1.27)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=2.126 × top=2.845 = 14.6631 [hard_votes=6]
+  ↗ explanation: base=1.957 × top=2.777 = 14.6477 [hard_votes=7]
+  ↗ identity: base=2.125 × top=2.844 = 14.6432 [hard_votes=6]
+  · reasoning: base=0.25 × top=0.25 = 0.0625 [hard_votes=0]
+Passthrough Lobes: [explanation, identity]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=1.596 × top=2.85 = 22.4664 [hard_votes=6]
+  ↗ explanation: base=1.463 × top=2.848 = 22.432 [hard_votes=5]
+  ↗ identity: base=1.574 × top=2.849 = 22.4272 [hard_votes=6]
+  · planning: base=0.428 × top=0.428 = 0.1836 [hard_votes=0]
+[ENGINE] 💧 Node node_119 softened (strength=5.0 < 9.0) — NONJITTER tag removed, jitter resumed.
+--> 28 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe water directly] Here is the picture: water soft in hand but strong in river. The link is clear: water is described. I am not fully locked in — fire hot and burns wood, fire scares wolf but must stay in ring, wolf fur teeth and hungry eyes, rock can cut when sharp and crush when heavy, wolf is hunger with legs and song, rock hard earth that holds shape, wolf dangerous near dark edge of camp, food keeps tribe alive tomorrow, and food can heal hunger or hurt belly if rotten is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is water'
+Primary Action: water soft in hand but strong in river  (conf=4.74, certainty=UNSURE)
+Sure Actions: [water soft in hand but strong in river, water wet and gives drink, what is water: water wet life drink]
+Unsure Actions (Coinflip Side-Features): [fire hot and burns wood, fire scares wolf but must stay in ring, fire hot and burns wood, wolf fur teeth and hungry eyes, rock can cut when sharp and crush when heavy, wolf is hunger with legs and song, rock hard earth that holds shape, wolf dangerous near dark edge of camp, food keeps tribe alive tomorrow, food can heal hunger or hurt belly if rotten, food can heal hunger or hurt belly if rotten]
+Constraints: [dry, poison, empty, uphill, fixed, scattered, dirty, burns, starves, barren, hostile, hard, weak, still, only-safe, shallow, harmless, fire, dust, stone, dead]
+Winning Node: node_80
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, water)
+Node Triples: (what, is, water), (what, is, water), (water, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_81 | action=water wet and gives drink | conf=4.74 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🪨 node_107 | action=what is water: water wet life drink | conf=4.74 | relations=(what, is, water), (what, is, water), (water, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_62 | action=fire hot and burns wood | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_98 | action=fire scares wolf but must stay in ring | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_63 | action=fire hot and burns wood | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_110 | action=wolf fur teeth and hungry eyes | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_68 | action=rock can cut when sharp and crush when heavy | conf=2.38 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_86 | action=wolf is hunger with legs and song | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_101 | action=rock hard earth that holds shape | conf=2.38 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_87 | action=wolf dangerous near dark edge of camp | conf=2.38 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_92 | action=food keeps tribe alive tomorrow | conf=2.36 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_113 | action=food can heal hunger or hurt belly if rotten | conf=2.35 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_93 | action=food can heal hunger or hurt belly if rotten | conf=2.35 | relations=(what, is, food), (what, is, food), (food, is, described)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=4] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'greeting': [node_20] (intensity=0.67) | [User]: what is water (intensity=1.71)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=1.596 × top=2.85 = 22.4664 [hard_votes=6]
+  ↗ explanation: base=1.463 × top=2.848 = 22.432 [hard_votes=5]
+  ↗ identity: base=1.574 × top=2.849 = 22.4272 [hard_votes=6]
+  · planning: base=0.428 × top=0.428 = 0.1836 [hard_votes=0]
+Passthrough Lobes: [explanation, identity]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=2.03 × top=2.931 = 24.998 [hard_votes=7]
+  ↗ explanation: base=2.196 × top=3.079 = 24.9863 [hard_votes=6]
+  ↗ identity: base=2.196 × top=3.08 = 24.9807 [hard_votes=6]
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe water directly] Here is the picture: beverage soft in hand but strong in river. The link is clear: describe targets water. I am not fully locked in — food is earth changed into body strength, food can heal hunger or hurt belly if rotten, fire eats dry grass and grows fast, fire is light that moves and needs food, fire hot and burns wood, rock hard earth that holds shape, wolf hunts in pack and listens to pack, what is wolf: wolf pack hunter with teeth, rock breaks wood and protects cave, small rock throw big rock build, rock is sleeping mountain piece in grug hand, and water wet and gives drink is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe water'
+Primary Action: water soft in hand but strong in river  (conf=5.0, certainty=UNSURE)
+Sure Actions: [water soft in hand but strong in river, water feeds fish plant and tribe, water soft in hand but strong in river]
+Unsure Actions (Coinflip Side-Features): [food is earth changed into body strength, food can heal hunger or hurt belly if rotten, fire eats dry grass and grows fast, fire is light that moves and needs food, fire hot and burns wood, rock hard earth that holds shape, wolf hunts in pack and listens to pack, what is wolf: wolf pack hunter with teeth, rock breaks wood and protects cave, small rock throw big rock build, what is wolf: wolf pack hunter with teeth, rock is sleeping mountain piece in grug hand, water wet and gives drink]
+Constraints: [dry, poison, empty, uphill, fixed, scattered, dirty, burns, starves, barren, hostile, hard, weak, still, only-safe, shallow, harmless, fire, dust, stone, dead]
+Winning Node: node_82
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (describe, targets, water)
+Node Triples: (describe, targets, water), (describe, targets, water), (water, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_83 | action=water feeds fish plant and tribe | conf=5.0 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🪨 node_108 | action=water soft in hand but strong in river | conf=5.0 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_94 | action=food is earth changed into body strength | conf=2.6 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_114 | action=food can heal hunger or hurt belly if rotten | conf=2.6 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_64 | action=fire eats dry grass and grows fast | conf=2.39 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_99 | action=fire is light that moves and needs food | conf=2.39 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_65 | action=fire hot and burns wood | conf=2.38 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_72 | action=rock hard earth that holds shape | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_88 | action=wolf hunts in pack and listens to pack | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_89 | action=what is wolf: wolf pack hunter with teeth | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_73 | action=rock breaks wood and protects cave | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_103 | action=small rock throw big rock build | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_111 | action=what is wolf: wolf pack hunter with teeth | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_104 | action=rock is sleeping mountain piece in grug hand | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_24 | action=water wet and gives drink | conf=0.7 | relations=(water, quenches, thirst), (water, carves, stone), (water, feeds, fish)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=7] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_29] (intensity=0.67)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=2.03 × top=2.931 = 24.998 [hard_votes=7]
+  ↗ explanation: base=2.196 × top=3.079 = 24.9863 [hard_votes=6]
+  ↗ identity: base=2.196 × top=3.08 = 24.9807 [hard_votes=6]
+Passthrough Lobes: [explanation, identity]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 identity: base=1.588 × top=2.859 = 22.4815 [hard_votes=6]
+  ↗ explanation: base=1.473 × top=2.859 = 22.48 [hard_votes=5]
+  ↗ knowledge: base=1.608 × top=2.861 = 22.4395 [hard_votes=6]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+[ENGINE] 💧 Node node_119 softened (strength=5.0 < 9.0) — NONJITTER tag removed, jitter resumed.
+--> 28 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe wolf directly] Here is the picture: wolf dangerous near dark edge of camp. The link is clear: wolf is described. I am not fully locked in — fire dangerous because it bites skin, food keeps tribe alive tomorrow, fire scares wolf but must stay in ring, fire warms tribe and cooks meat, what is food: food thing tribe eats to live, rock breaks wood and protects cave, water can save thirst or pull grug under, rock can cut when sharp and crush when heavy, water wet and gives drink, and grug listen first grug speak second is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is wolf'
+Primary Action: wolf dangerous near dark edge of camp  (conf=4.74, certainty=UNSURE)
+Sure Actions: [wolf dangerous near dark edge of camp, wolf teaches hunter patience and tracks, wolf fast predator that smells fear]
+Unsure Actions (Coinflip Side-Features): [fire dangerous because it bites skin, food keeps tribe alive tomorrow, fire scares wolf but must stay in ring, fire warms tribe and cooks meat, what is food: food thing tribe eats to live, what is food: food thing tribe eats to live, rock breaks wood and protects cave, water can save thirst or pull grug under, rock can cut when sharp and crush when heavy, water wet and gives drink, rock breaks wood and protects cave, grug listen first grug speak second]
+Constraints: [plant, soft, blind, alone, scattered, deaf, slow, prey, dull-nose, brave-fire, silence, harmless, daylight-only, tame, impatient, random, lost, full, still, silent, food, friend]
+Winning Node: node_110
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, wolf)
+Node Triples: (what, is, wolf), (what, is, wolf), (wolf, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_87 | action=wolf teaches hunter patience and tracks | conf=4.74 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🪨 node_86 | action=wolf fast predator that smells fear | conf=4.74 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_62 | action=fire dangerous because it bites skin | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_92 | action=food keeps tribe alive tomorrow | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_98 | action=fire scares wolf but must stay in ring | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_63 | action=fire warms tribe and cooks meat | conf=2.4 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_113 | action=what is food: food thing tribe eats to live | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_93 | action=what is food: food thing tribe eats to live | conf=2.4 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🔸 node_68 | action=rock breaks wood and protects cave | conf=2.38 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_81 | action=water can save thirst or pull grug under | conf=2.38 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_69 | action=rock can cut when sharp and crush when heavy | conf=2.38 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_107 | action=water wet and gives drink | conf=2.38 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_101 | action=rock breaks wood and protects cave | conf=2.38 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_119 | action=grug listen first grug speak second | conf=0.53 | relations=(grug, helps, tribe), (grug, listens, first)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=7] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_33] (intensity=0.67)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 identity: base=1.588 × top=2.859 = 22.4815 [hard_votes=6]
+  ↗ explanation: base=1.473 × top=2.859 = 22.48 [hard_votes=5]
+  ↗ knowledge: base=1.608 × top=2.861 = 22.4395 [hard_votes=6]
+  · planning: base=0.333 × top=0.333 = 0.1111 [hard_votes=0]
+Passthrough Lobes: [explanation, knowledge]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 explanation: base=2.137 × top=2.947 = 22.9105 [hard_votes=6]
+  ↗ identity: base=2.137 × top=2.946 = 22.9012 [hard_votes=6]
+  ↗ knowledge: base=1.977 × top=2.824 = 22.8904 [hard_votes=7]
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe wolf directly] Here is the picture: wolf fur teeth and hungry eyes. The link is clear: describe targets wolf. I am not fully locked in — what is water: water wet life drink, what is fire: fire hot light that eats wood, food is meat root fruit and berry, what is rock: rock hard stone from earth, rock can cut when sharp and crush when heavy, food fills belly and gives strength, rock hard earth that holds shape, fire scares wolf but must stay in ring, fire friend when tended enemy when ignored, water flows downhill and fills bowl, rock comes from mountain and keeps old memory, wolf fears fire and loud tribe, wolf fur teeth and hungry eyes, wolf is hunger with legs and song, and wolf hunts in pack and listens to pack is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe wolf'
+Primary Action: wolf fur teeth and hungry eyes  (conf=4.79, certainty=UNSURE)
+Sure Actions: [wolf fur teeth and hungry eyes, wolf dangerous near dark edge of camp, wolf fur teeth and hungry eyes]
+Unsure Actions (Coinflip Side-Features): [what is water: water wet life drink, what is fire: fire hot light that eats wood, food is meat root fruit and berry, what is rock: rock hard stone from earth, rock can cut when sharp and crush when heavy, food fills belly and gives strength, rock hard earth that holds shape, what is water: water wet life drink, fire scares wolf but must stay in ring, what is rock: rock hard stone from earth, rock hard earth that holds shape, food is meat root fruit and berry, fire friend when tended enemy when ignored, water flows downhill and fills bowl, rock comes from mountain and keeps old memory, wolf fears fire and loud tribe, wolf fur teeth and hungry eyes, wolf is hunger with legs and song, wolf hunts in pack and listens to pack]
+Constraints: [plant, soft, blind, alone, scattered, deaf, slow, prey, dull-nose, brave-fire, silence, harmless, daylight-only, tame, impatient, random, lost, full, still, silent, food, friend]
+Winning Node: node_89
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (describe, targets, wolf)
+Node Triples: (describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_111 | action=wolf dangerous near dark edge of camp | conf=4.79 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🪨 node_88 | action=wolf fur teeth and hungry eyes | conf=4.78 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_83 | action=what is water: water wet life drink | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_65 | action=what is fire: fire hot light that eats wood | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_95 | action=food is meat root fruit and berry | conf=2.33 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_75 | action=what is rock: rock hard stone from earth | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_73 | action=rock can cut when sharp and crush when heavy | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_114 | action=food fills belly and gives strength | conf=2.33 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_104 | action=rock hard earth that holds shape | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_108 | action=what is water: water wet life drink | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_99 | action=fire scares wolf but must stay in ring | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_103 | action=what is rock: rock hard stone from earth | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_72 | action=rock hard earth that holds shape | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_94 | action=food is meat root fruit and berry | conf=2.33 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🔸 node_64 | action=fire friend when tended enemy when ignored | conf=2.33 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_82 | action=water flows downhill and fills bowl | conf=2.33 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_74 | action=rock comes from mountain and keeps old memory | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_25 | action=wolf fears fire and loud tribe | conf=0.7 | relations=(wolf, hunts, prey), (wolf, fears, fire), (wolf, listens, pack)
+  🔸 node_86 | action=wolf fur teeth and hungry eyes | conf=0.39 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_110 | action=wolf is hunger with legs and song | conf=0.39 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_87 | action=wolf hunts in pack and listens to pack | conf=0.39 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=7] (Recent): No recent sounds
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 explanation: base=2.137 × top=2.947 = 22.9105 [hard_votes=6]
+  ↗ identity: base=2.137 × top=2.946 = 22.9012 [hard_votes=6]
+  ↗ knowledge: base=1.977 × top=2.824 = 22.8904 [hard_votes=7]
+Passthrough Lobes: [identity, knowledge]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=1.642 × top=2.932 = 24.5025 [hard_votes=6]
+  ↗ explanation: base=1.547 × top=2.931 = 24.5025 [hard_votes=7]
+  ↗ identity: base=1.619 × top=2.931 = 24.5025 [hard_votes=6]
+  · planning: base=0.425 × top=0.425 = 0.1809 [hard_votes=0]
+--> 28 valid votes passed gate... compiling JIT superposition...
+[ORCHESTRATOR] 🎲  TIE DETECTED! 3 rocks at confidence 4.95. Random winner: node_93
+
+🤖 AIML Output Scaffold:
+[Grug describe food directly] Here is the picture: food shared tastes better than food alone. The link is clear: what is food. I am not fully locked in — fire hot and burns wood, fire bright and makes smoke, wolf is hunger with legs and song, rock hard earth that holds shape, what is wolf: wolf pack hunter with teeth, rock is sleeping mountain piece in grug hand, wolf fears fire and loud tribe, water soft in hand but strong in river, water falls as rain and runs as river, food is meat root fruit and berry, and grug think slow because slow think is honest think is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'what is food'
+Primary Action: food shared tastes better than food alone  (conf=4.95, certainty=UNSURE)
+Sure Actions: [food is earth changed into body strength, food shared tastes better than food alone, food is earth changed into body strength]
+Unsure Actions (Coinflip Side-Features): [fire hot and burns wood, fire bright and makes smoke, fire hot and burns wood, wolf is hunger with legs and song, rock hard earth that holds shape, what is wolf: wolf pack hunter with teeth, rock is sleeping mountain piece in grug hand, wolf fears fire and loud tribe, rock hard earth that holds shape, water soft in hand but strong in river, water falls as rain and runs as river, food is meat root fruit and berry, grug think slow because slow think is honest think]
+Constraints: [empty, weak, poison, stone, smoke, hunger, starves, kills, yesterday, hoarded, bitter, selfish, fresh-only, safe-rotten, sky-only, useless, separate, rock]
+Winning Node: node_93
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (what, is, food)
+Node Triples: (what, is, food), (what, is, food), (food, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_92 | action=food is earth changed into body strength | conf=4.95 | relations=(what, is, food), (what, is, food), (food, is, described)
+  🪨 node_113 | action=food is earth changed into body strength | conf=4.95 | relations=(what, is, food), (what, is, food), (food, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_98 | action=fire hot and burns wood | conf=2.55 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_63 | action=fire bright and makes smoke | conf=2.55 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_62 | action=fire hot and burns wood | conf=2.55 | relations=(what, is, fire), (what, is, fire), (fire, is, described)
+  🔸 node_87 | action=wolf is hunger with legs and song | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_68 | action=rock hard earth that holds shape | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_86 | action=what is wolf: wolf pack hunter with teeth | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_69 | action=rock is sleeping mountain piece in grug hand | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_110 | action=wolf fears fire and loud tribe | conf=2.4 | relations=(what, is, wolf), (what, is, wolf), (wolf, is, described)
+  🔸 node_101 | action=rock hard earth that holds shape | conf=2.4 | relations=(what, is, rock), (what, is, rock), (rock, is, described)
+  🔸 node_107 | action=water soft in hand but strong in river | conf=2.36 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_80 | action=water falls as rain and runs as river | conf=2.35 | relations=(what, is, water), (what, is, water), (water, is, described)
+  🔸 node_27 | action=food is meat root fruit and berry | conf=0.7 | relations=(food, feeds, tribe), (hunt, provides, meat), (sharing, strengthens, bond)
+  🔸 node_119 | action=grug think slow because slow think is honest think | conf=0.5 | relations=(grug, helps, tribe), (grug, listens, first)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=6] (Recent): [System]: 🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_32] (intensity=0.67) | [System]: /grow survival [JSON MAP PACKET] (intensity=0.67) | [User]: what is food (intensity=1.67)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=1.642 × top=2.932 = 24.5025 [hard_votes=6]
+  ↗ explanation: base=1.547 × top=2.931 = 24.5025 [hard_votes=7]
+  ↗ identity: base=1.619 × top=2.931 = 24.5025 [hard_votes=6]
+  · planning: base=0.425 × top=0.425 = 0.1809 [hard_votes=0]
+Passthrough Lobes: [explanation, identity]
+=========================================
+
+Brain > --> Grug thawing specimen from file...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=126, msg=256)
+┌ Warning: Replacing docs for `GrugBot420.words_to_signal :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.rewrite_passive_mission :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_relational_triples :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_dynamic_relational_triples :: Tuple{String, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.evaluate_relational_dialectics :: Tuple{Vector{GrugBot420.RelationalTriple}, Vector{GrugBot420.RelationalTriple}, Vector{String}, Dict{String, Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_input_hash :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_lookup :: Tuple{UInt64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_record! :: Tuple{UInt64, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_nonjitter :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.set_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.clear_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_nonjitter_ids :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.jitter_allowed_for :: Tuple{GrugBot420.Node, Float64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_solidified :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.check_solidify_threshold! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.bump_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.penalize_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_grave! :: Tuple{GrugBot420.Node, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_contributor! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.try_link_nodes! :: Tuple{GrugBot420.Node, GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.find_best_latch_target :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._token_overlap_similarity :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.next_group_id :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.register_group! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.add_to_group! :: Tuple{GrugBot420.NodeGroup, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_group_grave_slot! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.group_for :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.chatter_cooldown_remaining :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.stamp_chatter! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_node! :: Tuple{String, String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.detach_node! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.fire_attachments! :: Tuple{String, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachment_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachments_for_target :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.crystalize_attachment! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.decrystalize_attachment! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._semantic_truth_score :: Tuple{Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.auto_crystalize_sweep! :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_crystalized :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sdf_signal_similarity :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_image_node! :: Tuple{String, String, Vector{UInt8}, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.reset_throttle! :: Tuple{GrugBot420.Node, Float64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.create_node :: Tuple{String, String, Dict, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.parse_action_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.select_action :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.screen_input_complexity :: Tuple{Vector{Float64}, Vector{GrugBot420.RelationalTriple}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._effective_scan_mode :: Tuple{Int64, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._bidirectional_cheap_scan :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_drop_table_neighbors :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.strength_biased_scan_coinflip :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_specimens :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_and_expand :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_vote :: NTuple{5, Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_explicit_vote :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_right_feedback! :: Tuple{Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.ensure_action_packet_registered! :: Tuple{AbstractString}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.grow_nodes_from_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_node_status_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.add_orchestration_rule! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.count_alive_nodes_in_lobe :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_2"
+│   pattern_len = 6
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_2"
+│   pattern_len = 6
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.56 | ArousalNudge=0.0 | Weight=1.34 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_63"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_66"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_2"
+│   pattern_len = 6
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_100"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_62"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_61"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_67"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_98"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_2"
+│   pattern_len = 6
+│   input_len = 4
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'fire' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.51 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_2"
+│   pattern_len = 6
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'mountain' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_106"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_71"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_70"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_79"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_102"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_78"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'stone' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'rock' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'river' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_84"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_80"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_85"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_109"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_107"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_81"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'river' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.56 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'wolf' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'wolf' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_90"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_87"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_91"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_110"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_112"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_86"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'wolf' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+┌ Warning: [MAIN v7.16 synthesis] Every synonym of 'wolf' is inhibited (neg thesaurus or node drop_table). Emitting original to preserve content.
+└ @ GrugBot420 /workspace/grugbot420_repo/src/Main.jl:1596
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_119"
+│   pattern_len = 4
+│   input_len = 3
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.56 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_92"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_115"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_96"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_97"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_113"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+┌ Warning: [ENGINE] BUG-004: pattern longer than input — using cheap bidirectional scan.
+│   node_id = "node_93"
+│   pattern_len = 3
+│   input_len = 2
+└ @ GrugBot420 /workspace/grugbot420_repo/src/engine.jl:2990
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (6 classes, 40 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (16)
+  📋 Lobe tables restored (16)
+  🌱 Nodes restored (126)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (256 total, 8 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🗣  Chatter groups restored (106)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 15 lobes)
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grug_test/kitchen_sink_v17_descriptive_votes/kitchen_sink.specimen.gz
+  📦  Compressed size  : 54407 bytes
+  📄  JSON size        : 523024 bytes
+  ⏱️   Time             : 0.01s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 126
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 256 (8 pinned)
+  🔧  Verb classes     : 6 (40 verbs)
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🤖  AIML nodes       : 0 (15 lobes)
+  👁   Arousal          : 0.3
+  🔢  ID counters      : node=126, msg=256
+  ─────────────────────────────────────────────
+  🧹  Previous state   : WIPED (full brain transplant)
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > 👁  Arousal set to 0.3. Eye system updated.
+
+Brain > --> Scanning specimens & looking for dialectical relations...
+[ORCHESTRATOR] 🎯 Lobe Curve (base × top = score):
+  👑 knowledge: base=2.054 × top=2.973 = 25.0 [hard_votes=7]
+  ↗ identity: base=2.222 × top=3.132 = 24.985 [hard_votes=6]
+  ↗ explanation: base=2.222 × top=3.132 = 24.9712 [hard_votes=6]
+--> 25 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Grug describe food directly] Here is the picture: Gives strength and food fills belly. The link is clear: describe targets food. I am not fully locked in — what is fire: fire hot light that eats wood, what is water: water wet life drink, fire bright and makes smoke, fire warms tribe and cooks meat, water flows downhill and fills bowl, wolf fur teeth and hungry eyes, rock comes from mountain and keeps old memory, rock heavy and useful for tool wall and hammer, wolf is hunger with legs and song, rock hard earth that holds shape, rock can cut when sharp and crush when heavy, wolf hunts in pack and listens to pack, and food fills belly and gives strength is also on the table.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'describe food'
+Primary Action: food fills belly and gives strength  (conf=5.0, certainty=UNSURE)
+Sure Actions: [food fills belly and gives strength, food keeps tribe alive tomorrow, food fills belly and gives strength]
+Unsure Actions (Coinflip Side-Features): [what is fire: fire hot light that eats wood, what is water: water wet life drink, fire bright and makes smoke, fire warms tribe and cooks meat, water flows downhill and fills bowl, water flows downhill and fills bowl, wolf fur teeth and hungry eyes, rock comes from mountain and keeps old memory, rock comes from mountain and keeps old memory, rock heavy and useful for tool wall and hammer, wolf is hunger with legs and song, rock hard earth that holds shape, rock can cut when sharp and crush when heavy, wolf hunts in pack and listens to pack, food fills belly and gives strength]
+Constraints: [empty, weak, poison, stone, smoke, hunger, starves, kills, yesterday, hoarded, bitter, selfish, fresh-only, safe-rotten, sky-only, useless, separate, rock]
+Winning Node: node_94
+Lobe Context: [explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]
+User Triples: (describe, targets, food)
+Node Triples: (describe, targets, food), (describe, targets, food), (food, is, described)
+Anti-Match Detected: false
+Tied Alternatives (not selected):
+  🪨 node_114 | action=food keeps tribe alive tomorrow | conf=5.0 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+  🪨 node_95 | action=food fills belly and gives strength | conf=5.0 | relations=(describe, targets, food), (describe, targets, food), (food, is, described)
+Other Possibilities (strong but not winners):
+  🔸 node_64 | action=what is fire: fire hot light that eats wood | conf=2.6 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_82 | action=what is water: water wet life drink | conf=2.6 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_65 | action=fire bright and makes smoke | conf=2.6 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_99 | action=fire warms tribe and cooks meat | conf=2.6 | relations=(describe, targets, fire), (describe, targets, fire), (fire, is, described)
+  🔸 node_83 | action=water flows downhill and fills bowl | conf=2.6 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_108 | action=water flows downhill and fills bowl | conf=2.6 | relations=(describe, targets, water), (describe, targets, water), (water, is, described)
+  🔸 node_88 | action=wolf fur teeth and hungry eyes | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_72 | action=rock comes from mountain and keeps old memory | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_103 | action=rock comes from mountain and keeps old memory | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_104 | action=rock heavy and useful for tool wall and hammer | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_111 | action=wolf is hunger with legs and song | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_75 | action=rock hard earth that holds shape | conf=2.33 | relations=(describe, targets, rocks), (describe, targets, rock), (rock, is, described)
+  🔸 node_73 | action=rock can cut when sharp and crush when heavy | conf=2.33 | relations=(describe, targets, rock), (describe, targets, rock), (rock, is, described)
+  🔸 node_89 | action=wolf hunts in pack and listens to pack | conf=2.33 | relations=(describe, targets, wolf), (describe, targets, wolf), (wolf, is, described)
+  🔸 node_27 | action=food fills belly and gives strength | conf=0.7 | relations=(food, feeds, tribe), (hunt, provides, meat), (sharing, strengthens, bond)
+AIML Memory Bank:
+Deep Memory (Pinned): [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Grug speak plain. Grug not pretend smart. | [User_Pinned]: Many rocks compete. Loudest rock get to talk. | [User_Pinned]: Grug listen first, talk second. | [User_Pinned]: Tribe stronger than lone hunter. | [User_Pinned]: Hot rock burn. Soft skin remember.
+Fresh Memory [threshold=0.67 eligible=10] (Recent): [System]: /grow greeting [JSON MAP PACKET] (intensity=0.67) | [System]: /saveSpecimen grug-binary/default.specimen.gz (intensity=0.67) | [System]: /grow explanation [JSON MAP PACKET] (intensity=0.67)
+Memory-Pull Policy: pull_fresh=true — vote certainty=UNSURE — context helps disambiguate
+Lobe Curve (base × top = score):
+  👑 knowledge: base=2.054 × top=2.973 = 25.0 [hard_votes=7]
+  ↗ identity: base=2.222 × top=3.132 = 24.985 [hard_votes=6]
+  ↗ explanation: base=2.222 × top=3.132 = 24.9712 [hard_votes=6]
+Passthrough Lobes: [identity, explanation]
+=========================================
+
+Brain > [GRUG] 👋 /quit received. Cave closes. Goodbye.

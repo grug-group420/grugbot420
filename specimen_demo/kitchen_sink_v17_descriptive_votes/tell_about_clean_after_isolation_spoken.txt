@@ -1,0 +1,8 @@
+# tell_about_clean_after_isolation: 2 mission/reply pairs
+
+- mission : 'tell me about fire'
+  reply   : [Grug describe fire directly] Here is the picture: fire scares wolf but must stay in ring. The link is clear: say about fire. I am not fully locked in — small rock throw big rock build, food is meat root fruit and berry, food can heal hunger or hurt belly if rotten, food shared tastes better than food alone, what is rock: rock hard stone from earth, wolf dangerous near dark edge of camp, what is water: water wet life drink, wolf fur teeth and hungry eyes, rock can cut when sharp and crush when heavy, describe, and what is fire: fire hot light that eats wood is also on the table.
+
+- mission : 'tell me about rocks'
+  reply   : [Grug describe rock directly] Here is the picture: rock comes from mountain and keeps old memory. The link is clear: converse about rocks. I am not fully locked in — what is rock: rock hard stone from earth, rock is sleeping mountain piece in grug hand, water can save thirst or pull grug under, food keeps tribe alive tomorrow, wolf teaches hunter patience and tracks, fire warms tribe and cooks meat, water feeds fish plant and tribe, food shared tastes better than food alone, fire is light that moves and needs food, what is wolf: wolf pack hunter with teeth, describe, and rock hard earth that holds shape is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
+

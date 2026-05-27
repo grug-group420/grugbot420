@@ -1173,22 +1173,10 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     for (lid, base_avg, _, _, _) in LobeOrchestrator.LAST_LOBE_SCORES[]
         lobe_base_map[lid] = base_avg
     end
-    # Action-tone prediction (last computed by scan_specimens)
-    last_pred = try
-        ActionTonePredictor.LAST_PREDICTION[]
-    catch
-        nothing
-    end
-
-    # v7.21b-3b: TonalJudge verdict (last computed by engine after the
-    # prediction). Read once and reuse for every candidate so we don't keep
-    # re-resolving the Ref. Nothing means "no judge ran" -> all multipliers
-    # collapse to 1.0 (pure back-compat).
-    last_judgement = try
-        TonalJudge.get_last_judgement()
-    catch
-        nothing
-    end
+    # v7.21c-5 side-process isolation:
+    # ActionTonePredictor/TonalJudge outputs are diagnostic only here. Do not
+    # compute side-process scoring fields for VoteCandidate; raw confidence is
+    # the only primary-ranking signal.
 
     vote_candidates = VoteOrchestrator.VoteCandidate[]
     candidate_to_vote = Dict{String, Vote}()
@@ -1230,27 +1218,9 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 clamp(shared / max(1, length(user_keys)), 0.0, 1.0)
             end
 
-            # Action-tone alignment: ask predictor whether this node's
-            # action_packet is in the predicted family.
-            tone_align = if isnothing(last_pred)
-                NaN
-            else
-                try
-                    w = ActionTonePredictor.get_action_weight_multiplier(last_pred, v.action)
-                    # Multiplier is action_weight (>1) when aligned, suppression
-                    # factor (<1) when not, 1.0 when prediction too weak.
-                    # Map to [0,1]: aligned -> 1.0, neutral -> 0.5, suppressed -> 0.0
-                    if w > 1.0
-                        1.0
-                    elseif w < 1.0
-                        0.0
-                    else
-                        0.5
-                    end
-                catch
-                    NaN
-                end
-            end
+            # Side-process isolation: action/tone alignment is diagnostic
+            # only and must not affect vote confidence or primary ranking.
+            tone_align = NaN
 
             anti_score = v.antimatch ? 1.0 : 0.0
 
@@ -1264,28 +1234,9 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 NaN
             end
 
-            # v7.21b-3b: Frame-match plug. Read this node's declared
-            # frame_hints (a Vector{String} like ["de_escalating", "terse"])
-            # from json_data and ask TonalJudge what multiplier to apply.
-            # Empty/missing list -> 1.0 (back-compat). Match -> lift. Mismatch
-            # -> inhibit ONLY under RELATIONAL mode (see TonalJudge for the
-            # gating rule).
-            node_hints = let raw = get(node.json_data, "frame_hints", String[])
-                if raw isa Vector
-                    String[lowercase(string(h)) for h in raw]
-                elseif raw isa AbstractString
-                    # tolerate a single-string declaration
-                    String[lowercase(string(raw))]
-                else
-                    String[]
-                end
-            end
-            frame_mult = try
-                TonalJudge.compute_frame_match_multiplier(node_hints, last_judgement)
-            catch e
-                @warn "[ORCHESTRATOR] frame_match_multiplier failed for $(v.node_id): $e (using 1.0)"
-                1.0
-            end
+            # Side-process isolation: frame hints/judgements are diagnostic
+            # only and must not tilt vote ranking.
+            frame_mult = 1.0
 
             push!(vote_candidates, VoteOrchestrator.VoteCandidate(
                 v.node_id, v.confidence, node.strength;
