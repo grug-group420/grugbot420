@@ -1,0 +1,47 @@
+# ============================================================================
+# kitchen_sink_v18c — fresh confidence-isolation conversation
+# ============================================================================
+# Re-run of the v18b mix against the same descriptive-votes specimen, but
+# captured fresh from a clean Julia invocation. Purpose: confirm the
+# v7.21c-5 isolation work + SelfObserver landing is stable across runs and
+# the reply quality matches expectations. Same prompt mix as v18b so
+# results are directly comparable.
+#
+# CLI dispatcher only accepts slash commands; bare lines are rejected as
+# "command bad format". Every spoken prompt is wrapped in /mission or
+# /brainstorm.
+# ============================================================================
+
+/loadSpecimen specimen_demo/kitchen_sink_v18c_fresh_run/kitchen_sink.specimen.gz
+
+/status
+
+# -------- subject-lobe missions: snap-back then far-jump per lobe --------
+/mission explain how force relates to acceleration and mass
+/brainstorm explain how force relates to acceleration and mass
+
+/mission explain how acid balances richness in a heavy dish
+/brainstorm explain how acid balances richness in a heavy dish
+
+/mission describe how melody and harmony work together
+/brainstorm describe how melody and harmony work together
+
+/mission reason about fairness when cases look similar but feel different
+/brainstorm reason about fairness when cases look similar but feel different
+
+# -------- bare-noun descriptive prompts via /mission --------
+/mission tell me about fire
+/mission what is rock
+/mission describe water
+/mission tell about wolf
+/mission what is food
+
+# -------- self / culture prompts via /mission --------
+/mission who are you
+/mission what do you do
+/mission the tribe
+
+/status
+/aimlStatus
+
+/quit
