@@ -1,0 +1,96 @@
+# ============================================================================
+# GRUG v21 KITCHEN SINK — FULL COVERAGE CONVERSATION
+# ============================================================================
+# Exercises every lobe in the specimen with both /mission and /brainstorm
+# prompts, then adds dedicated SIGIL MATH coverage for the Stage 1.5a / 
+# 1.5a-fix-1 / 1.5c population compression pipeline.
+#
+# LOBES HIT:
+#   greeting    — hello hi, good morning, goodbye
+#   comfort     — i feel sad, i am worried, i feel lonely, thank you
+#   survival    — danger, fire burns, run flee, watch out
+#   math        — 7 surface variants of "what is 2+2" (SIGIL COMPRESSION)
+#                 + conditional predicate tests
+#   knowledge   — fire, water, wolf, rock, sky, food
+#   identity    — who are you, the tribe, speak plain, listen first
+#
+# SIGIL MATH VARIANTS (Stage 1.5a population compression):
+#   All 7 should fire the SAME math node because the front-door promoter
+#   collapses them to "what is &n &op &n" before the matcher sees them.
+#   Surface preservation (1.5a-fix-1) means ATP/AIML can still read the
+#   original user tokens via binding.surface and current_promotion_raw().
+#   Conditional predicate (1.5c) means big numbers stay literal while
+#   small ones promote.
+# ============================================================================
+
+/loadSpecimen kitchen_sink_v21.specimen.gz
+
+/status
+
+# -------- GREETING LOBE --------
+/mission hello hi
+/mission good morning
+/brainstorm goodbye see you
+
+# -------- COMFORT LOBE --------
+/mission i feel sad
+/mission i am worried
+/mission i feel lonely
+/mission thank you
+
+# -------- SURVIVAL LOBE --------
+/mission danger threat
+/mission fire burns hot
+/brainstorm run flee hide
+/mission watch out careful
+
+# -------- MATH LOBE — SIGIL POPULATION COMPRESSION --------
+# Seven surface variants of "what is 2+2". ALL should fire the same
+# math node (node_14, pattern "what is &n &op &n") because the front-door
+# promoter rewrites them to the same canonical input.
+/mission what is 2 + 2
+/mission what is two plus two
+/mission what is 2 plus 2
+/mission what is two + 2
+/mission WHAT IS FIVE TIMES THREE
+/mission what is 7 minus 4
+/brainstorm what is 3 times 8
+
+# -------- MATH LOBE — CONDITIONAL PREDICATE (1.5c) --------
+# These test the per-token predicate gate. With a v<100 predicate on &n,
+# small numbers promote while large numbers stay literal.
+/mission compute 3 plus 5
+/mission compute 500 plus 3
+
+# -------- MATH LOBE — PURE TEXT (CONFIDENCE-EQUIVALENCE) --------
+# Pure-text inputs with no math tokens should pass through the promoter
+# unchanged (confidence-equivalence guarantee). The same node that would
+# fire without the promoter should still fire.
+/mission what is the meaning of life
+
+# -------- KNOWLEDGE LOBE --------
+/mission tell about fire
+/mission tell about water
+/brainstorm tell about wolf
+/mission tell about rock
+/mission tell about sky
+/mission tell about food
+
+# -------- IDENTITY LOBE --------
+/mission who are you
+/mission what do you do
+/mission the tribe
+/mission the cave
+/mission speak plain
+/brainstorm listen first
+
+# -------- CROSS-LOBE BRIDGE: survival → knowledge --------
+/mission how does fire work
+
+# -------- CROSS-LOBE BRIDGE: greeting → comfort --------
+/mission hello i feel sad today
+
+/status
+/aimlStatus
+
+/quit

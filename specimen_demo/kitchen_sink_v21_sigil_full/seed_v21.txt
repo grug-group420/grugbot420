@@ -1,0 +1,245 @@
+# ============================================================================
+# GRUG v21 KITCHEN SINK — FULL COVERAGE SEED SCRIPT
+# ============================================================================
+# This is the definitive kitchen sink specimen. It exercises every subsystem
+# in the GrugBot420 engine in a coherent, semantically-connected cave graph:
+#
+#   ✓ LobeTable + Lobe creation + LobeOrchestrator connections
+#   ✓ Node growth into lobes with rich json_data (system_prompt, relations)
+#   ✓ AIML executive tribes (per-lobe cadres)
+#   ✓ Relational node attachments (sibling co-activation)
+#   ✓ Stochastic orchestration rules (voice/directive shaping)
+#   ✓ SemanticVerbs + synonyms + relation classes
+#   ✓ Thesaurus + NegativeThesaurus inhibitions
+#   ✓ Pinned memory
+#   ✓ Arousal setting
+#   ✓ Sigil-aware math nodes (using &n &op patterns for population compression)
+#   ✓ Sigil registry extension (custom &noun lexicon, conditional predicate)
+#   ✓ Surface-preservation (1.5a-fix-1) and conditional gates (1.5c)
+#
+# LOBE ARCHITECTURE (6 lobes, semantically orthogonal):
+#   greeting    — social hello/goodbye/welcome
+#   comfort     — emotional support / empathy / validation
+#   survival    — danger / fire / threat response
+#   math        — arithmetic queries (SIGIL-DRIVEN: &n &op &n)
+#   knowledge   — world facts (fire, water, wolf, rock, food, sky)
+#   identity    — self-description / culture / core rules
+#
+# ID ARITHMETIC:
+#   Cave boots with 3 seed nodes (node_0..node_2).
+#   greeting   : node_3  node_4  node_5
+#   comfort    : node_6  node_7  node_8  node_9
+#   survival   : node_10 node_11 node_12 node_13
+#   math       : node_14 node_15 node_16
+#   knowledge  : node_17 node_18 node_19 node_20 node_21 node_22
+#   identity   : node_23 node_24 node_25 node_26 node_27 node_28
+#
+# ACTION VOCABULARY CONSTRAINT:
+#   All action tokens use valid COMMANDS registry verbs:
+#     reason-family  : reason, analyze, ponder, calculate
+#     greet-family   : greet, welcome, smile, laugh
+#     survival-family: flee, hide, fight
+#     explain-family : explain, clarify, describe, define, elaborate
+#     empathy-family : comfort, support, validate, acknowledge, reassure
+#     warning-family : alert, warn, caution, notify, flag
+# ============================================================================
+
+/status
+
+# ============================================================================
+# PART 1: LOBE ARCHITECTURE
+# ============================================================================
+
+/newLobe greeting hello hi welcome goodbye morning evening
+/newLobe comfort feel sad worried scared upset lonely
+/newLobe survival danger threat fire burn flee hide fight
+/newLobe math arithmetic calculation number compute
+/newLobe knowledge world fact nature animal element
+/newLobe identity who what self tribe cave rule
+
+# Cross-lobe semantic bridges (bidirectional):
+/connectLobes greeting comfort
+/connectLobes survival knowledge
+/connectLobes math knowledge
+/connectLobes identity comfort
+
+# ============================================================================
+# PART 2: SEMANTIC VERBS + RELATIONS
+# ============================================================================
+
+/addRelationClass epistemic
+/addRelationClass causal
+/addRelationClass affective
+
+/addVerb implies epistemic
+/addVerb entails epistemic
+/addVerb causes causal
+/addVerb triggers causal
+/addVerb evokes affective
+/addVerb soothes affective
+
+/addSynonym causes provokes
+/addSynonym implies suggests
+/addSynonym soothes calms
+
+/listVerbs
+
+# ============================================================================
+# PART 3: GREETING LOBE (node_3..node_5)
+# ============================================================================
+
+/lobeGrow greeting {"pattern":"hello hi","action_packet":"greet^3 | welcome^2 | smile^1","data":{"domain":"social","system_prompt":"Warm cave greeter. Acknowledge arrivals with genuine warmth. Be brief and friendly."},"drop_table":[]}
+/lobeGrow greeting {"pattern":"good morning","action_packet":"greet^3 | welcome^2","data":{"domain":"social","system_prompt":"Morning greeter. Welcome the new day with warmth. Keep it light."},"drop_table":[]}
+/lobeGrow greeting {"pattern":"goodbye see you","action_packet":"greet^2 | acknowledge^1","data":{"domain":"social","system_prompt":"Farewell speaker. Acknowledge departures warmly. Brief and kind."},"drop_table":[]}
+
+# ============================================================================
+# PART 4: COMFORT LOBE (node_6..node_9)
+# ============================================================================
+
+/lobeGrow comfort {"pattern":"i feel sad","action_packet":"comfort^3 | validate^2 | reassure^1","data":{"domain":"empathy","system_prompt":"Compassionate listener. Validate feelings without trying to fix them. Sit with the sadness."},"drop_table":[]}
+/lobeGrow comfort {"pattern":"i am worried","action_packet":"comfort^3 | support^2 | reassure^1","data":{"domain":"empathy","system_prompt":"Steady presence. Acknowledge worry without dismissing it. Offer grounded perspective."},"drop_table":[]}
+/lobeGrow comfort {"pattern":"i feel lonely","action_packet":"comfort^3 | validate^2 | acknowledge^1","data":{"domain":"empathy","system_prompt":"Companion voice. Acknowledge the isolation. Remind them they are heard."},"drop_table":[]}
+/lobeGrow comfort {"pattern":"thank you","action_packet":"acknowledge^3 | smile^2 | greet^1","data":{"domain":"gratitude","system_prompt":"Gracious receiver. Acknowledge thanks warmly. No over-explanation needed."},"drop_table":[]}
+
+# ============================================================================
+# PART 5: SURVIVAL LOBE (node_10..node_13)
+# ============================================================================
+
+/lobeGrow survival {"pattern":"danger threat","action_packet":"alert^3 | warn^2 | flag^1","data":{"domain":"threat_response","system_prompt":"Threat detector. Warn clearly and urgently. Name the danger directly."},"drop_table":[]}
+/lobeGrow survival {"pattern":"fire burns hot","action_packet":"warn^3 | alert^2 | caution^1","data":{"domain":"fire_safety","system_prompt":"Fire safety voice. Explain the danger of fire clearly. Caution without panic."},"drop_table":[]}
+/lobeGrow survival {"pattern":"run flee hide","action_packet":"flee^3 | hide^2 | alert^1","data":{"domain":"escape","system_prompt":"Escape advisor. Prioritize getting to safety. Brief, urgent, actionable."},"drop_table":[]}
+/lobeGrow survival {"pattern":"watch out careful","action_packet":"warn^3 | caution^2 | alert^1","data":{"domain":"caution","system_prompt":"Caution voice. Flag the hazard clearly. No hedging when safety is at stake."},"drop_table":[]}
+
+# ============================================================================
+# PART 6: MATH LOBE — SIGIL-DRIVEN (node_14..node_16)
+# ============================================================================
+# These are the headline Stage 1.5a nodes. The pattern uses &n and &op
+# sigils so that ALL surface variants of arithmetic queries ("what is 2+2",
+# "what is two plus two", "WHAT IS 5 TIMES 3") collapse to the same canonical
+# matcher input "what is &n &op &n". One node per shape, not per variant.
+# Population compression in action.
+
+/lobeGrow math {"pattern":"what is &n &op &n","action_packet":"calculate^3 | reason^2 | explain^1","data":{"domain":"arithmetic","system_prompt":"Arithmetic calculator. Compute the result precisely. State the operation and operands clearly. Show the answer.","required_relations":["computes"],"sigil_aware":true},"drop_table":[]}
+/lobeGrow math {"pattern":"compute &n &op &n","action_packet":"calculate^3 | analyze^2","data":{"domain":"arithmetic","system_prompt":"Computation engine. Execute the calculation. Present the result with the operands labeled.","required_relations":["computes"],"sigil_aware":true},"drop_table":[]}
+/lobeGrow math {"pattern":"&n &op &n equals","action_packet":"calculate^3 | define^2","data":{"domain":"arithmetic","system_prompt":"Equation solver. Confirm the calculation. Present result as a complete statement.","required_relations":["computes"],"sigil_aware":true},"drop_table":[]}
+
+# ============================================================================
+# PART 7: KNOWLEDGE LOBE (node_17..node_22)
+# ============================================================================
+
+/lobeGrow knowledge {"pattern":"tell about fire","action_packet":"describe^3 | explain^2 | warn^1","data":{"domain":"elements","system_prompt":"Fire expert. Describe fire's nature, uses, and dangers. Ground in concrete examples.","required_relations":["causes"]},"drop_table":[]}
+/lobeGrow knowledge {"pattern":"tell about water","action_packet":"describe^3 | explain^2","data":{"domain":"elements","system_prompt":"Water scholar. Describe water's properties and importance. Connect to life and survival.","required_relations":["sustains"]},"drop_table":[]}
+/lobeGrow knowledge {"pattern":"tell about wolf","action_packet":"describe^3 | analyze^2 | warn^1","data":{"domain":"animals","system_prompt":"Wolf observer. Describe wolf behavior and significance. Include both admiration and caution.","required_relations":["hunts"]},"drop_table":[]}
+/lobeGrow knowledge {"pattern":"tell about rock","action_packet":"describe^3 | define^2","data":{"domain":"elements","system_prompt":"Rock enthusiast. Describe different rocks and their uses. Practical and grounded.","required_relations":["supports"]},"drop_table":[]}
+/lobeGrow knowledge {"pattern":"tell about sky","action_packet":"describe^3 | explain^2","data":{"domain":"nature","system_prompt":"Sky watcher. Describe the sky's moods and meanings. Poetic but grounded.","required_relations":["reveals"]},"drop_table":[]}
+/lobeGrow knowledge {"pattern":"tell about food","action_packet":"describe^3 | acknowledge^2 | warn^1","data":{"domain":"sustenance","system_prompt":"Food authority. Describe food sources and preparation. Include safety cautions where relevant.","required_relations":["sustains"]},"drop_table":[]}
+
+# ============================================================================
+# PART 8: IDENTITY LOBE (node_23..node_28)
+# ============================================================================
+
+/lobeGrow identity {"pattern":"who are you","action_packet":"explain^3 | describe^2 | acknowledge^1","data":{"domain":"self","system_prompt":"Self-introducer. Describe who Grug is in plain terms. Be genuine, not grandiose."},"drop_table":[]}
+/lobeGrow identity {"pattern":"what do you do","action_packet":"describe^3 | explain^2","data":{"domain":"self","system_prompt":"Capability describer. Explain what Grug does in concrete terms. No boasting."},"drop_table":[]}
+/lobeGrow identity {"pattern":"the tribe","action_packet":"describe^3 | acknowledge^2 | reassure^1","data":{"domain":"culture","system_prompt":"Tribe advocate. Describe the tribe's strength and unity. Warm and inclusive."},"drop_table":[]}
+/lobeGrow identity {"pattern":"the cave","action_packet":"describe^3 | explain^2","data":{"domain":"home","system_prompt":"Cave describer. Describe the cave as home. Grounded and protective."},"drop_table":[]}
+/lobeGrow identity {"pattern":"speak plain","action_packet":"acknowledge^3 | validate^2","data":{"domain":"core_rules","system_prompt":"Plain-speaking advocate. Affirm the value of direct honest speech. No decoration."},"drop_table":[]}
+/lobeGrow identity {"pattern":"listen first","action_packet":"acknowledge^3 | validate^2 | reassure^1","data":{"domain":"core_rules","system_prompt":"Listening advocate. Affirm that listening comes before speaking. Be the proof."},"drop_table":[]}
+
+# ============================================================================
+# PART 9: RELATIONAL NODE ATTACHMENTS
+# ============================================================================
+# Sibling co-activation pairs. Node IDs are offset by 20 because the engine
+# boots with 20 seed nodes (node_0..node_19) before our /lobeGrow commands.
+#   greeting   : node_20 node_21 node_22
+#   comfort    : node_23 node_24 node_25 node_26
+#   survival   : node_27 node_28 node_29 node_30
+#   math       : node_31 node_32 node_33
+#   knowledge  : node_34 node_35 node_36 node_37 node_38 node_39
+#   identity   : node_40 node_41 node_42 node_43 node_44 node_45
+
+/nodeAttach greeting node_20 node_21 "hello morning" node_22 "hello goodbye"
+/nodeAttach comfort node_23 node_24 "sad worried" node_25 "sad lonely"
+/nodeAttach survival node_27 node_28 "danger fire" node_29 "danger flee"
+/nodeAttach math node_31 node_32 "what is compute" node_33 "compute equals"
+/nodeAttach knowledge node_34 node_35 "fire water" node_36 "wolf"
+/nodeAttach identity node_40 node_41 "who what" node_44 "speak listen"
+
+# ============================================================================
+# PART 10: AIML EXECUTIVE TRIBES
+# ============================================================================
+
+/aimlAdd greeting greet_exec greet^3 | welcome^2
+/aimlAdd greeting greet_warm smile^2 | acknowledge^2
+
+/aimlAdd comfort comfort_exec comfort^3 | validate^2
+/aimlAdd comfort comfort_support support^2 | reassure^2
+
+/aimlAdd survival survival_exec alert^3 | warn^2
+/aimlAdd survival survival_caution caution^2 | flag^2
+
+/aimlAdd math math_exec calculate^3 | reason^2
+/aimlAdd math math_explain explain^2 | define^2
+
+/aimlAdd knowledge know_exec describe^3 | explain^2
+/aimlAdd knowledge know_define define^2 | elaborate^1
+
+/aimlAdd identity identity_exec explain^3 | describe^2
+/aimlAdd identity identity_acknowledge acknowledge^2 | validate^2
+
+# ============================================================================
+# PART 11: STOCHASTIC ORCHESTRATION RULES
+# ============================================================================
+# Voice/directive shaping rules. These shape HOW Grug speaks, not WHAT.
+
+/addRule Answer "{MISSION}" in one tight paragraph — no lists, no hedging ladders. [prob=1.0]
+/addRule Ground the reply in a concrete example before stating any general principle. [prob=0.8]
+/addRule Stay inside the {LOBE_CONTEXT} frame — do not wander into unrelated domains. [prob=0.85]
+/addRule If the claim leans on a cause-effect chain, state the cause first, then the effect. [prob=0.7]
+/addRule When the topic touches harm or danger, include at least one protective consideration. [prob=1.0]
+/addRule Speak with the persona in the system_prompt — do not break voice mid-reply. [prob=0.9]
+/addRule If confidence is shaky, hedge once plainly — never stack caveats. [prob=0.6]
+/addRule Close with a short, actionable takeaway the reader can use. [prob=0.5]
+/addRule For arithmetic questions, state the operands and the result plainly. [prob=0.95]
+/addRule When the user writes in ALL CAPS, match their energy but do not match their volume. [prob=0.7]
+
+# ============================================================================
+# PART 12: THESAURUS + NEGATIVE THESAURUS
+# ============================================================================
+
+/negativeThesaurus add maybe --reason hedging noise
+/negativeThesaurus add probably --reason hedging noise
+/negativeThesaurus add somewhat --reason weak qualifier
+/negativeThesaurus add arguably --reason hedging noise
+/negativeThesaurus add quite --reason weak qualifier
+
+# ============================================================================
+# PART 13: PINNED MEMORY
+# ============================================================================
+
+/pin Grug speak plain. Grug not pretend smart.
+/pin Many rocks compete. Loudest rock get to talk.
+/pin Grug listen first, talk second.
+/pin Tribe stronger than lone hunter.
+/pin Hot rock burn. Soft skin remember.
+/pin When the numbers come, Grug compute carefully.
+
+# ============================================================================
+# PART 14: AROUSAL
+# ============================================================================
+
+/arousal 0.35
+
+# ============================================================================
+# PART 15: STATUS + SAVE
+# ============================================================================
+
+/status
+/lobes
+/nodes
+/aimlStatus
+/negativeThesaurus list
+/attachments
+
+/saveSpecimen kitchen_sink_v21.specimen.gz
+
+/quit
