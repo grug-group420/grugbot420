@@ -61,13 +61,13 @@ GRUGBOT SYSTEM STATUS
 
 ### Cycle 1 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** explain how force relates to acceleration and mass
 
 **🧠 Grug** _(as **Grug explain plain**)_:
 
 > Here is the picture: grug make picture in air with words.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.67, eligible=11` · user triples `None` · node triples `None`</sub>
+<sub>primary `grug make picture in air with words` · conf `0.5` · certainty `SURE` · sure `[grug make picture in air with words]` · unsure `[None]` · winning node `node_38` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.67, eligible=11` · user triples `None` · node triples `None`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -98,15 +98,15 @@ Lobe Curve (base × top = score):
 
 ---
 
-### Cycle 2 · `/mission`
+### Cycle 2 · `/brainstorm`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** explain how force relates to acceleration and mass
 
 **🧠 Grug** _(as **Grug explain plain**)_:
 
 > Here is the picture: grug make picture in air with words.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.46, eligible=8` · user triples `None` · node triples `None`</sub>
+<sub>primary `grug make picture in air with words` · conf `0.5` · certainty `SURE` · sure `[grug make picture in air with words]` · unsure `[None]` · winning node `node_38` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.46, eligible=8` · user triples `None` · node triples `None`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -139,13 +139,13 @@ Lobe Curve (base × top = score):
 
 ### Cycle 3 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
 **🧠 Grug** _(as **Grug explain plain**)_:
 
 > Here is the picture: grug make picture in air with words.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=5` · user triples `None` · node triples `None`</sub>
+<sub>primary `grug make picture in air with words` · conf `0.48` · certainty `SURE` · sure `[grug make picture in air with words]` · unsure `[None]` · winning node `node_38` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=5` · user triples `None` · node triples `None`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -176,7 +176,7 @@ Lobe Curve (base × top = score):
 
 ---
 
-### Cycle 4 · `/mission`
+### Cycle 4 · `/brainstorm`
 
 **🗣️ Interviewer:** explain how acid balances richness in a heavy dish
 
@@ -219,13 +219,13 @@ Lobe Curve (base × top = score):
 
 ### Cycle 5 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** describe how melody and harmony work together
 
 **🧠 Grug** _(as **Grug describe water directly**)_:
 
 > Here is the picture: fluid cleans wound and cools fire. The link is clear: describe targets water. I am not fully locked in — wolf fears fire and loud tribe, fire friend when tended enemy when ignored, rock hard earth that holds shape, fire hot and burns wood, rock comes from mountain and keeps old memory, wolf is hunger with legs and song, what is food: food thing tribe eats to live, rock can cut when sharp and crush when heavy, food can heal hunger or hurt belly if rotten, and wolf fur teeth and hungry eyes is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `(describe, targets, how)` · node triples `(describe, targets, water), (describe, targets, water), (water, is, described)`</sub>
+<sub>primary `water cleans wound and cools fire` · conf `2.28` · certainty `UNSURE` · sure `[water cleans wound and cools fire, water wet and gives drink, what is rock: rock hard stone from earth, water wet and gives drink, rock is sleeping mountain piece in grug hand, rock is sleeping mountain piece in grug hand]` · unsure `[wolf fears fire and loud tribe, fire friend when tended enemy when ignored, rock hard earth that holds shape, fire hot and burns wood, rock comes from mountain and keeps old memory, wolf is hunger with legs and song, what is food: food thing tribe eats to live, rock can cut when sharp and crush when heavy, food can heal hunger or hurt belly if rotten, fire hot and burns wood, wolf fur teeth and hungry eyes]` · winning node `node_82` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `(describe, targets, how)` · node triples `(describe, targets, water), (describe, targets, water), (water, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -277,15 +277,15 @@ Passthrough Lobes: [identity, explanation]
 
 ---
 
-### Cycle 6 · `/mission`
+### Cycle 6 · `/brainstorm`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** describe how melody and harmony work together
 
 **🧠 Grug** _(as **Grug describe rock directly**)_:
 
 > Here is the picture: rock patient because it changes slow. The link is clear: rock is described. A companion frame: describe water. I am not fully locked in — rock is sleeping mountain piece in grug hand, wolf teaches hunter patience and tracks, fire scares wolf but must stay in ring, rock can cut when sharp and crush when heavy, fire friend when tended enemy when ignored, food keeps tribe alive tomorrow, what is food: food thing tribe eats to live, wolf hunts in pack and listens to pack, small rock throw big rock build, and fire starts from spark wood air and patience is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `(describe, targets, how)` · node triples `(describe, targets, rocks), (describe, targets, rock), (rock, is, described)`</sub>
+<sub>primary `rock patient because it changes slow` · conf `2.28` · certainty `UNSURE` · sure `[rock patient because it changes slow, water falls as rain and runs as river, water can save thirst or pull grug under, small rock throw big rock build, rock can cut when sharp and crush when heavy, water soft in hand but strong in river]` · unsure `[rock is sleeping mountain piece in grug hand, wolf teaches hunter patience and tracks, fire scares wolf but must stay in ring, rock can cut when sharp and crush when heavy, fire friend when tended enemy when ignored, food keeps tribe alive tomorrow, what is food: food thing tribe eats to live, wolf hunts in pack and listens to pack, small rock throw big rock build, fire starts from spark wood air and patience]` · winning node `node_74` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=9` · user triples `(describe, targets, how)` · node triples `(describe, targets, rocks), (describe, targets, rock), (rock, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -338,13 +338,13 @@ Passthrough Lobes: [explanation, identity]
 
 ### Cycle 7 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** reason about fairness when cases look similar but feel different
 
 **🧠 Grug** _(as **Grug describe wolf directly**)_:
 
 > Here is the picture: wolf fast predator that smells fear. The link is clear: tell about wolf.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `(tell, about, wolf), (tell, about, wolf), (wolf, is, described)`</sub>
+<sub>primary `wolf fast predator that smells fear` · conf `0.31` · certainty `SURE` · sure `[wolf fast predator that smells fear]` · unsure `[None]` · winning node `node_90` · lobe `[knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `(tell, about, wolf), (tell, about, wolf), (wolf, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -379,15 +379,15 @@ Lobe Curve (base × top = score):
 
 ---
 
-### Cycle 8 · `/mission`
+### Cycle 8 · `/brainstorm`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** reason about fairness when cases look similar but feel different
 
 **🧠 Grug** _(as **Grug describe water directly**)_:
 
 > Here is the picture: Cools fire and fluid cleans wound. The link is clear: tell about water.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `(tell, about, water), (tell, about, water), (water, is, described)`</sub>
+<sub>primary `water cleans wound and cools fire` · conf `0.31` · certainty `SURE` · sure `[water cleans wound and cools fire]` · unsure `[None]` · winning node `node_109` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `None` · node triples `(tell, about, water), (tell, about, water), (water, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -424,13 +424,13 @@ Lobe Curve (base × top = score):
 
 ### Cycle 9 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** tell me about fire
 
 **🧠 Grug** _(as **Grug describe fire directly**)_:
 
 > Here is the picture: fire eats dry grass and grows rapid. The link is clear: tell about fire. I am not fully locked in — rock hard earth that holds shape, what is rock: rock hard stone from earth, what is food: food thing tribe eats to live, food fills belly and gives strength, water wet and gives drink, small rock throw big rock build, wolf hunts in pack and listens to pack, water flows downhill and fills bowl, wolf teaches hunter patience and tracks, water falls as rain and runs as river, and fire dangerous because it bites skin is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `(tell, about, fire)` · node triples `(tell, about, fire), (tell, about, fire), (fire, is, described)`</sub>
+<sub>primary `fire eats dry grass and grows fast` · conf `4.83` · certainty `UNSURE` · sure `[fire eats dry grass and grows fast, fire bright and makes smoke, fire dangerous because it bites skin]` · unsure `[rock hard earth that holds shape, what is rock: rock hard stone from earth, what is food: food thing tribe eats to live, food fills belly and gives strength, food fills belly and gives strength, water wet and gives drink, small rock throw big rock build, wolf hunts in pack and listens to pack, what is rock: rock hard stone from earth, water flows downhill and fills bowl, wolf teaches hunter patience and tracks, rock hard earth that holds shape, water falls as rain and runs as river, fire dangerous because it bites skin]` · winning node `node_66` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `(tell, about, fire)` · node triples `(tell, about, fire), (tell, about, fire), (fire, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -486,13 +486,13 @@ Passthrough Lobes: [explanation, identity]
 
 ### Cycle 10 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** what is rock
 
 **🧠 Grug** _(as **Grug describe rock directly**)_:
 
 > Here is the picture: Useful for tool wall, rock heavy, and hammer. The link is clear: rock is described. I am not fully locked in — food can heal hunger or hurt belly if rotten, fire scares wolf but must stay in ring, fire friend when tended enemy when ignored, fire dangerous because it bites skin, wolf hunts in pack and listens to pack, water flows downhill and fills bowl, wolf is hunger with legs and song, water feeds fish plant and tribe, and rock hard earth that holds shape is also on the table. Pinned note: Many rocks compete. Loudest rock get to talk.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(what, is, rock)` · node triples `(what, is, rock), (what, is, rock), (rock, is, described)`</sub>
+<sub>primary `rock heavy and useful for tool wall and hammer` · conf `4.74` · certainty `UNSURE` · sure `[rock heavy and useful for tool wall and hammer, rock breaks wood and protects cave, rock heavy and useful for tool wall and hammer]` · unsure `[food can heal hunger or hurt belly if rotten, fire scares wolf but must stay in ring, fire friend when tended enemy when ignored, fire dangerous because it bites skin, wolf hunts in pack and listens to pack, wolf hunts in pack and listens to pack, water flows downhill and fills bowl, wolf is hunger with legs and song, water feeds fish plant and tribe, rock hard earth that holds shape]` · winning node `node_68` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(what, is, rock)` · node triples `(what, is, rock), (what, is, rock), (rock, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -542,13 +542,13 @@ Passthrough Lobes: [identity, explanation]
 
 ### Cycle 11 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** describe water
 
 **🧠 Grug** _(as **Grug describe water directly**)_:
 
 > Here is the picture: Pull grug under and water can store thirst. The link is clear: describe targets beverage. I am not fully locked in — food is earth changed into body strength, food shared tastes better than food alone, food fills belly and gives strength, fire starts from spark wood air and patience, fire hot and burns wood, fire friend when tended enemy when ignored, rock can cut when sharp and crush when heavy, wolf dangerous near dark edge of camp, rock under foot can help or trip grug, wolf is hunger with legs and song, rock hard earth that holds shape, rock heavy and useful for tool wall and hammer, wolf hunts in pack and listens to pack, and water falls as rain and runs as river is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(describe, targets, water)` · node triples `(describe, targets, water), (describe, targets, water), (water, is, described)`</sub>
+<sub>primary `water can save thirst or pull grug under` · conf `5.0` · certainty `UNSURE` · sure `[water can save thirst or pull grug under, what is water: water wet life drink, water soft in hand but strong in river]` · unsure `[food is earth changed into body strength, food shared tastes better than food alone, food fills belly and gives strength, fire starts from spark wood air and patience, fire hot and burns wood, fire friend when tended enemy when ignored, rock can cut when sharp and crush when heavy, wolf dangerous near dark edge of camp, rock under foot can help or trip grug, wolf is hunger with legs and song, rock hard earth that holds shape, rock can cut when sharp and crush when heavy, rock heavy and useful for tool wall and hammer, wolf hunts in pack and listens to pack, rock heavy and useful for tool wall and hammer, water falls as rain and runs as river]` · winning node `node_82` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(describe, targets, water)` · node triples `(describe, targets, water), (describe, targets, water), (water, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -602,13 +602,13 @@ Passthrough Lobes: [identity, explanation]
 
 ### Cycle 12 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** tell about wolf
 
 **🧠 Grug** _(as **Grug describe wolf directly**)_:
 
 > Here is the picture: wolf fast predator that smells fear. The link is clear: tell about wolf. I am not fully locked in — small rock throw big rock build, rock patient because it changes slow, rock comes from mountain and keeps old memory, fire hot and burns wood, water cleans wound and cools fire, food keeps tribe alive tomorrow, what is water: water wet life drink, food fills belly and gives strength, food can heal hunger or hurt belly if rotten, rock hard earth that holds shape, water feeds fish plant and tribe, fire bright and makes smoke, fire warms tribe and cooks meat, rock heavy and useful for tool wall and hammer, and wolf fur teeth and hungry eyes is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `(tell, about, wolf)` · node triples `(tell, about, wolf), (tell, about, wolf), (wolf, is, described)`</sub>
+<sub>primary `wolf fast predator that smells fear` · conf `4.79` · certainty `UNSURE` · sure `[wolf fast predator that smells fear, wolf dangerous near dark edge of camp, wolf hunts in pack and listens to pack]` · unsure `[small rock throw big rock build, rock patient because it changes slow, rock comes from mountain and keeps old memory, rock patient because it changes slow, fire hot and burns wood, water cleans wound and cools fire, food keeps tribe alive tomorrow, what is water: water wet life drink, food fills belly and gives strength, food can heal hunger or hurt belly if rotten, rock hard earth that holds shape, water feeds fish plant and tribe, fire bright and makes smoke, fire warms tribe and cooks meat, rock heavy and useful for tool wall and hammer, wolf fur teeth and hungry eyes]` · winning node `node_91` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `(tell, about, wolf)` · node triples `(tell, about, wolf), (tell, about, wolf), (wolf, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -663,13 +663,13 @@ Passthrough Lobes: [knowledge, identity]
 
 ### Cycle 13 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** what is food
 
 **🧠 Grug** _(as **Grug describe food directly**)_:
 
 > Here is the picture: food is earth changed into body strength. The link is clear: what is dish. I am not fully locked in — fire hot and burns wood, fire small sun tribe carries in cave, fire dangerous because it bites skin, rock is sleeping mountain piece in grug hand, wolf hunts in pack and listens to pack, rock hard earth that holds shape, wolf teaches hunter patience and tracks, water can save thirst or pull grug under, water flows downhill and fills bowl, every thing is also brother of other thing, food keeps tribe alive tomorrow, and define is also on the table.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(what, is, food)` · node triples `(what, is, food), (what, is, food), (food, is, described)`</sub>
+<sub>primary `food is earth changed into body strength` · conf `4.95` · certainty `UNSURE` · sure `[food is earth changed into body strength, food keeps tribe alive tomorrow, food keeps tribe alive tomorrow]` · unsure `[fire hot and burns wood, fire small sun tribe carries in cave, fire dangerous because it bites skin, rock is sleeping mountain piece in grug hand, wolf hunts in pack and listens to pack, rock hard earth that holds shape, wolf teaches hunter patience and tracks, water can save thirst or pull grug under, water flows downhill and fills bowl, water flows downhill and fills bowl, every thing is also brother of other thing, food keeps tribe alive tomorrow, define]` · winning node `node_113` · lobe `[explanation (25/25 active (describe rocks | what is fire | describe water))] | [identity (24/24 active (goodness | describe wolf | describe food))] | [knowledge (23/23 active (what is food | tell about fire | what are rocks))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(what, is, food)` · node triples `(what, is, food), (what, is, food), (food, is, described)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -721,13 +721,13 @@ Passthrough Lobes: [explanation, knowledge]
 
 ### Cycle 14 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** who are you
 
 **🧠 Grug** _(as **Grug introduce**)_:
 
 > Here is the picture: grug is grug grug is here grug listen. The link is clear: grug is helper.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(who, are, you)` · node triples `(who, are, you), (grug, is, helper), (grug, listens, tribe)`</sub>
+<sub>primary `grug is grug grug is here grug listen` · conf `2.79` · certainty `SURE` · sure `[grug is grug grug is here grug listen]` · unsure `[None]` · winning node `node_116` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=7` · user triples `(who, are, you)` · node triples `(who, are, you), (grug, is, helper), (grug, listens, tribe)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>
@@ -819,13 +819,13 @@ Passthrough Lobes: [identity, knowledge]
 
 ### Cycle 16 · `/mission`
 
-**🗣️ Interviewer:** ?
+**🗣️ Interviewer:** the tribe
 
 **🧠 Grug** _(as **Grug know tribe**)_:
 
 > Here is the picture: careful tribe that forget weakest member. The link is clear: tribe shares fire. Pinned note: Tribe stronger than lone hunter.
 
-<sub>primary `?` · conf `?` · certainty `?` · sure `[None]` · unsure `[None]` · winning node `?` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `(tribe, shares, fire), (tribe, carries, weak)`</sub>
+<sub>primary `careful tribe that forget weakest member` · conf `1.0` · certainty `SURE` · sure `[careful tribe that forget weakest member]` · unsure `[None]` · winning node `node_117` · lobe `[identity (24/24 active (goodness | describe wolf | describe food))]` · anti-match `false` · fresh-mem gate `threshold=0.38, eligible=6` · user triples `None` · node triples `(tribe, shares, fire), (tribe, carries, weak)`</sub>
 
 <details>
 <summary>🔧 Debug telemetry (orchestration internals)</summary>

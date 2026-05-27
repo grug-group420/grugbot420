@@ -59,10 +59,20 @@ SCAFFOLD_RE = re.compile(
 
 # Pull the stats block bounded by the telemetry separator and the
 # '=====' divider that closes every scaffold.
+#
+# GRUG: Primary Action text can be multi-word (e.g. "morning bring fresh
+# light to cave"). The previous \S+ pattern only matched single-token
+# action labels and silently dropped every multi-word cycle to a fallback
+# of "?" for mission/primary/conf/cert/winner. Fix is a non-greedy .+?
+# anchored on the trailing "  (conf=..., certainty=...)" tail. The double-
+# space before "(conf" is preserved as a hard anchor because the engine
+# always emits exactly two spaces there; if that ever changes, this regex
+# must change with it (no silent failures).
+#
 TELEMETRY_RE = re.compile(
     r"--- DEBUG TELEMETRY \(orchestration internals, not for speech\) ---\n"
     r"Mission: '(.+?)'\n"
-    r"Primary Action: (\S+)\s+\(conf=([0-9.]+), certainty=(\w+)\)\n"
+    r"Primary Action: (.+?)\s+\(conf=([0-9.]+), certainty=(\w+)\)\n"
     r"Sure Actions: \[(.*?)\]\n"
     r"Unsure Actions \(Coinflip Side-Features\): \[(.*?)\]\n"
     r".*?Winning Node: (\S+)\n",
