@@ -1,0 +1,52 @@
+# ============================================================================
+# kitchen_sink_v18b — confidence-isolation conversation
+# ============================================================================
+# A normal mixed conversation against the v17 descriptive-votes specimen.
+# Purpose: confirm that after the v7.21c-5 isolation work, vote confidences
+# in the captured telemetry are NOT being warped by side processes
+# (no ActionTonePredictor multiplier, no composite-rerank, slow-response
+# turned into telemetry only). We just talk to it and read the conf= values.
+#
+# The CLI dispatcher only accepts slash commands, so every spoken prompt
+# below is wrapped in /mission or /brainstorm. Bare lines (no slash) are
+# rejected as "bad format" and produce noise in the log.
+#
+# Mix: /mission and /brainstorm pairs across the 4 subject lobes (snap-back
+# vs far-jump per lobe), then /mission-driven descriptive prompts that
+# exercise the v7.21c-5 noun-question relations and direct-noun-description
+# aliases, then /mission-driven self/culture prompts (pinned-memory path).
+# ============================================================================
+
+/loadSpecimen specimen_demo/kitchen_sink_v18b_isolation_check/kitchen_sink.specimen.gz
+
+/status
+
+# -------- subject-lobe missions: snap-back then far-jump per lobe --------
+/mission explain how force relates to acceleration and mass
+/brainstorm explain how force relates to acceleration and mass
+
+/mission explain how acid balances richness in a heavy dish
+/brainstorm explain how acid balances richness in a heavy dish
+
+/mission describe how melody and harmony work together
+/brainstorm describe how melody and harmony work together
+
+/mission reason about fairness when cases look similar but feel different
+/brainstorm reason about fairness when cases look similar but feel different
+
+# -------- bare-noun descriptive prompts via /mission --------
+/mission tell me about fire
+/mission what is rock
+/mission describe water
+/mission tell about wolf
+/mission what is food
+
+# -------- self / culture prompts via /mission --------
+/mission who are you
+/mission what do you do
+/mission the tribe
+
+/status
+/aimlStatus
+
+/quit
