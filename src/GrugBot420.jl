@@ -101,6 +101,15 @@ using .AIMLNodeSystem
 include("VoteOrchestrator.jl")
 using .VoteOrchestrator
 
+# GRUG: SelfObserver — subconscious-style microlog store. ARCHITECTURALLY ISOLATED
+# from vote ranking and routing. Stochastic writes, throttled single-reader peeks,
+# fuzzy "rule of thumb" time buckets, drop-table associative recall. The public
+# API returns NO Float64 — this is a structural guarantee enforced by tests.
+# Side processes never affect vote confidence: SelfObserver hints are usable only
+# by the generation/system-prompt layer, never by candidate scoring.
+include("SelfObserver.jl")
+using .SelfObserver
+
 include("engine.jl")
 include("Main.jl")
 
@@ -176,5 +185,16 @@ export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
 export set_jitter_coin_ratio!, get_jitter_coin_ratio
 export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
+
+# GRUG: SelfObserver exports — subconscious microlog store. Public surface only.
+# Microlog and SubconsciousStore are exported for callers who need to construct
+# their own; the typical caller just uses observe!/peek_exact/peek_pattern.
+# audit_trail returns Int-valued counters (no Float64 leakage path).
+export SelfObserver
+export Microlog, SubconsciousStore, SubconsciousHint
+export SelfObserverError, SelfObserverConfigError, SelfObserverArgumentError
+export observe!, peek_exact, peek_pattern, audit_trail
+export drop_store!, reset_audit!, store_size, key_count
+export FUZZY_BUCKETS
 
 end # module GrugBot420
