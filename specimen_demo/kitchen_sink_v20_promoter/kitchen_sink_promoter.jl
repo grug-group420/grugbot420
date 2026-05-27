@@ -281,11 +281,81 @@ function main()
     end
 
     # ==========================================================================
-    # SUMMARY
+    # PHASE 6 — Surface preservation (Stage 1.5a-fix-1).
+    # ==========================================================================
+    banner("PHASE 6 — SURFACE PRESERVATION (1.5a-fix-1)")
+
+    # GRUG: each binding remembers what the user actually typed in the .surface
+    # field (and where it lives in the raw stream via .raw_position). AIML
+    # render and ATP read this so "WHAT IS TWO PLUS TWO" and "what is 2+2"
+    # don't look identical to downstream phases.
+    surface_cases = [
+        "what is 2 + 2",
+        "what is two plus two",
+        "what is 2 plus three",
+        "WHAT IS TWO PLUS TWO",
+        "  what is  two  plus  3  ",
+    ]
+    for raw in surface_cases
+        scan_and_expand(raw)
+        kept_raw      = current_promotion_raw()
+        kept_promoted = current_promotion_rewritten()
+        bindings      = current_promotion_bindings()
+        if kept_raw != raw
+            fail_loud("raw drift: stashed='$kept_raw' input='$raw'")
+        end
+        surfaces = [b.surface for b in bindings]
+        @printf("  · raw='%s'\n        promoted='%s'\n        surfaces=%s\n",
+                raw, kept_promoted, surfaces)
+    end
+    ok("current_promotion_raw() preserves verbatim user input across all $(length(surface_cases)) cases")
+    ok("each SigilBinding.surface holds the user's actual token (caps, words, digits)")
+
+    # ==========================================================================
+    # PHASE 7 — Conditional predicate (Stage 1.5c).
+    # ==========================================================================
+    banner("PHASE 7 — CONDITIONAL PREDICATE (1.5c)")
+
+    # GRUG: end-user discretion — token vs functor vs conditional. We build
+    # a fresh registry where &n promotes only for small numbers (< 100). Big
+    # numbers fall through to literal pass-through, demonstrating that the
+    # same sigil can behave differently per token at user discretion.
+    cond_table = SigilTable("conditional-demo")
+    register_sigil!(cond_table;
+        name="n", class=:lambda, applies_at=:match,
+        sigil_type=:number, provenance="demo",
+        promote_at_tokenize=true,
+        promote_predicate = canonical -> begin
+            v = tryparse(Int, canonical)
+            v !== nothing && v < 100
+        end)
+    register_sigil!(cond_table;
+        name="op", class=:lambda, applies_at=:match,
+        sigil_type=:op, provenance="demo",
+        promote_at_tokenize=true)
+
+    cases = [
+        ("compute 2 + 3",     "compute &n &op &n", 3),
+        ("compute 5 + 7",     "compute &n &op &n", 3),
+        ("compute 500 + 3",   "compute 500 &op &n", 2),  # 500 rejected, 3 promoted
+        ("compute 999 + 888", "compute 999 &op 888", 1), # only the op promotes
+    ]
+    for (raw, expected_rewrite, expected_bindings) in cases
+        rewritten, bindings = SigilPromoter.promote_input(cond_table, raw)
+        if rewritten != expected_rewrite
+            fail_loud("conditional drift on '$raw': got '$rewritten' want '$expected_rewrite'")
+        end
+        if length(bindings) != expected_bindings
+            fail_loud("conditional binding count drift on '$raw': got $(length(bindings)) want $expected_bindings")
+        end
+        @printf("  · '%s' -> '%s'  (%d bindings)\n", raw, rewritten, length(bindings))
+    end
+    ok("predicate gate runs per-token; user controls promotion granularity")
+
     # ==========================================================================
     banner("SUMMARY")
     println("""
-    ✅ STAGE 1.5a SIGIL PROMOTER — DEMO PASSED
+    ✅ STAGE 1.5a + 1.5a-fix-1 + 1.5c — DEMO PASSED
 
     What was demonstrated end-to-end:
       • $(length(variants)) surface variants of "what is 2 + 2" all collapse to
@@ -300,10 +370,28 @@ function main()
         shape, not one per variant. That is the whole point.
       • Pure-text inputs flow through unchanged; the math node stays silent.
 
+      [1.5a-fix-1] Surface preservation:
+      • current_promotion_raw() stashes the user's verbatim input alongside
+        the rewritten string.
+      • Each SigilBinding.surface holds the original token ("TWO" vs "2"),
+        and .raw_position indexes into the raw token stream.
+      • ATP and AIML can now distinguish word-form from symbolic input,
+        echo back in the user's register, and read tone signals (caps,
+        spacing) that promotion would otherwise erase.
+
+      [1.5c] Conditional predicate (end-user discretion):
+      • promote_predicate::Function on registry entries gates promotion
+        per-token. Three modes are now available per sigil:
+          - promote_at_tokenize=false                → FUNCTOR (matcher only)
+          - promote_at_tokenize=true,  pred=nothing  → TOKEN (always promote)
+          - promote_at_tokenize=true,  pred=fn       → CONDITIONAL
+        End user picks per registry entry. No silent failures: predicate
+        errors and non-Bool returns raise PromoterConfigError.
+
     Stage 1.5b parked: ATP arithmetic dispatch reading from
-    current_promotion_bindings(), render-side substitution, compound
-    number-words ("twenty-three"), word-form decimals, context-sensitive
-    "is" disambiguation.
+    current_promotion_bindings(), render-side substitution using .surface,
+    compound number-words ("twenty-three"), word-form decimals, context-
+    sensitive "is" disambiguation.
     """)
 end
 

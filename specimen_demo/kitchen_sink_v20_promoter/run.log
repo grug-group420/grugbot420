@@ -1,34 +1,49 @@
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.55 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.5 | ArousalNudge=0.0 | Weight=1.3 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.56 | ArousalNudge=0.0 | Weight=1.34 [FRAME=exploratory/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_NEUTRAL | Conf=0.25 | ArousalNudge=0.0 | Weight=1.05 [FALLBACK] [FRAME=contemplative/basic]
 ┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
-└ @ Main /workspace/grugbot420_repo/src/engine.jl:3519
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 [ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_NEUTRAL | Conf=1.0 | ArousalNudge=0.0 | Weight=1.2 [FALLBACK] [FRAME=contemplative/basic]
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.53 | ArousalNudge=0.0 | Weight=1.32 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.54 | ArousalNudge=0.0 | Weight=1.33 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.51 | ArousalNudge=0.0 | Weight=1.3 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.52 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.51 | ArousalNudge=0.0 | Weight=1.31 [FRAME=exploratory/basic]
+┌ Warning: [ORCHESTRATOR] lobe curve FAILED (continuing with unfiltered pool): UndefVarError(:LobeOrchestrator)
+└ @ Main /workspace/grugbot420_repo/src/engine.jl:3554
 
 ==============================================================================
   STAGE 1.5a SIGIL PROMOTER — END-TO-END COMPRESSION DEMO
 ==============================================================================
   · repo root: /workspace/grugbot420_repo/
-  · date:      2026-05-27T12:16:17.294
+  · date:      2026-05-27T12:48:43.665
   · julia:     1.10.4
 
 ==============================================================================
@@ -108,9 +123,39 @@
   ✓ pure-text 'hello world' → promoted='hello world'  bindings=[]  (confidence-equivalence held)
 
 ==============================================================================
+  PHASE 6 — SURFACE PRESERVATION (1.5a-fix-1)
+==============================================================================
+  · raw='what is 2 + 2'
+        promoted='what is &n &op &n'
+        surfaces=["2", "+", "2"]
+  · raw='what is two plus two'
+        promoted='what is &n &op &n'
+        surfaces=["two", "plus", "two"]
+  · raw='what is 2 plus three'
+        promoted='what is &n &op &n'
+        surfaces=["2", "plus", "three"]
+  · raw='WHAT IS TWO PLUS TWO'
+        promoted='what is &n &op &n'
+        surfaces=["TWO", "PLUS", "TWO"]
+  · raw='  what is  two  plus  3  '
+        promoted='what is &n &op &n'
+        surfaces=["two", "plus", "3"]
+  ✓ current_promotion_raw() preserves verbatim user input across all 5 cases
+  ✓ each SigilBinding.surface holds the user's actual token (caps, words, digits)
+
+==============================================================================
+  PHASE 7 — CONDITIONAL PREDICATE (1.5c)
+==============================================================================
+  · 'compute 2 + 3' -> 'compute &n &op &n'  (3 bindings)
+  · 'compute 5 + 7' -> 'compute &n &op &n'  (3 bindings)
+  · 'compute 500 + 3' -> 'compute 500 &op &n'  (2 bindings)
+  · 'compute 999 + 888' -> 'compute 999 &op 888'  (1 bindings)
+  ✓ predicate gate runs per-token; user controls promotion granularity
+
+==============================================================================
   SUMMARY
 ==============================================================================
-✅ STAGE 1.5a SIGIL PROMOTER — DEMO PASSED
+✅ STAGE 1.5a + 1.5a-fix-1 + 1.5c — DEMO PASSED
 
 What was demonstrated end-to-end:
   • 7 surface variants of "what is 2 + 2" all collapse to
@@ -125,8 +170,26 @@ What was demonstrated end-to-end:
     shape, not one per variant. That is the whole point.
   • Pure-text inputs flow through unchanged; the math node stays silent.
 
+  [1.5a-fix-1] Surface preservation:
+  • current_promotion_raw() stashes the user's verbatim input alongside
+    the rewritten string.
+  • Each SigilBinding.surface holds the original token ("TWO" vs "2"),
+    and .raw_position indexes into the raw token stream.
+  • ATP and AIML can now distinguish word-form from symbolic input,
+    echo back in the user's register, and read tone signals (caps,
+    spacing) that promotion would otherwise erase.
+
+  [1.5c] Conditional predicate (end-user discretion):
+  • promote_predicate::Function on registry entries gates promotion
+    per-token. Three modes are now available per sigil:
+      - promote_at_tokenize=false                → FUNCTOR (matcher only)
+      - promote_at_tokenize=true,  pred=nothing  → TOKEN (always promote)
+      - promote_at_tokenize=true,  pred=fn       → CONDITIONAL
+    End user picks per registry entry. No silent failures: predicate
+    errors and non-Bool returns raise PromoterConfigError.
+
 Stage 1.5b parked: ATP arithmetic dispatch reading from
-current_promotion_bindings(), render-side substitution, compound
-number-words ("twenty-three"), word-form decimals, context-sensitive
-"is" disambiguation.
+current_promotion_bindings(), render-side substitution using .surface,
+compound number-words ("twenty-three"), word-form decimals, context-
+sensitive "is" disambiguation.
 

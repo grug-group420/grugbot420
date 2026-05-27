@@ -316,12 +316,16 @@ using ._PromoterTestParent.SigilPromoter
 
     # ==========================================================================
     @testset "bindings_by_name view" begin
+        # GRUG: 6-arg SigilBinding (Stage 1.5a-fix-1): pos, name, value, class,
+        # surface, raw_position. Surface and raw_position are synthetic here
+        # because this testset is exercising the name-keyed view, not the
+        # promoter pipeline that produces them.
         bs = SigilBinding[
-            SigilBinding(0, "n",  3,   :lambda),
-            SigilBinding(1, "op", "+", :lambda),
-            SigilBinding(2, "n",  4,   :lambda),
-            SigilBinding(3, "op", "*", :lambda),
-            SigilBinding(4, "n",  5,   :lambda),
+            SigilBinding(0, "n",  3,   :lambda, "3", 0),
+            SigilBinding(1, "op", "+", :lambda, "+", 1),
+            SigilBinding(2, "n",  4,   :lambda, "4", 2),
+            SigilBinding(3, "op", "*", :lambda, "*", 3),
+            SigilBinding(4, "n",  5,   :lambda, "5", 4),
         ]
         v = bindings_by_name(bs)
         @test v["n"]  == Any[3, 4, 5]
@@ -345,13 +349,234 @@ using ._PromoterTestParent.SigilPromoter
     end
 
     # ==========================================================================
+    # Stage 1.5a-fix-1: surface preservation. Each binding remembers what
+    # the user actually typed, AND its position in the raw token stream.
+    # AIML render uses .surface to echo back in the user's register; ATP
+    # uses .surface + .raw_position for tone signals (caps, written-out vs
+    # symbolic, position-in-utterance).
+    # ==========================================================================
+    @testset "promote_input — surface preservation (1.5a-fix-1)" begin
+        t = default_registry()
+
+        # Digits → surface keeps the digits, value is the parsed number.
+        r, b = promote_input(t, "what is 2 + 3")
+        @test r == "what is &n &op &n"
+        @test length(b) == 3
+        @test b[1].value == 2  && b[1].surface == "2"
+        @test b[2].value == "+" && b[2].surface == "+"
+        @test b[3].value == 3  && b[3].surface == "3"
+
+        # Words → surface keeps the WORDS, value is the canonical number/op.
+        # This is the whole point: AIML can render "two plus three" back in
+        # words because the user wrote in words.
+        r, b = promote_input(t, "what is two plus three")
+        @test r == "what is &n &op &n"
+        @test length(b) == 3
+        @test b[1].value == 2  && b[1].surface == "two"
+        @test b[2].value == "+" && b[2].surface == "plus"
+        @test b[3].value == 3  && b[3].surface == "three"
+
+        # Mixed → each binding remembers its own form.
+        r, b = promote_input(t, "what is 2 plus three")
+        @test b[1].surface == "2"
+        @test b[2].surface == "plus"
+        @test b[3].surface == "three"
+
+        # Caps preserved verbatim — ATP reads this for arousal.
+        r, b = promote_input(t, "WHAT IS TWO PLUS TWO")
+        @test r == "what is &n &op &n"  # rewrite is lowercased
+        @test b[1].surface == "TWO"     # but surface keeps the user's caps
+        @test b[2].surface == "PLUS"
+        @test b[3].surface == "TWO"
+
+        # Sign-prefix merge surface = joined raw tokens ("negative three"),
+        # NOT the canonical "-3". The user said it in words; render echoes
+        # in words.
+        r, b = promote_input(t, "compute negative three")
+        @test r == "compute &n"
+        @test length(b) == 1
+        @test b[1].value == -3
+        @test b[1].surface == "negative three"
+    end
+
+    # ==========================================================================
+    @testset "promote_input — raw_position tracking (1.5a-fix-1)" begin
+        t = default_registry()
+
+        # Simple digit case: raw token positions match rewritten positions.
+        r, b = promote_input(t, "what is 2 + 2")
+        # raw stream tokens: ["what", "is", "2", "+", "2"]  (indices 0..4)
+        @test b[1].raw_position == 2  # "2"
+        @test b[2].raw_position == 3  # "+"
+        @test b[3].raw_position == 4  # "2"
+        # rewritten stream: ["what", "is", "&n", "&op", "&n"] (same indices)
+        @test b[1].position == 2
+        @test b[2].position == 3
+        @test b[3].position == 4
+
+        # Sign-prefix merge: raw consumes 2 tokens, rewritten emits 1.
+        # Bindings AFTER the merge have diverging positions.
+        r, b = promote_input(t, "give me negative three plus 5")
+        # raw:        ["give"=0, "me"=1, "negative"=2, "three"=3, "plus"=4, "5"=5]
+        # rewritten:  ["give"=0, "me"=1, "&n"=2,                   "&op"=3, "&n"=4]
+        @test length(b) == 3
+        @test b[1].surface      == "negative three"
+        @test b[1].raw_position == 2  # points at FIRST raw token of merge
+        @test b[1].position     == 2  # rewritten index
+        @test b[2].surface      == "plus"
+        @test b[2].raw_position == 4  # raw index 4
+        @test b[2].position     == 3  # rewritten index 3 — diverged
+        @test b[3].surface      == "5"
+        @test b[3].raw_position == 5
+        @test b[3].position     == 4
+    end
+
+    # ==========================================================================
+    @testset "promote_input — surface for decimals" begin
+        t = default_registry()
+        r, b = promote_input(t, "compute 2.5 plus 1.5")
+        @test r == "compute &n &op &n"
+        @test b[1].value == 2.5  && b[1].surface == "2.5"
+        @test b[2].value == "+"  && b[2].surface == "plus"
+        @test b[3].value == 1.5  && b[3].surface == "1.5"
+    end
+
+    # ==========================================================================
+    # Stage 1.5c — conditional promote_predicate. Three treatment modes per
+    # sigil (functor / token / conditional) are now end-user discretion.
+    # ==========================================================================
+    @testset "promote_input — conditional predicate (1.5c) accepts" begin
+        # GRUG: predicate that only allows promotion of small integers.
+        # &n with promote=true + predicate(canonical) -> canonical numeric < 100.
+        # Demonstrates per-token gating without changing the matcher or the
+        # rest of the registry.
+        t = SigilTable("conditional-small")
+        register_sigil!(t;
+            name="n", class=:lambda, applies_at=:match,
+            sigil_type=:number, provenance="test",
+            promote_at_tokenize=true,
+            promote_predicate = canonical -> begin
+                # parse and gate; predicate is responsible for its own parsing
+                v = tryparse(Int, canonical)
+                v !== nothing && v < 100
+            end)
+        register_sigil!(t;
+            name="op", class=:lambda, applies_at=:match,
+            sigil_type=:op, provenance="test",
+            promote_at_tokenize=true)
+
+        # 2 < 100 -> promotes.
+        r, b = promote_input(t, "compute 2 + 3")
+        @test r == "compute &n &op &n"
+        @test length(b) == 3
+
+        # 500 >= 100 -> predicate rejects -> token stays as literal "500".
+        r, b = promote_input(t, "compute 500 + 3")
+        @test r == "compute 500 &op &n"
+        @test length(b) == 2  # only &op and the trailing &n
+        @test b[1].name == "op"
+        @test b[2].name == "n" && b[2].value == 3
+    end
+
+    @testset "promote_input — conditional predicate (1.5c) rejects all" begin
+        # GRUG: predicate that always returns false. Even though
+        # promote_at_tokenize=true, NO token gets promoted. This is the
+        # "functor-at-runtime" treatment expressed declaratively.
+        t = SigilTable("conditional-never")
+        register_sigil!(t;
+            name="n", class=:lambda, applies_at=:match,
+            sigil_type=:number, provenance="test",
+            promote_at_tokenize=true,
+            promote_predicate = _ -> false)
+        # &op stays as the always-promote default so we can see the
+        # asymmetry in the rewrite.
+        register_sigil!(t;
+            name="op", class=:lambda, applies_at=:match,
+            sigil_type=:op, provenance="test",
+            promote_at_tokenize=true)
+
+        r, b = promote_input(t, "compute 2 + 3")
+        @test r == "compute 2 &op 3"
+        @test length(b) == 1
+        @test b[1].name == "op"
+    end
+
+    @testset "promote_input — conditional predicate (1.5c) on macro" begin
+        # GRUG: predicates work on :macro classes too. Lexicon membership is
+        # gated through the predicate before being checked. Use case: a
+        # &color macro whose lexicon is huge, but we only want to promote
+        # when the surrounding context is a paint-mixing utterance — the
+        # predicate can run any cheap check.
+        t = SigilTable("conditional-macro")
+        register_sigil!(t;
+            name="color", class=:macro, applies_at=:bind,
+            lexicon=["red", "blue", "green"],
+            provenance="test",
+            promote_at_tokenize=true,
+            # Reject "red" specifically (silly, but proves the gate fires).
+            promote_predicate = canonical -> canonical != "red")
+
+        r, b = promote_input(t, "i like red")
+        @test r == "i like red"   # red was rejected by predicate, stays literal
+        @test isempty(b)
+
+        r, b = promote_input(t, "i like blue")
+        @test r == "i like &color"
+        @test length(b) == 1
+        @test b[1].value == "blue"
+    end
+
+    @testset "promote_input — predicate raising raises PromoterConfigError" begin
+        # GRUG: no silent failures. If the user-supplied predicate throws,
+        # the promoter wraps and rethrows as PromoterConfigError attributable
+        # to the offending sigil + token.
+        t = SigilTable("conditional-broken")
+        register_sigil!(t;
+            name="n", class=:lambda, applies_at=:match,
+            sigil_type=:number, provenance="test",
+            promote_at_tokenize=true,
+            promote_predicate = _ -> error("predicate intentionally explodes"))
+
+        @test_throws PromoterConfigError promote_input(t, "compute 2 + 3")
+    end
+
+    @testset "promote_input — predicate returning non-Bool raises" begin
+        # GRUG: predicate must return Bool, not truthy. We catch this
+        # explicitly to prevent silent misclassification (a String "yes"
+        # is truthy in many languages but is a bug here).
+        t = SigilTable("conditional-bad-return")
+        register_sigil!(t;
+            name="n", class=:lambda, applies_at=:match,
+            sigil_type=:number, provenance="test",
+            promote_at_tokenize=true,
+            promote_predicate = canonical -> "yes")  # String, not Bool
+
+        @test_throws PromoterConfigError promote_input(t, "compute 2 + 3")
+    end
+
+    @testset "register_sigil! — predicate without promote=true raises" begin
+        # GRUG: setting a predicate when promote_at_tokenize=false would
+        # cause the predicate to never run — a silent no-op. We forbid
+        # this at registration time.
+        t = SigilTable("bad-predicate-config")
+        @test_throws SigilConfigError register_sigil!(t;
+            name="n", class=:lambda, applies_at=:match,
+            sigil_type=:number, provenance="test",
+            promote_at_tokenize=false,
+            promote_predicate = _ -> true)
+    end
+
+    # ==========================================================================
     @testset "SigilBinding shape" begin
         # The struct is plain immutable, fields are exactly what consumers
-        # rely on. If anyone makes it mutable later, this fires.
+        # rely on. If anyone makes it mutable later, this fires. Stage
+        # 1.5a-fix-1 added :surface and :raw_position so AIML render and
+        # ATP can read the user's original input alongside the canonical
+        # value.
         @test isstructtype(SigilBinding)
         @test !ismutabletype(SigilBinding)
         fns = fieldnames(SigilBinding)
-        @test fns == (:position, :name, :value, :class)
+        @test fns == (:position, :name, :value, :class, :surface, :raw_position)
     end
 
     # ==========================================================================

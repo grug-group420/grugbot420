@@ -228,6 +228,28 @@ const MAX_LEXICON_SIZE::Int = 1024
 #                 class is gated out of pattern resolution anyway). The flag
 #                 is purely additive — patterns and pattern-bind confidence
 #                 do not consult it; only the front-door promoter does.
+#   promote_predicate
+#               — Stage 1.5c conditional-promotion hook. Optional. When
+#                 set AND promote_at_tokenize=true, the front-door promoter
+#                 calls `promote_predicate(canonical_token)::Bool` per
+#                 candidate token; only promotes when the predicate returns
+#                 true. Lets end-users opt sigils into a third treatment
+#                 mode beyond the binary token-vs-functor split:
+#
+#                   promote_at_tokenize=false                      → FUNCTOR
+#                       (matcher handles entirely at runtime; the front
+#                        door doesn't touch matching tokens.)
+#                   promote_at_tokenize=true,  predicate=nothing   → TOKEN
+#                       (front door always rewrites matching tokens; this
+#                        is the Stage 1.5a default for &n and &op.)
+#                   promote_at_tokenize=true,  predicate=fn        → CONDITIONAL
+#                       (front door calls fn; rewrite only when fn returns
+#                        true. e.g. promote &n only inside a math context,
+#                        leave bare numerics alone everywhere else.)
+#
+#                 Predicate must be callable as `fn(::String)::Bool`. If it
+#                 errors or returns a non-Bool the promoter raises
+#                 PromoterConfigError — no silent fallbacks. Default nothing.
 #
 # All fields are immutable. Updating an entry means re-registering it, which
 # (by default) throws on collision unless the caller passes overwrite=true.
@@ -245,6 +267,7 @@ struct SigilEntry
     expansion::Union{Nothing,Vector{Any}}  # Stage 6 reserved.
     provenance::String
     promote_at_tokenize::Bool              # Stage 1.5 ingest hook. Default false.
+    promote_predicate::Union{Nothing,Function}  # Stage 1.5c conditional gate. Default nothing.
 end
 
 """
@@ -294,6 +317,14 @@ Optional keyword args:
     predicate (for :lambda) or lexicon membership (for :macro) into the
     canonical `&name` form. Only meaningful for :lambda and :macro classes;
     setting it on :tag or any reserved class throws SigilConfigError.
+  - `promote_predicate::Union{Nothing,Function}=nothing` — Stage 1.5c
+    conditional-promotion gate. When set AND `promote_at_tokenize=true`,
+    the front-door promoter calls `predicate(canonical_token)::Bool` per
+    candidate token; only promotes when the predicate returns true. Setting
+    this without `promote_at_tokenize=true` throws SigilConfigError (the
+    flag has no effect without ingest-time promotion enabled, and silent
+    no-ops are bugs). The predicate must be callable; argument-arity errors
+    surface at promote time as PromoterConfigError, not here.
 
 Returns the newly-registered SigilEntry.
 """
@@ -309,6 +340,7 @@ function register_sigil!(
     provenance::AbstractString="unspecified",
     overwrite::Bool=false,
     promote_at_tokenize::Bool=false,
+    promote_predicate::Union{Nothing,Function}=nothing,
 )::SigilEntry
     # GRUG: name validation — present, non-empty, matches name regex.
     nm = String(name)
@@ -395,6 +427,22 @@ function register_sigil!(
             "promote_at_tokenize"))
     end
 
+    # GRUG: promote_predicate validation (Stage 1.5c). Two rules:
+    #   1. If predicate is set, promote_at_tokenize MUST also be true.
+    #      A predicate without ingest-time promotion does nothing — that's
+    #      a silent no-op and silent no-ops are bugs.
+    #   2. The predicate must be a callable Function (Julia's type system
+    #      already enforces this via the kwarg type, but we keep the check
+    #      for the error-message clarity it gives downstream debuggers).
+    # We do NOT call the predicate here — argument-arity errors and
+    # non-Bool returns surface at promote time as PromoterConfigError,
+    # attributable to the actual offending input token.
+    if promote_predicate !== nothing && !promote_at_tokenize
+        throw(SigilConfigError(
+            "promote_predicate set on &$nm but promote_at_tokenize=false; predicate would never run (silent no-ops are forbidden — set promote_at_tokenize=true or drop the predicate)",
+            "promote_predicate"))
+    end
+
     # GRUG: registry size cap.
     if length(table.entries) >= MAX_REGISTRY_ENTRIES && !haskey(table.entries, nm)
         throw(SigilConfigError(
@@ -422,6 +470,7 @@ function register_sigil!(
         exp_clean,
         String(provenance),
         promote_at_tokenize,
+        promote_predicate,
     )
     table.entries[nm] = entry
     return entry

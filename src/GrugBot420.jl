@@ -254,4 +254,10 @@ export PromoterError, PromoterArgumentError, PromoterConfigError
 export promote_input, bindings_by_name, canonicalize_token
 export NUMBER_WORD_MAP, OP_WORD_MAP, OP_SYMBOL_SET, NUMBER_TOKEN_REGEX
 
+# GRUG: front-door promotion side-channel accessors (live in engine.jl,
+# re-exported here so callers don't have to know which module owns the
+# task-local storage). Stage 1.5a-fix-1 added current_promotion_raw to
+# preserve the user's verbatim input alongside the rewritten string.
+export current_promotion_bindings, current_promotion_rewritten, current_promotion_raw
+
 end # module GrugBot420

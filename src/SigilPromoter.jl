@@ -211,19 +211,39 @@ const SIGN_PREFIX_MAP::Dict{String,String} = Dict(
 A single sigil capture from the front-door promoter.
 
 Fields:
-  - `position::Int` — 0-based token index in the rewritten string.
-  - `name::String`  — sigil name (no `&` prefix).
-  - `value::Any`    — captured value. For :number → Int or Float64.
-                      For :op → String (single-char operator).
-                      For :macro → String (the canonical surface form
-                      that matched the lexicon).
-  - `class::Symbol` — class of the producing sigil (mirrors SigilEntry.class).
+  - `position::Int`     — 0-based token index in the REWRITTEN string.
+  - `name::String`      — sigil name (no `&` prefix).
+  - `value::Any`        — captured value. For :number → Int or Float64.
+                          For :op → String (single-char operator).
+                          For :macro → String (the canonical surface form
+                          that matched the lexicon).
+  - `class::Symbol`     — class of the producing sigil (mirrors SigilEntry.class).
+  - `surface::String`   — the ORIGINAL surface token(s) the binding replaced
+                          (e.g. "two" vs "2", "plus" vs "+"). For sign-prefix
+                          merges this is the joined raw text ("negative three").
+                          AIML/render phases use this to echo back in the
+                          user's own register; ATP uses it for tone signals
+                          (caps, word-vs-digit, written-out-vs-symbolic).
+  - `raw_position::Int` — 0-based token index in the RAW input stream
+                          (post-tokenize, pre-promote). Lets downstream
+                          phases map a binding back to its source position
+                          even after Layer 1 canonicalization rewrote tokens.
+                          For sign-prefix merges, points at the FIRST raw
+                          token consumed (the sign word).
+
+The two position fields differ when canonicalization changes token count:
+sign-prefix merge consumes 2 raw tokens ("negative", "three") but emits 1
+rewritten token ("&n"), so `raw_position` and `position` diverge for any
+binding that follows. Multi-token surface forms (currently just sign-prefix)
+are the only case where 1 binding maps to >1 raw token.
 """
 struct SigilBinding
     position::Int
     name::String
     value::Any
     class::Symbol
+    surface::String
+    raw_position::Int
 end
 
 # ==============================================================================
@@ -280,7 +300,10 @@ end
 const _TOKENIZE_REGEX::Regex =
     r"&[A-Za-z\u0370-\u03FF][A-Za-z0-9_\-\u0370-\u03FF]*|\d+(?:\.\d+)?|[A-Za-z][A-Za-z'\-]*|[+\-*/=<>%^]"
 
-# GRUG: split raw input into a Vector{String}. Each token is one of:
+# GRUG: split raw input into a Vector{Tuple{String,Int}}. Each tuple is
+# (token, raw_position) where raw_position is the 0-based index of this
+# token in the raw token stream (NOT a byte offset — token index).
+# Each token is one of:
 #   - existing sigil token (preserved verbatim, idempotency hook)
 #   - signed/unsigned integer or decimal (preserved as one token)
 #   - a word (letters, possibly with apostrophe or hyphen interior)
@@ -288,8 +311,18 @@ const _TOKENIZE_REGEX::Regex =
 # Anything that doesn't match (punctuation like ?, ., commas) is dropped at
 # the tokenizer. The matcher already strips those downstream so dropping
 # here matches existing behaviour.
-function _tokenize(raw::AbstractString)::Vector{String}
-    return [String(m.match) for m in eachmatch(_TOKENIZE_REGEX, String(raw))]
+#
+# raw_position is what downstream phases (ATP, AIML render) use to map a
+# binding back to its origin in the user's actual input. Critical for
+# preserving "two" vs "2" intent — see SigilBinding.surface / raw_position.
+function _tokenize(raw::AbstractString)::Vector{Tuple{String,Int}}
+    out = Tuple{String,Int}[]
+    idx = 0
+    for m in eachmatch(_TOKENIZE_REGEX, String(raw))
+        push!(out, (String(m.match), idx))
+        idx += 1
+    end
+    return out
 end
 
 # ==============================================================================
@@ -344,7 +377,9 @@ function promote_input(
     raw_str = String(raw)
 
     # GRUG: tokenize and run sign-merge in a single pass to keep token
-    # positions correct in the bindings list.
+    # positions correct in the bindings list. Each entry is (token, raw_pos)
+    # so SigilBinding.raw_position survives Layer 1 canonicalization
+    # collapsing/dropping tokens.
     raw_tokens = _tokenize(raw_str)
 
     # GRUG: collect the entries the registry says we should consider for
@@ -374,7 +409,7 @@ function promote_input(
     # into the following number-word's canonicalization.
     i = 1
     while i <= length(raw_tokens)
-        tok = raw_tokens[i]
+        tok, raw_pos = raw_tokens[i]
 
         # GRUG: idempotency hook — preserve already-promoted sigil tokens.
         if !isempty(tok) && tok[1] == SIGIL_PREFIX
@@ -395,7 +430,7 @@ function promote_input(
         # numeric token.
         if haskey(SIGN_PREFIX_MAP, lc) && i < length(raw_tokens)
             sign = SIGN_PREFIX_MAP[lc]
-            next_tok = raw_tokens[i+1]
+            next_tok, _next_pos = raw_tokens[i+1]
             next_can = canonicalize_token(next_tok)
             if occursin(NUMBER_TOKEN_REGEX, next_can)
                 # GRUG: merge into a single signed numeric. If next_can already
@@ -403,8 +438,16 @@ function promote_input(
                 # is the simplest rule and matches English usage).
                 stripped = lstrip(next_can, ['+', '-'])
                 merged = string(sign, stripped)
-                # Run layer-2 promotion on the merged numeric directly.
-                _promote_layer2!(out_tokens, bindings, merged, promote_lambdas, promote_macros)
+                # Surface = the user's actual two raw tokens joined ("negative three"),
+                # not the canonicalized "-3". Render/ATP read this to echo back
+                # in the user's register.
+                merged_surface = string(tok, " ", next_tok)
+                # Run layer-2 promotion on the merged numeric directly. The
+                # binding's raw_position points at the FIRST raw token (the
+                # sign word) — that's the user's anchor for this concept.
+                _promote_layer2!(out_tokens, bindings, merged,
+                                 merged_surface, raw_pos,
+                                 promote_lambdas, promote_macros)
                 i += 2
                 continue
             end
@@ -417,8 +460,11 @@ function promote_input(
             continue
         end
 
-        # GRUG: Layer 2 promotion.
-        _promote_layer2!(out_tokens, bindings, canonical, promote_lambdas, promote_macros)
+        # GRUG: Layer 2 promotion. Pass the ORIGINAL surface token (not the
+        # canonicalized form) so the binding remembers what the user typed.
+        _promote_layer2!(out_tokens, bindings, canonical,
+                         tok, raw_pos,
+                         promote_lambdas, promote_macros)
         i += 1
     end
 
@@ -431,39 +477,91 @@ end
 # in deterministic order, capture the first match, append the resulting
 # sigil-or-literal token + binding to the accumulators.
 #
+# `surface` is the ORIGINAL raw token (or joined tokens for sign-prefix
+# merges). `raw_pos` is the 0-based index of that token in the raw stream.
+# Both feed straight into SigilBinding so downstream phases can read them.
+#
 # In-place mutation of out_tokens and bindings keeps the main loop simple
 # and avoids per-token allocation churn.
 function _promote_layer2!(
     out_tokens::Vector{String},
     bindings::Vector{SigilBinding},
     canonical::String,
+    surface::AbstractString,
+    raw_pos::Int,
     promote_lambdas::Vector{SigilEntry},
     promote_macros::Vector{SigilEntry},
 )
     # GRUG: try each promotable lambda's shape predicate.
     for e in promote_lambdas
+        # Stage 1.5c conditional gate. If the registry entry carries a
+        # user-supplied promote_predicate, ask it first; only run the
+        # shape predicate when the gate allows.
+        if !_predicate_allows(e, canonical)
+            continue
+        end
         captured = _try_lambda_promote(e, canonical)
         if captured !== nothing
             pos = length(out_tokens)
             push!(out_tokens, string(SIGIL_PREFIX, e.name))
-            push!(bindings, SigilBinding(pos, e.name, captured, :lambda))
+            push!(bindings, SigilBinding(
+                pos, e.name, captured, :lambda,
+                String(surface), raw_pos))
             return nothing
         end
     end
 
     # GRUG: try each promotable macro's lexicon membership.
     for e in promote_macros
+        # Stage 1.5c conditional gate (same rule as lambdas above).
+        if !_predicate_allows(e, canonical)
+            continue
+        end
         if e.lexicon !== nothing && canonical in e.lexicon
             pos = length(out_tokens)
             push!(out_tokens, string(SIGIL_PREFIX, e.name))
-            push!(bindings, SigilBinding(pos, e.name, canonical, :macro))
+            push!(bindings, SigilBinding(
+                pos, e.name, canonical, :macro,
+                String(surface), raw_pos))
             return nothing
         end
     end
 
-    # GRUG: nothing matched — token passes through as a literal.
+    # GRUG: nothing matched — token passes through as a literal. No binding
+    # is recorded; the literal lands in out_tokens at the canonicalized
+    # form (lowercased + number-word-resolved). surface/raw_pos go unused
+    # for fast-path tokens because there's nothing to map back to.
     push!(out_tokens, canonical)
     return nothing
+end
+
+# GRUG: Stage 1.5c — per-entry conditional gate. If the registry entry has
+# a promote_predicate set, call it with the canonical token. The predicate
+# MUST return Bool; anything else is a PromoterConfigError attributable to
+# the registry author. If the predicate raises, we wrap and rethrow with
+# context so the user can see which sigil and which token tripped it.
+#
+# Returns true when the entry should be considered for promotion (either
+# because no predicate is set, or because the predicate returned true).
+# Returns false when the predicate returned false.
+#
+# No silent failures: predicate exceptions and non-Bool returns both raise.
+function _predicate_allows(e::SigilEntry, canonical::String)::Bool
+    pred = e.promote_predicate
+    pred === nothing && return true
+    result = try
+        pred(canonical)
+    catch err
+        throw(PromoterConfigError(
+            "promote_predicate for &$(e.name) raised on token $(repr(canonical)): $(err)",
+            "promote_predicate"))
+    end
+    if !(result isa Bool)
+        throw(PromoterConfigError(
+            "promote_predicate for &$(e.name) returned $(typeof(result)) ($(repr(result))) on token $(repr(canonical)); must return Bool",
+            "promote_predicate"))
+    end
+    return result
 end
 
 # GRUG: per-sigil_type shape predicate. Returns the captured value or nothing.

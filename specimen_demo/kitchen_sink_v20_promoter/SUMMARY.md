@@ -1,103 +1,82 @@
-# Kitchen Sink v20 — Stage 1.5a Sigil Promoter (Front-Door Compression)
+# Kitchen Sink v20 — Stage 1.5a + 1.5a-fix-1 + 1.5c (Sigil Promoter)
 
-**Status:** ✅ PASSED — 7/7 surface variants → 1 node fires (population compression).
+**Status:** ✅ PASSED — every phase green.
 
-## What this demo proves
+## Three stages, one demo
 
-Stage 1.5a wires a **two-layer input promoter** at the engine's front door
-(the very top of `scan_and_expand`). Before the matcher sees anything, raw
-user input flows through:
+| Stage | What it adds | Demo phase |
+|---|---|---|
+| **1.5a**       | Two-layer front-door promoter; population compression. | Phases 1–5 |
+| **1.5a-fix-1** | Surface preservation; `.surface` + `.raw_position` on bindings; `current_promotion_raw()` accessor. | Phase 6 |
+| **1.5c**       | Conditional `promote_predicate::Function` on registry entries; end-user discretion (functor / token / conditional triplet). | Phase 7 |
 
-1. **Layer 1 — thesaurus canonicalization.** `"two plus two"` → `"2 + 2"`,
-   case-folded, whitespace-normalized. Closed maps: `NUMBER_WORD_MAP` (0–100),
-   `OP_WORD_MAP` (`plus`/`minus`/`times`/`divided by`/`equals`),
-   `SIGN_PREFIX_MAP` (`negative`/`positive`).
-
-2. **Layer 2 — registry shape promotion.** `"2 + 2"` → `"&n &op &n"`. Driven
-   by `SigilEntry.promote_at_tokenize::Bool` flag on the registry — only
-   sigils that opt in get promoted. Stage 1.5a flags `&n` and `&op`.
-
-The matcher downstream just compares strings. Many surface variants of the
-same shape collapse onto **one pattern bucket → one node**.
-
-## The headline
-
-| Raw Input | Promoted | Node Fired |
-|-----------|----------|-----------:|
-| `what is 2 + 2`             | `what is &n &op &n` | `node_0` |
-| `what is 2+2`               | `what is &n &op &n` | `node_0` |
-| `what is two plus two`      | `what is &n &op &n` | `node_0` |
-| `what is 2 plus two`        | `what is &n &op &n` | `node_0` |
-| `what is two plus 2`        | `what is &n &op &n` | `node_0` |
-| `WHAT is TWO Plus 2`        | `what is &n &op &n` | `node_0` |
-| `  what is  2  +  2  `      | `what is &n &op &n` | `node_0` |
-
-**`node_0`: 7/7 fires.** One pattern, one node, every variant.
-
-## Bindings (position-keyed side-channel)
-
-For all 7 variants the promoter produces an identical
-`Vector{SigilBinding}`:
+## Phase 4 headline (1.5a)
 
 ```
-[ pos=2  &n=2     class=:lambda
-  pos=3  &op="+"  class=:lambda
-  pos=4  &n=2     class=:lambda ]
+node_0   7/7 fires   ★ MATH NODE
 ```
 
-Stashed in task-local storage by `scan_and_expand`. Read with
-`current_promotion_bindings()` from any downstream phase. Stage 1.5b will
-have ActionTonePredictor consume these for arithmetic dispatch.
+Seven surface variants of "what is 2+2" — `2+2`, `two plus two`, `WHAT is TWO Plus 2`, mix-and-match — **all collapse to one canonical matcher input** (`what is &n &op &n`) and **fire the same node**. Population compression in real engine plumbing.
 
-## Confidence-equivalence guarantee
-
-Pure-text inputs (no digits, no math-words) round-trip **byte-identical**
-with empty bindings:
-
-| Input | Promoted | Bindings |
-|-------|----------|----------|
-| `hello world`                     | `hello world`                     | `[]` |
-| `the cat sat on the mat`          | `the cat sat on the mat`          | `[]` |
-| `fire makes grug warm and happy`  | `fire makes grug warm and happy`  | `[]` |
-| `sun shine bright today`          | `sun shine bright today`          | `[]` |
-
-Every existing test in the suite — none of which uses arithmetic input —
-sees byte-identical scanner inputs before and after wiring. Confirmed by
-running `test_comprehensive.jl`, `test_chatter_v2.jl`, `test_v7_21c2.jl`
-post-wire: all pass.
-
-## Idempotency
+## Phase 6 headline (1.5a-fix-1)
 
 ```
-promote(promote("what is 2 + 2"))
-  == promote("what is 2 + 2")
-  == "what is &n &op &n"
+[caps preserved]
+  raw       = "WHAT IS TWO PLUS TWO"
+  binding   = name=&n  value=2  surface="TWO"   pos=2 raw_pos=2
+  binding   = name=&op value="+" surface="PLUS" pos=3 raw_pos=3
+  binding   = name=&n  value=2  surface="TWO"   pos=4 raw_pos=4
 ```
 
-The second pass produces the same string with **zero new bindings** — sigil
-tokens (`&n`, `&op`) are preserved verbatim by the tokenizer's first-alt
-regex match. Critical for safe re-application during the matcher's
-expansion passes.
+The user typed `"WHAT IS TWO PLUS TWO"`. The matcher saw `"what is &n &op &n"` (so the math node fired the same way as it would for `"what is 2+2"`). And ATP / AIML can now read:
+
+- `current_promotion_raw()` → `"WHAT IS TWO PLUS TWO"` (verbatim)
+- `binding.surface` → `"TWO"`, `"PLUS"`, `"TWO"` (per-binding original tokens)
+- `binding.raw_position` → 2, 3, 4 (per-binding index in raw token stream)
+
+So if AIML wants to render back as "TWO PLUS TWO IS FOUR" (matching the user's caps/word register) it can. If ATP wants to read "the user is yelling and writing in words" for tone, it can. Neither was possible in plain Stage 1.5a.
+
+## Phase 7 headline (1.5c)
+
+```
+'compute 2 + 3'     → 'compute &n &op &n'   (3 bindings)
+'compute 5 + 7'     → 'compute &n &op &n'   (3 bindings)
+'compute 500 + 3'   → 'compute 500 &op &n'  (2 bindings)   ← 500 stayed literal
+'compute 999 + 888' → 'compute 999 &op 888' (1 bindings)   ← only op promoted
+```
+
+The same `&n` registry entry — same name, same `sigil_type=:number` — promotes for `2`, `3`, `5`, `7` but **not** for `500`, `888`, `999`. The end-user-supplied predicate (`v < 100`) gated the promotion per-token. Three treatment modes are now end-user discretion **per sigil entry**:
+
+| Mode | Registry config | Behavior |
+|---|---|---|
+| **FUNCTOR** | `promote_at_tokenize=false` | Matcher handles entirely at runtime. Front door doesn't touch matching tokens. |
+| **TOKEN** | `promote_at_tokenize=true,` `promote_predicate=nothing` | Front door always promotes matching tokens. (Stage 1.5a default for `&n`/`&op`.) |
+| **CONDITIONAL** | `promote_at_tokenize=true,` `promote_predicate=fn` | Front door calls `fn(canonical)::Bool`; promotes only when `true`. |
+
+No silent failures: predicate errors and non-`Bool` returns raise `PromoterConfigError`. Setting a predicate without `promote_at_tokenize=true` raises `SigilConfigError` at registration time (would be a silent no-op otherwise).
 
 ## Files involved
 
-- `src/SigilRegistry.jl` — added `promote_at_tokenize::Bool` field,
-  validation, default-registry entry for `&op`, `&n` flagged true.
-- `src/SigilPromoter.jl` (NEW) — two-layer promoter, closed canonical
-  maps, sign-prefix peek, position-keyed bindings, error types.
-- `src/engine.jl` — guarded include of registry+promoter, const
-  `_ENGINE_SIGIL_TABLE`, task-local stash, `scan_and_expand` wired at
-  the front door.
-- `test/test_sigil_registry.jl` — 171/171 ✓
-- `test/test_sigil_promoter.jl` (NEW) — 226/226 ✓
-- `test/runtests.jl` — added `test_sigil_promoter.jl` to ALL_TESTS
+- `src/SigilRegistry.jl`
+  - Stage 1.5a: `promote_at_tokenize::Bool`
+  - Stage 1.5c: `promote_predicate::Union{Nothing,Function}` field, validation, `register_sigil!` kwarg
+- `src/SigilPromoter.jl`
+  - Stage 1.5a: two-layer promoter, `SigilBinding`
+  - Stage 1.5a-fix-1: `surface::String` + `raw_position::Int` on `SigilBinding`; tokenizer returns `(token, raw_pos)` tuples
+  - Stage 1.5c: `_predicate_allows` gate; `PromoterConfigError` on predicate failure
+- `src/engine.jl`
+  - Stage 1.5a: `_ENGINE_SIGIL_TABLE`, task-local stash, `scan_and_expand` front-door wire
+  - Stage 1.5a-fix-1: `_PROMOTION_RAW_KEY`, `current_promotion_raw()` accessor
+- `src/GrugBot420.jl` — re-exports
+- `test/test_sigil_registry.jl` — **177/177** ✓
+- `test/test_sigil_promoter.jl` — **284/284** ✓
 
-## Stage 1.5b (parked)
+## Stage 1.5b (still parked)
 
-Reads from `current_promotion_bindings()`:
+Reads from `current_promotion_bindings()` and `current_promotion_raw()`:
 
 - ATP arithmetic dispatch branch (`ACTION_COMPUTE` action class).
-- Render-side substitution (rebuild reply text from bindings).
+- Render-side substitution using `binding.surface` (echo back in user's register).
 - Compound number-words (`twenty-three` → `23`).
 - Word-form decimals (`two point five` → `2.5`).
 - Context-sensitive `is` (definitional copula vs equality op).

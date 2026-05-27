@@ -313,6 +313,41 @@ using .SigilRegistry
     end
 
     # ==========================================================================
+    @testset "register_sigil! — promote_predicate validation (1.5c)" begin
+        t = SigilTable("predicate-test")
+
+        # Valid: predicate + promote_at_tokenize=true.
+        e_ok = register_sigil!(t;
+            name="gated_n", class=:lambda, applies_at=:match,
+            sigil_type=:number, promote_at_tokenize=true,
+            promote_predicate = canonical -> canonical != "0")
+        @test e_ok.promote_predicate !== nothing
+        # Confirm it's stored verbatim (no copy / wrap).
+        @test e_ok.promote_predicate("1") === true
+        @test e_ok.promote_predicate("0") === false
+
+        # Default nothing when not specified.
+        e_def = register_sigil!(t;
+            name="plain_n", class=:lambda, applies_at=:match,
+            sigil_type=:number, promote_at_tokenize=true)
+        @test e_def.promote_predicate === nothing
+
+        # REJECTED: predicate set without promote_at_tokenize=true.
+        # Silent no-ops are forbidden.
+        @test_throws SigilConfigError register_sigil!(t;
+            name="silent_no_op", class=:lambda, applies_at=:match,
+            sigil_type=:number, promote_at_tokenize=false,
+            promote_predicate = _ -> true)
+
+        # Predicate works on :macro too (lexicon membership gated).
+        e_mac = register_sigil!(t;
+            name="gated_color", class=:macro, applies_at=:bind,
+            lexicon=["red", "blue"], promote_at_tokenize=true,
+            promote_predicate = canonical -> canonical != "red")
+        @test e_mac.promote_predicate !== nothing
+    end
+
+    # ==========================================================================
     @testset "register_sigil! — registry size cap" begin
         t = SigilTable("test")
 
@@ -634,11 +669,14 @@ using .SigilRegistry
         # this assertion fires.
         @test isstructtype(SigilEntry)
         @test !ismutabletype(SigilEntry)
-        # Fields are exactly the 9 we locked in (Stage 1.5 added promote_at_tokenize).
+        # Fields are exactly the 10 we locked in:
+        #   Stage 1     — first 8 (name..provenance)
+        #   Stage 1.5a  — promote_at_tokenize
+        #   Stage 1.5c  — promote_predicate (conditional gate)
         fns = fieldnames(SigilEntry)
         @test fns == (:name, :class, :applies_at, :sigil_type,
                       :lexicon, :params, :expansion, :provenance,
-                      :promote_at_tokenize)
+                      :promote_at_tokenize, :promote_predicate)
     end
 
 end

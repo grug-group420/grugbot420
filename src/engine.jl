@@ -108,8 +108,15 @@ const _ENGINE_SIGIL_TABLE::SigilRegistry.SigilTable = SigilRegistry.default_regi
 # read them without changing return-tuple shapes. Stage 1.5a writes; Stage
 # 1.5b reads (ATP arithmetic dispatch). Default empty so non-promoted text
 # paths see a defined-but-empty side-channel.
-const _PROMOTION_BINDINGS_KEY::Symbol = :grugbot420_sigil_promotion_bindings
+#
+# Stage 1.5a-fix-1 adds _PROMOTION_RAW_KEY: the ORIGINAL user input string,
+# preserved verbatim. ATP needs it for tone signals (caps, written-out vs
+# symbolic). AIML render needs it to echo back in the user's register.
+# Without this, "what is 2+2" and "what is two plus two" look identical to
+# every downstream phase, which is wrong.
+const _PROMOTION_BINDINGS_KEY::Symbol  = :grugbot420_sigil_promotion_bindings
 const _PROMOTION_REWRITTEN_KEY::Symbol = :grugbot420_sigil_promotion_rewritten
+const _PROMOTION_RAW_KEY::Symbol       = :grugbot420_sigil_promotion_raw
 
 """
     current_promotion_bindings() -> Vector{SigilPromoter.SigilBinding}
@@ -139,6 +146,29 @@ and round-trip assertions.
 """
 function current_promotion_rewritten()::Union{String,Nothing}
     return get(task_local_storage(), _PROMOTION_REWRITTEN_KEY, nothing)
+end
+
+"""
+    current_promotion_raw() -> Union{String,Nothing}
+
+Return the ORIGINAL user input string from the most recent
+`scan_and_expand` call on the current task, or `nothing` if no promotion
+has run on this task. This is the verbatim input — caps, whitespace,
+word-vs-digit, all preserved.
+
+Stage 1.5a-fix-1 added this so:
+  - ATP can read user tone signals that promotion strips ("WHAT IS 2+2"
+    is angrier than "what is two plus two").
+  - AIML render can echo back in the user's register ("two plus two" vs
+    "2 + 2"), making replies feel coherent rather than alien.
+  - Telemetry can show before/after for diff'ing promotion behaviour.
+
+Pair with `current_promotion_bindings()`: each binding's `.surface` field
+gives you the user's raw token for that capture, and `.raw_position`
+indexes into the raw token stream.
+"""
+function current_promotion_raw()::Union{String,Nothing}
+    return get(task_local_storage(), _PROMOTION_RAW_KEY, nothing)
 end
 
 # ==============================================================================
@@ -3303,8 +3333,13 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
 
     # GRUG: Stash on the current task. Each scan_and_expand call OVERWRITES
     # any prior binding so stale state from a previous input never leaks.
-    task_local_storage(_PROMOTION_BINDINGS_KEY, promotion_bindings)
+    # Three keys:
+    #   _PROMOTION_RAW_KEY        — the user's verbatim input (Stage 1.5a-fix-1)
+    #   _PROMOTION_REWRITTEN_KEY  — the matcher-ready promoted string
+    #   _PROMOTION_BINDINGS_KEY   — Vector{SigilBinding} side-channel
+    task_local_storage(_PROMOTION_RAW_KEY,       input_text)
     task_local_storage(_PROMOTION_REWRITTEN_KEY, promoted_text)
+    task_local_storage(_PROMOTION_BINDINGS_KEY,  promotion_bindings)
 
     # GRUG: From here on, scan_specimens and the cascade gates see the
     # PROMOTED text, not the raw text. That is the whole point — one shape,
