@@ -1,0 +1,29 @@
+# =============================================================
+# v16 ANCHOR PROBES — exercise NONJITTER + high-strength nodes
+# Each probe is invoked multiple times to test confidence stability.
+# =============================================================
+/mission who are you
+/mission who are you
+/mission who are you
+/mission what is tribe
+/mission what is tribe
+/mission what is cave
+/mission what do you do
+/mission what do you do
+/mission are you smart
+/mission what is good
+/mission speak plain please
+/mission listen first to me
+/mission do not pretend
+/mission never harm the tribe
+# bedrock topics — should win over jitter peers
+/mission what is fire
+/mission what is fire
+/mission tell me about fire
+/mission what is wolf
+/mission what is wolf
+/mission i am sad
+/mission i am scared
+/mission watch out behind you
+/mission warning incoming
+/mission stop right now

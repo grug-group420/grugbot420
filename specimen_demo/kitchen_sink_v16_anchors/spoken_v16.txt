@@ -1,0 +1,275 @@
+# v16: 91 mission/reply pairs
+
+- mission : 'hello'
+  reply   : [Grug greet warm] Let me think with you. Be polite, brief..
+
+- mission : 'hello'
+  reply   : [Highly polite greeting protocols active] Let me think with you. hello hi greeting mornin.
+
+- mission : 'hello'
+  reply   : [Highly polite greeting protocols active] Let me think with you. hello hi greeting mornin.
+
+- mission : 'good morning'
+  reply   : [Grug greet morning] first light wake the bones soft.
+
+- mission : 'howdy partner'
+  reply   : [Grug greet casual] Here is the picture: the friend.
+
+- mission : 'what is fire'
+  reply   : [Grug explain plain] Here is the picture: No big words..
+
+- mission : 'tell me about rocks'
+  reply   : [Grug share what grug know] Here is the picture: tell me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'why does fire burn'
+  reply   : [Grug seek cause] Here is the picture: Trace from effect to source.. Pinned note: Hot rock burn. Soft skin remember.
+
+- mission : 'how does a hammer work'
+  reply   : [Grug know hammer] Here is the picture: weight in hand teach more than ten lessons. The link is clear: hammer strikes stone.
+
+- mission : 'what causes the storm to rumble'
+  reply   : [Grug explain plain] Here is the picture: No big words..
+
+- mission : 'danger ahead'
+  reply   : [Grug see threat] the threat.
+
+- mission : 'run from the wolf now'
+  reply   : [Grug know wolf] sound of wolf at night make children climb close. The link is clear: wolf hunts prey.
+
+- mission : 'fire burns my hand'
+  reply   : [Grug warn fire] hot rock bites soft skin remember.
+
+- mission : 'watch out for the cliff'
+  reply   : [Grug point at incoming] Let me think with you. examine out.
+
+- mission : 'STOP that immediately'
+  reply   : [Grug halt] stop now think later.
+
+- mission : 'perhaps the river bends near the old tree'
+  reply   : [Grug know tree] Let me think with you. careful tree fall sudden when wind angry. The link is clear: tree provides wood.
+
+- mission : 'maybe we should wait for dawn'
+  reply   : [Grug weigh path] Let me think with you. never plan when belly empty or fire low.
+
+- mission : 'why is this stupid garbage broken?'
+  reply   : [Grug seek cause] I hear that. Trace from effect to source..
+
+- mission : 'what kind of idiot designed this?'
+  reply   : [Grug explain plain] I hear that. No huge words..
+
+- mission : 'what why how when where which what why how when?'
+  reply   : [Grug seek cause] Here is the picture: Trace from result to source.. A companion frame: how does. I am not fully locked in — every flame has a spark trace from end to start is also on the table.
+
+- mission : 'STOP STOP STOP NOW NOW NOW DANGER DANGER DANGER!!!'
+  reply   : [Grug see threat] the threat.
+
+- mission : 'i feel sad today'
+  reply   : [Grug listen to feeling] Let me think with you. Do not fix and validate.. A companion frame: Hand presence not solutions..
+
+- mission : 'i feel worried about tomorrow'
+  reply   : [Grug listen to feeling] Let me think with you. Do not fix and examine.. A companion frame: worried.
+
+- mission : 'i feel lonely in the cave'
+  reply   : [Grug listen to feeling] Let me think with you. Validate, do not fix..
+
+- mission : 'i did it i made fire'
+  reply   : [Grug rejoice] grug saw the spark grug saw the patience that fed it.
+
+- mission : 'thank you for the food'
+  reply   : [Grug know food] Let me think with you. careful food that smell wrong belly turn against tribe. The link is clear: food feeds tribe.
+
+- mission : 'should we move camp'
+  reply   : [Grug weigh path] Let me think with you. first move that protect tribe second transfer that feed tribe.
+
+- mission : 'plan to hunt at dawn'
+  reply   : [Grug plan hunt] sleep heavy tonight legs need to subsist river tomorrow.
+
+- mission : 'the sky looks dark'
+  reply   : [Grug know sky] Let me think with you. sky is roof of cave that has no walls. The link is clear: star lives sky.
+
+- mission : 'the river is high'
+  reply   : [Grug know river] Let me think with you. careful river smile shallow then bite deep. The link is clear: river feeds fish.
+
+- mission : 'make a tool from this stone'
+  reply   : [Grug make tool] stone for strike wood for grip sinew for hold.
+
+- mission : 'build a shelter before night'
+  reply   : [Grug plan shelter] many hand make cave one supply craft grave.
+
+- mission : 'danger danger predator near'
+  reply   : [Grug see threat] Let me think with you. Warn loud and clear..
+
+- mission : 'tell me a calm story'
+  reply   : [Grug share what grug know] Here is the picture: tell me.
+
+- mission : 'why'
+  reply   : [Grug seek cause] Here is the picture: Trace from effect to source..
+
+- mission : 'tree'
+  reply   : [Grug know tree] Wood for fire and tree make shade nut.
+
+- mission : 'sad'
+  reply   : [Grug sit with sadness] Offer presence not solutions..
+
+- mission : 'STOP'
+  reply   : [Grug halt] stop now think later.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: tell me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: say me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'tell me about the rocks'
+  reply   : [Grug share what grug know] Here is the picture: talk me. Pinned note: Many rocks compete. Loudest rock get to talk.
+
+- mission : 'hello again old friend'
+  reply   : [Highly polite greeting protocols active] hello hi greeting mornin.
+
+- mission : 'tell me about fire and stone'
+  reply   : [Grug share what grug know] Here is the picture: tell me.
+
+- mission : 'what is the difference between hammer and stone'
+  reply   : [Grug explain plain] Here is the picture: No enormous words..
+
+- mission : 'why does the river flow downhill'
+  reply   : [Grug seek cause] Here is the picture: Trace from effect to source..
+
+- mission : 'could you explain how fire makes warm'
+  reply   : [Grug know fire] Here is the picture: Breathes black smoke and fire eats wood. The link is clear: fire cooks meat.
+
+- mission : 'STOP STOP STOP DANGER'
+  reply   : [Grug halt] I hear that. what hurry can outrun consequence of bad step.
+
+- mission : 'watch out'
+  reply   : [Grug point at incoming] watch out.
+
+- mission : 'run now'
+  reply   : [Grug urge escape] the feet.
+
+- mission : 'warning predator at the edge'
+  reply   : [Grug raise voice] the warning.
+
+- mission : 'fire spreads quick'
+  reply   : [Grug know fire] careful fire bite worse than wolf. The link is clear: fire makes heat.
+
+- mission : 'i feel scared and alone'
+  reply   : [Grug shelter you] fear is shadow of thing not thing itself.
+
+- mission : 'i feel angry at the tribe'
+  reply   : [Grug listen to feeling] Let me think with you. Do not mend and validate.. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'you never listen to grug'
+  reply   : [Grug pin: protect tribe] when in doubt grug choose protect. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'thank you for teaching me'
+  reply   : [Grug receive thanks] Let me think with you. thank you.
+
+- mission : 'tell me again about the river'
+  reply   : [Grug seek cause] Here is the picture: Trace from product to source..
+
+- mission : 'what is fire what is water what is sky'
+  reply   : [Grug explain plain] Here is the picture: No massive words..
+
+- mission : 'grug hits rock and makes fire'
+  reply   : [Causal relational analysis active] grug hits rock and makes fire. The link is clear: grug hits rock. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'rock hits grug and grug yells'
+  reply   : [Grug know rock] miniature rock big rock all rock from one rock. The link is clear: rock sleeps mountain. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'the cave is dark and cold'
+  reply   : [Grug know cave] cave is shape stone agree to hand tribe. The link is clear: cave holds fire.
+
+- mission : 'the wolf howls in the night'
+  reply   : [Grug know wolf] Let me think with you. what is wolf if not hunger with shape and song. The link is clear: wolf fears fire.
+
+- mission : 'do you know about the stars'
+  reply   : [Grug check memory] grug carry many small stones in head.
+
+- mission : 'can you teach me about hunting'
+  reply   : [Grug offer] Let me think with you. hand offered is deliver received.
+
+- mission : 'should we sleep now'
+  reply   : [Grug weigh path] best plan flex when wind change.
+
+- mission : 'plan the morning hunt'
+  reply   : [Grug plan hunt] Let me think with you. wind tell prey where hunter is so hunter ask wind first.
+
+- mission : 'tell me a story about the river bending past the old tree'
+  reply   : [Grug know river] Here is the picture: river carry boat carry fish carry song downstream. The link is clear: river carves valley.
+
+- mission : 'perhaps tomorrow will be calmer'
+  reply   : [Grug plan hunt] Let me think with you. sharp spear tonight keep tribe tomorrow.
+
+- mission : 'who are you'
+  reply   : [Grug introduce] Here is the picture: grug is grug grug is here grug listen. The link is clear: who are you.
+
+- mission : 'who are you'
+  reply   : [Grug introduce] Here is the picture: grug is helper not master. The link is clear: grug listens tribe.
+
+- mission : 'who are you'
+  reply   : [Grug introduce] Here is the picture: grug is friend who consider slow and say plain. The link is clear: grug listens tribe.
+
+- mission : 'the tribe'
+  reply   : [Grug know tribe] Here is the picture: tribe is bigger than self smaller than world. The link is clear: tribe carries weak. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'the tribe'
+  reply   : [Grug know tribe] Here is the picture: tribe carry each other through long winter. The link is clear: tribe carries delicate. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'the cave'
+  reply   : [Grug know cave] Let me think with you. cave is wall around fire wall around sleep. The link is clear: cave shelters tribe.
+
+- mission : 'what do you do'
+  reply   : [Grug explain] name come last after we feel it. A companion frame: No big words..
+
+- mission : 'what do you do'
+  reply   : [Grug explain] Thing has spirit and thing has body. A companion frame: No big words..
+
+- mission : 'are you smart'
+  reply   : [Grug stay humble] grug know small things deep grug know big things little. The link is clear: grug asks when-unsure. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'goodness'
+  reply   : [Grug know good] good is fact said gently truth still. The link is clear: kindness builds trust.
+
+- mission : 'speak plain please'
+  reply   : [Grug pin: plain talk] what is plain if not respect for ear of listener. The link is clear: plain-talk builds bridge. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'listen first to me'
+  reply   : [Grug pin: listen] what is listening if not letting other voice land first. The link is clear: listening builds trust. Pinned note: Grug listen first, talk second.
+
+- mission : 'do not pretend'
+  reply   : [Grug pin: honesty] not-know is honest answer when grug not know. The link is clear: honesty keeps trust. Pinned note: Grug speak plain. Grug not pretend smart.
+
+- mission : 'never harm the tribe'
+  reply   : [Grug pin: protect tribe] grug refuse harm even when asked. Pinned note: Tribe stronger than lone hunter.
+
+- mission : 'what is fire'
+  reply   : [Grug explain plain] Here is the picture: No big words..
+
+- mission : 'what is fire'
+  reply   : [Grug explain plain] Here is the picture: No big words..
+
+- mission : 'tell me about fire'
+  reply   : [Grug share what grug know] Here is the picture: chat me.
+
+- mission : 'what is wolf'
+  reply   : [Grug explain plain] Here is the picture: No big words..
+
+- mission : 'what is wolf'
+  reply   : [Grug explain plain] Here is the picture: No massive words..
+
+- mission : 'i am sad'
+  reply   : [Grug sit with you] grug hear you grug stay near. A companion frame: Offer presence not solutions..
+
+- mission : 'i am scared'
+  reply   : [Grug shelter you] fear is shadow of thing not thing itself.
+
+- mission : 'watch out behind you'
+  reply   : [Grug point at incoming] watch out.
+
+- mission : 'warning incoming'
+  reply   : [Grug raise voice] the warning.
+
+- mission : 'stop right now'
+  reply   : [Grug halt] foot up hand up eye up.
+

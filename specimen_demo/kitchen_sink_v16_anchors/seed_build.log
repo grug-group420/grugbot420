@@ -1,0 +1,535 @@
+┌ Warning: [SEMANTIC] Relation class 'causal' already exists. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:90
+┌ Warning: [SEMANTIC] Relation class 'spatial' already exists. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:90
+┌ Warning: [SEMANTIC] Relation class 'epistemic' already exists. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:90
+[ Info: [SEMANTIC] ✅  New relation class added: 'emotive'
+┌ Warning: [SEMANTIC] Verb 'causes' already in class 'causal'. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:128
+┌ Warning: [SEMANTIC] Verb 'makes' already in class 'causal'. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:128
+[ Info: [SEMANTIC] ✅  Verb 'triggers' added to class 'causal'
+[ Info: [SEMANTIC] ✅  Verb 'leads_to' added to class 'causal'
+┌ Warning: [SEMANTIC] Verb 'burns' already registered under class 'action'. Adding to 'causal' too. Polysemy cave — verb may match multiple relation types.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:137
+[ Info: [SEMANTIC] ✅  Verb 'burns' added to class 'causal'
+┌ Warning: [SEMANTIC] Verb 'hits' already in class 'causal'. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:128
+[ Info: [SEMANTIC] ✅  Verb 'feeds' added to class 'causal'
+[ Info: [SEMANTIC] ✅  Verb 'eats' added to class 'causal'
+[ Info: [SEMANTIC] ✅  Verb 'near' added to class 'spatial'
+[ Info: [SEMANTIC] ✅  Verb 'above' added to class 'spatial'
+[ Info: [SEMANTIC] ✅  Verb 'below' added to class 'spatial'
+[ Info: [SEMANTIC] ✅  Verb 'inside' added to class 'spatial'
+[ Info: [SEMANTIC] ✅  Verb 'before' added to class 'temporal'
+[ Info: [SEMANTIC] ✅  Verb 'after' added to class 'temporal'
+[ Info: [SEMANTIC] ✅  Verb 'during' added to class 'temporal'
+[ Info: [SEMANTIC] ✅  Verb 'believes' added to class 'epistemic'
+┌ Warning: [SEMANTIC] Verb 'knows' already in class 'epistemic'. No change.
+└ @ Main.SemanticVerbs /workspace/grugbot420_repo/src/SemanticVerbs.jl:128
+[ Info: [SEMANTIC] ✅  Verb 'doubts' added to class 'epistemic'
+[ Info: [SEMANTIC] ✅  Verb 'feels' added to class 'emotive'
+[ Info: [SEMANTIC] ✅  Verb 'fears' added to class 'emotive'
+[ Info: [SEMANTIC] ✅  Verb 'loves' added to class 'emotive'
+[ Info: [SEMANTIC] ✅  Verb 'misses' added to class 'emotive'
+🧠 Default specimen detected at /workspace/grugbot420_repo/src/../grug-binary/default.specimen.gz — auto-loading...
+  🧹 Wiping current cave state...
+  ✅ Cave wiped clean. Beginning restore...
+  🔢 ID counters restored (node=20, msg=38)
+  🗳  Last voters restored (0 IDs)
+  👁  Eye state restored
+  🔧 Verb registry restored (5 classes, 22 verbs, 0 synonyms)
+  🔤 Thesaurus restored (499 words)
+  🧠 Lobes restored (7)
+  📋 Lobe tables restored (7)
+  🌱 Nodes restored (20)
+  ⚡ Hopfield cache restored (0 entries)
+  ⚙️  Rules restored (0)
+  🚫 Inhibitions restored (0)
+  💬 Messages restored (38 total, 3 pinned)
+  👁  Arousal restored (level=0.3)
+  🧬 BrainStem state restored
+  🔗 Attachments restored (0)
+  🔮 Trajectory restored (0 entries)
+  🕐 Temporal coherence restored (0 entries)
+  ⏳ Morph cooldowns restored (0 active)
+  🛡 Immune system restored (0 signatures, 0 ledger entries)
+  🤖 AIML system restored (0 nodes across 6 lobes)
+  ✅ Default specimen restored.
+    ╔══════════════════════════════════════════════════════════════╗
+    ║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║
+    ╠══════════════════════════════════════════════════════════════╣
+      📁  File             : /workspace/grugbot420_repo/src/../grug-binary/default.specimen.gz
+      📦  Compressed size  : 12556 bytes
+      📄  JSON size        : 92213 bytes
+  (Set GRUG_NO_AUTOLOAD=1 to skip this on next boot.)
+System Online. Grug waiting at cave entrance for instructions.
+Primary  : /mission <input>                    (text or image binary)
+Feedback : /wrong                              (penalize last response voters)
+Explicit : /explicit <cmd> [<node_id>] <input>
+Grow     : /grow <lobe_id> <json_packet>      (plant node(s) into a lobe)
+         :   • <lobe_id> is required — use `-` for unassigned pool
+         :   • Single node: {"pattern":"...","action_packet":"...","data":{...}}
+         :   • Multi node:  {"nodes":[{...},{...}]}
+         :   • `data.system_prompt` defaults to "Grug speaks plainly." if absent
+Rules    : /addRule <rule text> [prob=0.0-1.0]
+           Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+Memory   : /pin <text>
+Nodes    : /nodes                              (show node map status)
+Status   : /status                             (show chatter + system status)
+Arousal  : /arousal <0.0-1.0>                 (set eye system arousal level)
+Verbs    : /addVerb <verb> <class>             (add verb to relation class)
+         : /addRelationClass <name>            (create new verb class bucket)
+         : /addSynonym <canonical> <alias>     (normalize alias->canonical)
+         : /listVerbs                          (show all verb classes + synonyms)
+Lobes    : /newLobe <id> <subject>             (create a new subject lobe)
+         : /connectLobes <id_a> <id_b>         (connect two lobes)
+         : /lobeGrow <lobe_id> <json_packet>   (DEPRECATED — alias for /grow)
+         : /lobes                              (list all lobes + node counts)
+         : /tableStatus <lobe_id>              (show hash table chunks for a lobe)
+         : /tableMatch <lobe_id> <chunk> <pat> (pattern-activate entries in chunk)
+Thesaurus: /thesaurus <word1> | <word2>        (compare words/concepts dimensionally)
+         : /thesaurus <w1> | <w2> :: <ctx1> :: <ctx2>  (with context lists)
+NegThes  : /negativeThesaurus add|remove|list|check|flush
+Attach   : /nodeAttach <lobe> <target> <id> <pat> ...  (attach nodes with relational fire patterns)
+         : /nodeDetach <lobe> <target> <id>            (detach a node from target)
+ImgAttach: /imgnodeAttach <lobe> <tgt> <id> <b64> [w h] (attach image node with SDF-based fire)
+         : /imgnodeDetach <lobe> <target> <id>         (detach image node from target)
+         : /attachments                         (show all node attachments)
+Crystal  : /crystalize <lobe> <target> <attach>        (💎 mark attachment as sticky/user-locked)
+         : /decrystalize <lobe> <target> <attach>      (🔓 remove sticky flag, restore coinflip)
+Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
+         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Help     : /help                               (full command reference)
+
+╔══════════════════════════════════════════════════════════════════╗
+║  SPECIMEN SEEDING GUIDE (read before /grow)                     ║
+╠══════════════════════════════════════════════════════════════════╣
+║  Automatic neighbor latching is SUPPRESSED below 1000 nodes.   ║
+║  Below that threshold, YOU control topology via drop_table.     ║
+║                                                                  ║
+║  For a coherent specimen from the start:                        ║
+║  1. Seed ORTHOGONAL archetypes first - distinct semantic poles. ║
+║     Don't plant 50 near-identical nodes up front.               ║
+║  2. Use required_relations as semantic GATES from day one.      ║
+║     Nodes that demand specific verbs won't fire on noise.       ║
+║  3. Name action_packets deliberately - distinct action families ║
+║     give the superposition orchestrator something to work with. ║
+║  4. Wire drop_tables manually for known co-activation pairs.    ║
+║     Don't rely on the latch system to discover semantics.       ║
+║  5. Your first ~100 nodes are the specimen's DNA.               ║
+║     The engine enforces structure at scale (1000+ nodes).       ║
+║     You enforce MEANING at the start.                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Brain > 🗂  Relation class 'causal' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'spatial' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'epistemic' created. Use /addVerb to populate.
+
+Brain > 🗂  Relation class 'emotive' created. Use /addVerb to populate.
+
+Brain > 🔧 Verb 'causes' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'makes' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'triggers' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'leads_to' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'burns' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'hits' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'feeds' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'eats' added to class 'causal'. Active immediately.
+
+Brain > 🔧 Verb 'near' added to class 'spatial'. Active immediately.
+
+Brain > 🔧 Verb 'above' added to class 'spatial'. Active immediately.
+
+Brain > 🔧 Verb 'below' added to class 'spatial'. Active immediately.
+
+Brain > 🔧 Verb 'inside' added to class 'spatial'. Active immediately.
+
+Brain > 🔧 Verb 'before' added to class 'temporal'. Active immediately.
+
+Brain > 🔧 Verb 'after' added to class 'temporal'. Active immediately.
+
+Brain > 🔧 Verb 'during' added to class 'temporal'. Active immediately.
+
+Brain > 🔧 Verb 'believes' added to class 'epistemic'. Active immediately.
+
+Brain > 🔧 Verb 'knows' added to class 'epistemic'. Active immediately.
+
+Brain > 🔧 Verb 'doubts' added to class 'epistemic'. Active immediately.
+
+Brain > 🔧 Verb 'feels' added to class 'emotive'. Active immediately.
+
+Brain > 🔧 Verb 'fears' added to class 'emotive'. Active immediately.
+
+Brain > 🔧 Verb 'loves' added to class 'emotive'. Active immediately.
+
+Brain > 🔧 Verb 'misses' added to class 'emotive'. Active immediately.
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'greeting' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'reasoning' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'survival' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'explanation' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'comfort' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > 🧠 Lobe 'inquiry' created for subject: 'ask question wonder curious learn'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'planning' created for subject: 'plan strategy goal future intend'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'memory' created for subject: 'remember recall past history'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'nature' created for subject: 'sky river tree wind animal'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'craft' created for subject: 'tool make build hammer carve'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > !!! SYSTEM ERROR: Main.Lobe.LobeError("Lobe 'alert' already exists. Grug not make duplicate cave!", "create_lobe!") !!!
+
+Stacktrace:
+  [1] throw_lobe_error(msg::String, ctx::String)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:32
+  [2] (::Main.Lobe.var"#2#3"{Int64, String, String})()
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:85
+  [3] lock(f::Main.Lobe.var"#2#3"{Int64, String, String}, l::ReentrantLock)
+    @ Base ./lock.jl:229
+  [4] create_lobe!(id::String, subject::String; node_cap::Int64)
+    @ Main.Lobe /workspace/grugbot420_repo/src/Lobe.jl:83
+  [5] create_lobe!
+    @ /workspace/grugbot420_repo/src/Lobe.jl:73 [inlined]
+  [6] run_cli()
+    @ Main /workspace/grugbot420_repo/src/Main.jl:5223
+  [7] top-level scope
+    @ /workspace/grugbot420_repo/src/Main.jl:5758
+  [8] include(mod::Module, _path::String)
+    @ Base ./Base.jl:495
+  [9] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:318
+ [10] _start()
+    @ Base ./client.jl:552
+
+Brain > 🧠 Lobe 'celebration' created for subject: 'celebrate joy happy glad cheerful'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > 🧠 Lobe 'knowledge' created for subject: 'fire water wolf rock food'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'greeting'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'greeting': [node_20]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'greeting'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'greeting': [node_21]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'greeting'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'greeting': [node_22]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'knowledge'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'knowledge': [node_23]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'knowledge'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'knowledge': [node_24]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'knowledge'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'knowledge': [node_25]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'knowledge'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'knowledge': [node_26]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'knowledge'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'knowledge': [node_27]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'reasoning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_28]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'reasoning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_29]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'reasoning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_30]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'reasoning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'reasoning': [node_31]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'survival'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_32]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'survival'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_33]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'survival'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_34]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'survival'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'survival': [node_35]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'explanation'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'explanation': [node_36]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'explanation'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'explanation': [node_37]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'explanation'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'explanation': [node_38]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'explanation'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'explanation': [node_39]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'comfort'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'comfort': [node_40]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'comfort'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'comfort': [node_41]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'comfort'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'comfort': [node_42]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'comfort'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'comfort': [node_43]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'inquiry'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'inquiry': [node_44]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'inquiry'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'inquiry': [node_45]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'inquiry'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'inquiry': [node_46]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'planning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'planning': [node_47]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'planning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'planning': [node_48]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'planning'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'planning': [node_49]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'memory'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'memory': [node_50]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'memory'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'memory': [node_51]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'nature'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'nature': [node_52]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'nature'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'nature': [node_53]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'nature'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'nature': [node_54]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'craft'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'craft': [node_55]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'craft'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'craft': [node_56]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'alert'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'alert': [node_57]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'alert'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'alert': [node_58]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'alert'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'alert': [node_59]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'celebration'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'celebration': [node_60]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'celebration'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'celebration': [node_61]
+
+Brain > 🧠 Lobe 'identity' created for subject: 'who grug is and what grug does'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > ⚠  /newLobe: subject contains '_' or '-'. These are normalized to spaces during topicality matching, but you probably wanted plain space-separated keywords. Consider: '/newLobe core_rules speak plain culture rules — always on'
+🧠 Lobe 'core_rules' created for subject: 'speak-plain culture rules — always-on'. Cap: 20000 nodes. AIML tribe registered (cap=6666).
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_62]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_63]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_64]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_65]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_66]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'identity'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'identity': [node_67]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'core_rules'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'core_rules': [node_68]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'core_rules'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'core_rules': [node_69]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'core_rules'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'core_rules': [node_70]
+
+Brain > --> Grug unpacking JSON node seeds for lobe 'core_rules'...
+🌱 Tribe expanded! Grug planted 1 new nodes into lobe 'core_rules': [node_71]
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > 📌 Grug pinned text to Memory Wall!
+
+Brain > --> Grug freezing entire cave to specimen file...
+
+╔══════════════════════════════════════════════════════════════╗
+║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : kitchen_sink.specimen.gz
+  📦  JSON size        : 258905 bytes
+  🗜️   Compressed size  : 36147 bytes (86.0% smaller)
+  ⏱️   Time             : 0.43s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 72
+  🧠  Lobes            : 16
+  📋  Lobe tables      : 16
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 0
+  💬  Messages         : 148
+  🔧  Verb classes     : 6
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 0
+  🔗  Attachments      : 0
+  🔮  Trajectory entries : 0
+  🕐  Temporal coherence : 0
+  ⏳  Morph cooldowns    : 0
+  🤖  AIML nodes       : 0
+  👁   Arousal          : 0.3
+╚══════════════════════════════════════════════════════════════╝
+
+Brain > [GRUG] 👋 /quit received. Cave closes. Goodbye.
