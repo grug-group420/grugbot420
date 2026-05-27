@@ -1,0 +1,105 @@
+# ============================================================================
+# kitchen_sink_v18d — full-coverage conversation against real handles
+# ============================================================================
+# Previous v18b/v18c runs used invented prompts (force/acceleration, acid
+# balances richness, melody/harmony, fairness) that have NO matching nodes
+# in this specimen, which is why those cycles fell back to thin generic
+# baselines. This run hits every lobe in the specimen using the actual
+# patterns present in node JSON.
+#
+# Lobes covered (count = nodes present, parenthesized handle picked):
+#   greeting  6  ('hello hi', 'good morning', 'howdy')
+#   comfort   7  ('i feel', 'sad', 'thank you')
+#   survival  7  ('run', 'danger', 'fire burns')
+#   alert     5  ('warning', 'watch out', 'stop')
+#   memory    2  ('remember when', 'forgot')
+#   reasoning 7  ('think about', 'why', 'how does')
+#   inquiry   3  ('do you know', 'how do you', 'can you')
+#   planning  3  ('what should we', 'hunt tomorrow', 'build cave')
+#   celebration 2 ('i did it', 'we made fire')
+#   nature    3  ('sky', 'river', 'tree')
+#   craft     2  ('hammer', 'make tool')
+#   knowledge 23 ('fire','water','wolf','rock','food' + 'tell about X')
+#   identity  24 ('who are you','what do you do','are you smart',
+#                 'the tribe','the cave','goodness')
+#   core_rules 4 ('speak plain','listen first','not pretend','never harm tribe')
+#
+# Mix is /mission for snap-back and /brainstorm for far-jump on a few
+# entries so we see both jitter modes against real content.
+# ============================================================================
+
+/loadSpecimen specimen_demo/kitchen_sink_v18d_real_handles/kitchen_sink.specimen.gz
+
+/status
+
+# -------- greeting lobe --------
+/mission hello hi
+/mission good morning
+/brainstorm howdy
+
+# -------- comfort lobe --------
+/mission i feel sad
+/mission thank you
+
+# -------- survival + alert --------
+/mission danger
+/mission fire burns
+/mission watch out
+
+# -------- memory --------
+/mission remember when
+/mission forgot
+
+# -------- reasoning --------
+/mission why
+/mission how does fire work
+/brainstorm think about wolf
+
+# -------- inquiry --------
+/mission do you know
+/mission can you
+
+# -------- planning --------
+/mission what should we
+/mission hunt tomorrow
+/mission build cave
+
+# -------- celebration --------
+/mission we made fire
+/mission i did it
+
+# -------- nature --------
+/mission sky
+/mission river
+/mission tree
+
+# -------- craft --------
+/mission hammer
+/mission make tool
+
+# -------- knowledge nouns (alias tier, expect conf >= 4.7) --------
+/mission tell about fire
+/mission tell about water
+/mission tell about wolf
+/mission tell about rock
+/mission tell about food
+/brainstorm describe fire
+/brainstorm what is rock
+
+# -------- identity / culture --------
+/mission who are you
+/mission what do you do
+/mission are you smart
+/mission the tribe
+/mission the cave
+/mission goodness
+
+# -------- core_rules (pinned) --------
+/mission speak plain
+/mission listen first
+/mission never harm tribe
+
+/status
+/aimlStatus
+
+/quit
