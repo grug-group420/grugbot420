@@ -1,0 +1,767 @@
+# ==============================================================================
+# SigilRegistry.jl — GRUG Sigil Registry Kernel (Stage 1)
+# ==============================================================================
+# GRUG say: every smart system have many small word-pictures (verbs, thesaurus,
+#           drops, AIML keys, lobe subjects). Each one have its OWN little
+#           dictionary. They drift apart over time. Bug in one, no help to other.
+# GRUG say: sigil is one little name shared by all. Write once, look up many.
+# GRUG say: token sigil = hole in pattern. "&n" mean "any number here".
+#           "&noun" mean "any noun from list". Lambda or macro, registry says.
+# GRUG say: registry kernel — small, dumb, well-tested, fail loud. Other modules
+#           layer on top. If kernel break, everything break, so kernel must
+#           be tiny and right.
+# GRUG say: NO SILENT FAILURES. Unknown sigil at bind-time = THROW.
+#           Bad class = THROW. Bad applies_at = THROW. Empty name = THROW.
+#           Nothing here returns nothing-on-error. Errors are loud.
+# GRUG say: ZERO RUNTIME COST when no sigils used. Pattern with no `&` walks
+#           a fast path that does not allocate. Old specimens behave bit-identical.
+# ==============================================================================
+#
+# ACADEMIC: This module implements the sigil registry kernel — a single source
+# of truth for typed symbolic handles used across pattern matching and (in
+# later stages) cross-subsystem semantic propagation. Stage 1 scope:
+#   - Registry data model (entry struct, registry struct, error types).
+#   - Token-sigil classes activated: :lambda, :macro, :tag.
+#     (:glue, :functor, :procedure are reserved enum values, not implemented.)
+#   - Pattern-string parsing: extract `&name` tokens, resolve against registry,
+#     fail loud on unknown.
+#   - Engine-default registry shipping `&n`, `&word`, `&rest`, `&noun`.
+#   - Backward compat: zero-sigil patterns get a fast-path "no sigils" return.
+#   - `expansion::Union{Nothing,Vector}` field reserved on every entry for the
+#     Stage 6 :procedure class — adding procedure entries later is purely
+#     additive, no schema change.
+#
+# What is INTENTIONALLY out of scope for Stage 1 (deferred to later stages):
+#   - Glue-class semantics (compound prompts, sub-vote splitting).
+#   - Functor-class semantics (phase-pipeline morphisms).
+#   - Procedure-class expansion (named ordered chains).
+#   - Macro lexicon expansion at bind time (the macro class is recognized,
+#     but actual alternation expansion is a Stage 2 concern).
+#   - Cross-subsystem propagation (thesaurus, drop-tables, inhibitions, etc.).
+#   - Runtime evaluator system / computed votes.
+#   - Dynamic relational triples.
+#
+# This module is the FOUNDATION. Every later stage extends it without revising
+# the schema. The class enum is open (`Symbol`-typed); the entry struct already
+# has the fields later stages will fill in.
+# ==============================================================================
+
+module SigilRegistry
+
+# ==============================================================================
+# EXPORTS
+# ==============================================================================
+
+export SigilEntry, SigilTable, SigilTokenRef
+export SigilError, SigilConfigError, SigilArgumentError, SigilResolutionError
+export register_sigil!, lookup_sigil, has_sigil, list_sigils, clear_registry!
+export resolve_sigils_in_pattern, parse_sigil_token
+export default_registry, merge_registry!
+export SIGIL_CLASSES, SIGIL_APPLIES_AT, SIGIL_PREFIX
+export SIGIL_NAME_REGEX, SIGIL_TOKEN_REGEX
+
+# ==============================================================================
+# ERROR TYPES — GRUG: NO SILENT FAILURES on programmer errors.
+# ==============================================================================
+# GRUG: Same shape as SelfObserver: distinct types per category so callers can
+# pattern-match. Public API throws on bad input or unknown sigil — these are
+# always programmer errors. There is no "fall back to no-op" branch, ever.
+
+"""
+Generic SigilRegistry error. Carries `message` and a free-form `context`
+string for log/audit traces.
+"""
+struct SigilError <: Exception
+    message::String
+    context::String
+end
+
+"""
+Configuration error — bad class name, bad applies_at value, malformed entry
+shape, schema violation. Indicates the registry was assembled wrong.
+"""
+struct SigilConfigError <: Exception
+    message::String
+    field::String
+end
+
+"""
+Argument error — caller passed bad type, empty name, nil registry, etc.
+Indicates the caller used the API wrong.
+"""
+struct SigilArgumentError <: Exception
+    message::String
+    arg::String
+end
+
+"""
+Resolution error — a pattern referenced a sigil that doesn't exist in the
+registry. This is a bind-time programmer error: every `&name` in a pattern
+MUST resolve, or the node refuses to load.
+"""
+struct SigilResolutionError <: Exception
+    message::String
+    sigil_name::String
+    pattern::String
+end
+
+function Base.showerror(io::IO, e::SigilError)
+    print(io, "SigilError: ", e.message, " (context=", e.context, ")")
+end
+function Base.showerror(io::IO, e::SigilConfigError)
+    print(io, "SigilConfigError: ", e.message, " (field=", e.field, ")")
+end
+function Base.showerror(io::IO, e::SigilArgumentError)
+    print(io, "SigilArgumentError: ", e.message, " (arg=", e.arg, ")")
+end
+function Base.showerror(io::IO, e::SigilResolutionError)
+    print(io, "SigilResolutionError: ", e.message,
+          " (sigil=&", e.sigil_name, ", pattern=\"", e.pattern, "\")")
+end
+
+# ==============================================================================
+# CONSTANTS — GRUG: small closed sets, locked at engine version. Adding to
+# either set is an engine-version event, not a runtime knob.
+# ==============================================================================
+
+# GRUG: sigil prefix character. Single ASCII byte chosen to avoid collision
+# with Julia's `@` (macros) and `:` (symbols). Reads naturally in patterns.
+const SIGIL_PREFIX::Char = '&'
+
+# GRUG: closed enum of sigil classes. Stage 1 implements :lambda, :macro, :tag.
+# :glue, :functor, :procedure are RESERVED — their registry entries are accepted
+# but cannot yet appear in a pattern (would throw at parse time). Reservation
+# is so Stage 2+ can add them without revising the registry schema.
+const SIGIL_CLASSES::NTuple{6,Symbol} = (
+    :lambda,    # parametric position; binds value at match time. Stage 1.
+    :macro,     # alternation family; expands to alternatives at bind. Stage 1.
+    :tag,       # annotation; carries no value, no expansion. Stage 1.
+    :glue,      # connector; sub-vote boundary at match time. RESERVED for Stage 2.
+    :functor,   # phase morphism; applies to phase data. RESERVED for Stage 6.
+    :procedure, # named ordered chain of sigils+literals. RESERVED for Stage 6.
+)
+
+# GRUG: closed enum of phases a sigil can `applies_at`. Stage 1 only really
+# uses :bind and :match (via pattern parsing). Other values are reserved for
+# later stages but accepted on registration so registries are forward-compat.
+const SIGIL_APPLIES_AT::NTuple{9,Symbol} = (
+    :bind,        # bind-time pattern compilation. Stage 1.
+    :match,       # runtime pattern matching. Stage 1.
+    :vote_shape,  # vote record construction. RESERVED for Stage 3.
+    :tone,        # tone metadata attachment. RESERVED for Stage 7.
+    :render,      # AIML scaffold synthesis. RESERVED for Stage 7.
+    :thesaurus,   # cross-subsystem: thesaurus expansion. RESERVED for Stage 8.
+    :drop_table,  # cross-subsystem: drop tables. RESERVED for Stage 8.
+    :inhibit,     # cross-subsystem: inhibition rules. RESERVED for Stage 8.
+    :relation,    # cross-subsystem: relational triples. RESERVED for Stage 4-5.
+)
+
+# GRUG: which classes are activated in Stage 1. Patterns referencing reserved
+# classes throw at parse time with a clear "reserved for stage N" message.
+const STAGE1_ACTIVE_CLASSES::NTuple{3,Symbol} = (:lambda, :macro, :tag)
+
+# GRUG: which applies_at values are activated in Stage 1.
+const STAGE1_ACTIVE_PHASES::NTuple{2,Symbol} = (:bind, :match)
+
+# GRUG: regex for a valid sigil name. Letters, digits, dash, underscore. No
+# spaces, no other punctuation. Greek letters allowed (for the eventual
+# procedure-class Σ-naming convention) but engine does not REQUIRE Greek.
+# Names are case-sensitive: `&Noun` and `&noun` are distinct sigils.
+const SIGIL_NAME_REGEX::Regex = r"^[A-Za-z\u0370-\u03FF][A-Za-z0-9_\-\u0370-\u03FF]*$"
+
+# GRUG: regex for a sigil TOKEN as it appears inside a pattern string. Matches
+# `&name` where name conforms to SIGIL_NAME_REGEX. Used by pattern parser.
+# Greek block U+0370–U+03FF supports Σ, Π, λ, etc. as prefix letters.
+const SIGIL_TOKEN_REGEX::Regex =
+    r"&([A-Za-z\u0370-\u03FF][A-Za-z0-9_\-\u0370-\u03FF]*)"
+
+# GRUG: hard upper bound on number of sigils per pattern. Patterns far above
+# this are almost certainly malformed; throw rather than allocate forever.
+const MAX_SIGILS_PER_PATTERN::Int = 64
+
+# GRUG: hard upper bound on registry entries. 4096 is generous — beyond it,
+# the user is using sigils as a database and should not be.
+const MAX_REGISTRY_ENTRIES::Int = 4096
+
+# GRUG: hard upper bound on macro lexicon size per entry. Macros expand at
+# bind time and can blow up the pattern table; cap to prevent accidents.
+const MAX_LEXICON_SIZE::Int = 1024
+
+# ==============================================================================
+# DATA MODEL — Sigil entry + registry table.
+# ==============================================================================
+# GRUG: SigilEntry is the single row in the registry. ALL fields are present
+# on EVERY entry, even when they don't apply — `nothing` means "not used by
+# this class". This makes serialization/deserialization predictable: same
+# JSON shape for every entry, same Julia struct for every entry. No subtypes,
+# no abstract base. Flat, dumb, fast.
+#
+# Field-by-field:
+#
+#   name        — the sigil's bare name, no `&` prefix (e.g. "n", "noun", "Σ-greet").
+#                 Must match SIGIL_NAME_REGEX.
+#   class       — one of SIGIL_CLASSES. Stage 1 actively uses :lambda, :macro, :tag.
+#   applies_at  — one of SIGIL_APPLIES_AT. Stage 1 actively uses :bind, :match.
+#   sigil_type  — for :lambda class only: a Symbol describing what value is
+#                 bound (:number, :word, :slurp, ...). Stage 1 ships :number,
+#                 :word, :slurp. nothing for non-lambda classes.
+#   lexicon     — for :macro class only: vector of strings making up the
+#                 alternation. Bounded by MAX_LEXICON_SIZE. nothing for
+#                 non-macro classes.
+#   params      — optional Dict of param-name => value. Used (in later stages)
+#                 for parameterized sigils like &fuzzy-match(max=2). Stage 1
+#                 stores them but doesn't consume them. nothing if no params.
+#   expansion   — RESERVED for Stage 6 :procedure class. Will hold the chain
+#                 of sigils+literals that the procedure expands to. nothing
+#                 for all other classes. Field is present on every entry so
+#                 the schema is forward-compatible.
+#   provenance  — free-form string describing where this entry came from
+#                 (e.g. "engine-default", "specimen:foo.json", "test").
+#                 Used in error messages and audit logs.
+#
+# All fields are immutable. Updating an entry means re-registering it, which
+# (by default) throws on collision unless the caller passes overwrite=true.
+"""
+A single row in the sigil registry. All fields present on every entry; fields
+not relevant to the entry's class are `nothing`.
+"""
+struct SigilEntry
+    name::String
+    class::Symbol
+    applies_at::Symbol
+    sigil_type::Union{Nothing,Symbol}
+    lexicon::Union{Nothing,Vector{String}}
+    params::Union{Nothing,Dict{String,Any}}
+    expansion::Union{Nothing,Vector{Any}}  # Stage 6 reserved.
+    provenance::String
+end
+
+"""
+The registry table. A small hash map from sigil name to entry. Wrapped in a
+struct so we can attach metadata (provenance label, lock for thread safety
+in later stages) without changing the call sites.
+
+Stage 1 is single-threaded at the registry level — registries are built at
+specimen load and read during pattern parsing; concurrent mutation is not a
+supported pattern. If a later stage needs concurrent registration we add a
+`ReentrantLock` field; today we don't, to keep the kernel simple.
+"""
+mutable struct SigilTable
+    entries::Dict{String,SigilEntry}
+    label::String  # human-readable name for logs (e.g. "engine-default", "specimen-foo")
+end
+
+SigilTable() = SigilTable(Dict{String,SigilEntry}(), "unlabeled")
+SigilTable(label::AbstractString) = SigilTable(Dict{String,SigilEntry}(), String(label))
+
+# ==============================================================================
+# REGISTRATION — `register_sigil!` is the only way to add a row.
+# ==============================================================================
+# GRUG: register_sigil! validates EVERY field. Bad input throws. The validation
+# table is exhaustive on purpose — Stage 1's job is to make the kernel
+# bullet-proof so later stages can trust their inputs.
+
+"""
+    register_sigil!(table; name, class, applies_at, ...) -> SigilEntry
+
+Validate and insert a sigil entry into `table`. Throws on any malformed input.
+
+Required keyword args:
+  - `name::AbstractString` — sigil name, no `&` prefix. Must match SIGIL_NAME_REGEX.
+  - `class::Symbol` — one of SIGIL_CLASSES.
+  - `applies_at::Symbol` — one of SIGIL_APPLIES_AT.
+
+Optional keyword args:
+  - `sigil_type::Union{Nothing,Symbol}=nothing` — only valid when class==:lambda.
+  - `lexicon::Union{Nothing,AbstractVector}=nothing` — only valid when class==:macro.
+  - `params::Union{Nothing,Dict}=nothing` — optional param dict.
+  - `expansion::Union{Nothing,AbstractVector}=nothing` — RESERVED for :procedure.
+  - `provenance::AbstractString="unspecified"` — origin tag for audit.
+  - `overwrite::Bool=false` — if true, replace existing entry; else throw on collision.
+
+Returns the newly-registered SigilEntry.
+"""
+function register_sigil!(
+    table::SigilTable;
+    name::AbstractString,
+    class::Symbol,
+    applies_at::Symbol,
+    sigil_type::Union{Nothing,Symbol}=nothing,
+    lexicon::Union{Nothing,AbstractVector}=nothing,
+    params::Union{Nothing,Dict}=nothing,
+    expansion::Union{Nothing,AbstractVector}=nothing,
+    provenance::AbstractString="unspecified",
+    overwrite::Bool=false,
+)::SigilEntry
+    # GRUG: name validation — present, non-empty, matches name regex.
+    nm = String(name)
+    if isempty(nm)
+        throw(SigilArgumentError("sigil name must be non-empty", "name"))
+    end
+    if !occursin(SIGIL_NAME_REGEX, nm)
+        throw(SigilArgumentError(
+            "sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): \"$nm\"",
+            "name"))
+    end
+
+    # GRUG: class validation — must be one of the closed enum.
+    if !(class in SIGIL_CLASSES)
+        throw(SigilConfigError(
+            "unknown sigil class :$class (allowed: $(SIGIL_CLASSES))",
+            "class"))
+    end
+
+    # GRUG: applies_at validation — must be one of the closed enum.
+    if !(applies_at in SIGIL_APPLIES_AT)
+        throw(SigilConfigError(
+            "unknown applies_at :$applies_at (allowed: $(SIGIL_APPLIES_AT))",
+            "applies_at"))
+    end
+
+    # GRUG: class/field-coherence validation. Each class has rules about
+    # which optional fields make sense. Reject incoherent combinations LOUDLY.
+    _validate_class_fields(class, sigil_type, lexicon, expansion, nm)
+
+    # GRUG: lexicon size cap.
+    lex_clean::Union{Nothing,Vector{String}} = nothing
+    if lexicon !== nothing
+        if length(lexicon) > MAX_LEXICON_SIZE
+            throw(SigilConfigError(
+                "macro lexicon for &$nm has $(length(lexicon)) entries, exceeds MAX_LEXICON_SIZE=$MAX_LEXICON_SIZE",
+                "lexicon"))
+        end
+        # GRUG: convert to Vector{String} and validate each entry is non-empty.
+        clean = String[]
+        for (i, e) in enumerate(lexicon)
+            s = String(e)
+            if isempty(s)
+                throw(SigilConfigError(
+                    "macro lexicon for &$nm contains empty string at index $i",
+                    "lexicon"))
+            end
+            push!(clean, s)
+        end
+        lex_clean = clean
+    end
+
+    # GRUG: params normalization to Dict{String,Any} if provided.
+    params_clean::Union{Nothing,Dict{String,Any}} = nothing
+    if params !== nothing
+        d = Dict{String,Any}()
+        for (k, v) in params
+            d[String(k)] = v
+        end
+        params_clean = d
+    end
+
+    # GRUG: expansion field is RESERVED for Stage 6 :procedure class. Stage 1
+    # accepts the field but rejects non-nothing values UNLESS class is
+    # :procedure (which is reserved itself). This guards against accidental
+    # use before Stage 6 lands.
+    exp_clean::Union{Nothing,Vector{Any}} = nothing
+    if expansion !== nothing
+        if class !== :procedure
+            throw(SigilConfigError(
+                "expansion field is reserved for :procedure class (got class :$class)",
+                "expansion"))
+        end
+        exp_clean = Vector{Any}(expansion)
+    end
+
+    # GRUG: registry size cap.
+    if length(table.entries) >= MAX_REGISTRY_ENTRIES && !haskey(table.entries, nm)
+        throw(SigilConfigError(
+            "registry has reached MAX_REGISTRY_ENTRIES=$MAX_REGISTRY_ENTRIES; refuse to add &$nm",
+            "table.entries"))
+    end
+
+    # GRUG: collision check. Default behavior is THROW on collision —
+    # silently overwriting an existing sigil is exactly the kind of subtle
+    # bug we are trying to prevent. Caller must opt in with overwrite=true.
+    if haskey(table.entries, nm) && !overwrite
+        existing = table.entries[nm]
+        throw(SigilConfigError(
+            "sigil &$nm already registered (existing class=:$(existing.class), provenance=\"$(existing.provenance)\"); pass overwrite=true to replace",
+            "name"))
+    end
+
+    entry = SigilEntry(
+        nm,
+        class,
+        applies_at,
+        sigil_type,
+        lex_clean,
+        params_clean,
+        exp_clean,
+        String(provenance),
+    )
+    table.entries[nm] = entry
+    return entry
+end
+
+# GRUG: per-class field-coherence rules. Centralized so adding a new class
+# requires touching exactly one function. Throws SigilConfigError on any
+# inconsistency.
+function _validate_class_fields(
+    class::Symbol,
+    sigil_type::Union{Nothing,Symbol},
+    lexicon::Union{Nothing,AbstractVector},
+    expansion::Union{Nothing,AbstractVector},
+    name::String,
+)
+    if class === :lambda
+        # GRUG: lambdas need a sigil_type (number/word/slurp/...).
+        if sigil_type === nothing
+            throw(SigilConfigError(
+                ":lambda sigil &$name requires sigil_type (e.g. :number, :word, :slurp)",
+                "sigil_type"))
+        end
+        if lexicon !== nothing
+            throw(SigilConfigError(
+                ":lambda sigil &$name must not carry a lexicon (lexicons are for :macro)",
+                "lexicon"))
+        end
+    elseif class === :macro
+        # GRUG: macros need a lexicon. Empty lexicon is allowed (specimen-overridable).
+        if lexicon === nothing
+            throw(SigilConfigError(
+                ":macro sigil &$name requires a lexicon (use [] for empty/specimen-overridable)",
+                "lexicon"))
+        end
+        if sigil_type !== nothing
+            throw(SigilConfigError(
+                ":macro sigil &$name must not carry sigil_type (sigil_type is for :lambda)",
+                "sigil_type"))
+        end
+    elseif class === :tag
+        # GRUG: tags carry neither type nor lexicon. They are pure annotations.
+        if sigil_type !== nothing
+            throw(SigilConfigError(
+                ":tag sigil &$name must not carry sigil_type",
+                "sigil_type"))
+        end
+        if lexicon !== nothing
+            throw(SigilConfigError(
+                ":tag sigil &$name must not carry lexicon",
+                "lexicon"))
+        end
+    elseif class === :glue
+        # GRUG: Stage 2 reserved. Accept the entry shape but later stages
+        # will tighten the rules. For Stage 1 we accept any shape so a
+        # registry can pre-declare glue sigils that will activate in Stage 2.
+        # (No fields are required yet; we just don't error out.)
+    elseif class === :functor
+        # GRUG: Stage 6 reserved. Same forward-compat policy as :glue.
+    elseif class === :procedure
+        # GRUG: Stage 6 reserved. expansion field is the procedure's chain.
+        # Stage 1 won't be able to USE these but we let them register so a
+        # specimen can ship them ahead of Stage 6.
+    else
+        # Unreachable: class was already validated against SIGIL_CLASSES.
+        throw(SigilError("unreachable: unhandled class :$class in field validation",
+                         "_validate_class_fields"))
+    end
+    return nothing
+end
+
+# ==============================================================================
+# LOOKUP — small, predictable.
+# ==============================================================================
+
+"""
+    lookup_sigil(table, name) -> SigilEntry
+
+Return the entry for `name`. Throws SigilResolutionError if not found.
+
+The bare-name form (no `&` prefix) is canonical. Callers that have a token
+string should call `parse_sigil_token` first.
+"""
+function lookup_sigil(table::SigilTable, name::AbstractString)::SigilEntry
+    if isempty(name)
+        throw(SigilArgumentError("sigil name must be non-empty", "name"))
+    end
+    nm = String(name)
+    if !haskey(table.entries, nm)
+        throw(SigilResolutionError(
+            "no such sigil in registry \"$(table.label)\"",
+            nm,
+            ""))
+    end
+    return table.entries[nm]
+end
+
+"""
+    has_sigil(table, name) -> Bool
+
+Non-throwing existence check. For probe / inspect use only — the bind-time
+path always uses `lookup_sigil` so unknown sigils fail loud.
+"""
+function has_sigil(table::SigilTable, name::AbstractString)::Bool
+    return haskey(table.entries, String(name))
+end
+
+"""
+    list_sigils(table; class=nothing, applies_at=nothing) -> Vector{SigilEntry}
+
+Return entries, optionally filtered by class and/or applies_at. Returned
+order is deterministic: lexicographically by name.
+"""
+function list_sigils(
+    table::SigilTable;
+    class::Union{Nothing,Symbol}=nothing,
+    applies_at::Union{Nothing,Symbol}=nothing,
+)::Vector{SigilEntry}
+    if class !== nothing && !(class in SIGIL_CLASSES)
+        throw(SigilArgumentError(
+            "filter class :$class is not a known SIGIL_CLASSES value",
+            "class"))
+    end
+    if applies_at !== nothing && !(applies_at in SIGIL_APPLIES_AT)
+        throw(SigilArgumentError(
+            "filter applies_at :$applies_at is not a known SIGIL_APPLIES_AT value",
+            "applies_at"))
+    end
+
+    out = SigilEntry[]
+    for k in sort!(collect(keys(table.entries)))
+        e = table.entries[k]
+        if class !== nothing && e.class !== class
+            continue
+        end
+        if applies_at !== nothing && e.applies_at !== applies_at
+            continue
+        end
+        push!(out, e)
+    end
+    return out
+end
+
+"""
+    clear_registry!(table) -> Nothing
+
+Wipe every entry. Used by tests and by specimen-reload paths.
+"""
+function clear_registry!(table::SigilTable)
+    empty!(table.entries)
+    return nothing
+end
+
+# ==============================================================================
+# PATTERN PARSING — extract sigil tokens from a pattern string.
+# ==============================================================================
+# GRUG: This is the kernel routine that the pattern matcher will call. Given
+# a pattern string, return the list of sigil names found in it. The matcher
+# then resolves each name against the registry and validates per-position
+# semantics. Stage 1 returns the names + offsets; later stages will produce
+# a full compiled-pattern struct.
+
+"""
+A reference to a sigil token inside a pattern string.
+
+Fields:
+  - `name::String` — sigil name (no `&` prefix).
+  - `start_byte::Int` — byte offset of `&` in the pattern (1-based).
+  - `end_byte::Int` — byte offset of last name char (1-based, inclusive).
+  - `entry::SigilEntry` — resolved registry entry.
+"""
+struct SigilTokenRef
+    name::String
+    start_byte::Int
+    end_byte::Int
+    entry::SigilEntry
+end
+
+"""
+    parse_sigil_token(s) -> Union{Nothing,String}
+
+Convenience: if `s` looks like a single sigil token (`&name`), return `name`.
+Otherwise return `nothing`. Used by callers that want to test "is this a
+literal or a sigil reference?" without scanning a whole pattern.
+
+This function does NOT consult the registry; it's pure syntax.
+"""
+function parse_sigil_token(s::AbstractString)::Union{Nothing,String}
+    str = String(s)
+    if isempty(str) || str[1] !== SIGIL_PREFIX
+        return nothing
+    end
+    rest = str[2:end]
+    if isempty(rest) || !occursin(SIGIL_NAME_REGEX, rest)
+        return nothing
+    end
+    return rest
+end
+
+"""
+    resolve_sigils_in_pattern(table, pattern; allow_reserved=false)
+        -> Vector{SigilTokenRef}
+
+Scan `pattern` for `&name` tokens and resolve each against `table`.
+
+Behavior:
+  - Pattern with no `&` character returns `SigilTokenRef[]` immediately.
+    (Fast path. Old patterns pay zero cost.)
+  - Each `&name` is resolved; unknown name throws SigilResolutionError.
+  - If the resolved entry's `class` is not in STAGE1_ACTIVE_CLASSES and
+    `allow_reserved=false`, throws SigilConfigError. Callers that are
+    intentionally pre-registering reserved-class sigils (e.g. tests) can
+    pass `allow_reserved=true`.
+  - If the pattern contains more than MAX_SIGILS_PER_PATTERN sigil tokens,
+    throws SigilConfigError.
+
+Returns the list of resolved tokens in pattern-position order.
+"""
+function resolve_sigils_in_pattern(
+    table::SigilTable,
+    pattern::AbstractString;
+    allow_reserved::Bool=false,
+)::Vector{SigilTokenRef}
+    pat = String(pattern)
+
+    # GRUG: fast path — no `&` anywhere, no work to do, allocate nothing.
+    if !occursin(SIGIL_PREFIX, pat)
+        return SigilTokenRef[]
+    end
+
+    refs = SigilTokenRef[]
+    count = 0
+    for m in eachmatch(SIGIL_TOKEN_REGEX, pat)
+        count += 1
+        if count > MAX_SIGILS_PER_PATTERN
+            throw(SigilConfigError(
+                "pattern contains more than MAX_SIGILS_PER_PATTERN=$MAX_SIGILS_PER_PATTERN sigil tokens; pattern=\"$pat\"",
+                "pattern"))
+        end
+        name = String(m.captures[1])
+        # GRUG: registry lookup — throws SigilResolutionError on miss with
+        # the pattern attached for context.
+        entry = if haskey(table.entries, name)
+            table.entries[name]
+        else
+            throw(SigilResolutionError(
+                "no such sigil in registry \"$(table.label)\"",
+                name,
+                pat))
+        end
+        # GRUG: reserved-class gate. Stage 1 only allows :lambda, :macro, :tag
+        # in patterns. Other classes can be REGISTERED but not USED yet.
+        if !allow_reserved && !(entry.class in STAGE1_ACTIVE_CLASSES)
+            throw(SigilConfigError(
+                "sigil &$name has class :$(entry.class) which is reserved for a later stage; Stage 1 only activates classes $(STAGE1_ACTIVE_CLASSES)",
+                "class"))
+        end
+        # GRUG: phase gate. Stage 1 only activates :bind and :match.
+        if !allow_reserved && !(entry.applies_at in STAGE1_ACTIVE_PHASES)
+            throw(SigilConfigError(
+                "sigil &$name has applies_at :$(entry.applies_at) which is reserved for a later stage; Stage 1 only activates phases $(STAGE1_ACTIVE_PHASES)",
+                "applies_at"))
+        end
+        push!(refs, SigilTokenRef(name, m.offset, m.offset + length(m.match) - 1, entry))
+    end
+    return refs
+end
+
+# ==============================================================================
+# DEFAULT REGISTRY — the engine ships this. Specimens extend it.
+# ==============================================================================
+# GRUG: The default registry contains the small set of sigils that every
+# specimen can rely on without extra configuration. It is rebuilt fresh on
+# each call (specimens get their own copy and can mutate freely).
+
+"""
+    default_registry() -> SigilTable
+
+Build a fresh SigilTable populated with the engine-default sigils.
+
+Stage 1 ships:
+  &n     — :lambda, sigil_type=:number, applies_at=:match. Matches a numeric token.
+  &word  — :lambda, sigil_type=:word,   applies_at=:match. Matches a single word.
+  &rest  — :lambda, sigil_type=:slurp,  applies_at=:match. Slurps remaining tokens.
+  &noun  — :macro,  lexicon=[],         applies_at=:bind.  Specimen-overridable list.
+
+Specimens that want a populated `&noun` lexicon merge a specimen-level
+registry on top using `merge_registry!`.
+"""
+function default_registry()::SigilTable
+    t = SigilTable("engine-default")
+
+    register_sigil!(t;
+        name="n",
+        class=:lambda,
+        applies_at=:match,
+        sigil_type=:number,
+        provenance="engine-default")
+
+    register_sigil!(t;
+        name="word",
+        class=:lambda,
+        applies_at=:match,
+        sigil_type=:word,
+        provenance="engine-default")
+
+    register_sigil!(t;
+        name="rest",
+        class=:lambda,
+        applies_at=:match,
+        sigil_type=:slurp,
+        provenance="engine-default")
+
+    register_sigil!(t;
+        name="noun",
+        class=:macro,
+        applies_at=:bind,
+        lexicon=String[],
+        provenance="engine-default")
+
+    return t
+end
+
+"""
+    merge_registry!(target, source; conflict=:error) -> SigilTable
+
+Merge entries from `source` into `target`. Three conflict policies:
+
+  - `:error` (default) — collision throws. Specimens that intend to override
+    an engine-default sigil must explicitly pass `:overwrite`.
+  - `:overwrite` — source entry replaces target entry. Provenance carries
+    the source's value.
+  - `:keep`     — target entry is preserved. Source entry is dropped silently
+                  (this is the ONE place we silently drop; documented and
+                  intentional, and only on explicit caller opt-in).
+
+Returns `target` (mutated in place).
+"""
+function merge_registry!(
+    target::SigilTable,
+    source::SigilTable;
+    conflict::Symbol=:error,
+)::SigilTable
+    if !(conflict in (:error, :overwrite, :keep))
+        throw(SigilArgumentError(
+            "conflict policy must be :error, :overwrite, or :keep (got :$conflict)",
+            "conflict"))
+    end
+
+    for (nm, src_entry) in source.entries
+        if haskey(target.entries, nm)
+            if conflict === :error
+                tgt_entry = target.entries[nm]
+                throw(SigilConfigError(
+                    "merge collision on &$nm: target provenance=\"$(tgt_entry.provenance)\", source provenance=\"$(src_entry.provenance)\"; pass conflict=:overwrite or :keep",
+                    "name"))
+            elseif conflict === :overwrite
+                target.entries[nm] = src_entry
+            elseif conflict === :keep
+                # GRUG: explicit, opt-in silent drop. This is the documented
+                # exception to the no-silent-failures rule. The caller asked
+                # for it.
+                continue
+            end
+        else
+            target.entries[nm] = src_entry
+        end
+    end
+    return target
+end
+
+end # module SigilRegistry

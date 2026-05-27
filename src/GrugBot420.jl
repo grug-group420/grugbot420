@@ -110,6 +110,19 @@ using .VoteOrchestrator
 include("SelfObserver.jl")
 using .SelfObserver
 
+# GRUG: SigilRegistry — Stage 1 sigil registry kernel. Single source of truth
+# for typed symbolic handles (&n, &word, &rest, &noun, ...) used in pattern
+# matching and (in later stages) cross-subsystem semantic propagation. Stage 1
+# activates classes :lambda, :macro, :tag and phases :bind, :match. Reserved
+# classes (:glue, :functor, :procedure) and reserved phases are accepted on
+# registration but rejected at pattern-resolution time. NO SILENT FAILURES:
+# unknown sigils, bad classes, malformed names all THROW. Patterns with no
+# `&` token take a fast path that allocates nothing — old specimens are
+# bit-identical to pre-sigil behaviour. See plans/sigil_architecture/STAGE1.md
+# for the locked-in scope and the reserved-stage roadmap.
+include("SigilRegistry.jl")
+using .SigilRegistry
+
 include("engine.jl")
 include("Main.jl")
 
@@ -196,5 +209,20 @@ export SelfObserverError, SelfObserverConfigError, SelfObserverArgumentError
 export observe!, peek_exact, peek_pattern, audit_trail
 export drop_store!, reset_audit!, store_size, key_count
 export FUZZY_BUCKETS
+
+# GRUG: SigilRegistry exports — Stage 1 sigil kernel public surface.
+# Registry entry/table types, error types, registration/lookup/list helpers,
+# pattern-resolution entry point, default registry builder, and merge helper.
+# Constants (SIGIL_CLASSES, SIGIL_APPLIES_AT, SIGIL_PREFIX, regexes) are
+# exported for callers that want to validate against the closed enums
+# without reaching into the submodule namespace.
+export SigilRegistry
+export SigilEntry, SigilTable, SigilTokenRef
+export SigilError, SigilConfigError, SigilArgumentError, SigilResolutionError
+export register_sigil!, lookup_sigil, has_sigil, list_sigils, clear_registry!
+export resolve_sigils_in_pattern, parse_sigil_token
+export default_registry, merge_registry!
+export SIGIL_CLASSES, SIGIL_APPLIES_AT, SIGIL_PREFIX
+export SIGIL_NAME_REGEX, SIGIL_TOKEN_REGEX
 
 end # module GrugBot420

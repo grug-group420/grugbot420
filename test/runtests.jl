@@ -52,6 +52,7 @@ const ALL_TESTS = [
     "test_v7_21c1.jl",
     "test_v7_21c2.jl",
     "test_self_observer.jl",
+    "test_sigil_registry.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

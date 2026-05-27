@@ -1,0 +1,190 @@
+
+==============================================================================
+  PHASE 1 — Engine default registry
+==============================================================================
+Build the default registry that the engine ships. Stage 1 ships exactly
+four sigils: &n, &word, &rest, &noun. The &noun macro lexicon ships
+empty so specimens can fill it in without a collision.
+
+Registry label: "engine-default"  size=4
+
+--- default entries (lexicographic) ---------------------------------------
+  &n              class=lambda     phase=match        type=number   lex=—                        params=—              exp=—              prov=engine-default
+  &noun           class=macro      phase=bind         type=—        lex=[]                       params=—              exp=—              prov=engine-default
+  &rest           class=lambda     phase=match        type=slurp    lex=—                        params=—              exp=—              prov=engine-default
+  &word           class=lambda     phase=match        type=word     lex=—                        params=—              exp=—              prov=engine-default
+
+==============================================================================
+  PHASE 2 — Specimen-level registry & merge policies
+==============================================================================
+Specimens declare their own sigils and layer them on top of the engine
+default. We exercise all three conflict policies: :error (default),
+:overwrite (specimen wins), :keep (engine wins).
+
+Specimen built: label="specimen-cave-life"  size=6
+
+--- specimen entries (lexicographic) --------------------------------------
+  &and            class=glue       phase=bind         type=—        lex=—                        params=—              exp=—              prov=specimen-cave-life-stage2-preview
+  &color          class=macro      phase=bind         type=—        lex=[red, ochre, white, black] params=—              exp=—              prov=specimen-cave-life
+  &fuzzy          class=tag        phase=bind         type=—        lex=—                        params=Dict{String, Any}("metric" => "lev", "max_distance" => 2) exp=—              prov=specimen-cave-life
+  &noun           class=macro      phase=bind         type=—        lex=[mammoth, fish, berry, fire, cave] params=—              exp=—              prov=specimen-cave-life
+  &urgent         class=tag        phase=bind         type=—        lex=—                        params=—              exp=—              prov=specimen-cave-life
+  &Σ_greet        class=procedure  phase=bind         type=—        lex=—                        params=—              exp=Any["hello", "&noun"] prov=specimen-cave-life-stage6-preview
+
+--- merge with :error policy (collision expected on &noun) ----------------
+  [merge(:error) with &noun collision] threw SigilConfigError — SigilConfigError: merge collision on &noun: target provenance="engine-default", source provenance="specimen-cave-life"; pass conflict=:ov...
+  After failed merge, &noun in target still has provenance=engine-default, lexicon=String[]
+
+--- merge with :keep policy (engine wins on collision) --------------------
+  After :keep merge, &noun provenance=engine-default (engine retained), and &color present=true
+
+--- merge with :overwrite policy (specimen wins on collision) -------------
+  After :overwrite merge, &noun provenance=specimen-cave-life, lexicon=["mammoth", "fish", "berry", "fire", "cave"]
+  Total merged size=9
+
+--- merged registry — all entries (lexicographic) -------------------------
+  &and            class=glue       phase=bind         type=—        lex=—                        params=—              exp=—              prov=specimen-cave-life-stage2-preview
+  &color          class=macro      phase=bind         type=—        lex=[red, ochre, white, black] params=—              exp=—              prov=specimen-cave-life
+  &fuzzy          class=tag        phase=bind         type=—        lex=—                        params=Dict{String, Any}("metric" => "lev", "max_distance" => 2) exp=—              prov=specimen-cave-life
+  &n              class=lambda     phase=match        type=number   lex=—                        params=—              exp=—              prov=engine-default
+  &noun           class=macro      phase=bind         type=—        lex=[mammoth, fish, berry, fire, cave] params=—              exp=—              prov=specimen-cave-life
+  &rest           class=lambda     phase=match        type=slurp    lex=—                        params=—              exp=—              prov=engine-default
+  &urgent         class=tag        phase=bind         type=—        lex=—                        params=—              exp=—              prov=specimen-cave-life
+  &word           class=lambda     phase=match        type=word     lex=—                        params=—              exp=—              prov=engine-default
+  &Σ_greet        class=procedure  phase=bind         type=—        lex=—                        params=—              exp=Any["hello", "&noun"] prov=specimen-cave-life-stage6-preview
+
+==============================================================================
+  PHASE 3 — Per-class counts and filter discipline
+==============================================================================
+list_sigils filters by class and/or applies_at, with deterministic
+lexicographic ordering. Used by serialization and audit paths.
+
+  class=:lambda     count=3  names=["n", "rest", "word"]
+  class=:macro      count=2  names=["color", "noun"]
+  class=:tag        count=2  names=["fuzzy", "urgent"]
+  class=:glue       count=1  names=["and"]
+  class=:functor    count=0  names=String[]
+  class=:procedure  count=1  names=["Σ_greet"]
+
+  phase=:bind         count=6  names=["and", "color", "fuzzy", "noun", "urgent", "Σ_greet"]
+  phase=:match        count=3  names=["n", "rest", "word"]
+  phase=:vote_shape   count=0  names=String[]
+  phase=:tone         count=0  names=String[]
+  phase=:render       count=0  names=String[]
+  phase=:thesaurus    count=0  names=String[]
+  phase=:drop_table   count=0  names=String[]
+  phase=:inhibit      count=0  names=String[]
+  phase=:relation     count=0  names=String[]
+
+==============================================================================
+  PHASE 4 — Pattern parsing battery
+==============================================================================
+Walk a battery of pattern strings through resolve_sigils_in_pattern.
+Stage 1 active classes are :lambda, :macro, :tag. Active phases are
+:bind and :match. Patterns referencing reserved classes/phases throw
+unless the caller passes allow_reserved=true.
+
+--- 4a. zero-sigil fast path (no &) ---------------------------------------
+  pattern="hello world"  refs=0
+  pattern="the cat sat on the mat"  refs=0
+  pattern="lorem ipsum dolor sit amet"  refs=0
+  pattern=""  refs=0
+
+--- 4b. single-sigil patterns ---------------------------------------------
+  pattern="I want a &noun"                 refs=1 names=["noun"] classes=[:macro]
+  pattern="give me &n apples"              refs=1 names=["n"] classes=[:lambda]
+  pattern="say &word now"                  refs=1 names=["word"] classes=[:lambda]
+  pattern="tell me &rest"                  refs=1 names=["rest"] classes=[:lambda]
+
+--- 4c. multi-sigil math pattern (canonical) ------------------------------
+  pattern="what is &n + &n equal to"           refs=2
+      [1] &n  bytes=9..10  type=number
+      [2] &n  bytes=14..15  type=number
+  pattern="compute &n times &n plus &n"        refs=3
+      [1] &n  bytes=9..10  type=number
+      [2] &n  bytes=18..19  type=number
+      [3] &n  bytes=26..27  type=number
+  pattern="&n &n &n &n"                        refs=4
+      [1] &n  bytes=1..2  type=number
+      [2] &n  bytes=4..5  type=number
+      [3] &n  bytes=7..8  type=number
+      [4] &n  bytes=10..11  type=number
+
+--- 4d. mixed lambda + macro pattern --------------------------------------
+  pattern="I have &n &noun in my cave"     refs=2 classes=[:lambda, :macro]
+  pattern="the &color &noun is mine"       refs=2 classes=[:macro, :macro]
+  pattern="&n &color &noun please"         refs=3 classes=[:lambda, :macro, :macro]
+
+--- 4e. Greek-letter sigil parsing (Σ_greet is reserved :procedure) -------
+  parse_sigil_token("&Σ_greet") = "Σ_greet"
+  [pattern uses &Σ_greet (reserved :procedure)] threw SigilConfigError — SigilConfigError: sigil &Σ_greet has class :procedure which is reserved for a later stage; Stage 1 only activates classes (:lambda, :mac...
+  with allow_reserved=true:
+    refs=1 class=procedure expansion=Any["hello", "&noun"]
+
+==============================================================================
+  PHASE 5 — Error-path battery (NO SILENT FAILURES)
+==============================================================================
+Every malformed input throws a typed error. We trigger every documented
+path and capture the error type + message for the audit log.
+
+--- 5a. registration: bad name shapes -------------------------------------
+  [empty name] threw SigilArgumentError — SigilArgumentError: sigil name must be non-empty (arg=name)
+  [leading digit] threw SigilArgumentError — SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): "1n" (arg=name)
+  [space in name] threw SigilArgumentError — SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): "n n" (arg=name)
+  [punctuation in name] threw SigilArgumentError — SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): "n.x" (arg=name)
+  [name carries prefix] threw SigilArgumentError — SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): "&n" (arg=name)
+
+--- 5b. registration: bad class / phase -----------------------------------
+  [unknown class] threw SigilConfigError — SigilConfigError: unknown sigil class :nope (allowed: (:lambda, :macro, :tag, :glue, :functor, :procedure)) (field=class)
+  [unknown phase] threw SigilConfigError — SigilConfigError: unknown applies_at :nope (allowed: (:bind, :match, :vote_shape, :tone, :render, :thesaurus, :drop_table, :inhibit, :rel...
+
+--- 5c. registration: class/field coherence -------------------------------
+  [:lambda missing sigil_type] threw SigilConfigError — SigilConfigError: :lambda sigil &bad requires sigil_type (e.g. :number, :word, :slurp) (field=sigil_type)
+  [:lambda with lexicon] threw SigilConfigError — SigilConfigError: :lambda sigil &bad must not carry a lexicon (lexicons are for :macro) (field=lexicon)
+  [:macro missing lexicon] threw SigilConfigError — SigilConfigError: :macro sigil &bad requires a lexicon (use [] for empty/specimen-overridable) (field=lexicon)
+  [:macro with sigil_type] threw SigilConfigError — SigilConfigError: :macro sigil &bad must not carry sigil_type (sigil_type is for :lambda) (field=sigil_type)
+  [:tag with sigil_type] threw SigilConfigError — SigilConfigError: :tag sigil &bad must not carry sigil_type (field=sigil_type)
+  [:tag with lexicon] threw SigilConfigError — SigilConfigError: :tag sigil &bad must not carry lexicon (field=lexicon)
+  [expansion on non-:procedure] threw SigilConfigError — SigilConfigError: expansion field is reserved for :procedure class (got class :tag) (field=expansion)
+
+--- 5d. registration: lexicon size and content ----------------------------
+  [empty string in lexicon] threw SigilConfigError — SigilConfigError: macro lexicon for &bad contains empty string at index 2 (field=lexicon)
+
+--- 5e. collision: default throws, overwrite=true succeeds ----------------
+  [collision without overwrite] threw SigilConfigError — SigilConfigError: sigil &x already registered (existing class=:tag, provenance="first"); pass overwrite=true to replace (field=name)
+  with overwrite=true: provenance now=second
+
+--- 5f. lookup: miss + empty name -----------------------------------------
+  [lookup_sigil miss] threw SigilResolutionError — SigilResolutionError: no such sigil in registry "engine-default" (sigil=&definitely_not_there, pattern="")
+  [lookup_sigil empty name] threw SigilArgumentError — SigilArgumentError: sigil name must be non-empty (arg=name)
+
+--- 5g. pattern: unknown sigil, reserved gating, oversize -----------------
+  [unknown sigil in pattern] threw SigilResolutionError — SigilResolutionError: no such sigil in registry "engine-default" (sigil=&nope, pattern="what about &nope here")
+  [reserved :glue in pattern] threw SigilConfigError — SigilConfigError: sigil &and has class :glue which is reserved for a later stage; Stage 1 only activates classes (:lambda, :macro, :tag) ...
+  [pattern over MAX_SIGILS_PER_PATTERN cap] threw SigilConfigError — SigilConfigError: pattern contains more than MAX_SIGILS_PER_PATTERN=64 sigil tokens; pattern="&n + &n + &n + &n + &n + &n + &n + &n + &n ...
+
+--- 5h. list_sigils: bad filter values ------------------------------------
+  [list_sigils class filter unknown] threw SigilArgumentError — SigilArgumentError: filter class :nope is not a known SIGIL_CLASSES value (arg=class)
+  [list_sigils phase filter unknown] threw SigilArgumentError — SigilArgumentError: filter applies_at :nope is not a known SIGIL_APPLIES_AT value (arg=applies_at)
+
+--- 5i. merge_registry!: bad conflict policy ------------------------------
+  [merge_registry! bad policy] threw SigilArgumentError — SigilArgumentError: conflict policy must be :error, :overwrite, or :keep (got :nope) (arg=conflict)
+
+==============================================================================
+  PHASE 6 — Audit dump
+==============================================================================
+Dump the final merged registry and the captured error log to JSON for
+diff-friendly snapshotting. The error log proves every documented error
+path is live and typed.
+Audit dump written to: /workspace/grugbot420_repo/specimen_demo/kitchen_sink_v19_sigils/audit_dump.json (8291 bytes)
+Total error paths exercised: 24
+
+==============================================================================
+  KITCHEN SINK COMPLETE — Stage 1 sigil registry validated end-to-end
+==============================================================================
+Engine default registry: 4 entries (&n &word &rest &noun)
+Specimen registry:       6 entries (3 active classes + 2 reserved)
+Merged registry:         9 entries
+Pattern parsings:        zero-sigil fast path + single + multi + Greek
+Error paths covered:     24 typed throws, all NO-SILENT-FAILURE
+

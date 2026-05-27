@@ -1,0 +1,251 @@
+{
+  "generated_utc": "2026-05-27T11:23:21.428",
+  "engine_default_size": 4,
+  "max_lexicon_size": 1024,
+  "active_classes": [
+    "lambda",
+    "macro",
+    "tag"
+  ],
+  "active_phases": [
+    "bind",
+    "match"
+  ],
+  "stage": 1,
+  "merged_size": 9,
+  "merged_entries": [
+    {
+      "provenance": "specimen-cave-life-stage2-preview",
+      "name": "and",
+      "sigil_type": null,
+      "expansion": null,
+      "class": "glue",
+      "lexicon": null,
+      "applies_at": "bind",
+      "params": null
+    },
+    {
+      "provenance": "specimen-cave-life",
+      "name": "color",
+      "sigil_type": null,
+      "expansion": null,
+      "class": "macro",
+      "lexicon": [
+        "red",
+        "ochre",
+        "white",
+        "black"
+      ],
+      "applies_at": "bind",
+      "params": null
+    },
+    {
+      "provenance": "specimen-cave-life",
+      "name": "fuzzy",
+      "sigil_type": null,
+      "expansion": null,
+      "class": "tag",
+      "lexicon": null,
+      "applies_at": "bind",
+      "params": {
+        "metric": "lev",
+        "max_distance": 2
+      }
+    },
+    {
+      "provenance": "engine-default",
+      "name": "n",
+      "sigil_type": "number",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "specimen-cave-life",
+      "name": "noun",
+      "sigil_type": null,
+      "expansion": null,
+      "class": "macro",
+      "lexicon": [
+        "mammoth",
+        "fish",
+        "berry",
+        "fire",
+        "cave"
+      ],
+      "applies_at": "bind",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "rest",
+      "sigil_type": "slurp",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "specimen-cave-life",
+      "name": "urgent",
+      "sigil_type": null,
+      "expansion": null,
+      "class": "tag",
+      "lexicon": null,
+      "applies_at": "bind",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "word",
+      "sigil_type": "word",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "specimen-cave-life-stage6-preview",
+      "name": "Σ_greet",
+      "sigil_type": null,
+      "expansion": [
+        "hello",
+        "&noun"
+      ],
+      "class": "procedure",
+      "lexicon": null,
+      "applies_at": "bind",
+      "params": null
+    }
+  ],
+  "max_registry_entries": 4096,
+  "specimen_size": 6,
+  "error_log": [
+    {
+      "label": "empty name",
+      "message": "SigilArgumentError: sigil name must be non-empty (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "leading digit",
+      "message": "SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): \"1n\" (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "space in name",
+      "message": "SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): \"n n\" (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "punctuation in name",
+      "message": "SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): \"n.x\" (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "name carries prefix",
+      "message": "SigilArgumentError: sigil name does not match required pattern (letters/digits/dash/underscore, must start with letter): \"&n\" (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "unknown class",
+      "message": "SigilConfigError: unknown sigil class :nope (allowed: (:lambda, :macro, :tag, :glue, :functor, :procedure)) (field=class)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "unknown phase",
+      "message": "SigilConfigError: unknown applies_at :nope (allowed: (:bind, :match, :vote_shape, :tone, :render, :thesaurus, :drop_table, :inhibit, :relation)) (field=applies_at)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":lambda missing sigil_type",
+      "message": "SigilConfigError: :lambda sigil &bad requires sigil_type (e.g. :number, :word, :slurp) (field=sigil_type)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":lambda with lexicon",
+      "message": "SigilConfigError: :lambda sigil &bad must not carry a lexicon (lexicons are for :macro) (field=lexicon)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":macro missing lexicon",
+      "message": "SigilConfigError: :macro sigil &bad requires a lexicon (use [] for empty/specimen-overridable) (field=lexicon)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":macro with sigil_type",
+      "message": "SigilConfigError: :macro sigil &bad must not carry sigil_type (sigil_type is for :lambda) (field=sigil_type)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":tag with sigil_type",
+      "message": "SigilConfigError: :tag sigil &bad must not carry sigil_type (field=sigil_type)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": ":tag with lexicon",
+      "message": "SigilConfigError: :tag sigil &bad must not carry lexicon (field=lexicon)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "expansion on non-:procedure",
+      "message": "SigilConfigError: expansion field is reserved for :procedure class (got class :tag) (field=expansion)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "empty string in lexicon",
+      "message": "SigilConfigError: macro lexicon for &bad contains empty string at index 2 (field=lexicon)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "collision without overwrite",
+      "message": "SigilConfigError: sigil &x already registered (existing class=:tag, provenance=\"first\"); pass overwrite=true to replace (field=name)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "lookup_sigil miss",
+      "message": "SigilResolutionError: no such sigil in registry \"engine-default\" (sigil=&definitely_not_there, pattern=\"\")",
+      "type": "SigilResolutionError"
+    },
+    {
+      "label": "lookup_sigil empty name",
+      "message": "SigilArgumentError: sigil name must be non-empty (arg=name)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "unknown sigil in pattern",
+      "message": "SigilResolutionError: no such sigil in registry \"engine-default\" (sigil=&nope, pattern=\"what about &nope here\")",
+      "type": "SigilResolutionError"
+    },
+    {
+      "label": "reserved :glue in pattern",
+      "message": "SigilConfigError: sigil &and has class :glue which is reserved for a later stage; Stage 1 only activates classes (:lambda, :macro, :tag) (field=class)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "pattern over MAX_SIGILS_PER_PATTERN cap",
+      "message": "SigilConfigError: pattern contains more than MAX_SIGILS_PER_PATTERN=64 sigil tokens; pattern=\"&n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n + &n\" (field=pattern)",
+      "type": "SigilConfigError"
+    },
+    {
+      "label": "list_sigils class filter unknown",
+      "message": "SigilArgumentError: filter class :nope is not a known SIGIL_CLASSES value (arg=class)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "list_sigils phase filter unknown",
+      "message": "SigilArgumentError: filter applies_at :nope is not a known SIGIL_APPLIES_AT value (arg=applies_at)",
+      "type": "SigilArgumentError"
+    },
+    {
+      "label": "merge_registry! bad policy",
+      "message": "SigilArgumentError: conflict policy must be :error, :overwrite, or :keep (got :nope) (arg=conflict)",
+      "type": "SigilArgumentError"
+    }
+  ],
+  "max_sigils_per_pattern": 64,
+  "schema_version": "sigil-registry/v1"
+}
