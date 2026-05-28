@@ -77,6 +77,13 @@ const ALL_TESTS = [
     "test_sigil_registry.jl",
     "test_sigil_promoter.jl",
     "test_arithmetic_engine.jl",
+    # GRUG (v7.16+ / v2.6): comprehensive sigil pipeline coverage.
+    # SigilMediator surface, node tagging convention, multi-vote math fire
+    # path (single + multi-step), multipart clause slicing, Vote.payload
+    # backward compat, SigilFireError, end-to-end process_mission stdout,
+    # save/load v2.6 round-trip + v2.5 backward compat, singleton lifecycle,
+    # restore_table! tolerance, list_sigil_node_ids graved-skip.
+    "test_sigil_pipeline.jl",
     # GRUG (v7.16+): tonal build-up over consecutive same-tone predictions
     # + per-prediction Lorenz snap-back jitter. Locks in the new dynamics
     # added on top of the v7.15-updates ActionTonePredictor.

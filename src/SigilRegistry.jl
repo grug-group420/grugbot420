@@ -971,7 +971,22 @@ function restore_table!(table::SigilTable, data::AbstractDict)::Int
         table.label = String(data["label"])
     end
     raw_entries = get(data, "entries", nothing)
-    isnothing(raw_entries) && return 0
+
+    # GRUG: helper closure -- always re-attach engine-default predicates via
+    # :keep merge so engine-default sigils (& their lambda predicates which
+    # never serialize) remain usable after even minimal/legacy/empty inputs.
+    function _reattach_defaults_local()
+        try
+            merge_registry!(table, default_registry(); conflict=:keep)
+        catch e
+            @warn "[SigilRegistry] restore_table!: default-merge failed (non-fatal): $e"
+        end
+    end
+
+    if isnothing(raw_entries)
+        _reattach_defaults_local()
+        return 0
+    end
     if !(raw_entries isa AbstractVector)
         throw(SigilArgumentError(
             "restore_table!: 'entries' must be a Vector, got $(typeof(raw_entries))",
@@ -1014,11 +1029,10 @@ function restore_table!(table::SigilTable, data::AbstractDict)::Int
     # GRUG: re-attach engine-default predicates via :keep merge — restored
     # entries win, defaults fill any gaps (e.g. legacy v2.5 specimens with
     # no "sigils" block at all).
-    try
-        merge_registry!(table, default_registry(); conflict=:keep)
-    catch e
-        @warn "[SigilRegistry] restore_table!: default-merge failed (non-fatal): $e"
-    end
+    # GRUG: re-attach engine-default predicates via :keep merge -- restored
+    # entries win, defaults fill any gaps (e.g. legacy v2.5 specimens with
+    # no "sigils" block at all).
+    _reattach_defaults_local()
 
     return n
 end
