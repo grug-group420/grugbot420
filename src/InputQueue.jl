@@ -345,6 +345,49 @@ function concept_inhibition_count()::Int
 end
 
 """
+    serialize_concept_inhibitions() -> Vector{Dict{String,Any}}
+
+GRUG: Snapshot all concept-class bans for persistence. Same shape as the
+`inhibitions` save block --- (word, reason, added_at) per entry.
+"""
+function serialize_concept_inhibitions()::Vector{Dict{String, Any}}
+    out = Vector{Dict{String, Any}}()
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        for (_, entry) in _NEG_CONCEPT_BANS
+            push!(out, Dict{String, Any}(
+                "word"     => entry.word,
+                "reason"   => entry.reason,
+                "added_at" => entry.added_at,
+            ))
+        end
+    end
+    return out
+end
+
+"""
+    restore_concept_inhibitions!(data::AbstractVector) -> Int
+
+GRUG: Wipe and rehydrate the concept-class bans from a snapshot.
+Returns count restored. Tolerant of missing fields.
+"""
+function restore_concept_inhibitions!(data::AbstractVector)::Int
+    n = 0
+    lock(_NEG_CONCEPT_BANS_LOCK) do
+        empty!(_NEG_CONCEPT_BANS)
+        for raw in data
+            isa(raw, AbstractDict) || continue
+            word = strip(String(get(raw, "word", "")))
+            isempty(word) && continue
+            reason = String(get(raw, "reason", "restored"))
+            added_at = Float64(get(raw, "added_at", time()))
+            _NEG_CONCEPT_BANS[lowercase(word)] = NegEntry(lowercase(word), reason, added_at)
+            n += 1
+        end
+    end
+    return n
+end
+
+"""
 list_inhibitions()::Vector{NegEntry}
 
 GRUG: Get all current inhibition entries sorted alphabetically.

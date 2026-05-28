@@ -86,6 +86,11 @@ const ALL_TESTS = [
     # SPARSE_ACTIVE_FIRE_FLOOR (0.20) are culled BEFORE claiming a fire slot.
     # Per user directive \u2014 not the AIML layer's job.
     "test_sparse_active_fire.jl",
+    # GRUG (v2.5): save coverage — seven new specimen categories
+    # (tonal_buildup, concept_classes, concept_inhibitions, groups,
+    # crystalize, chatter_swap_cooldowns, subconscious). Round-trip per
+    # module + integration through save_specimen_to_file!/load_*.
+    "test_save_coverage_v25.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

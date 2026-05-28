@@ -581,4 +581,91 @@ function load_registry_compressed(path::String = DEFAULT_REGISTRY_DISK_PATH)
     return nothing
 end
 
+# ==============================================================================
+# IN-MEMORY SERIALIZATION (for canonical save_specimen integration)
+# ==============================================================================
+
+"""
+    serialize_state() -> Dict{String,Any}
+
+GRUG: Snapshot the live group registry to a JSON-friendly dict for the
+canonical save path. Distinct from `save_registry_compressed` --- this
+function returns a dict for embedding in the unified specimen file
+instead of writing its own external file.
+"""
+function serialize_state()::Dict{String, Any}
+    lock(_REGISTRY.lock) do
+        Dict{String, Any}(
+            "version" => "v7.15",
+            "groups" => [Dict{String, Any}(
+                "group_id"      => g.group_id,
+                "member_ids"    => copy(g.member_ids),
+                "partner_cap"   => g.partner_cap,
+                "is_unlinkable" => g.is_unlinkable,
+                "grave_count"   => g.grave_count,
+            ) for (_, g) in _REGISTRY.groups],
+            "group_id_order" => copy(_REGISTRY.group_id_order),
+            "cursor"         => _REGISTRY.cursor,
+        )
+    end
+end
+
+"""
+    restore_state!(data::AbstractDict) -> Int
+
+GRUG: Wipe the live registry and rehydrate from a `serialize_state` dict.
+Returns the number of groups restored. Tolerant of missing keys.
+"""
+function restore_state!(data::AbstractDict)::Int
+    n = 0
+    lock(_REGISTRY.lock) do
+        empty!(_REGISTRY.groups)
+        empty!(_REGISTRY.node_to_groups)
+        empty!(_REGISTRY.group_id_order)
+        _REGISTRY.cursor = 1
+
+        groups_raw = get(data, "groups", Any[])
+        if isa(groups_raw, AbstractVector)
+            for g in groups_raw
+                isa(g, AbstractDict) || continue
+                gid = String(get(g, "group_id", ""))
+                isempty(gid) && continue
+                members_raw = get(g, "member_ids", String[])
+                members = isa(members_raw, AbstractVector) ?
+                    String[String(m) for m in members_raw] : String[]
+                partner_cap = Int(get(g, "partner_cap", PARTNER_CAP_MIN))
+                is_unlinkable = Bool(get(g, "is_unlinkable", false))
+                grave_count = Int(get(g, "grave_count", 0))
+                _REGISTRY.groups[gid] = NodeGroup(gid, members, partner_cap, is_unlinkable, grave_count)
+                for m in members
+                    if !haskey(_REGISTRY.node_to_groups, m)
+                        _REGISTRY.node_to_groups[m] = String[]
+                    end
+                    push!(_REGISTRY.node_to_groups[m], gid)
+                end
+                n += 1
+            end
+        end
+
+        order_raw = get(data, "group_id_order", String[])
+        if isa(order_raw, AbstractVector)
+            for gid in order_raw
+                push!(_REGISTRY.group_id_order, String(gid))
+            end
+        end
+        # GRUG: If no order was provided but groups exist, fall back to keys order.
+        if isempty(_REGISTRY.group_id_order) && !isempty(_REGISTRY.groups)
+            for gid in keys(_REGISTRY.groups)
+                push!(_REGISTRY.group_id_order, gid)
+            end
+        end
+
+        if haskey(data, "cursor")
+            c = Int(get(data, "cursor", 1))
+            _REGISTRY.cursor = max(1, c)
+        end
+    end
+    return n
+end
+
 end # module GroupRegistry

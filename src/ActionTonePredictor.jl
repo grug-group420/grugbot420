@@ -676,6 +676,53 @@ function get_tonal_buildup()
     end
 end
 
+"""
+    serialize_tonal_buildup() -> Dict{String,Any}
+
+GRUG: Snapshot the single-slot tonal-build-up accumulator for persistence.
+`tone === nothing` is encoded as the empty string `""`. JSON-friendly.
+"""
+function serialize_tonal_buildup()::Dict{String, Any}
+    snap = get_tonal_buildup()
+    tone_str = snap.tone === nothing ? "" : String(Symbol(snap.tone))
+    return Dict{String, Any}(
+        "tone"    => tone_str,
+        "buildup" => snap.buildup,
+        "ts"      => snap.ts,
+    )
+end
+
+"""
+    restore_tonal_buildup!(data::AbstractDict) -> Bool
+
+GRUG: Replace the single-slot tonal build-up state from a snapshot.
+Tolerant of missing keys (defaults: tone=nothing, buildup=0.0, ts=0.0).
+Returns true on a clean restore. Unknown tone strings round-trip as
+`nothing` --- safer than failing the whole load.
+"""
+function restore_tonal_buildup!(data::AbstractDict)::Bool
+    tone_raw = String(get(data, "tone", ""))
+    tone_val::Union{Nothing, ToneFamily} = nothing
+    if !isempty(tone_raw)
+        sym = Symbol(tone_raw)
+        # GRUG: @enum doesn't have a Symbol constructor in stock Julia. Walk
+        # `instances(ToneFamily)` and string-match. Bounded (6 variants) and
+        # safe --- unknown tone strings round-trip as nothing.
+        for tf in instances(ToneFamily)
+            if Symbol(tf) === sym
+                tone_val = tf
+                break
+            end
+        end
+    end
+    buildup = clamp(Float64(get(data, "buildup", 0.0)), 0.0, 1.0)
+    ts      = Float64(get(data, "ts", 0.0))
+    lock(_TONAL_BUILDUP_LOCK) do
+        _TONAL_BUILDUP[] = (tone = tone_val, buildup = buildup, ts = ts)
+    end
+    return true
+end
+
 # GRUG: Update the build-up accumulator given the predicted tone for THIS
 # call. Returns the new buildup value. Internal — predict_action_tone is
 # the only caller. Cool-down is applied first (decay against time), THEN

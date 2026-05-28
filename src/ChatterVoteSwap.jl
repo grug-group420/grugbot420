@@ -354,4 +354,47 @@ function run_vote_swap_round!(
     return stats
 end
 
+# ==============================================================================
+# SERIALIZATION (for canonical save_specimen integration)
+# ==============================================================================
+
+"""
+    serialize_cooldowns() -> Dict{String, Float64}
+
+GRUG: Snapshot the chatter-swap cooldown map for persistence. Same
+shape as `MORPH_COOLDOWN_MAP` --- node_id => last_swap_timestamp. Reload
+preserves the 1-hour cooldown invariant across save/load cycles.
+"""
+function serialize_cooldowns()::Dict{String, Float64}
+    lock(_COOLDOWN_LOCK) do
+        Dict{String, Float64}(k => v for (k, v) in _COOLDOWN_MAP)
+    end
+end
+
+"""
+    restore_cooldowns!(data::AbstractDict) -> Int
+
+GRUG: Wipe and rehydrate the chatter-swap cooldown map from a snapshot.
+Returns count restored. Tolerant of missing / malformed entries.
+"""
+function restore_cooldowns!(data::AbstractDict)::Int
+    n = 0
+    lock(_COOLDOWN_LOCK) do
+        empty!(_COOLDOWN_MAP)
+        for (raw_id, raw_ts) in data
+            nid = strip(String(raw_id))
+            isempty(nid) && continue
+            ts = try
+                Float64(raw_ts)
+            catch
+                continue
+            end
+            isfinite(ts) || continue
+            _COOLDOWN_MAP[nid] = ts
+            n += 1
+        end
+    end
+    return n
+end
+
 end # module ChatterVoteSwap

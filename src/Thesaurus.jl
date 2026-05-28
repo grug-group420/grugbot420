@@ -881,6 +881,58 @@ function remove_concept_class!(concept_name::AbstractString)::Bool
 end
 
 """
+    serialize_concept_classes() -> Dict{String, Vector{String}}
+
+GRUG: Snapshot the concept-class membership map for persistence.
+Sorted output for stable diffs. The reverse map is rebuilt on load
+via `restore_concept_classes!` and need not be persisted separately.
+"""
+function serialize_concept_classes()::Dict{String, Vector{String}}
+    out = Dict{String, Vector{String}}()
+    lock(CONCEPT_CLASS_LOCK) do
+        for (name, members) in CONCEPT_CLASS_MEMBERS
+            out[name] = sort(collect(members))
+        end
+    end
+    return out
+end
+
+"""
+    restore_concept_classes!(data::AbstractDict) -> Int
+
+GRUG: Wipe the concept-class registry and rehydrate from a snapshot.
+Returns the number of classes restored. The reverse map is rebuilt
+in-place. Tolerant of malformed entries (skipped, not fatal).
+"""
+function restore_concept_classes!(data::AbstractDict)::Int
+    n = 0
+    lock(CONCEPT_CLASS_LOCK) do
+        empty!(CONCEPT_CLASS_MEMBERS)
+        empty!(CONCEPT_CLASS_REVERSE)
+        for (raw_name, raw_members) in data
+            name = lowercase(strip(String(raw_name)))
+            isempty(name) && continue
+            isa(raw_members, AbstractVector) || continue
+            members = Set{String}()
+            for m in raw_members
+                clean = lowercase(strip(String(m)))
+                isempty(clean) || push!(members, clean)
+            end
+            isempty(members) && continue
+            CONCEPT_CLASS_MEMBERS[name] = members
+            for m in members
+                if !haskey(CONCEPT_CLASS_REVERSE, m)
+                    CONCEPT_CLASS_REVERSE[m] = Set{String}()
+                end
+                push!(CONCEPT_CLASS_REVERSE[m], name)
+            end
+            n += 1
+        end
+    end
+    return n
+end
+
+"""
     get_concept_equivalents(word::AbstractString)::Set{String}
 
 GRUG v7.16.0: Given a word, return the union of all its concept-class

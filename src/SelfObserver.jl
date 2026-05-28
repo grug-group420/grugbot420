@@ -972,4 +972,148 @@ Number of distinct keys with at least one microlog. Integer.
 """
 key_count(store::SubconsciousStore)::Int = length(store.table)
 
+# ==============================================================================
+# PROCESS-WIDE SINGLETON (for save/load integration with Main.save_specimen!)
+# ==============================================================================
+
+# GRUG: One subconscious store per process. Lazily replaced on /loadSpecimen
+# (`restore_global_store!`) and wiped on cave reset (`drop_store!` on the
+# return of `default_store()`). Tests that want isolation should construct
+# their own SubconsciousStore and pass it explicitly --- the singleton is
+# only for the live runtime path.
+const _GLOBAL_STORE = Ref{SubconsciousStore}(SubconsciousStore())
+
+"""
+    default_store() -> SubconsciousStore
+
+GRUG: Return the process-wide subconscious store singleton. Used by the
+canonical save/load path in `Main.save_specimen_to_file!` so that the
+SelfObserver microlog table travels with the specimen.
+"""
+default_store() = _GLOBAL_STORE[]
+
+"""
+    serialize_store(store::SubconsciousStore) -> Dict{String,Any}
+
+GRUG: Snapshot the live microlog table + drop tables to a JSON-friendly
+dict. Audit counters and token buckets are NOT persisted --- they are
+diagnostic / per-session and mean nothing after a reload.
+
+Schema (specimen key `subconscious`):
+```
+Dict(
+  "table"         => Dict{String, Vector{Dict}},  # key -> list of microlog dicts
+  "drop_tables"   => Dict{String, Vector{String}},
+  "total_entries" => Int
+)
+```
+Each microlog dict has: key, tag (String), payload (Dict{String,Any}),
+weight (Float64), timestamp (Float64), provenance (String), drop_table
+(Vector{String}).
+"""
+function serialize_store(store::SubconsciousStore)::Dict{String, Any}
+    out = Dict{String, Any}()
+    lock(store.write_lock)
+    try
+        table_out = Dict{String, Any}()
+        for (k, mls) in store.table
+            entries = Vector{Dict{String, Any}}()
+            for ml in mls
+                push!(entries, Dict{String, Any}(
+                    "key"        => ml.key,
+                    "tag"        => String(ml.tag),
+                    "payload"    => ml.payload,
+                    "weight"     => ml.weight,
+                    "timestamp"  => ml.timestamp,
+                    "provenance" => String(ml.provenance),
+                    "drop_table" => copy(ml.drop_table),
+                ))
+            end
+            table_out[k] = entries
+        end
+        out["table"] = table_out
+
+        drops_out = Dict{String, Any}()
+        for (k, v) in store.drop_tables
+            drops_out[k] = copy(v)
+        end
+        out["drop_tables"] = drops_out
+        out["total_entries"] = store.total_entries
+    finally
+        unlock(store.write_lock)
+    end
+    return out
+end
+
+"""
+    restore_store!(store::SubconsciousStore, data::AbstractDict)::Int
+
+GRUG: Wipe `store` and rehydrate it from a `serialize_store` snapshot.
+Returns the number of microlog entries restored. Tolerant of missing
+keys --- a partial / older snapshot just restores what's there.
+"""
+function restore_store!(store::SubconsciousStore, data::AbstractDict)::Int
+    drop_store!(store)  # wipe table + drop_tables + buckets
+
+    n_restored = 0
+    lock(store.write_lock)
+    try
+        if haskey(data, "table") && isa(data["table"], AbstractDict)
+            for (k, entries) in data["table"]
+                key = String(k)
+                mls = Vector{Microlog}()
+                for raw in entries
+                    isa(raw, AbstractDict) || continue
+                    tag_str = String(get(raw, "tag", "meta"))
+                    tag_sym = Symbol(tag_str)
+                    if !(tag_sym in VALID_TAGS)
+                        # GRUG: silently coerce unknown tags to :meta rather than
+                        # throw --- save format is forward-compatible by design.
+                        tag_sym = :meta
+                    end
+                    payload_raw = get(raw, "payload", Dict{String, Any}())
+                    payload = isa(payload_raw, AbstractDict) ?
+                        Dict{String, Any}(String(k2) => v2 for (k2, v2) in payload_raw) :
+                        Dict{String, Any}()
+                    weight_raw = get(raw, "weight", DEFAULT_SALIENCE)
+                    weight = clamp(Float64(weight_raw), SALIENCE_FLOOR, SALIENCE_CEILING)
+                    timestamp = Float64(get(raw, "timestamp", time()))
+                    prov = Symbol(String(get(raw, "provenance", "restored")))
+                    dt_raw = get(raw, "drop_table", String[])
+                    dt = isa(dt_raw, AbstractVector) ? String[String(x) for x in dt_raw] : String[]
+                    ml = Microlog(key, tag_sym, payload, weight, timestamp, prov, dt)
+                    push!(mls, ml)
+                    n_restored += 1
+                end
+                if !isempty(mls)
+                    store.table[key] = mls
+                end
+            end
+        end
+
+        if haskey(data, "drop_tables") && isa(data["drop_tables"], AbstractDict)
+            for (k, v) in data["drop_tables"]
+                if isa(v, AbstractVector)
+                    store.drop_tables[String(k)] = String[String(x) for x in v]
+                end
+            end
+        end
+
+        # GRUG: total_entries is authoritative from our actual rehydrate count,
+        # not whatever was in the snapshot. Keeps the invariant tight.
+        store.total_entries = n_restored
+    finally
+        unlock(store.write_lock)
+    end
+    return n_restored
+end
+
+"""
+    restore_global_store!(data::AbstractDict)::Int
+
+GRUG: Convenience wrapper for the canonical load path --- replaces the
+process-wide singleton's contents from a snapshot. Returns count restored.
+"""
+restore_global_store!(data::AbstractDict)::Int = restore_store!(_GLOBAL_STORE[], data)
+
 end # module SelfObserver

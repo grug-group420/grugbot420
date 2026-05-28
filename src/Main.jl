@@ -3900,10 +3900,50 @@ function save_specimen_to_file!(filepath::String)::String
     # the specimen forgets its learned AIML patterns and tribal structure.
     specimen["aiml_system"] = AIMLNodeSystem.serialize_aiml_state()
 
+    # ── 20. TONAL BUILD-UP (ActionTonePredictor) ─────────────────────
+    # GRUG v7.16+: Single-slot tonal arousal accumulator. Without this,
+    # consecutive-same-tone build-up resets to cold on every reload —
+    # the specimen forgets its emotional inertia.
+    specimen["tonal_buildup"] = ActionTonePredictor.serialize_tonal_buildup()
+
+    # ── 21. CONCEPT CLASSES (Thesaurus) ──────────────────────────────
+    # GRUG v7.16+: Runtime-added concept classes (via /conceptClass add)
+    # were lost on reload. Now persisted alongside thesaurus_seeds.
+    specimen["concept_classes"] = Thesaurus.serialize_concept_classes()
+
+    # ── 22. CONCEPT INHIBITIONS (InputQueue) ─────────────────────────
+    # GRUG v7.16+: Sibling of `inhibitions` — concept-class-level bans
+    # were silently dropped at reload. User-managed; loss is a regression.
+    specimen["concept_inhibitions"] = InputQueue.serialize_concept_inhibitions()
+
+    # ── 23. GROUP REGISTRY (GroupRegistry) ───────────────────────────
+    # GRUG v7.15+: Was writing its own external file (group_registry.json.gz),
+    # fragmenting persistence across two files. Now folded into the
+    # canonical specimen. The legacy save_registry_compressed function is
+    # still available for ops use but is no longer the primary persistence.
+    specimen["groups"] = GroupRegistry.serialize_state()
+
+    # ── 24. CRYSTALIZE TAGS (CrystalizeTag) ──────────────────────────
+    # GRUG v7.15+: Two sets — user-issued + auto-promoted crystalizations.
+    # Lost on reload before; now preserved.
+    specimen["crystalize"] = CrystalizeTag.serialize_state()
+
+    # ── 25. CHATTER SWAP COOLDOWNS (ChatterVoteSwap) ─────────────────
+    # GRUG v7.15+: 1-hour cooldown timestamps for chatter swaps. Same
+    # shape as morph_cooldowns. Reload would let all swaps fire again
+    # immediately without this.
+    specimen["chatter_swap_cooldowns"] = ChatterVoteSwap.serialize_cooldowns()
+
+    # ── 26. SUBCONSCIOUS MICROLOGS (SelfObserver) ────────────────────
+    # GRUG: SelfObserver subconscious microlog table. The store is a
+    # process-wide singleton (SelfObserver._GLOBAL_STORE). Without this,
+    # the subconscious is wiped on every reload.
+    specimen["subconscious"] = SelfObserver.serialize_store(SelfObserver.default_store())
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.4",
+        "version"    => "2.5",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.4"
+        "format"     => "grugbot420-specimen-v2.5"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -3965,6 +4005,25 @@ function save_specimen_to_file!(filepath::String)::String
     _aiml_registry = get(_aiml_data, "registry", Dict())
     _aiml_total_nodes = isempty(_aiml_registry) ? 0 : sum(length(v) for v in values(_aiml_registry))
     push!(lines, "  🤖  AIML nodes       : $(_aiml_total_nodes)")
+    # GRUG v2.5 NEW save categories — surface counts for ops visibility.
+    _tb           = get(specimen, "tonal_buildup", Dict())
+    _cc           = get(specimen, "concept_classes", Dict())
+    _ci           = get(specimen, "concept_inhibitions", Any[])
+    _groups       = get(specimen, "groups", Dict())
+    _groups_count = length(get(_groups, "groups", Any[]))
+    _crys         = get(specimen, "crystalize", Dict())
+    _crys_user    = length(get(_crys, "user", String[]))
+    _crys_auto    = length(get(_crys, "auto", String[]))
+    _swap_cool    = get(specimen, "chatter_swap_cooldowns", Dict())
+    _subc         = get(specimen, "subconscious", Dict())
+    _subc_keys    = length(get(_subc, "table", Dict()))
+    push!(lines, "  🌡️   Tonal build-up   : tone=$(get(_tb, "tone", "")) buildup=$(round(Float64(get(_tb, "buildup", 0.0)), digits=3))")
+    push!(lines, "  🔠  Concept classes  : $(length(_cc))")
+    push!(lines, "  🚫  Concept bans     : $(length(_ci))")
+    push!(lines, "  👥  Groups           : $(_groups_count)")
+    push!(lines, "  💎  Crystalized      : user=$(_crys_user) auto=$(_crys_auto)")
+    push!(lines, "  🔁  Swap cooldowns   : $(length(_swap_cool))")
+    push!(lines, "  💭  Subconscious keys: $(_subc_keys)")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
     return join(lines, "\n")
@@ -4043,7 +4102,11 @@ function load_specimen_from_file!(filepath::String)::String
                         "lobes", "node_to_lobe_idx", "lobe_tables",
                         "verb_registry", "thesaurus_seeds", "inhibitions",
                         "arousal", "eye_state", "id_counters", "last_voters", "brainstem", "attachments",
-                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system", "_meta"])
+                        "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system",
+                        # GRUG v2.5 NEW save categories
+                        "tonal_buildup", "concept_classes", "concept_inhibitions",
+                        "groups", "crystalize", "chatter_swap_cooldowns", "subconscious",
+                        "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
             push!(validation_errors, "Unknown top-level key '$key'")
@@ -4181,6 +4244,24 @@ function load_specimen_from_file!(filepath::String)::String
     # Wipe immune system state
     # GRUG: Clear all immune memory. Specimen will bring its own.
     ImmuneSystem.reset_immune_state!()
+
+    # GRUG v2.5: Wipe v2.5 state holders so a /loadSpecimen of a specimen
+    # MISSING those keys ends up clean rather than carrying old state.
+    # Each restore block above handles the present-key case; these wipes
+    # cover the absent-key path.
+    ActionTonePredictor.reset_tonal_buildup!()
+    InputQueue.restore_concept_inhibitions!(Any[])
+    GroupRegistry.restore_state!(Dict{String,Any}(
+        "groups" => Any[], "group_id_order" => String[], "cursor" => 1))
+    CrystalizeTag.restore_state!(Dict{String,Any}("user" => String[], "auto" => String[]))
+    ChatterVoteSwap.restore_cooldowns!(Dict{String,Any}())
+    SelfObserver.restore_global_store!(Dict{String,Any}())
+    # GRUG: Concept classes have hardcoded seeds. Wipe to seeds, NOT empty.
+    # If the specimen carries a `concept_classes` block, the restore step
+    # below replaces these with the saved set (which itself includes seeds
+    # because the save serializes the full live registry).
+    Thesaurus.restore_concept_classes!(Dict{String,Any}())
+    Thesaurus._build_concept_class_seed!()
 
     println("  ✅ Cave wiped clean. Beginning restore...")
 
@@ -4759,6 +4840,69 @@ function load_specimen_from_file!(filepath::String)::String
         counts["aiml_lobes"] = n_aiml_lobes
         counts["aiml_nodes"] = n_aiml_nodes
         println("  🤖 AIML system restored ($n_aiml_nodes nodes across $n_aiml_lobes lobes)")
+    end
+
+    # ── 4.20 TONAL BUILD-UP (ActionTonePredictor) ─────────────────────
+    # GRUG v2.5: Restore the single-slot tonal arousal accumulator.
+    if haskey(specimen, "tonal_buildup") && isa(specimen["tonal_buildup"], Dict)
+        ActionTonePredictor.restore_tonal_buildup!(specimen["tonal_buildup"])
+        tb = ActionTonePredictor.get_tonal_buildup()
+        counts["tonal_buildup"] = 1
+        println("  🌡️  Tonal build-up restored (tone=$(tb.tone === nothing ? "nothing" : Symbol(tb.tone)) buildup=$(round(tb.buildup, digits=3)))")
+    else
+        # GRUG: Spec missing key → reset to clean slate so we never carry over
+        # stale build-up from a previous load. Cleaner than leaving it dirty.
+        ActionTonePredictor.reset_tonal_buildup!()
+    end
+
+    # ── 4.21 CONCEPT CLASSES (Thesaurus) ──────────────────────────────
+    # GRUG v2.5: Restore runtime-added concept classes (rebuilds reverse map).
+    if haskey(specimen, "concept_classes") && isa(specimen["concept_classes"], Dict)
+        n_cc = Thesaurus.restore_concept_classes!(specimen["concept_classes"])
+        counts["concept_classes"] = n_cc
+        println("  🔠 Concept classes restored ($n_cc classes)")
+    end
+
+    # ── 4.22 CONCEPT INHIBITIONS (InputQueue) ─────────────────────────
+    # GRUG v2.5: Restore concept-class-level bans (sibling of inhibitions).
+    if haskey(specimen, "concept_inhibitions") && isa(specimen["concept_inhibitions"], AbstractVector)
+        n_ci = InputQueue.restore_concept_inhibitions!(specimen["concept_inhibitions"])
+        counts["concept_inhibitions"] = n_ci
+        println("  🚫 Concept inhibitions restored ($n_ci classes banned)")
+    end
+
+    # ── 4.23 GROUP REGISTRY (GroupRegistry) ───────────────────────────
+    # GRUG v2.5: Folded the previously-external group_registry.json.gz file
+    # into the unified specimen.
+    if haskey(specimen, "groups") && isa(specimen["groups"], Dict)
+        n_groups = GroupRegistry.restore_state!(specimen["groups"])
+        counts["groups"] = n_groups
+        println("  👥 Group registry restored ($n_groups groups)")
+    end
+
+    # ── 4.24 CRYSTALIZE TAGS (CrystalizeTag) ──────────────────────────
+    # GRUG v2.5: Restore both user + auto crystalization sets.
+    if haskey(specimen, "crystalize") && isa(specimen["crystalize"], Dict)
+        (n_cu, n_ca) = CrystalizeTag.restore_state!(specimen["crystalize"])
+        counts["crystalize_user"] = n_cu
+        counts["crystalize_auto"] = n_ca
+        println("  💎 Crystalize tags restored (user=$n_cu, auto=$n_ca)")
+    end
+
+    # ── 4.25 CHATTER SWAP COOLDOWNS (ChatterVoteSwap) ─────────────────
+    # GRUG v2.5: Preserve 1-hour cooldown invariant across reload.
+    if haskey(specimen, "chatter_swap_cooldowns") && isa(specimen["chatter_swap_cooldowns"], Dict)
+        n_csc = ChatterVoteSwap.restore_cooldowns!(specimen["chatter_swap_cooldowns"])
+        counts["chatter_swap_cooldowns"] = n_csc
+        println("  🔁 Chatter swap cooldowns restored ($n_csc nodes)")
+    end
+
+    # ── 4.26 SUBCONSCIOUS MICROLOGS (SelfObserver) ────────────────────
+    # GRUG v2.5: Restore the process-wide subconscious store.
+    if haskey(specimen, "subconscious") && isa(specimen["subconscious"], Dict)
+        n_subc = SelfObserver.restore_global_store!(specimen["subconscious"])
+        counts["subconscious"] = n_subc
+        println("  💭 Subconscious restored ($n_subc microlog entries)")
     end
 
 

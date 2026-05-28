@@ -205,6 +205,74 @@ crossed sparse-active threshold.
 
 ---
 
+## NEW in this round — save format v2.5 (specimen save coverage holes plugged)
+
+> **User directive (verbatim):** *"i think there are quite a few features that
+> save to disc rn that arent part of the save file system. so yea check that
+> ... sub conscious writing isn't in the file either. lets get it all wired up"*
+
+The audit found seven categories of live runtime state that the canonical
+`/saveSpecimen` was silently dropping. All seven are now folded into the
+unified specimen file. Format version: `2.4 → 2.5`. Backward-compatible:
+loading a v2.4 specimen leaves the new categories at clean defaults (with
+concept-class seeds rebuilt automatically).
+
+### What was missing before v2.5
+| Specimen key | State holder | Why it matters |
+|---|---|---|
+| `tonal_buildup` | `ActionTonePredictor._TONAL_BUILDUP` | Single-slot tonal arousal accumulator — added earlier this round. Reload zeroed it → cold-start every save. |
+| `concept_classes` | `Thesaurus.CONCEPT_CLASS_MEMBERS` | v7.16 concept classes. User-managed via `/conceptClass add/remove`. Reload lost runtime additions. |
+| `concept_inhibitions` | `InputQueue._NEG_CONCEPT_BANS` | Sibling of `inhibitions`. User-managed. Reload silently lost all bans. |
+| `groups` | `GroupRegistry._REGISTRY` | v7.15 group registry. Was previously persisted via its OWN external file (`group_registry.json.gz`) — splitting state across two files. Now folded into the unified specimen. |
+| `crystalize` | `CrystalizeTag` (two sets) | v7.15 crystallization tags (user-issued + auto-promoted). Reload lost every "lock me forever" decision. |
+| `chatter_swap_cooldowns` | `ChatterVoteSwap._COOLDOWN_MAP` | 1-hour cooldown timestamps for chatter swaps. Reload let all swaps fire again immediately (parity with `morph_cooldowns` which WAS saved). |
+| `subconscious` | `SelfObserver._GLOBAL_STORE` | NEW process-wide singleton wired this round. Without it, the subconscious microlog table was wiped on every reload. |
+
+### Disk-write fragmentation: fixed
+`GroupRegistry.save_registry_compressed` / `load_registry_compressed` are
+preserved (still callable for ops use) but are no longer the primary
+persistence path for groups. Everything goes through the unified specimen.
+
+### Per-module API surface added
+Each affected module now has matched `serialize_*` / `restore_*` helpers so
+the persistence concern lives near the type:
+
+- `ActionTonePredictor.serialize_tonal_buildup() / restore_tonal_buildup!`
+- `Thesaurus.serialize_concept_classes() / restore_concept_classes!`
+- `InputQueue.serialize_concept_inhibitions() / restore_concept_inhibitions!`
+- `GroupRegistry.serialize_state() / restore_state!`
+- `CrystalizeTag.serialize_state() / restore_state!`
+- `ChatterVoteSwap.serialize_cooldowns() / restore_cooldowns!`
+- `SelfObserver.default_store() / serialize_store / restore_store! / restore_global_store!`
+
+The wipe phase of `/loadSpecimen` resets each holder to clean state before
+the restore step, so loading an older v2.4 specimen leaves the new
+categories empty rather than carrying forward stale runtime state. Concept
+classes are re-seeded after wipe (they have hardcoded baseline seeds).
+
+### Validation allowlist
+`load_specimen_from_file!`'s `allowed_keys` set was extended to accept the
+seven new top-level keys. Unknown keys still produce a hard validation
+failure — no silent acceptance.
+
+### Tests
+`test/test_save_coverage_v25.jl` — **87 assertions across 9 testsets**:
+- 7 per-module round-trip testsets (one per new save category)
+- 1 testset for tone-string corruption tolerance (unknown tone → nothing,
+  missing keys → defaults)
+- 1 integration testset that drives the full `save_specimen_to_file!` →
+  decompress JSON → assert seven new keys present → wipe live state →
+  `load_specimen_from_file!` → assert live state restored
+
+Full suite: 47 / 47 testfiles pass, ~4m20s. Zero regressions.
+
+### Specimen ops scroll
+The save scroll now reports counts for every new category alongside the
+existing ones (tone build-up snapshot, concept classes, concept bans,
+groups, crystalize sets, swap cooldowns, subconscious keys).
+
+---
+
 ## What was NOT ported (and why)
 
 | From `origin/main` | Why not |
@@ -264,18 +332,25 @@ grugbot420/
 ├── AGENT_RULES.md                        ← agent-behavior contract (do not fork)
 ├── READ-FIRST-IMPORTANT.md               ← this file
 ├── src/
-│   ├── ActionTonePredictor.jl            ← MODIFIED: tonal build-up + Lorenz snap-back
+│   ├── ActionTonePredictor.jl            ← MODIFIED: tonal build-up + Lorenz snap-back + v2.5 ser/de
 │   ├── ArithmeticEngine.jl               ← NEW (ported from main)
+│   ├── ChatterVoteSwap.jl                ← MODIFIED: v2.5 cooldown ser/de
+│   ├── CrystalizeTag.jl                  ← MODIFIED: v2.5 state ser/de
 │   ├── engine.jl                         ← MODIFIED: sparse-active fire gate at 2 sites
+│   ├── GroupRegistry.jl                  ← MODIFIED: v2.5 in-memory state ser/de
 │   ├── GrugBot420.jl                     ← MODIFIED: 4 new module includes
-│   ├── SelfObserver.jl                   ← NEW (ported from main)
+│   ├── InputQueue.jl                     ← MODIFIED: v2.5 concept-inhibitions ser/de
+│   ├── Main.jl                           ← MODIFIED: save/load wired for v2.5 (7 new keys)
+│   ├── SelfObserver.jl                   ← MODIFIED: process-wide singleton + v2.5 ser/de
 │   ├── SigilPromoter.jl                  ← NEW (ported from main)
 │   ├── SigilRegistry.jl                  ← NEW (ported from main)
+│   ├── Thesaurus.jl                      ← MODIFIED: v2.5 concept-class ser/de
 │   └── VoteOrchestrator.jl               ← MODIFIED: sparse-active gate API + constants
 └── test/
-    ├── runtests.jl                       ← MODIFIED: 6 new entries in ALL_TESTS
+    ├── runtests.jl                       ← MODIFIED: 7 new entries in ALL_TESTS
     ├── test_arithmetic_engine.jl         ← NEW (ported from main)
     ├── test_dynamic_action_tone.jl       ← MODIFIED: tolerances for jitter+build-up
+    ├── test_save_coverage_v25.jl         ← NEW (v2.5 save coverage round-trip)
     ├── test_self_observer.jl             ← NEW (ported from main)
     ├── test_sigil_promoter.jl            ← NEW (ported from main)
     ├── test_sigil_registry.jl            ← NEW (ported from main)

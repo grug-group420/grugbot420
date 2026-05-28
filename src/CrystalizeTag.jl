@@ -226,4 +226,62 @@ function should_auto_crystalize(
     return false     # release
 end
 
+# ==============================================================================
+# SERIALIZATION (for canonical save_specimen integration)
+# ==============================================================================
+
+"""
+    serialize_state() -> Dict{String, Vector{String}}
+
+GRUG: Snapshot both crystalization sets (user + auto) for persistence.
+Sorted lists for stable diffs. Two distinct sources of authority --- a
+node lives in either or both, both are preserved.
+"""
+function serialize_state()::Dict{String, Vector{String}}
+    lock(_CRYSTALIZE_LOCK) do
+        Dict{String, Vector{String}}(
+            "user" => sort(collect(_USER_CRYSTALIZED)),
+            "auto" => sort(collect(_AUTO_CRYSTALIZED)),
+        )
+    end
+end
+
+"""
+    restore_state!(data::AbstractDict) -> Tuple{Int, Int}
+
+GRUG: Wipe and rehydrate the two crystalization sets from a snapshot.
+Returns `(n_user, n_auto)` counts restored. Tolerant of missing keys.
+"""
+function restore_state!(data::AbstractDict)::Tuple{Int, Int}
+    n_user = 0
+    n_auto = 0
+    lock(_CRYSTALIZE_LOCK) do
+        empty!(_USER_CRYSTALIZED)
+        empty!(_AUTO_CRYSTALIZED)
+
+        user_raw = get(data, "user", String[])
+        if isa(user_raw, AbstractVector)
+            for nid in user_raw
+                clean = strip(String(nid))
+                if !isempty(clean)
+                    push!(_USER_CRYSTALIZED, clean)
+                    n_user += 1
+                end
+            end
+        end
+
+        auto_raw = get(data, "auto", String[])
+        if isa(auto_raw, AbstractVector)
+            for nid in auto_raw
+                clean = strip(String(nid))
+                if !isempty(clean)
+                    push!(_AUTO_CRYSTALIZED, clean)
+                    n_auto += 1
+                end
+            end
+        end
+    end
+    return (n_user, n_auto)
+end
+
 end # module CrystalizeTag
