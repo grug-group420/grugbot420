@@ -254,3 +254,53 @@ using `sub.role` as the vote role would cause MultipartError.
   parts may not render well in all contexts (e.g., Discord, web chat). A more
   sophisticated separator (numbered sections, bullet headers) would improve
   readability but is a presentation-layer concern, not an architecture one.
+
+---
+
+## v7.23 — Tiered /right Feedback (confidence-biased coinflip)
+
+### Design (from user)
+
+Locked-in (top tier / high confidence) votes get a reward PERIOD — no coinflip.
+The rest of the votes get a reward on a BIASED coinflip, biased by confidence.
+Nodes ONLY get a reward if they didn't ALREADY gain strength from their use
+coinflip this cycle (`gained_this_cycle == false`).
+
+### Implementation
+
+1. **New primary signature**: `apply_right_feedback!(contributor_votes::Vector{Vote}, locked_node_ids::Set{String} = Set{String}())::Dict{String, Any}`
+   - Locked votes (node_id in `locked_node_ids`) → guaranteed `STRENGTH_DELTA` reward
+   - Unsure votes (not locked) → `rand() < vote.confidence` coinflip for reward
+   - Both tiers: skip if `gained_this_cycle` is already true
+   - Grave nodes always skipped
+   - Deduplication via `seen_nodes` set — a node only gets one chance even if it appears in multiple votes
+
+2. **Backward-compat wrapper**: `apply_right_feedback!(contributor_ids::Vector{String})` creates stub Votes with `confidence=0.5` and empty locked set, preserving old 50/50 behavior
+
+3. **Storage in Main.jl**:
+   - `LAST_CONTRIBUTOR_VOTES::Vector{Vote}` — stores full Vote objects from contributing voters
+   - `LAST_LOCKED_NODE_IDS::Set{String}` — stores node IDs that were in `sure_votes` (locked tier)
+   - `LAST_CONTRIBUTOR_IDS::Vector{String}` — DEPRECATED, kept for /wrong compat
+   - All three are thread-safe behind `LAST_VOTER_LOCK`
+
+4. **Result dictionary** extended with:
+   - `"locked_rewarded"` — Node IDs from locked tier that gained strength
+   - `"unsure_rewarded"` — Node IDs from unsure tier that won the coinflip
+   - Existing keys preserved: `"rewarded"`, `"skipped_double_reward"`, `"coinflip_missed"`, `"grave_skipped"`
+
+5. **Docstring fix**: The `"""..."""` docstring before `apply_right_feedback!` caused Julia's docsystem error because it was placed immediately after another `"""..."""` docstring (for `apply_wrong_feedback!`). Julia can only attach one docstring to the next expression. Fixed by converting the right-feedback docstring to a `#=` block comment.
+
+### Test Coverage
+
+`test/test_right_feedback_tiered.jl` — 11 test sets:
+1. Locked votes guaranteed reward
+2. High confidence unsure votes likely rewarded (statistical, n=100)
+3. Low confidence unsure votes rarely rewarded (statistical, n=100)
+4. Mixed locked + unsure tiers
+5. `gained_this_cycle` skips even locked votes
+6. Grave nodes skipped even if locked
+7. Backward compat: old `Vector{String}` signature
+8. Deduplication: same node in multiple votes
+9. Confidence=1.0 always rewarded (unsure tier)
+10. Confidence=0.0 never rewarded (unsure tier)
+11. Locked vote at low confidence still guaranteed

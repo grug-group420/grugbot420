@@ -3675,34 +3675,61 @@ GRUG: /wrong command! Every node who voted gets a coinflip.
 Losers have their strength lowered. Nodes that hit 0 are marked GRAVE.
 Grave nodes become negative reinforcement anchors during generative phase.
 """
-function apply_right_feedback!(contributor_ids::Vector{String})::Dict{String, Any}
-    """
-    Apply secondary reinforcement to regular (non-AIML) nodes that contributed to output.
-    
-    CRITICAL: Only processes nodes that fired_this_cycle == true (contributors).
-    - Nodes that already gained strength this cycle are skipped (no double reward)
-    - Grave nodes are skipped (dead nodes don't get feedback)
-    - Uses 50/50 coinflip for eligible contributors (secondary reinforcement chance)
-    
-    Returns statistics dictionary with:
-    - "total_contributors": Total number of contributing nodes
-    - "rewarded": Node IDs that gained strength
-    - "skipped_double_reward": Node IDs that already gained (skipped to avoid double reward)
-    - "coinflip_missed": Node IDs that lost the coinflip
-    - "grave_skipped": Node IDs that are grave and were skipped
-    """
-    if isempty(contributor_ids)
-        error("!!! FATAL: apply_right_feedback! got empty contributor_ids list! !!!")
+#=
+    apply_right_feedback!(contributor_votes, locked_node_ids) -> Dict
+
+Apply secondary reinforcement to nodes that contributed to output.
+
+v7.23 TIERED REWARD:
+- LOCKED votes (node_id in locked_node_ids) -> GUARANTEED reward. These
+  are the top-tier votes that were hard-selected by the orchestrator.
+  They earned their spot — /right confirms them unconditionally.
+- UNSURE votes (not locked) -> CONFIDENCE-BIASED coinflip. The coinflip
+  probability equals the vote's confidence. High-confidence unsure votes
+  are more likely to be rewarded; low-confidence ones are less likely.
+- EITHER tier: skip if gained_this_cycle is already true. Nodes that
+  already got a strength bump from their use-coinflip (bump_strength!)
+  this cycle don't get a second one — no double reward.
+- Grave nodes are always skipped.
+
+Returns statistics dictionary with:
+- "total_contributors": Total number of contributing votes
+- "rewarded": Node IDs that gained strength
+- "locked_rewarded": Node IDs from locked tier that gained strength
+- "unsure_rewarded": Node IDs from unsure tier that gained strength
+- "skipped_double_reward": Node IDs that already gained (skipped)
+- "coinflip_missed": Node IDs from unsure tier that lost the coinflip
+- "grave_skipped": Node IDs that are grave and were skipped
+=#
+function apply_right_feedback!(contributor_votes::Vector{Vote},
+                               locked_node_ids::Set{String} = Set{String}())::Dict{String, Any}
+    if isempty(contributor_votes)
+        error("!!! FATAL: apply_right_feedback! got empty contributor_votes list! !!!")
     end
 
     rewarded = String[]
+    locked_rewarded = String[]
+    unsure_rewarded = String[]
     skipped_double_reward = String[]
     coinflip_missed = String[]
     grave_skipped = String[]
     STRENGTH_DELTA = 1.0  # Same as AIML_STRENGTH_DELTA
 
+    # GRUG: Deduplicate by node_id — a node can appear in multiple votes
+    # (e.g., as both a primary and a support in different objectives).
+    # First occurrence wins; subsequent ones are skipped.
+    seen_nodes = Set{String}()
+
     lock(NODE_LOCK) do
-        for id in contributor_ids
+        for vote in contributor_votes
+            id = vote.node_id
+
+            # Skip duplicate node entries
+            if id in seen_nodes
+                continue
+            end
+            push!(seen_nodes, id)
+
             node = get(NODE_MAP, id, nothing)
             if isnothing(node)
                 # GRUG: Node may have already been deleted. Non-fatal, skip.
@@ -3722,27 +3749,59 @@ function apply_right_feedback!(contributor_ids::Vector{String})::Dict{String, An
                 continue
             end
 
-            # 50/50 coinflip for secondary reinforcement
-            if rand() < 0.5
-                bump_strength!(node)
+            is_locked = id in locked_node_ids
+
+            if is_locked
+                # LOCKED TIER: Guaranteed reward. This node was hard-selected
+                # by the orchestrator — it earned its spot. /right confirms it.
+                node.strength = min(node.strength + STRENGTH_DELTA, STRENGTH_CAP)
                 node.gained_this_cycle = true
                 node.strength_delta_this_cycle += STRENGTH_DELTA
+                check_solidify_threshold!(node)
                 push!(rewarded, node.id)
+                push!(locked_rewarded, node.id)
             else
-                push!(coinflip_missed, node.id)
+                # UNSURE TIER: Confidence-biased coinflip.
+                # The probability of reward equals the vote's confidence.
+                # High-confidence unsure votes are likely rewarded;
+                # low-confidence ones are unlikely. This is the GRUG way:
+                # uncertain contributors get an uncertain reward.
+                if rand() < vote.confidence
+                    node.strength = min(node.strength + STRENGTH_DELTA, STRENGTH_CAP)
+                    node.gained_this_cycle = true
+                    node.strength_delta_this_cycle += STRENGTH_DELTA
+                    check_solidify_threshold!(node)
+                    push!(rewarded, node.id)
+                    push!(unsure_rewarded, node.id)
+                else
+                    push!(coinflip_missed, node.id)
+                end
             end
         end
     end
 
     result = Dict{String, Any}(
-        "total_contributors"   => length(contributor_ids),
-        "rewarded"             => rewarded,
+        "total_contributors"    => length(contributor_votes),
+        "rewarded"              => rewarded,
+        "locked_rewarded"       => locked_rewarded,
+        "unsure_rewarded"       => unsure_rewarded,
         "skipped_double_reward" => skipped_double_reward,
-        "coinflip_missed"      => coinflip_missed,
-        "grave_skipped"        => grave_skipped,
+        "coinflip_missed"       => coinflip_missed,
+        "grave_skipped"         => grave_skipped,
     )
-    println("[ENGINE] ✅ /right: contributors=$(length(contributor_ids)) rewarded=$(length(rewarded)) double_skip=$(length(skipped_double_reward)) coinflip_miss=$(length(coinflip_missed)) grave_skip=$(length(grave_skipped))")
+    println("[ENGINE] ✅ /right: total=$(length(contributor_votes)) rewarded=$(length(rewarded)) [locked=$(length(locked_rewarded)) unsure=$(length(unsure_rewarded))] double_skip=$(length(skipped_double_reward)) coinflip_miss=$(length(coinflip_missed)) grave_skip=$(length(grave_skipped))")
     return result
+end
+
+# GRUG: Old signature kept for backward compat — delegates to new tiered version.
+# Any code still calling with just node IDs gets flat 50/50 coinflip for all
+# (confidence=0.5 stub, no locked tier).
+function apply_right_feedback!(contributor_ids::Vector{String})::Dict{String, Any}
+    # Build stub votes with confidence=0.5 (old 50/50 behavior) and empty locked set.
+    # This preserves backward compat for any callers that haven't been migrated.
+    stub_votes = [Vote(id, "", 0.5, String[], RelationalTriple[], RelationalTriple[], false, "", :singleton)
+                  for id in contributor_ids]
+    return apply_right_feedback!(stub_votes, Set{String}())
 end
 
 function apply_wrong_feedback!(contributor_ids::Vector{String})

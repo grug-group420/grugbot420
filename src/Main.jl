@@ -2654,7 +2654,9 @@ const HELP_MSG = """
 # GRUG: Track last voter IDs so /wrong knows who to punish
 const LAST_VOTER_IDS = String[]
 const LAST_VOTER_LOCK = ReentrantLock()
-const LAST_CONTRIBUTOR_IDS = String[]  # Node IDs that actually contributed to output (fired)
+const LAST_CONTRIBUTOR_IDS = String[]  # Node IDs that actually contributed to output (fired) — DEPRECATED, kept for /wrong compat
+const LAST_CONTRIBUTOR_VOTES = Vote[]  # v7.23: Vote objects from contributors (preserves confidence for tiered /right)
+const LAST_LOCKED_NODE_IDS = Set{String}()  # v7.23: Node IDs that were in sure_votes (locked-in, guaranteed /right reward)
 
 """
 process_mission(mission_text::String)
@@ -2985,6 +2987,7 @@ function process_mission(mission_text::String)
 
     # GRUG: Merge sure and unsure votes - these are the contributors (votes that generated output)
     contributing_votes = vcat(sure_votes, unsure_votes)
+    locked_node_ids = Set(v.node_id for v in sure_votes)  # v7.23: locked-in votes for tiered /right
     
     # GRUG: Mark contributing nodes and record response time
     for v in cast_votes
@@ -3018,6 +3021,12 @@ function process_mission(mission_text::String)
     lock(LAST_VOTER_LOCK) do
         empty!(LAST_CONTRIBUTOR_IDS)
         append!(LAST_CONTRIBUTOR_IDS, [v.node_id for v in contributing_votes])
+        # v7.23: Store full Vote objects and locked-in node IDs for tiered /right feedback.
+        # Locked votes (sure_votes) get guaranteed reward; unsure votes get confidence-biased coinflip.
+        empty!(LAST_CONTRIBUTOR_VOTES)
+        append!(LAST_CONTRIBUTOR_VOTES, contributing_votes)
+        empty!(LAST_LOCKED_NODE_IDS)
+        union!(LAST_LOCKED_NODE_IDS, locked_node_ids)
     end
 
     println("\n🤖 AIML Output Scaffold:\n$output")
@@ -4966,18 +4975,24 @@ function run_cli()
                 end
 
 elseif !isnothing(m_right)
-                # GRUG: /right - user says last response was good.
-                # CRITICAL: Only nodes that actually contributed (fired) get secondary reinforcement.
-                # Contributors that didn't already gain strength get a 50% coinflip chance.
-                contributor_ids = lock(LAST_VOTER_LOCK) do
-                    copy(LAST_CONTRIBUTOR_IDS)
+                # GRUG v7.23: /right - user says last response was good.
+                # TIERED REWARD: Locked-in votes (sure_votes) get guaranteed reward.
+                # Unsure votes get a confidence-biased coinflip. Both tiers skip
+                # nodes that already gained strength this cycle (no double reward).
+                contributor_votes = lock(LAST_VOTER_LOCK) do
+                    copy(LAST_CONTRIBUTOR_VOTES)
+                end
+                locked_ids = lock(LAST_VOTER_LOCK) do
+                    copy(LAST_LOCKED_NODE_IDS)
                 end
 
-                if isempty(contributor_ids)
+                if isempty(contributor_votes)
                     println("⚠  /right: No previous contributors to reward. Did you run /mission first?")
                 else
-                    result = apply_right_feedback!(contributor_ids)
-                    println("✅ /right applied. $(length(contributor_ids)) contributor(s) processed: $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained), $(length(result["coinflip_missed"])) missed coinflip.")
+                    result = apply_right_feedback!(contributor_votes, locked_ids)
+                    n_locked = count(v -> v.node_id in locked_ids, contributor_votes)
+                    n_unsure = length(contributor_votes) - n_locked
+                    println("✅ /right applied. $(length(contributor_votes)) contributor(s) [$n_locked locked, $n_unsure unsure]: $(length(result["rewarded"])) rewarded, $(length(result["skipped_double_reward"])) skipped (already gained), $(length(result["coinflip_missed"])) missed coinflip.")
                 end
 
                 # GRUG v7.12: Context-intensity feedback (positive).

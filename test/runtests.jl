@@ -62,6 +62,7 @@ const ALL_TESTS = [
     "test_input_decomposer.jl",
     "test_atp_escalation.jl",
     "test_multipart_integration.jl",
+    "test_right_feedback_tiered.jl",
 ]
 
 @testset "GrugBot420 Tests" begin
