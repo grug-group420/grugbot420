@@ -3204,6 +3204,26 @@ function process_mission(mission_text::String)
     # GRUG: Pre-screen for image binary BEFORE normal scan
     is_image, img_signal = maybe_convert_image_input(mission_text)
 
+    # GRUG v7.16+: SIGIL MEDIATION (text inputs only).
+    # Run promote_input ONCE at the top of the cycle. The result carries:
+    #   - rewritten text (with &n &op &n etc) for downstream consumers that
+    #     want to bind against the canonicalized form
+    #   - bindings vector (consumed by cast_sigil_votes for math/multipart)
+    #   - kinds vector (e.g. [:math], [:multipart]) for routing decisions
+    # Image inputs skip mediation (no text to promote).
+    # Non-fatal: if promotion throws, log and proceed with empty mediation \u2014
+    # sigil routing is enhancement, not core; pattern bind still works.
+    sigil_mediation = if is_image
+        nothing
+    else
+        try
+            SigilMediator.mediate(mission_text)
+        catch e
+            @warn "[MAIN] SigilMediator.mediate failed (non-fatal, sigil routing disabled this cycle): $e"
+            nothing
+        end
+    end
+
     # GRUG: ACTION+TONE AROUSAL PRE-SET (text inputs only)
     # For text missions, run the predictor here to nudge EyeSystem arousal BEFORE
     # the scan starts. Image inputs skip this — SDF has its own visual arousal path.
@@ -3369,11 +3389,37 @@ function process_mission(mission_text::String)
     # Each cast_vote touches NODE_MAP, selects a stochastic action, and can
     # bump strength. Dispatched to its own Task with a unique name + timeout.
     # Typical runtime: well under 1s for 1000 specimens. 10s guard is generous.
+    #
+    # GRUG v7.16+: nodes carrying a "@sigil:*" tag in drop_table fan out to
+    # cast_sigil_votes (1+ votes per node) instead of the single-vote
+    # cast_vote path. The non-tagged path is unchanged.
     cast_votes_task_name, cast_votes_task = VoteOrchestrator.dispatch_task_with_timeout(
         () -> begin
             out = Vote[]
+            # GRUG: pull mediation locals once for the closure -- bindings is
+            # the typed Vector{SigilBinding} the engine path expects; original
+            # is the user's untouched text used for clause-text echo.
+            sm_bindings = isnothing(sigil_mediation) ? SigilPromoter.SigilBinding[] : sigil_mediation.bindings
+            sm_original = isnothing(sigil_mediation) ? mission_text                  : sigil_mediation.original
             for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
-                push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+                # GRUG: peek the node's tag without holding the lock across
+                # the per-node fire (cast_sigil_votes takes its own lock).
+                node_peek = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+                if !isnothing(node_peek) && has_sigil_tag(node_peek)
+                    try
+                        sigil_votes = cast_sigil_votes(id, conf, sm_bindings, sm_original, u_trips, n_trips)
+                        append!(out, sigil_votes)
+                    catch e
+                        # GRUG: sigil fire failed (e.g. unknown kind, arithmetic
+                        # malformed). Log loudly and fall back to single
+                        # cast_vote so the node still contributes its voice
+                        # this cycle. NO SILENT FAILURE -- the warning is loud.
+                        @warn "[MAIN] cast_sigil_votes failed on node $(id) ($(typeof(e))): $e -- falling back to cast_vote"
+                        push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+                    end
+                else
+                    push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+                end
             end
             return out
         end,

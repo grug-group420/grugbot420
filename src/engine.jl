@@ -3089,6 +3089,247 @@ function cast_explicit_vote(cmd_name::String, id::String)::Vote
 end
 
 # ==============================================================================
+# SIGIL-ROUTED MULTI-VOTE FIRE PATH  -  GRUG v7.16+
+# ==============================================================================
+# GRUG: For nodes carrying a "@sigil:*" tag in drop_table, the fire path emits
+# 1+ votes instead of the usual single vote. The opener is selected
+# stochastically from the node's static action_packet (same select_action
+# machinery as cast_vote) and concatenated with a structured payload derived
+# from the sigil bindings.
+#
+# CONFIDENCE: all emitted votes inherit the SAME conf from pattern-bind, per
+# architecture spec ("vote inheritance"). Pattern-bind says "this node is
+# relevant"; the multi-vote layer says "and here are the structured pieces
+# of the answer". The orchestrator picks among them downstream.
+#
+# DISPATCH BY KIND:
+#   :math      -> compute_arithmetic(bindings) + opener concat;
+#                 multi-step results emit one vote per ComputationStep
+#   :multipart -> one vote per clause boundary (split on &conj bindings);
+#                 each clause gets its own opener+payload
+#   :instruction -> reserved; throws NotImplementedError until wired
+#   :none / unknown -> falls back to a single regular cast_vote
+#
+# WHY OPENER+PAYLOAD CONCAT (not pure structured output):
+# Per architecture: "vote pools for nodes like this can still contain static
+# openers and you could just concatenate the solution to the problem." The
+# opener carries the node's voice/personality; the payload carries the
+# computed answer. Concatenation preserves both.
+
+"""
+    SigilFireError <: Exception
+
+Raised when sigil-routed firing fails in a way that should NOT silently
+fall back to single-vote cast_vote. Carries `kind`, `node_id`, `reason`.
+"""
+struct SigilFireError <: Exception
+    kind::Symbol
+    node_id::String
+    reason::String
+end
+Base.showerror(io::IO, e::SigilFireError) = print(io,
+    "SigilFireError on node '$(e.node_id)' (kind=:$(e.kind)): $(e.reason)")
+
+"""
+    _select_opener(packet) -> String
+
+Pick a stochastic opener action name from `packet`. Uses the same
+machinery as cast_vote's select_action so opener distributions follow
+the same per-node weights specimens already author. Returns the action
+name; the caller is responsible for verifying it lives in COMMANDS.
+"""
+function _select_opener(packet::String)::String
+    opener, _ = select_action(packet)
+    return opener
+end
+
+"""
+    cast_sigil_votes(id, conf, bindings, original_text, u_trips, n_trips) -> Vector{Vote}
+
+Dispatch a sigil-tagged node to its kind-specific multi-vote handler.
+Returns a Vector{Vote}; for kind=:none or unknown kinds, returns a
+1-element vector containing the result of cast_vote (so callers can
+treat all paths uniformly).
+
+NO SILENT FAILURES: empty id, missing node, or unknown action throws.
+For known kinds, ArithmeticEngine errors propagate as SigilFireError so
+the caller can decide whether to retry or skip.
+"""
+function cast_sigil_votes(
+    id::String,
+    conf::Float64,
+    bindings::Vector,                 # SigilPromoter.SigilBinding, untyped to avoid using-cycle
+    original_text::String,
+    u_trips::Vector{RelationalTriple},
+    n_trips::Vector{RelationalTriple},
+)::Vector{Vote}
+    if strip(id) == ""
+        error("!!! FATAL: cast_sigil_votes got empty node id! !!!")
+    end
+    node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+    isnothing(node) && error("!!! FATAL: Node [$id] vanished before sigil vote! !!!")
+
+    kind = node_sigil_kind(node)
+
+    # GRUG: untagged or unknown kind -> just delegate to cast_vote so the
+    # caller can use this function uniformly without branching.
+    if kind === :none
+        return Vote[cast_vote(id, conf, false, u_trips, n_trips)]
+    end
+
+    # GRUG: per-kind dispatch. Each branch builds a Vector{Vote} sharing the
+    # same conf, antimatch=false, u_trips, n_trips. bump_strength! is called
+    # ONCE per fire (not per emitted vote) to match cast_vote's intent.
+    bump_strength!(node)
+
+    if kind === :math
+        return _cast_math_votes(node, conf, bindings, u_trips, n_trips)
+    elseif kind === :multipart
+        return _cast_multipart_votes(node, conf, bindings, original_text, u_trips, n_trips)
+    elseif kind === :instruction
+        throw(SigilFireError(kind, id,
+            "@sigil:instruction lane is reserved; not yet implemented"))
+    else
+        # GRUG: unknown sigil kind on a tagged node = specimen authoring error.
+        # Loud failure, no silent fallback.
+        throw(SigilFireError(kind, id,
+            "unknown sigil kind :$(kind); known kinds are :math, :multipart, :instruction"))
+    end
+end
+
+# -----------------------------------------------------------------------------
+# :math handler
+# -----------------------------------------------------------------------------
+# GRUG: Read bindings, run compute_arithmetic, emit votes:
+#   - simple binary op (e.g. 2+2): 1 vote = "<opener> <answer>"
+#   - chained op (e.g. 1+2+3):     1 vote per ComputationStep PLUS final vote
+#                                   ALL steps share the same conf (inheritance)
+# If compute_arithmetic returns an error result, we emit a single fallback
+# opener-only vote (no answer) so the node still contributes its voice.
+function _cast_math_votes(
+    node::Node,
+    conf::Float64,
+    bindings::Vector,
+    u_trips::Vector{RelationalTriple},
+    n_trips::Vector{RelationalTriple},
+)::Vector{Vote}
+    opener = _select_opener(node.action_packet)
+    if !haskey(COMMANDS, opener)
+        error("!!! FATAL: Sigil opener [$opener] not in COMMANDS dictionary !!!")
+    end
+    _, negatives = select_action(node.action_packet)
+
+    # GRUG: filter to math bindings only and pass to ArithmeticEngine.
+    # has_math_bindings was already checked by SigilMediator for routing
+    # decisions, but we verify again here so this function is safe to call
+    # standalone (e.g. from tests).
+    if !has_math_bindings(bindings)
+        @warn "[ENGINE] _cast_math_votes called with non-math bindings on node $(node.id); emitting opener-only fallback"
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false)]
+    end
+
+    result = compute_arithmetic(bindings)
+    if !isnothing(result.error)
+        @warn "[ENGINE] _cast_math_votes: compute_arithmetic error on node $(node.id): $(result.error); emitting opener-only fallback"
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false)]
+    end
+
+    out = Vote[]
+
+    # GRUG: per-step votes (only emitted for chained ops where len(steps) > 1).
+    # Each step's textual form is "<lhs> <op> <rhs> = <result>".
+    if length(result.steps) > 1
+        for step in result.steps
+            step_text = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
+            push!(out, Vote(node.id, step_text, conf, negatives, u_trips, n_trips, false))
+        end
+    end
+
+    # GRUG: final vote = opener + answer. This is the "headline" vote; the
+    # orchestrator's top-tier selector will normally pick this one when
+    # multiple sigil-routed votes survive thresholding, because it carries
+    # the node's voice (opener) plus the answer.
+    final_text = "$(opener) $(result.answer_str)"
+    push!(out, Vote(node.id, final_text, conf, negatives, u_trips, n_trips, false))
+
+    return out
+end
+
+# -----------------------------------------------------------------------------
+# :multipart handler
+# -----------------------------------------------------------------------------
+# GRUG: Split the original text on &conj boundaries; emit one opener+clause
+# vote per piece. Bindings give us conj raw_position values which we use to
+# slice the original text deterministically. If no &conj is present, falls
+# back to a single opener+full-text vote.
+#
+# DESIGN: we slice ORIGINAL text (not rewritten) so the user sees their own
+# words echoed back, which reads more naturally than "&n &op &n".
+function _cast_multipart_votes(
+    node::Node,
+    conf::Float64,
+    bindings::Vector,
+    original_text::String,
+    u_trips::Vector{RelationalTriple},
+    n_trips::Vector{RelationalTriple},
+)::Vector{Vote}
+    opener = _select_opener(node.action_packet)
+    if !haskey(COMMANDS, opener)
+        error("!!! FATAL: Sigil opener [$opener] not in COMMANDS dictionary !!!")
+    end
+    _, negatives = select_action(node.action_packet)
+
+    # GRUG: SigilBinding.raw_position is 0-based per SigilPromoter contract.
+    # Convert to 1-based Julia indices for slicing.
+    conj_positions = sort!([Int(b.raw_position) + 1 for b in bindings if b.name == "conj"])
+
+    if isempty(conj_positions)
+        # GRUG: no clause boundaries -> single vote with full text echo.
+        return Vote[Vote(node.id, "$(opener) $(strip(original_text))",
+                         conf, negatives, u_trips, n_trips, false)]
+    end
+
+    # GRUG: split original text on word-index boundaries. raw_position is the
+    # word index from SigilPromoter._tokenize (1-based). We collect tokens,
+    # then slice on conj positions.
+    tokens = split(original_text)
+    n_toks = length(tokens)
+    out = Vote[]
+    start_idx = 1
+    for cp in conj_positions
+        # GRUG: clause runs [start_idx, cp-1]. Skip empty clauses (consecutive
+        # conjunctions) so we don't emit blank votes.
+        cp_clamped = clamp(cp, 1, n_toks + 1)
+        clause_end = cp_clamped - 1
+        if clause_end >= start_idx
+            clause_text = strip(join(tokens[start_idx:clause_end], " "))
+            if !isempty(clause_text)
+                push!(out, Vote(node.id, "$(opener) $(clause_text)",
+                                conf, negatives, u_trips, n_trips, false))
+            end
+        end
+        start_idx = cp_clamped + 1
+    end
+    # GRUG: trailing clause after the last conj.
+    if start_idx <= n_toks
+        tail_text = strip(join(tokens[start_idx:n_toks], " "))
+        if !isempty(tail_text)
+            push!(out, Vote(node.id, "$(opener) $(tail_text)",
+                            conf, negatives, u_trips, n_trips, false))
+        end
+    end
+
+    # GRUG: edge case -- if all clauses got dropped (e.g. text was just a
+    # bare "and"), emit the fallback single-vote so the node still speaks.
+    if isempty(out)
+        push!(out, Vote(node.id, "$(opener) $(strip(original_text))",
+                        conf, negatives, u_trips, n_trips, false))
+    end
+
+    return out
+end
+
+# ==============================================================================
 # /WRONG FEEDBACK: PENALIZE ALL VOTERS
 # ==============================================================================
 
