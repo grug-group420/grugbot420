@@ -635,6 +635,28 @@ struct Vote
     user_triples::Vector{RelationalTriple}
     node_triples::Vector{RelationalTriple}
     antimatch::Bool
+    # ---- v7.23 multipart fields (additive, default-safe) ------------------
+    # GRUG: empty group_id means "this vote is on its own". Same node may emit
+    # several votes that all carry the SAME non-empty group_id; AIML treats
+    # them as one objective. Role distinguishes the locked-in claim
+    # (:primary) from the supports (:support). :singleton is the default
+    # marker for the historical case (no multipart).
+    multipart_group::String
+    multipart_role::Symbol
+end
+
+# GRUG: 7-arg outer constructor preserves every existing call site.
+# Supplies "" / :singleton for the new fields. Old code is bit-exact.
+function Vote(node_id::String,
+              action::String,
+              confidence::Float64,
+              negatives::Vector{String},
+              user_triples::Vector{RelationalTriple},
+              node_triples::Vector{RelationalTriple},
+              antimatch::Bool)
+    return Vote(node_id, action, confidence, negatives,
+                user_triples, node_triples, antimatch,
+                "", :singleton)
 end
 
 const NODE_MAP  = Dict{String, Node}()

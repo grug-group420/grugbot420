@@ -856,4 +856,141 @@ function merge_registry!(
     return target
 end
 
+# ==============================================================================
+# v7.23 — :procedure CLASS ACTIVATION (math-acronym sigils)
+# ==============================================================================
+# GRUG say: Stage 6 said "procedure reserved". v7.23 light it up. Procedure
+#           sigil is small ordered chain of literals and other sigil names
+#           that the engine expand inline at promotion time. End user define
+#           them. Acts like a math acronym: write `&Sigma`, mean "sum of".
+#           Engine expand to the chain at promotion. Pattern matching itself
+#           still runs through resolve_sigils_in_pattern with allow_reserved
+#           toggled to true ONLY for procedure-aware paths.
+# GRUG say: NO SILENT FAILURES. Unknown nested sigil throws. Recursive
+#           expansion bounded by MAX_PROCEDURE_DEPTH so a cyclic definition
+#           cannot lock the engine.
+
+const MAX_PROCEDURE_DEPTH::Int = 8
+
+"""
+    register_procedure_sigil!(table; name, expansion, provenance="user-procedure")
+        -> SigilEntry
+
+Register a `:procedure` class sigil whose body is an ordered `expansion`
+chain of literal `String`s and `&name` references to other registered sigils.
+This is the v7.23 entry point for math-acronym style sigils.
+
+Example:
+    register_procedure_sigil!(tbl;
+        name = "Sigma-then-double",
+        expansion = ["sum", "&n", "&op", "&n", "then double"])
+
+Throws SigilConfigError on empty expansion or any non-String element.
+"""
+function register_procedure_sigil!(table::SigilTable;
+                                   name::AbstractString,
+                                   expansion::AbstractVector,
+                                   provenance::AbstractString = "user-procedure",
+                                   overwrite::Bool = false)::SigilEntry
+    if isempty(expansion)
+        throw(SigilConfigError(
+            "register_procedure_sigil!: expansion cannot be empty for &$name",
+            "expansion"))
+    end
+    for (i, el) in enumerate(expansion)
+        if !(el isa AbstractString)
+            throw(SigilConfigError(
+                "register_procedure_sigil!: expansion[$i] must be a String, got $(typeof(el))",
+                "expansion"))
+        end
+        if isempty(strip(String(el)))
+            throw(SigilConfigError(
+                "register_procedure_sigil!: expansion[$i] is empty/whitespace",
+                "expansion"))
+        end
+    end
+    return register_sigil!(table;
+                           name = name,
+                           class = :procedure,
+                           applies_at = :bind,
+                           expansion = collect(String, expansion),
+                           provenance = String(provenance),
+                           overwrite = overwrite)
+end
+
+"""
+    expand_procedure_sigil(table, name; depth=0) -> Vector{String}
+
+Recursively expand a `:procedure` sigil into a flat vector of literal tokens.
+Nested `&xxx` references inside the expansion are looked up; if the nested
+sigil is also a `:procedure`, it is expanded recursively (bounded by
+MAX_PROCEDURE_DEPTH). Non-procedure nested sigils are emitted as their
+canonical `&name` token (so downstream pattern code still sees a sigil).
+
+Throws:
+  - SigilResolutionError when a referenced sigil is not in the table.
+  - SigilConfigError when recursion exceeds MAX_PROCEDURE_DEPTH (cycle guard).
+  - SigilConfigError when the named sigil exists but is not :procedure class.
+"""
+function expand_procedure_sigil(table::SigilTable,
+                                name::AbstractString;
+                                depth::Int = 0)::Vector{String}
+    if depth > MAX_PROCEDURE_DEPTH
+        throw(SigilConfigError(
+            "procedure expansion depth exceeded MAX_PROCEDURE_DEPTH=$MAX_PROCEDURE_DEPTH (cycle?) at &$name",
+            "expansion"))
+    end
+    nm = String(name)
+    haskey(table.entries, nm) || throw(SigilResolutionError(
+        "no such sigil in registry \"$(table.label)\"", nm, "<expand>"))
+    entry = table.entries[nm]
+    entry.class === :procedure || throw(SigilConfigError(
+        "expand_procedure_sigil: &$nm has class :$(entry.class), expected :procedure",
+        "class"))
+    entry.expansion === nothing && throw(SigilConfigError(
+        "expand_procedure_sigil: &$nm has no expansion chain", "expansion"))
+
+    out = String[]
+    prefix_str = string(SIGIL_PREFIX)
+    prefix_len = length(prefix_str)
+    for el in entry.expansion
+        s = String(el)
+        if startswith(s, prefix_str)
+            inner_str = String(SubString(s, prefix_len + 1))
+            if haskey(table.entries, inner_str) &&
+               table.entries[inner_str].class === :procedure
+                append!(out, expand_procedure_sigil(table, inner_str; depth = depth + 1))
+            else
+                # Non-procedure nested sigil: emit canonical token unchanged.
+                # Pattern resolver will validate it later when this expansion
+                # is fed through normal channels.
+                if !haskey(table.entries, inner_str)
+                    throw(SigilResolutionError(
+                        "procedure &$nm references unknown sigil &$inner_str",
+                        inner_str, s))
+                end
+                push!(out, s)
+            end
+        else
+            push!(out, s)
+        end
+    end
+    return out
+end
+
+"""
+    is_procedure_sigil(table, name) -> Bool
+
+Cheap check used by the promoter to decide whether to call the expander.
+"""
+function is_procedure_sigil(table::SigilTable, name::AbstractString)::Bool
+    nm = String(name)
+    haskey(table.entries, nm) || return false
+    return table.entries[nm].class === :procedure
+end
+
+# Re-export the new public surface so callers can `using` them.
+export register_procedure_sigil!, expand_procedure_sigil, is_procedure_sigil,
+       MAX_PROCEDURE_DEPTH
+
 end # module SigilRegistry

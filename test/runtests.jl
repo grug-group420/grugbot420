@@ -55,6 +55,10 @@ const ALL_TESTS = [
     "test_sigil_registry.jl",
     "test_sigil_promoter.jl",
     "test_arithmetic_engine.jl",
+    # ---- v7.23 additions ----
+    "test_multipart_orchestrator.jl",
+    "test_ephemeral_automaton.jl",
+    "test_procedure_sigil.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

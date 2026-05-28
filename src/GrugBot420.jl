@@ -146,6 +146,22 @@ using .SigilPromoter
 include("ArithmeticEngine.jl")
 using .ArithmeticEngine
 
+# GRUG: v7.23 — MultipartOrchestrator. Coalesces votes that share a
+# `multipart_group` id into one cohesive AIML objective with internal
+# (locked / unsure) structure. Singletons pass through as one-vote objectives
+# so downstream code sees a uniform shape. Depends on VoteOrchestrator
+# constants only; uses duck-typing on the Vote struct so this module does
+# not require engine.jl to be loaded first.
+include("MultipartOrchestrator.jl")
+using .MultipartOrchestrator
+
+# GRUG: v7.23 — EphemeralAutomaton. ATP-callable JIT step machine for
+# pattern-completion paths. Pure working-memory loop, no node population,
+# user-extensible rule set, jitter snap-back on caller-tagged numeric
+# outputs only. Depends on RelationalJitter.
+include("EphemeralAutomaton.jl")
+using .EphemeralAutomaton
+
 include("engine.jl")
 include("Main.jl")
 
@@ -277,5 +293,32 @@ export current_promotion_bindings, current_promotion_rewritten, current_promotio
 export ArithmeticEngine
 export ArithmeticResult, ComputationStep
 export compute_arithmetic, format_arithmetic_reply, has_math_bindings
+
+# GRUG: v7.23 MultipartOrchestrator exports — vote coalescing into objectives.
+# `build_objectives(votes)` is the primary entry; pairs nicely with the existing
+# `select_aiml_votes` (singletons can flow through either path identically).
+# `MultipartObjective` is the unit of work AIML now consumes.
+export MultipartOrchestrator
+export MultipartObjective, MultipartError
+export group_votes_by_multipart, build_objectives, summarize_objective
+
+# GRUG: v7.23 EphemeralAutomaton exports — ATP-callable JIT step machine.
+# Rules are persistent in the registry; traces are not. `register_automaton_rule!`
+# adds a rule; `run_for_action_family(family, conf)` is the typical ATP-side
+# call (returns nothing if no matching rule). `:procedure` sigils from the
+# registry can stand in as compact step descriptions.
+export EphemeralAutomaton
+export AutomatonRule, AutomatonStep, AutomatonTrace
+export AutomatonError, AutomatonRuleError
+export register_automaton_rule!, unregister_automaton_rule!,
+       list_automaton_rules, lookup_automaton_rule, clear_automaton_rules!
+export run_automaton, find_matching_rule, run_for_action_family
+
+# GRUG: v7.23 — :procedure class activation in SigilRegistry. New helpers for
+# math-acronym style sigils that expand to ordered chains of literals and
+# nested sigil tokens. Bounded recursion (cycle guard); loud failures on
+# unknown nested references.
+export register_procedure_sigil!, expand_procedure_sigil, is_procedure_sigil,
+       MAX_PROCEDURE_DEPTH
 
 end # module GrugBot420
