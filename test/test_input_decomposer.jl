@@ -102,3 +102,20 @@ end
     summary = InputDecomposer.summarize_decomposition(subs)
     @test occursin("singleton", summary)
 end
+
+@testset "InputDecomposer — comma-based splitting" begin
+    # Comma between two question clauses should split.
+    subs = decompose_input("what is fire, what is ice")
+    @test length(subs) == 2
+    @test subs[1].multipart_group == "mp_1"
+    @test subs[2].multipart_group == "mp_2"
+    @test occursin("fire", subs[1].text)
+    @test occursin("ice", subs[2].text)
+end
+
+@testset "InputDecomposer — comma list stays together" begin
+    # Comma in a list (no question markers) should NOT split.
+    subs = decompose_input("bread, butter, and cheese")
+    @test length(subs) == 1
+    @test subs[1].role == :singleton
+end

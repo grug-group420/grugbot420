@@ -137,9 +137,9 @@ end
 - `test/test_multipart_orchestrator.jl`
 - `test/test_ephemeral_automaton.jl`
 - `test/test_procedure_sigil.jl`
-- `test/test_input_decomposer.jl` — 10 test sets for InputDecomposer
+- `test/test_input_decomposer.jl` — 12 test sets for InputDecomposer (including comma-based splitting)
 - `test/test_atp_escalation.jl` — 6 test sets for ATP→automaton escalation hook
-- `test/test_multipart_integration.jl` — 10 test sets for InputDecomposer→MultipartOrchestrator pipeline
+- `test/test_multipart_integration.jl` — 13 test sets for InputDecomposer→MultipartOrchestrator pipeline (including regression tests for sub.role bug and comma splitting)
 - `plans/v7_23_multipart_automaton.md` (this file)
 
 ## Files modified
@@ -181,5 +181,76 @@ end
 12. ✅ No regressions in existing test suite (sampled: smoke, vote_orchestrator,
     arithmetic_engine, aiml_node_system, comprehensive, sigil_registry,
     sigil_promoter, self_observer, v7_20, v7_21a, v7_21c1, v7_21c2).
+13. ✅ Regression: using `sub.role` as vote multipart_role causes MultipartError
+    for non-first sub-subjects (Test 11 in test_multipart_integration.jl).
+14. ✅ Comma-based splitting: "what is X, what is Y" decomposes into two
+    sub-subjects; "bread, butter, and cheese" stays singleton.
+15. ✅ Unicode-safe string indexing in `_split_on_question_markers`.
 
 ## Done = green tests, no warnings beyond pre-existing, doc updated.
+
+## Post-Integration Architectural Review (post-commit 8dbea59)
+
+### Critical Bug Fixed: `sub.role` → `:primary` for ALL sub-subjects
+
+In `process_mission` (Main.jl line ~2828), the original code stamped specimens with
+`sub.role` from InputDecomposer. For the first sub-subject, `.role` is `:primary`;
+for subsequent sub-subjects, `.role` is `:support`. But MultipartOrchestrator requires
+exactly one `:primary` vote per group. So when mp_2's votes all carried `:support`
+role, `build_objectives` would throw `MultipartError("must have exactly one :primary
+vote, got 0")`.
+
+**Root cause**: The decomposer's `.role` field was being used for two different
+purposes. It was designed for OUTPUT ORDERING (first sub-subject's output appears
+first in the combined response), but process_mission was using it as the vote's
+`multipart_role` within each MultipartOrchestrator group.
+
+**Fix**: In process_mission, every sub-subject's specimens are now stamped with
+`:primary` as the vote role. Each sub-subject is an independent question — within
+its own group, the winning vote is always `:primary`. The decomposer's `.role` field
+is only for output ordering.
+
+**Regression test added**: test_multipart_integration.jl now includes Test 11
+("regression: every group needs :primary vote") which explicitly verifies that
+using `sub.role` as the vote role would cause MultipartError.
+
+### Improvements Applied
+
+1. **Comma-based splitting in InputDecomposer**: Added `_split_on_comma_clauses()`
+   which detects compound queries separated by commas — "what is X, what is Y" —
+   a common pattern that lacks explicit conjunctions. Only splits when the token
+   after the comma starts a question/command clause, avoiding false splits on
+   simple lists like "bread, butter, and cheese". Tests added in both
+   test_input_decomposer.jl and test_multipart_integration.jl.
+
+2. **Unicode-safe string indexing in `_split_on_question_markers`**: Replaced
+   `end_idx + 1` with `nextind(input_text, end_idx)` and `length(input_text)`
+   with `lastindex(input_text)` to handle multi-byte characters correctly.
+
+3. **InputDecomposer docstrings clarified**: The struct docstring and the
+   `decompose_input` function docstring now explicitly state that `.role` is for
+   OUTPUT ORDERING only, not for vote role assignment within MultipartOrchestrator.
+
+### Known Limitations (deferred)
+
+- **Sub-subject → output tracking for /right /wrong feedback**: Currently `/right`
+  rewards ALL contributors. For multipart responses, there's no way to reward just
+  one part (e.g., `/right mp_1`). This is a future enhancement — the current
+  behavior (reward all) is reasonable since `/right` implicitly confirms the whole
+  response.
+
+- **Objective-scoped votes in COMMANDS calls**: The `ephemeral_aiml_orchestrator`
+  passes ALL votes to each objective's COMMANDS handler. Ideally, each objective
+  would only receive its own group's votes. However, the COMMANDS interface is
+  used broadly, and changing it would require updating all handlers. The current
+  approach works because COMMANDS already receives the primary + sure/unsure from
+  the objective, and the full vote list is just background context.
+
+- **LAST_ESCALATION_TRACE is a global Ref**: No thread-safety guarantees. This is
+  acceptable for now since GrugBot runs single-threaded per cycle, but a future
+  concurrent architecture would need thread-local or atomic storage.
+
+- **`\n\n` join separator**: The `\n\n` separator between multi-objective output
+  parts may not render well in all contexts (e.g., Discord, web chat). A more
+  sophisticated separator (numbered sections, bullet headers) would improve
+  readability but is a presentation-layer concern, not an architecture one.

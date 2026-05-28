@@ -281,3 +281,84 @@ end
     @test length(multi) == 2
     @test length(single) == 1
 end
+
+# ==============================================================================
+# TEST 11: REGRESSION — using decomposer .role as vote role would FAIL
+# ==============================================================================
+# GRUG: This is the bug that was in process_mission! When InputDecomposer
+# splits "what is X also what is Y", subs[2].role is :support. If process_mission
+# stamps that :support as the vote's multipart_role, then MultipartOrchestrator
+# sees mp_2 with ZERO :primary votes and throws MultipartError. The fix is to
+# stamp :primary as the vote role for EVERY group's winning vote. Each sub-subject
+# is an independent question — within its own group, the winner is :primary.
+@testset "Multipart Integration — regression: every group needs :primary vote" begin
+    input = "what time is it also what is a dinosaur"
+    subs = decompose_input(input)
+
+    @test length(subs) == 2
+    @test subs[1].role == :primary
+    @test subs[2].role == :support   # decomposer says :support for ordering
+
+    # WRONG (old bug): using sub.role as vote multipart_role
+    # v1_buggy = TestVote("node_time",     "reason_time",     0.80, "mp_1", subs[1].role)  # :primary — OK
+    # v2_buggy = TestVote("node_dinosaur", "explain_dinosaur", 0.75, "mp_2", subs[2].role)  # :support — BOOM!
+    # build_objectives([v1_buggy, v2_buggy])  # would throw MultipartError
+
+    # CORRECT: every group's winning vote is :primary
+    v1 = TestVote("node_time",     "reason_time",     0.80, "mp_1", :primary)
+    v2 = TestVote("node_dinosaur", "explain_dinosaur", 0.75, "mp_2", :primary)
+
+    objs = build_objectives([v1, v2]; strength_of = _ -> 8.0)
+
+    @test length(objs) == 2
+    @test all(o -> o.is_multipart, objs)
+
+    # Verify that the WRONG pattern would indeed fail.
+    v2_buggy = TestVote("node_dinosaur", "explain_dinosaur", 0.75, "mp_2", :support)
+    @test_throws MultipartOrchestrator.MultipartError build_objectives([v1, v2_buggy]; strength_of = _ -> 8.0)
+end
+
+# ==============================================================================
+# TEST 12: Triple compound — every group is :primary
+# ==============================================================================
+@testset "Multipart Integration — triple compound: all groups :primary" begin
+    input = "what is the sun also what is the moon and what are the stars"
+    subs = decompose_input(input)
+
+    @test length(subs) == 3
+
+    # All three get :primary as their vote role (not decomposer's .role)
+    votes = [TestVote("node_$(i)", "action_$(i)", 0.70 + 0.05*i,
+                       subs[i].multipart_group, :primary)
+             for i in 1:3]
+
+    objs = build_objectives(votes; strength_of = _ -> 8.0)
+    @test length(objs) == 3
+
+    # Verify: using decomposer roles would fail for mp_2 and mp_3
+    buggy_votes = [TestVote("node_$(i)", "action_$(i)", 0.70 + 0.05*i,
+                             subs[i].multipart_group, subs[i].role)
+                   for i in 1:3]
+    @test_throws MultipartOrchestrator.MultipartError build_objectives(buggy_votes; strength_of = _ -> 8.0)
+end
+
+# ==============================================================================
+# TEST 13: Comma-based splitting → multiple objectives
+# ==============================================================================
+@testset "Multipart Integration — comma-separated compound questions" begin
+    # "what is X, what is Y" should decompose into two sub-subjects
+    input = "what is fire, what is ice"
+    subs = decompose_input(input)
+
+    @test length(subs) == 2
+    @test is_compound(input)
+
+    # Each sub-subject gets its own group with :primary winning vote.
+    votes = [TestVote("node_$(i)", "action_$(i)", 0.70 + 0.05*i,
+                       subs[i].multipart_group, :primary)
+             for i in 1:length(subs)]
+
+    objs = build_objectives(votes; strength_of = _ -> 8.0)
+    @test length(objs) == 2
+    @test all(o -> o.is_multipart, objs)
+end

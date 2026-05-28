@@ -2823,9 +2823,13 @@ function process_mission(mission_text::String)
                 @warn "[MAIN] Sub-scan for '$(sub.multipart_group)' failed (skipping): $e"
                 continue
             end
-            # GRUG: Stamp each specimen with the sub-subject's group ID and role.
+            # GRUG: Stamp each specimen with the sub-subject's group ID.
+            # CRITICAL: Every sub-subject's WINNING vote is :primary within its own
+            # group. The decomposer's .role field (:primary/:support) is for OUTPUT
+            # ORDERING in the combined response, NOT for vote role. Each group is
+            # independent — MultipartOrchestrator requires exactly one :primary per group.
             for (id, conf, antimatch, u_trips, n_trips) in sub_specimens
-                push!(merged, (id, conf, antimatch, u_trips, n_trips, sub.multipart_group, sub.role))
+                push!(merged, (id, conf, antimatch, u_trips, n_trips, sub.multipart_group, :primary))
             end
         end
         merged

@@ -62,8 +62,11 @@ export DecomposedSubSubject, decompose_input, is_compound
 A single sub-subject extracted from a compound input. `text` is the
 substring to scan. `multipart_group` is the group ID that will be stamped
 onto all votes produced by scanning this sub-subject. `role` is :primary
-for the first sub-subject and :support for subsequent ones within the same
-compound input. `index` is the 1-based position in the decomposition order.
+for the first sub-subject and :support for subsequent ones — this controls
+OUTPUT ORDERING in the combined response (first sub-subject's output appears
+first). It does NOT determine the vote's multipart_role within MultipartOrchestrator;
+every group's winning vote is always :primary within its own group. `index` is
+the 1-based position in the decomposition order.
 """
 struct DecomposedSubSubject
     text::String
@@ -116,6 +119,11 @@ with multipart_group = "" and role = :singleton (matching historical behavior).
 
 If compound, each sub-subject gets a unique multipart_group ("mp_1", "mp_2", ...)
 and the first sub-subject is :primary while subsequent ones are :support.
+NOTE: The .role field controls OUTPUT ORDERING only — it tells the orchestrator
+which part to render first. It does NOT set the vote's multipart_role. In
+MultipartOrchestrator, every group's winning vote is :primary within its own
+group, regardless of this field. The caller (process_mission) stamps :primary
+as the vote role for every sub-subject's winning vote.
 """
 function decompose_input(input_text::String)::Vector{DecomposedSubSubject}
     if isempty(strip(input_text))
@@ -129,6 +137,12 @@ function decompose_input(input_text::String)::Vector{DecomposedSubSubject}
     # question-marker splitting (multiple "?" in the input).
     if length(clauses) <= 1
         clauses = _split_on_question_markers(input_text)
+    end
+
+    # GRUG: Step 2b — if still just one clause, try comma-based splitting.
+    # "what is X, what is Y, what is Z" — commas between independent questions.
+    if length(clauses) <= 1
+        clauses = _split_on_comma_clauses(input_text)
     end
 
     # GRUG: Step 3 — still just one clause? Singleton. Old path.
@@ -251,6 +265,8 @@ end
 If the input contains multiple "?" characters, split at the sentence
 boundary before each subsequent "?". Each question becomes its own
 sub-subject. This catches: "what time is it? what is a dinosaur? what is 2+2?"
+
+NOTE: Uses `nextind` for Unicode-safe advancement past the "?" position.
 """
 function _split_on_question_markers(input_text::String)::Vector{String}
     # GRUG: Count question marks. If only one (or none), no split.
@@ -265,24 +281,26 @@ function _split_on_question_markers(input_text::String)::Vector{String}
 
     for qpos in q_positions
         # GRUG: Find the end of this sentence = after "?" and any
-        # trailing punctuation/whitespace.
+        # trailing punctuation/whitespace. Use chktop to avoid running
+        # past the end of the string. nextind handles multi-byte chars.
         end_idx = qpos
-        while end_idx < length(input_text) &&
-              (input_text[end_idx + 1] in " \t,;.")
-            end_idx += 1
+        while end_idx < lastindex(input_text)
+            nxt = nextind(input_text, end_idx)
+            input_text[nxt] in " \t,;." || break
+            end_idx = nxt
         end
 
         # GRUG: Extract this clause (from last_end to end of sentence).
-        clause = strip(input_text[last_end:min(end_idx, length(input_text))])
+        clause = strip(input_text[last_end:min(end_idx, lastindex(input_text))])
         if !isempty(clause)
             push!(clauses, clause)
         end
 
-        last_end = end_idx + 1
+        last_end = min(nextind(input_text, end_idx), lastindex(input_text) + 1)
     end
 
     # GRUG: Grab any remaining text after the last "?".
-    if last_end <= length(input_text)
+    if last_end <= lastindex(input_text)
         remainder = strip(input_text[last_end:end])
         if !isempty(remainder)
             push!(clauses, remainder)
@@ -316,6 +334,71 @@ function _has_clause_structure(lower_tokens::Vector{String},
         end
     end
     return false
+end
+
+# ==============================================================================
+# INTERNAL: COMMA-BASED CLAUSE SPLITTING
+# ==============================================================================
+
+"""
+    _split_on_comma_clauses(input_text) -> Vector{String}
+
+Split the input at comma boundaries where both sides look like independent
+questions or commands. This catches: "what is X, what is Y, what is Z" —
+a common compound pattern that lacks explicit conjunctions.
+
+Comma splitting is tried LAST (after conjunctions and question markers)
+because commas are ambiguous: "bread, butter, and cheese" is ONE subject,
+but "what is X, what is Y" is TWO. We only split when both sides have
+clause structure (question/command markers).
+"""
+function _split_on_comma_clauses(input_text::String)::Vector{String}
+    # GRUG: Only try if there are at least 2 commas. One comma might just be
+    # a list separator. Two+ commas between question-like clauses = compound.
+    comma_positions = findall(c -> c == ',', input_text)
+    length(comma_positions) < 1 && return [input_text]
+
+    tokens = split(input_text)
+    isempty(tokens) && return [input_text]
+    lower_tokens = [lowercase(replace(t, r"[,;.!?:]" => "")) for t in tokens]
+
+    # GRUG: Walk the token stream. When we find a comma, check if the
+    # right side starts a new independent clause (question/command marker).
+    splits = Int[]
+    for (tok_idx, tok) in enumerate(tokens)
+        if endswith(tok, ",")
+            # Check if the NEXT token starts a question/command clause.
+            if tok_idx < length(tokens)
+                next_tok = lower_tokens[tok_idx + 1]
+                if next_tok in QUESTION_MARKERS || next_tok in COMMAND_MARKERS
+                    push!(splits, tok_idx + 1)
+                end
+            end
+        end
+    end
+
+    isempty(splits) && return [input_text]
+
+    # GRUG: Build clause strings from split positions.
+    unique_sorted = sort(unique(splits))
+    clauses = String[]
+    prev = 1
+    for split_idx in unique_sorted
+        if split_idx > prev
+            clause = strip(join(tokens[prev:split_idx-1], " "), ',')
+            clause = strip(clause)
+            !isempty(clause) && push!(clauses, clause)
+        end
+        prev = split_idx
+    end
+    # Don't forget the last clause!
+    if prev <= length(tokens)
+        clause = strip(join(tokens[prev:end], " "), ',')
+        clause = strip(clause)
+        !isempty(clause) && push!(clauses, clause)
+    end
+
+    return isempty(clauses) ? [input_text] : clauses
 end
 
 # ==============================================================================
