@@ -563,8 +563,8 @@ using .SigilRegistry
     @testset "default_registry — exact contents + provenance" begin
         t = default_registry()
         @test t.label == "engine-default"
-        # Stage 1.5 added &op; default registry now ships 5 entries.
-        @test length(t.entries) == 5
+        # Stage 1.5 added &op; v7.16+ added &conj. Default registry ships 6 entries.
+        @test length(t.entries) == 6
 
         e_n = lookup_sigil(t, "n")
         @test e_n.class === :lambda
@@ -595,6 +595,16 @@ using .SigilRegistry
         @test e_op.applies_at === :match
         @test e_op.sigil_type === :op
         @test e_op.promote_at_tokenize === true
+
+        # v7.16+: &conj is the linguistic conjunction macro for clause-boundary
+        # detection in @sigil:multipart nodes. Engine-default lexicon.
+        e_conj = lookup_sigil(t, "conj")
+        @test e_conj.class === :macro
+        @test e_conj.applies_at === :bind
+        @test e_conj.promote_at_tokenize === true
+        @test "and" in e_conj.lexicon
+        @test "then" in e_conj.lexicon
+        @test "or" in e_conj.lexicon
 
         # Two fresh defaults are independent objects (no shared state).
         t2 = default_registry()

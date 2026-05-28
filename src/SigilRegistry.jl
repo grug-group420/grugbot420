@@ -59,6 +59,9 @@ export resolve_sigils_in_pattern, parse_sigil_token
 export default_registry, merge_registry!
 export SIGIL_CLASSES, SIGIL_APPLIES_AT, SIGIL_PREFIX
 export SIGIL_NAME_REGEX, SIGIL_TOKEN_REGEX
+# GRUG v7.16+: process-wide singleton API for engine-level sigil routing.
+export default_table, reset_default_table!, register_sigil_global!
+export serialize_table, restore_table!, serialize_global, restore_global!
 
 # ==============================================================================
 # ERROR TYPES — GRUG: NO SILENT FAILURES on programmer errors.
@@ -805,6 +808,21 @@ function default_registry()::SigilTable
         provenance="engine-default",
         promote_at_tokenize=true)
 
+    # GRUG v7.16+: linguistic conjunction sigil. Used by @sigil:multipart nodes
+    # to detect clause boundaries in multi-part user input ("tell me X and
+    # explain Y" -> &word &conj &word). Lexicon is closed/curated; specimens
+    # may merge their own additions via merge_registry!.
+    # Note: punctuation-as-clause-boundary (",", ";") is NOT covered here
+    # because the SigilPromoter tokenizer strips punctuation before sigil
+    # matching. Adding a punct-aware tokenizer is a separate Stage 2 task.
+    register_sigil!(t;
+        name="conj",
+        class=:macro,
+        applies_at=:bind,
+        lexicon=String["and", "then", "also", "plus", "but", "or"],
+        provenance="engine-default",
+        promote_at_tokenize=true)
+
     return t
 end
 
@@ -855,5 +873,168 @@ function merge_registry!(
     end
     return target
 end
+
+# ==============================================================================
+# PROCESS-WIDE SINGLETON  -  GRUG v7.16+
+# ==============================================================================
+# GRUG: One global SigilTable per cave. The engine pipeline (SigilMediator,
+# fire-time vote casters, save system) all hit this singleton instead of
+# threading a table reference through every call site. Tests and library
+# users can still build their own SigilTable instances and pass them
+# explicitly to register_sigil!/promote_input — the singleton is engine
+# convenience, not a hard dependency.
+#
+# RESET SEMANTICS: reset_default_table!() rebuilds from default_registry().
+# Used by the save-load wipe phase before restoring a specimen's saved
+# sigils, and by tests that need a clean slate.
+
+const _GLOBAL_TABLE = Ref{SigilTable}(default_registry())
+
+"""
+    default_table() -> SigilTable
+
+Return the process-wide singleton SigilTable used by the engine pipeline.
+Initialized lazily to `default_registry()` on first module load.
+"""
+default_table()::SigilTable = _GLOBAL_TABLE[]
+
+"""
+    reset_default_table!() -> SigilTable
+
+Replace the singleton with a fresh `default_registry()`. Returns the new
+table. Used by the save-load wipe phase and by test setup.
+"""
+function reset_default_table!()::SigilTable
+    _GLOBAL_TABLE[] = default_registry()
+    return _GLOBAL_TABLE[]
+end
+
+"""
+    register_sigil_global!(; kwargs...) -> SigilEntry
+
+Convenience wrapper around `register_sigil!` that targets the singleton.
+All keyword arguments are forwarded verbatim. Returns the inserted entry.
+"""
+function register_sigil_global!(; kwargs...)::SigilEntry
+    return register_sigil!(_GLOBAL_TABLE[]; kwargs...)
+end
+
+# ==============================================================================
+# SERIALIZATION  -  GRUG v7.16+
+# ==============================================================================
+# GRUG: SigilTable -> JSON-friendly Dict and back. Lambda predicates (Julia
+# function objects) cannot survive JSON ser/de cleanly, so we drop them on
+# save with a documented warning and re-attach engine-default predicates
+# from default_registry() on load. User-authored predicates are NOT
+# preserved across save/load — callers must re-register them after load
+# if they need custom predicates. This is documented behavior.
+
+"""
+    serialize_table(table) -> Dict{String,Any}
+
+Convert a `SigilTable` to a JSON-serializable Dict. Drops un-serializable
+fields (function predicates, params dict).
+"""
+function serialize_table(table::SigilTable)::Dict{String,Any}
+    entries_out = Vector{Dict{String,Any}}()
+    # GRUG: deterministic order by name so two saves of the same table
+    # produce byte-identical JSON. Helps diff tools and reproducibility.
+    for nm in sort!(collect(keys(table.entries)))
+        e = table.entries[nm]
+        push!(entries_out, Dict{String,Any}(
+            "name"                 => e.name,
+            "class"                => String(e.class),
+            "applies_at"           => String(e.applies_at),
+            "sigil_type"           => isnothing(e.sigil_type) ? "" : String(e.sigil_type),
+            "lexicon"              => isnothing(e.lexicon) ? nothing : collect(String.(e.lexicon)),
+            "provenance"           => e.provenance,
+            "promote_at_tokenize"  => e.promote_at_tokenize,
+        ))
+    end
+    return Dict{String,Any}(
+        "label"   => table.label,
+        "entries" => entries_out,
+    )
+end
+
+"""
+    restore_table!(table, data) -> Int
+
+Wipe `table` and rehydrate from a Dict produced by `serialize_table`.
+Returns the count of entries restored. After rehydration, engine-default
+sigils get their predicate functions re-attached via merge_registry!(:keep);
+user-authored lambda predicates are NOT preserved.
+"""
+function restore_table!(table::SigilTable, data::AbstractDict)::Int
+    empty!(table.entries)
+    if haskey(data, "label") && data["label"] isa AbstractString
+        table.label = String(data["label"])
+    end
+    raw_entries = get(data, "entries", nothing)
+    isnothing(raw_entries) && return 0
+    if !(raw_entries isa AbstractVector)
+        throw(SigilArgumentError(
+            "restore_table!: 'entries' must be a Vector, got $(typeof(raw_entries))",
+            "entries"))
+    end
+    n = 0
+    for ent in raw_entries
+        if !(ent isa AbstractDict)
+            @warn "[SigilRegistry] restore_table!: skipping non-Dict entry"
+            continue
+        end
+        nm = String(get(ent, "name", ""))
+        isempty(nm) && (@warn "[SigilRegistry] restore_table!: skipping entry with empty name"; continue)
+        cls = Symbol(String(get(ent, "class", "")))
+        ap  = Symbol(String(get(ent, "applies_at", "")))
+        stype_str = String(get(ent, "sigil_type", ""))
+        sigil_type = isempty(stype_str) ? nothing : Symbol(stype_str)
+        lex_raw = get(ent, "lexicon", nothing)
+        lexicon = isnothing(lex_raw) ? nothing :
+                  (lex_raw isa AbstractVector ? collect(String.(lex_raw)) : nothing)
+        prov = String(get(ent, "provenance", "restored"))
+        pat  = Bool(get(ent, "promote_at_tokenize", false))
+        try
+            register_sigil!(table;
+                name = nm,
+                class = cls,
+                applies_at = ap,
+                sigil_type = sigil_type,
+                lexicon = lexicon,
+                provenance = prov,
+                overwrite = true,
+                promote_at_tokenize = pat,
+            )
+            n += 1
+        catch e
+            @warn "[SigilRegistry] restore_table!: failed to register '&$nm': $e"
+        end
+    end
+
+    # GRUG: re-attach engine-default predicates via :keep merge — restored
+    # entries win, defaults fill any gaps (e.g. legacy v2.5 specimens with
+    # no "sigils" block at all).
+    try
+        merge_registry!(table, default_registry(); conflict=:keep)
+    catch e
+        @warn "[SigilRegistry] restore_table!: default-merge failed (non-fatal): $e"
+    end
+
+    return n
+end
+
+"""
+    serialize_global() -> Dict{String,Any}
+
+Serialize the singleton table. Convenience wrapper.
+"""
+serialize_global()::Dict{String,Any} = serialize_table(_GLOBAL_TABLE[])
+
+"""
+    restore_global!(data) -> Int
+
+Restore the singleton table from a Dict. Convenience wrapper.
+"""
+restore_global!(data::AbstractDict)::Int = restore_table!(_GLOBAL_TABLE[], data)
 
 end # module SigilRegistry
