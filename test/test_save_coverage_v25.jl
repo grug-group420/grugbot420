@@ -307,8 +307,11 @@ const _TEST_VERBS = Set{String}(["is", "are", "was", "were", "hit", "make", "cau
             @test haskey(parsed["chatter_swap_cooldowns"], "int_swap_n")
             @test isa(parsed["subconscious"]["table"], Dict)
 
-            # Meta version bumped.
-            @test parsed["_meta"]["version"] == "2.5"
+            # Meta version bumped (v2.5 added 7 holes; v2.6 added sigils block).
+            @test parsed["_meta"]["version"] == "2.6"
+            # v2.6 sigils block must be present in the saved JSON.
+            @test haskey(parsed, "sigils")
+            @test haskey(parsed["sigils"], "entries")
 
             # Now exercise the load path too — wipe everything, load back,
             # and assert the live state is restored.

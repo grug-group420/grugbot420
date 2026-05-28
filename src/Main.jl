@@ -4042,10 +4042,19 @@ function save_specimen_to_file!(filepath::String)::String
     # the subconscious is wiped on every reload.
     specimen["subconscious"] = SelfObserver.serialize_store(SelfObserver.default_store())
 
+    # GRUG v7.16+: 27. SIGIL REGISTRY (SigilRegistry) -----------------------
+    # Process-wide SigilTable singleton. Engine-default sigils (&n &word &rest
+    # &noun &op &conj) plus any specimen-merged additions. Lambda function
+    # predicates are NOT serialized -- they're re-attached from
+    # default_registry() on load via merge_registry!(:keep). Specimens
+    # carrying user-authored predicate lambdas must re-register them after
+    # load. Documented behavior.
+    specimen["sigils"] = SigilRegistry.serialize_global()
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.5",
+        "version"    => "2.6",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.5"
+        "format"     => "grugbot420-specimen-v2.6"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -4119,6 +4128,8 @@ function save_specimen_to_file!(filepath::String)::String
     _swap_cool    = get(specimen, "chatter_swap_cooldowns", Dict())
     _subc         = get(specimen, "subconscious", Dict())
     _subc_keys    = length(get(_subc, "table", Dict()))
+    _sigils       = get(specimen, "sigils", Dict())
+    _sigil_count  = length(get(_sigils, "entries", Any[]))
     push!(lines, "  🌡️   Tonal build-up   : tone=$(get(_tb, "tone", "")) buildup=$(round(Float64(get(_tb, "buildup", 0.0)), digits=3))")
     push!(lines, "  🔠  Concept classes  : $(length(_cc))")
     push!(lines, "  🚫  Concept bans     : $(length(_ci))")
@@ -4126,6 +4137,7 @@ function save_specimen_to_file!(filepath::String)::String
     push!(lines, "  💎  Crystalized      : user=$(_crys_user) auto=$(_crys_auto)")
     push!(lines, "  🔁  Swap cooldowns   : $(length(_swap_cool))")
     push!(lines, "  💭  Subconscious keys: $(_subc_keys)")
+    push!(lines, "  🔣  Sigils           : $(_sigil_count)")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
     return join(lines, "\n")
@@ -4208,6 +4220,8 @@ function load_specimen_from_file!(filepath::String)::String
                         # GRUG v2.5 NEW save categories
                         "tonal_buildup", "concept_classes", "concept_inhibitions",
                         "groups", "crystalize", "chatter_swap_cooldowns", "subconscious",
+                        # GRUG v2.6 NEW save category
+                        "sigils",
                         "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
@@ -4364,6 +4378,11 @@ function load_specimen_from_file!(filepath::String)::String
     # because the save serializes the full live registry).
     Thesaurus.restore_concept_classes!(Dict{String,Any}())
     Thesaurus._build_concept_class_seed!()
+    # GRUG v2.6: Sigil registry has hardcoded engine-default sigils. Wipe to
+    # those defaults, NOT empty. If the specimen carries a `sigils` block,
+    # the restore step below replaces these with the saved set; absent-key
+    # specimens (v2.5 and earlier) end up with default_registry().
+    SigilRegistry.reset_default_table!()
 
     println("  ✅ Cave wiped clean. Beginning restore...")
 
@@ -5005,6 +5024,17 @@ function load_specimen_from_file!(filepath::String)::String
         n_subc = SelfObserver.restore_global_store!(specimen["subconscious"])
         counts["subconscious"] = n_subc
         println("  💭 Subconscious restored ($n_subc microlog entries)")
+    end
+
+    # ── 4.27 SIGIL REGISTRY (SigilRegistry) ─────────────────────────────
+    # GRUG v2.6: process-wide SigilTable singleton. Entries restored from
+    # specimen; engine-default predicate functions re-attached on top via
+    # merge_registry!(:keep) inside restore_table!. Specimens older than
+    # v2.6 (no "sigils" key) leave the singleton at default_registry().
+    if haskey(specimen, "sigils") && isa(specimen["sigils"], Dict)
+        n_sig = SigilRegistry.restore_global!(specimen["sigils"])
+        counts["sigils"] = n_sig
+        println("  🔣 Sigil registry restored ($n_sig sigils)")
     end
 
 
