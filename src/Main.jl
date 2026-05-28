@@ -2405,6 +2405,41 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     end
 
     # -------------------------------------------------------------------
+    # GRUG v2.6+: action-verb -> short noun-y CLAIM handle.
+    # Used ONLY when the winning node is macro scaffolding (no spoken
+    # pattern to echo). Maps the action family to a short declarative
+    # phrase that AIML can paraphrase via _swap_words_in. The macro's
+    # computed value rides the payload concat AFTER this claim, so e.g.
+    # action="calculate" + payload="4" becomes
+    #   "Thinking it through: the calculation. 4"
+    # which _swap_words_in then varies into
+    #   "Thinking it through: the computation. 4"
+    # AIML never echoes the user's question; it states the response.
+    # -------------------------------------------------------------------
+    function _claim_handle_for_action(action::String)::String
+        a = lowercase(strip(action))
+        if a in ("greet", "welcome", "smile", "laugh")
+            return "the greeting"
+        elseif a in ("flee", "hide", "fight")
+            return "the response"
+        elseif a in ("comfort", "support", "validate", "acknowledge", "reassure")
+            return "the comfort"
+        elseif a in ("alert", "warn", "caution", "notify", "flag")
+            return "the warning"
+        elseif a in ("explain", "clarify", "describe", "define", "elaborate")
+            return "the explanation"
+        elseif a in ("calculate", "compute", "solve", "evaluate")
+            return "the calculation"
+        elseif a in ("reason", "analyze", "ponder", "consider", "reflect")
+            return "the reasoning"
+        else
+            # Generic fallback -- "the answer" reads naturally for any
+            # action verb the cave produced and pairs with any payload.
+            return "the answer"
+        end
+    end
+
+    # -------------------------------------------------------------------
     # GRUG v7.16: Look up the winning node so we can pull pattern,
     # drop_table, relational_patterns, and required_relations directly.
     # If the node vanished mid-cycle (shouldn't happen — cast_votes
@@ -2458,19 +2493,21 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # /lobeGrow enforces pattern), we fall back to a generic frame
     # around the mission so we never emit an empty reply.
     #
-    # GRUG v2.6+ SIGIL FIX: If the winner is a sigil-tagged node, its
-    # `pattern` is macro scaffolding (e.g. "&n &op &n", "&conj") -- those
-    # tokens are for the binder, NOT for the user. The macro's job is to
-    # compute a value (already in primary_vote.payload); AIML's job is
-    # to wrap that value in language. So for sigil winners we anchor the
-    # CLAIM on the ORIGINAL mission text the user actually said. The
-    # macro's computed answer gets concatenated onto the final output by
-    # the sigil payload concat step in process_mission, so the value
-    # still reaches the user -- it just doesn't fight the macro tokens
-    # for the claim slot. Macro tokens never reach the user-visible reply.
+    # GRUG v2.6+ SIGIL/MACRO RULE:
+    #   AIML orchestrates VOTES into a language OUTPUT. AIML never asks
+    #   questions back -- it states the response. Votes are actions
+    #   (verbs the cave has decided to take). When the winning node is
+    #   macro scaffolding (e.g. "&n &op &n"), the node's pattern is just
+    #   binder syntax, NOT response content. The macro's computed value
+    #   is already in primary_vote.payload (concatenated downstream).
+    #   So for macro winners we build CLAIM from the action verb itself
+    #   (a one-word noun-y handle like "the calculation" / "the picture"
+    #   / "the answer"), let _swap_words_in vary it via thesaurus, and
+    #   trust the payload to carry the actual value. We do NOT echo the
+    #   user's input -- that would turn AIML into a question-paraphraser.
     # -------------------------------------------------------------------
     claim_raw = if winner_pattern_is_scaffolding
-        strip(mission)
+        _claim_handle_for_action(primary_vote.action)
     elseif isempty(node_pattern)
         "the mission \"$mission\" touches unseeded territory"
     else
@@ -2537,15 +2574,21 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # (b) Sure companion → supporting claim from the TOP band. Only if we have
     # at least one tied alternative AND it has a pattern different from the
     # primary. This keeps the reply from repeating itself.
+    #
+    # GRUG v2.6+: render the companion as an ACTION VERB (not the node's
+    # pattern). Patterns are recognition vocabulary clusters and often
+    # contain interrogative tokens ("what why how when") which read like
+    # the cave is asking the user a question -- AIML orchestrates votes
+    # into a language OUTPUT, never a question. Use the vote's action
+    # routed through _pick_synonym for natural variation.
     if !isempty(tied_alternatives)
         companion = tied_alternatives[1]
-        comp_node = lock(() -> get(NODE_MAP, companion.node_id, nothing), NODE_LOCK)
-        if comp_node !== nothing && !isempty(comp_node.pattern) &&
-           comp_node.pattern != node_pattern &&
-           !pattern_is_macro_scaffolding(comp_node.pattern)  # GRUG v2.6: skip macro scaffolds; their value already flows via payload
-            comp_claim = _swap_words_in(String(comp_node.pattern),
+        if companion.action != primary_vote.action
+            comp_action = _pick_synonym(String(companion.action),
                                          node_drop_table, node_required)
-            push!(support_pieces, " A companion frame: $comp_claim.")
+            if !isempty(comp_action)
+                push!(support_pieces, " Grug also leans toward $comp_action.")
+            end
         end
     end
 
@@ -2597,28 +2640,33 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (d) UNLINKED SUPPORT BAND \u2192 RELIABILITY-FLAGGED support.
+    # (d) UNLINKED SUPPORT BAND -> RELIABILITY-FLAGGED support.
     # GRUG v7.16.1: These votes came in LOUD (past AIML_SUPPORT_FLOOR) but
     # FAILED the relation gate -- they may be off-topic despite high
     # confidence. We still surface them (biology rule: a loud voice should
     # be heard), but with an EXPLICIT warning to the user so they know
     # these claims haven't passed the topical-link check. Cap at 2 to
     # keep the reply tight.
+    #
+    # GRUG v2.6+: render via action verbs, NOT raw patterns. Patterns can
+    # contain interrogatives ("what why how") and reading them back makes
+    # AIML sound like it's asking the user a question. AIML orchestrates
+    # votes (which are actions) into a language *statement*. Dedupe by
+    # action so we don't repeat the same verb. Cap at 2 actions.
     if !isempty(unlinked_band_votes)
-        unlinked_added = 0
-        seen_patterns = Set{String}([node_pattern])
+        unlinked_actions = String[]
+        seen_actions = Set{String}([primary_vote.action])
         for uv in unlinked_band_votes
-            unlinked_added >= 2 && break
-            un = lock(() -> get(NODE_MAP, uv.node_id, nothing), NODE_LOCK)
-            un === nothing && continue
-            isempty(un.pattern) && continue
-            un.pattern in seen_patterns && continue
-            pattern_is_macro_scaffolding(un.pattern) && continue  # GRUG v2.6: skip pure macro patterns
-            un_claim = _swap_words_in(String(un.pattern),
-                                       node_drop_table, node_required)
-            push!(support_pieces, " Grug heard this strongly too but is not sure it fits here (take with caution): $un_claim.")
-            push!(seen_patterns, un.pattern)
-            unlinked_added += 1
+            length(unlinked_actions) >= 2 && break
+            uv.action in seen_actions && continue
+            push!(seen_actions, uv.action)
+            picked = _pick_synonym(String(uv.action), node_drop_table, node_required)
+            isempty(picked) && continue
+            push!(unlinked_actions, picked)
+        end
+        if !isempty(unlinked_actions)
+            prose = _prose_join(unlinked_actions)
+            push!(support_pieces, " Grug heard $prose strongly too but is less certain those fit here.")
         end
     end
 

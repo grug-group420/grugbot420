@@ -43,23 +43,31 @@ GB.load_specimen_from_file!(SPECIMEN_PATH)
 println("Specimen loaded.\n")
 
 # =============================================================================
-# capture helper -- runs `f()` while redirecting stdout to a buffer
+# capture helper -- runs `f()` while redirecting stdout to a tempfile,
+# reads it back, returns the text. tempfile path is robust across child
+# tasks (process_mission spawns Tasks via dispatch_task_with_timeout, and
+# pipe-based redirect_stdout in Julia 1.10 doesn't always propagate to
+# task-spawned writers, which silently dropped scan output between turns).
 # =============================================================================
 function capture_stdout(f::Function)::String
-    old_stdout = stdout
-    rd, wr = redirect_stdout()
+    path, io = mktemp()
     local ok = true
     local err_str = ""
     try
-        f()
-    catch e
-        ok = false
-        err_str = "ERROR: $(typeof(e))\n$(sprint(showerror, e))"
+        redirect_stdout(io) do
+            try
+                f()
+            catch e
+                ok = false
+                err_str = "ERROR: $(typeof(e))\n$(sprint(showerror, e))"
+            end
+            flush(io)
+        end
     finally
-        redirect_stdout(old_stdout)
-        close(wr)
+        close(io)
     end
-    txt = read(rd, String)
+    txt = read(path, String)
+    rm(path; force=true)
     if !ok
         txt *= "\n" * err_str
     end
