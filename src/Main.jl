@@ -1312,6 +1312,81 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         error("!!! FATAL: Winning node $(primary_vote.node_id) vanished before Grug could grab it! !!!")
     end
 
+    # GRUG v7.23: MULTIPART OBJECTIVE ORCHESTRATION.
+    # If any votes carry multipart_group != "", use MultipartOrchestrator
+    # to build objectives and generate output per-objective. Singleton
+    # objectives (group="") flow through the old COMMANDS path unchanged.
+    # Multipart objectives get their own output generation and are combined
+    # into one coherent response.
+    has_multipart = any(v -> !isempty(v.multipart_group), votes)
+
+    if has_multipart
+        # GRUG: Build objectives from ALL votes — singletons AND multipart groups.
+        # Each objective gets its own output. We combine them at the end.
+        objectives = try
+            MultipartOrchestrator.build_objectives(votes;
+                threshold  = VoteOrchestrator.AIML_CONFIDENCE_THRESHOLD,
+                top_window = VoteOrchestrator.AIML_TOP_TIER_WINDOW,
+                strength_of = v -> begin
+                    n = lock(() -> get(NODE_MAP, v.node_id, nothing), NODE_LOCK)
+                    isnothing(n) ? 5.0 : n.strength
+                end,
+                strength_cap = STRENGTH_CAP
+            )
+        catch e
+            @warn "[ORCHESTRATOR] MultipartOrchestrator.build_objectives failed, falling back to old path: $e"
+            objectives = nothing
+        end
+
+        if objectives !== nothing && !isempty(objectives)
+            # GRUG: Generate output for each objective.
+            output_parts = String[]
+            all_sure = Vote[]
+            all_unsure = Vote[]
+
+            for obj in objectives
+                obj_primary = obj.primary
+                obj_node = lock(() -> get(NODE_MAP, obj_primary.node_id, nothing), NODE_LOCK)
+                if isnothing(obj_node)
+                    @warn "[ORCHESTRATOR] Multipart objective primary node $(obj_primary.node_id) vanished, skipping"
+                    continue
+                end
+
+                # GRUG: Build sure/unsure from the objective's internal structure.
+                obj_sure = Vote[obj_primary]
+                append!(obj_sure, obj.locked_supports)
+                obj_unsure = Vote[obj.unsure_supports...]
+
+                # GRUG: Generate output for this objective.
+                obj_output = COMMANDS[obj_primary.action](mission, obj_node, obj_primary, obj_sure, obj_unsure, votes)
+
+                if !isempty(obj_output)
+                    push!(output_parts, obj_output)
+                end
+                append!(all_sure, obj_sure)
+                append!(all_unsure, obj_unsure)
+            end
+
+            # GRUG: Combine all objective outputs into one response.
+            # If multiple parts, join with a separator that looks natural.
+            if isempty(output_parts)
+                # GRUG: All objectives produced nothing? Fall back to old path.
+                output = COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+            elseif length(output_parts) == 1
+                output = output_parts[1]
+            else
+                output = join(output_parts, "\n\n")
+            end
+
+            # GRUG: Return the combined output with all contributing votes.
+            if !isempty(all_sure) || !isempty(all_unsure)
+                return output, all_sure, all_unsure
+            end
+            # GRUG: Fallback if no objective produced votes.
+            return output, sure_votes, unsure_votes
+        end
+    end
+
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
     output = COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
     
@@ -2626,6 +2701,22 @@ function process_mission(mission_text::String)
                 EyeSystem.get_arousal,
                 EyeSystem.set_arousal!
             )
+
+            # GRUG v7.23: ATP → AUTOMATON ESCALATION HOOK.
+            # After arousal nudge, check if ATP should escalate to the
+            # ephemeral automaton for pattern completion. The automaton
+            # runs only when: (1) action family is in ESCALATION_FAMILIES,
+            # (2) confidence ≥ floor, (3) a matching rule exists.
+            # Trace is stored in LAST_ESCALATION_TRACE for downstream
+            # consumers (orchestrator, diagnostics). Zero cost when idle.
+            try
+                ActionTonePredictor.maybe_escalate(
+                    prediction;
+                    automaton_module = EphemeralAutomaton
+                )
+            catch e
+                @warn "[MAIN] ATP→automaton escalation failed (non-fatal): $e"
+            end
         catch e
             @warn "[MAIN] ActionTonePredictor arousal nudge failed (non-fatal): $e"
         end
@@ -2663,6 +2754,23 @@ function process_mission(mission_text::String)
     println("--> Scanning specimens & looking for dialectical relations...")
     t_start = time()
 
+    # GRUG v7.23: INPUT DECOMPOSITION — detect compound queries.
+    # Before scanning, check if the input contains multiple independent
+    # sub-subjects (e.g. "what time is it ALSO what is a dinosaur AND what is 2+2").
+    # If compound, each sub-subject gets its own scan pass with a multipart_group
+    # ID stamped onto its votes. If simple, single scan — old path, zero overhead.
+    sub_subjects = try
+        InputDecomposer.decompose_input(mission_text)
+    catch e
+        @warn "[MAIN] Input decomposition failed (non-fatal, treating as singleton): $e"
+        [InputDecomposer.DecomposedSubSubject(mission_text, "", :singleton, 1)]
+    end
+
+    is_compound_input = length(sub_subjects) > 1
+    if is_compound_input
+        println("[MULTIPART] Compound input detected: $(InputDecomposer.summarize_decomposition(sub_subjects))")
+    end
+
     # GRUG: Build the DONE channel for this cycle. One slot per "lobe" unit of
     # fire work. Here we treat the entire scan+expand as one logical lobe
     # (the cave-wide firing pass). If we later split into per-lobe parallel
@@ -2671,38 +2779,76 @@ function process_mission(mission_text::String)
     # to the orchestrator layer, per architecture spec.
     done_channel = VoteOrchestrator.make_done_channel(8)
 
-    # GRUG: SCAN SUB-PROCESS DISPATCH!
-    # The whole scan+expand is its own Task with a unique non-colliding name
-    # and a hard timeout. If scan deadlocks (e.g. a wedged batch slipped through
-    # the inner batch_timeout), the scan-task timeout catches it at the outer
-    # boundary. TaskTimeoutError surfaces loudly — NO SILENT FAILURES.
-    # Timeout is derived from FIRE_BATCH_TIMEOUT_S * expected-batch-count margin:
-    # 30s is more than enough for any realistic cave, still bounded.
-    scan_task_name, scan_task = VoteOrchestrator.dispatch_task_with_timeout(
-        () -> begin
-            if is_image
-                println("[IMAGE] 🔍  Routing to image node scan path...")
-                return _scan_image_specimens(img_signal)
+    # GRUG v7.23: MULTI-SCAN for compound inputs.
+    # For singleton inputs, one scan_and_expand call as before.
+    # For compound inputs, scan each sub-subject independently and merge
+    # the specimen pools. Each sub-subject's specimens carry the
+    # multipart_group ID so votes can be stamped correctly.
+    all_specimens = if is_image
+        # GRUG: Image inputs don't decompose — single scan path.
+        println("[IMAGE] 🔍  Routing to image node scan path...")
+        scan_task_name, scan_task = VoteOrchestrator.dispatch_task_with_timeout(
+            () -> _scan_image_specimens(img_signal),
+            "scan_cycle",
+            30.0;
+            context = "run_mission.scan"
+        )
+        specimens = try
+            VoteOrchestrator.fetch_with_timeout(scan_task_name, scan_task)
+        catch e
+            if e isa VoteOrchestrator.TaskTimeoutError
+                @error "[MAIN] Scan sub-process TIMEOUT: $e"
             else
-                return scan_and_expand(mission_text)
+                @error "[MAIN] Scan sub-process FAILED: $e"
             end
-        end,
-        "scan_cycle",
-        30.0;
-        context = "run_mission.scan"
-    )
-
-    valid_specimens = try
-        VoteOrchestrator.fetch_with_timeout(scan_task_name, scan_task)
-    catch e
-        # GRUG: Scan exploded or timed out. Scream, then fail loudly —
-        # cave cannot respond without scan results. NO SILENT FAILURES.
-        if e isa VoteOrchestrator.TaskTimeoutError
-            @error "[MAIN] Scan sub-process TIMEOUT: $e"
-        else
-            @error "[MAIN] Scan sub-process FAILED: $e"
+            rethrow(e)
         end
-        rethrow(e)
+        # GRUG: Image specimens are singletons — no multipart stamping.
+        [(spec..., "", :singleton) for spec in specimens]
+    elseif is_compound_input
+        # GRUG: COMPOUND INPUT — scan each sub-subject independently.
+        # Each scan produces specimens tagged with the sub-subject's
+        # multipart_group and role. Merged into one pool for voting.
+        merged = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, String, Symbol}[]
+        for sub in sub_subjects
+            sub_task_name, sub_task = VoteOrchestrator.dispatch_task_with_timeout(
+                () -> scan_and_expand(sub.text),
+                "scan_$(sub.multipart_group)",
+                30.0;
+                context = "run_mission.scan.$(sub.multipart_group)"
+            )
+            sub_specimens = try
+                VoteOrchestrator.fetch_with_timeout(sub_task_name, sub_task)
+            catch e
+                @warn "[MAIN] Sub-scan for '$(sub.multipart_group)' failed (skipping): $e"
+                continue
+            end
+            # GRUG: Stamp each specimen with the sub-subject's group ID and role.
+            for (id, conf, antimatch, u_trips, n_trips) in sub_specimens
+                push!(merged, (id, conf, antimatch, u_trips, n_trips, sub.multipart_group, sub.role))
+            end
+        end
+        merged
+    else
+        # GRUG: SINGLETON INPUT — old path, one scan, no multipart stamping.
+        scan_task_name, scan_task = VoteOrchestrator.dispatch_task_with_timeout(
+            () -> scan_and_expand(mission_text),
+            "scan_cycle",
+            30.0;
+            context = "run_mission.scan"
+        )
+        specimens = try
+            VoteOrchestrator.fetch_with_timeout(scan_task_name, scan_task)
+        catch e
+            if e isa VoteOrchestrator.TaskTimeoutError
+                @error "[MAIN] Scan sub-process TIMEOUT: $e"
+            else
+                @error "[MAIN] Scan sub-process FAILED: $e"
+            end
+            rethrow(e)
+        end
+        # GRUG: Singleton specimens — no multipart stamping.
+        [(spec..., "", :singleton) for spec in specimens]
     end
 
     # GRUG: LOBE FIRING COMPLETE → emit DONE to the orchestrator layer.
@@ -2722,7 +2868,7 @@ function process_mission(mission_text::String)
         VoteOrchestrator.send_done!(done_channel, VoteOrchestrator.DoneSignal(
             "scan_pass",
             fires_total,
-            length(valid_specimens),
+            length(all_specimens),
             time() - t_start,
             nothing
         ))
@@ -2748,7 +2894,7 @@ function process_mission(mission_text::String)
         @warn "[MAIN] DONE wait failed (non-fatal, orchestrator will still run): $e"
     end
 
-    if isempty(valid_specimens)
+    if isempty(all_specimens)
         println("--> No valid specimens found for this input. Cave is silent.")
         return
     end
@@ -2782,8 +2928,12 @@ function process_mission(mission_text::String)
     cast_votes_task_name, cast_votes_task = VoteOrchestrator.dispatch_task_with_timeout(
         () -> begin
             out = Vote[]
-            for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
-                push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+            # GRUG v7.23: Specimens now carry multipart_group and multipart_role.
+            # Use cast_vote_with_group to stamp votes with the correct group.
+            # Singleton specimens (group="", role=:singleton) produce the same
+            # Vote as the old cast_vote — zero behavioral change for simple inputs.
+            for (id, conf, is_antimatch, u_trips, n_trips, mp_group, mp_role) in all_specimens
+                push!(out, cast_vote_with_group(id, conf, is_antimatch, u_trips, n_trips, mp_group, mp_role))
             end
             return out
         end,
@@ -2884,7 +3034,7 @@ function process_mission(mission_text::String)
             win = contributing_votes[1]
             "Mission \"$(mission_text)\" → primary=$(win.action) conf=$(round(win.confidence, digits=2)) node=$(win.node_id)"
         else
-            # GRUG: Should never happen (we guarded on isempty(valid_specimens)
+            # GRUG: Should never happen (we guarded on isempty(all_specimens)
             # well upstream) but be defensive. NO SILENT FAILURES — the
             # string still captures the mission so a future cycle can
             # score it.
@@ -4683,6 +4833,10 @@ function run_cli()
             m_aimlremove  = match(r"^/aimlRemove\s+(\S+)\s+(\S+)\s*$", line)
             m_aimlcycle   = match(r"^/aimlCycle\s*$",     line)
             m_aimlphagy   = match(r"^/aimlPhagy\s*$",     line)
+            # GRUG v7.23: Automaton management commands
+            m_autolist    = match(r"^/automaton\s+list\s*$",              line)
+            m_autoreg     = match(r"^/automaton\s+register\s+(\S+)\s+(\S+)\s+(\d+(?:\.\d+)?)\s*$", line)
+            m_autoremove  = match(r"^/automaton\s+remove\s+(\S+)\s*$",   line)
             m_explicit    = match(r"^/explicit\s+([a-zA-Z0-9_]+)\s+\[(.+?)\]\s+(.+)", line)
             m_grow        = match(r"^/grow\s+(\S+)\s+(.+)"s,      line)
             m_rule        = match(r"^/addRule\s+(.+)"s,   line)
@@ -4955,6 +5109,60 @@ elseif !isnothing(m_right)
                     println("🧹  /aimlPhagy: Cleaned up $removed_count grave node(s) from AIML registry")
                 else
                     println("✨  /aimlPhagy: No graves to clean. AIML registry already pristine!")
+                end
+
+            elseif !isnothing(m_autolist)
+                # GRUG v7.23: /automaton list — show all registered automaton rules.
+                rules = EphemeralAutomaton.list_automaton_rules()
+                if isempty(rules)
+                    println("📋  /automaton list: No rules registered. Cave has no step machines yet.")
+                else
+                    println("📋  /automaton list: $(length(rules)) rule(s) registered:")
+                    for r in rules
+                        jitter_str = isempty(r.jitter_targets) ? "none" :
+                            join(sort(collect(r.jitter_targets)), ",")
+                        println("  📎 $(r.id) | trigger=$(r.trigger_action) | min_conf=$(round(r.min_confidence, digits=2)) | steps=$(length(r.steps)) | jitter=$(jitter_str)")
+                    end
+                end
+
+            elseif !isnothing(m_autoreg)
+                # GRUG v7.23: /automaton register <id> <trigger_action> <min_confidence>
+                # Creates a minimal automaton rule with a single :literal step as placeholder.
+                # Users can build more complex rules programmatically; this CLI command
+                # provides the quick-register path for testing and simple rules.
+                rule_id, trigger, conf_str = m_autoreg.captures
+                rule_id_str = String(rule_id)
+                trigger_sym = Symbol(String(trigger))
+                conf_val = tryparse(Float64, String(conf_str))
+                if isnothing(conf_val)
+                    println("⚠  /automaton register: invalid confidence '$(conf_str)'. Must be a number 0.0-1.0.")
+                else
+                    # GRUG: Create a minimal rule with one :literal step as placeholder.
+                    # The user can replace this with a proper step chain programmatically.
+                    placeholder_step = EphemeralAutomaton.AutomatonStep(
+                        "placeholder", :literal, "auto-registered"
+                    )
+                    rule = EphemeralAutomaton.AutomatonRule(
+                        rule_id_str, trigger_sym,
+                        [placeholder_step];
+                        min_confidence = conf_val
+                    )
+                    try
+                        EphemeralAutomaton.register_automaton_rule!(rule)
+                        println("✅  /automaton register: Rule '$rule_id_str' registered (trigger=$trigger_sym, min_conf=$(round(conf_val, digits=2)), 1 placeholder step)")
+                    catch e
+                        println("⚠  /automaton register failed: $e")
+                    end
+                end
+
+            elseif !isnothing(m_autoremove)
+                # GRUG v7.23: /automaton remove <id>
+                rule_id_str = String(m_autoremove.captures[1])
+                removed = EphemeralAutomaton.unregister_automaton_rule!(rule_id_str)
+                if removed
+                    println("🗑️  /automaton remove: Rule '$rule_id_str' removed from registry.")
+                else
+                    println("⚠  /automaton remove: Rule '$rule_id_str' not found in registry.")
                 end
 
             elseif !isnothing(m_explicit)

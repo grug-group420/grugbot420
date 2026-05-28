@@ -162,6 +162,15 @@ using .MultipartOrchestrator
 include("EphemeralAutomaton.jl")
 using .EphemeralAutomaton
 
+# GRUG: v7.23 — InputDecomposer. Detects compound queries (multiple independent
+# sub-subjects in one user input) and splits them into sub-subjects, each with
+# a multipart_group ID. The group ID flows DOWN through scan and vote so
+# MultipartOrchestrator can coalesce votes from different scan passes into
+# one cohesive objective. THIS is where multipart_group is born — not in the
+# node, not in the vote, but at the INPUT DECOMPOSITION LAYER.
+include("InputDecomposer.jl")
+using .InputDecomposer
+
 include("engine.jl")
 include("Main.jl")
 
@@ -314,11 +323,25 @@ export register_automaton_rule!, unregister_automaton_rule!,
        list_automaton_rules, lookup_automaton_rule, clear_automaton_rules!
 export run_automaton, find_matching_rule, run_for_action_family
 
+# GRUG: v7.23 InputDecomposer exports — compound-query decomposition.
+# `decompose_input(text)` is the primary entry; returns Vector{DecomposedSubSubject}.
+# `is_compound(text)` is a cheap boolean check. Each sub-subject carries a
+# multipart_group ID that flows into scan → vote → MultipartOrchestrator.
+export InputDecomposer
+export DecomposedSubSubject, decompose_input, is_compound
+
 # GRUG: v7.23 — :procedure class activation in SigilRegistry. New helpers for
 # math-acronym style sigils that expand to ordered chains of literals and
 # nested sigil tokens. Bounded recursion (cycle guard); loud failures on
 # unknown nested references.
 export register_procedure_sigil!, expand_procedure_sigil, is_procedure_sigil,
        MAX_PROCEDURE_DEPTH
+
+# GRUG: v7.23 — ATP→automaton escalation hook. `maybe_escalate(prediction)` is
+# the primary entry; it checks if the predicted action family is in
+# ESCALATION_FAMILIES and confidence is high enough, then runs the matching
+# automaton rule. `LAST_ESCALATION_TRACE` stores the trace for downstream
+# consumers. Zero cost when no escalation occurs.
+export maybe_escalate, ESCALATION_FAMILIES, LAST_ESCALATION_TRACE
 
 end # module GrugBot420

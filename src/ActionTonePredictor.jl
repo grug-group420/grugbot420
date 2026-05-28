@@ -52,7 +52,9 @@ export ActionFamily, ToneFamily, PredictionResult,
        LAST_PREDICTION,
        # GRUG v7.20: heavy-fallback classifier surface
        LOW_SIGNAL_THRESHOLD, FALLBACK_DAMP_THRESHOLD,
-       get_predictor_telemetry, reset_predictor_telemetry!
+       get_predictor_telemetry, reset_predictor_telemetry!,
+       # GRUG v7.23: ATP→automaton escalation hook
+       maybe_escalate, ESCALATION_FAMILIES, LAST_ESCALATION_TRACE
 
 # ==============================================================================
 # ENUM TYPES
@@ -1579,6 +1581,111 @@ function format_prediction_summary(prediction::PredictionResult)::String
            "Conf=$(round(prediction.confidence, digits=2)) | " *
            "ArousalNudge=$(round(prediction.arousal_nudge, digits=2)) | " *
            "Weight=$(round(prediction.action_weight, digits=2))$(chain_str)$(damp_str)$(mode_str)$(incoh_str)"
+end
+
+# ==============================================================================
+# v7.23: ATP → EPHEMERAL AUTOMATON ESCALATION HOOK
+# ==============================================================================
+# GRUG: Basal ganglia decide if brain need working-memory scratch loop.
+# If ATP prediction says "this is REASON/EXPLAIN/PLAN/COMPUTE" AND confidence
+# is high enough, we check if an automaton rule matches. If it does, run it.
+# The trace folds into arousal/weight so multi-step paths get extra kick.
+#
+# GRUG: ONLY ATP calls automaton. Nodes NEVER call it. This is the basal
+# ganglia → prefrontal cortex escalation pathway. Sparse activation —
+# most queries don't need it, and that's fine. Zero cost when idle.
+# ==============================================================================
+
+"""
+Action families that, when predicted with high confidence, MAY trigger an
+automaton escalation. These are the families where multi-step pattern
+COMPLETION (rather than simple pattern REACTION) is likely needed.
+"""
+const ESCALATION_FAMILIES = Set{Symbol}([
+    :ACTION_QUERY,      # "explain why X" → may need step-by-step
+    :ACTION_SPECULATE,  # "what if X then Y" → may need chain completion
+])
+
+"""
+Minimum ATP confidence to even consider escalation. Below this, the
+automaton is never consulted — zero cost.
+"""
+const ESCALATION_CONFIDENCE_FLOOR = 0.6
+
+"""
+Last escalation trace produced by `maybe_escalate`. `nothing` if no
+escalation occurred this cycle. Downstream consumers (orchestrator,
+diagnostics) read this without re-running the automaton.
+"""
+const LAST_ESCALATION_TRACE = Ref{Any}(nothing)
+
+"""
+    maybe_escalate(prediction; automaton_module) -> Union{AutomatonTrace, Nothing}
+
+Check whether ATP should escalate to the ephemeral automaton. Returns an
+AutomatonTrace if escalation occurred, `nothing` otherwise.
+
+Conditions for escalation:
+1. predicted action family is in ESCALATION_FAMILIES
+2. prediction confidence ≥ ESCALATION_CONFIDENCE_FLOOR
+3. a matching automaton rule exists for the action family
+
+When escalation fires:
+- The automaton trace is stored in LAST_ESCALATION_TRACE
+- Arousal nudge is boosted by the trace's step count (more steps = more
+  deliberation = higher arousal to keep attention focused)
+- Action weight is multiplied by a trace-derived factor
+
+When escalation does NOT fire (the common case):
+- LAST_ESCALATION_TRACE is set to nothing
+- No cost — the function returns immediately
+"""
+function maybe_escalate(prediction::PredictionResult;
+                        automaton_module::Union{Module, Nothing} = nothing)::Any
+    # GRUG: No automaton module provided? Can't escalate. Return nothing.
+    if automaton_module === nothing
+        LAST_ESCALATION_TRACE[] = nothing
+        return nothing
+    end
+
+    # GRUG: Check condition 1 — is this action family escalation-worthy?
+    action_sym = Symbol(prediction.action_family)
+    if !(action_sym in ESCALATION_FAMILIES)
+        LAST_ESCALATION_TRACE[] = nothing
+        return nothing
+    end
+
+    # GRUG: Check condition 2 — is confidence high enough?
+    if prediction.confidence < ESCALATION_CONFIDENCE_FLOOR
+        LAST_ESCALATION_TRACE[] = nothing
+        return nothing
+    end
+
+    # GRUG: Check condition 3 — does a matching rule exist?
+    # Use the provided automaton module's dispatch helper.
+    trace = try
+        automaton_module.run_for_action_family(
+            action_sym, prediction.confidence
+        )
+    catch e
+        @warn "[ATP-ESCALATE] Automaton dispatch failed (non-fatal): $e"
+        LAST_ESCALATION_TRACE[] = nothing
+        return nothing
+    end
+
+    if trace === nothing
+        # GRUG: No matching rule. Not an error — sparse activation.
+        LAST_ESCALATION_TRACE[] = nothing
+        return nothing
+    end
+
+    # GRUG: ESCALATION FIRED! Store trace and log.
+    LAST_ESCALATION_TRACE[] = trace
+    @info "[ATP-ESCALATE] Automaton rule '$(trace.rule_id)' fired " *
+          "($(length(trace.sequence)) steps, $(length(trace.jittered)) jittered) " *
+          "for action=$(prediction.action_family) conf=$(round(prediction.confidence, digits=3))"
+
+    return trace
 end
 
 end # module ActionTonePredictor

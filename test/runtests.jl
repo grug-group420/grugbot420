@@ -59,6 +59,9 @@ const ALL_TESTS = [
     "test_multipart_orchestrator.jl",
     "test_ephemeral_automaton.jl",
     "test_procedure_sigil.jl",
+    "test_input_decomposer.jl",
+    "test_atp_escalation.jl",
+    "test_multipart_integration.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

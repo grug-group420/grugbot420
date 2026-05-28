@@ -3635,6 +3635,35 @@ function cast_explicit_vote(cmd_name::String, id::String)::Vote
     return Vote(id, cmd_name, 9999.0, negatives, RelationalTriple[], node.relational_patterns, false)
 end
 
+"""
+cast_vote_with_group(id, conf, antimatch, u_trips, n_trips, multipart_group, multipart_role)
+
+GRUG v7.23: Same as cast_vote but stamps the vote with multipart_group and
+multipart_role. Used when input decomposer splits a compound query into
+sub-subjects — each sub-subject's votes carry the group ID assigned by
+the decomposer, and the role (:primary for first sub-subject, :support
+for subsequent ones) so MultipartOrchestrator can coalesce them into
+one cohesive objective.
+"""
+function cast_vote_with_group(id, conf, antimatch, u_trips, n_trips,
+                               multipart_group::String, multipart_role::Symbol)
+    if strip(id) == "" error("!!! FATAL: Need real node ID to cast vote! !!!") end
+    
+    node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+    isnothing(node) && error("!!! FATAL: Node [$id] vanished before vote! !!!")
+
+    winning_action, negatives = select_action(node.action_packet)
+    
+    if !haskey(COMMANDS, winning_action) 
+        error("!!! FATAL: Grug rolled unknown action [$(winning_action)]! Not in COMMANDS dictionary !!!")
+    end
+
+    bump_strength!(node)
+
+    return Vote(id, winning_action, conf, negatives, u_trips, n_trips, antimatch,
+                multipart_group, multipart_role)
+end
+
 # ==============================================================================
 # /WRONG FEEDBACK: PENALIZE ALL VOTERS
 # ==============================================================================

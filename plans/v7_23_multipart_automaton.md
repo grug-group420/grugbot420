@@ -94,6 +94,24 @@ end
 - Trace folds into `weight_multiplier`/arousal nudge so high-confidence
   multi-step paths get extra kick.
 
+### F. InputDecomposer — compound-query input decomposition (v7.23 integration)
+- When user input contains multiple distinct subjects (e.g. "what time is it
+  ALSO what is a dinosaur AND what is 2+2"), the multipart system triggers
+  because the INPUT ITSELF decomposes into multiple independent scan targets,
+  each needing its own vote pool but coordinated as one response.
+- `decompose_input(input) -> Vector{DecomposedSubSubject}` — splits on
+  conjunction boundaries ("also", "but", "and" with question markers) and
+  multiple "?" markers.
+- Each sub-subject gets a deterministic multipart_group ID (mp_1, mp_2, ...).
+- The decomposer's role field (:primary for first, :support for subsequent)
+  is for OUTPUT ORDERING in the orchestrator's combined response, NOT for
+  vote role assignment. Each sub-subject's winning vote is :primary within
+  its own group.
+- `is_compound(input) -> Bool` — quick check for process_mission branching.
+- Wired into process_mission: if compound, each sub-subject gets its own
+  scan pass; specimen tuples expanded from 5-tuple to 7-tuple adding
+  (multipart_group, multipart_role); votes use `cast_vote_with_group`.
+
 ### E. Sigil registry: activate `:procedure` class for math-acronym sigils
 - Add `register_procedure_sigil!(name, steps)`.
 - Steps are a `Vector{Union{String, SigilTokenRef}}` — a chain of literals and
@@ -115,33 +133,53 @@ end
 ## Files added
 - `src/MultipartOrchestrator.jl`
 - `src/EphemeralAutomaton.jl`
+- `src/InputDecomposer.jl` — compound-query input decomposition layer (v7.23 integration)
 - `test/test_multipart_orchestrator.jl`
 - `test/test_ephemeral_automaton.jl`
 - `test/test_procedure_sigil.jl`
+- `test/test_input_decomposer.jl` — 10 test sets for InputDecomposer
+- `test/test_atp_escalation.jl` — 6 test sets for ATP→automaton escalation hook
+- `test/test_multipart_integration.jl` — 10 test sets for InputDecomposer→MultipartOrchestrator pipeline
 - `plans/v7_23_multipart_automaton.md` (this file)
 
 ## Files modified
 - `src/engine.jl` — extend `Vote` with two optional fields (default values
-  preserve back-compat).
+  preserve back-compat); add `cast_vote_with_group` for 7-tuple specimen
+  expansion.
 - `src/SigilRegistry.jl` — promote `:procedure` from reserved to active +
   add `register_procedure_sigil!`.
 - `src/ActionTonePredictor.jl` — add `maybe_escalate` hook + automaton trace
-  consumption.
+  consumption; `ESCALATION_FAMILIES`, `LAST_ESCALATION_TRACE`, 
+  `ESCALATION_CONFIDENCE_FLOOR`.
 - `src/Main.jl` — `ephemeral_aiml_orchestrator` consumes multipart objectives;
-  `/automaton` CLI commands for rule add/list/remove.
-- `src/GrugBot420.jl` — register the two new modules.
-- `test/runtests.jl` — include the three new test files.
+  `/automaton` CLI commands for rule add/list/remove; `process_mission` wired
+  with InputDecomposer multi-scan + ATP→automaton escalation hook; specimen
+  tuple expanded from 5-tuple to 7-tuple (multipart_group, multipart_role).
+- `src/GrugBot420.jl` — register MultipartOrchestrator, EphemeralAutomaton,
+  InputDecomposer modules + all new exports.
+- `test/runtests.jl` — include all six new test files.
 
 ## Test plan
-1. Singleton votes still produce identical AIML output (no regression).
-2. A 1-node-3-part vote group produces ONE objective with 1 primary +
+1. ✅ Singleton votes still produce identical AIML output (no regression).
+2. ✅ A 1-node-3-part vote group produces ONE objective with 1 primary +
    2 supports, all under one subject.
-3. Mixed singleton + multipart groups orchestrate independently.
-4. ATP escalation only fires when family is in `ESCALATION_FAMILIES` and
+3. ✅ Mixed singleton + multipart groups orchestrate independently.
+4. ✅ ATP escalation only fires when family is in `ESCALATION_FAMILIES` and
    confidence ≥ threshold; otherwise zero cost.
-5. Automaton with `jitter_targets = [:value]` produces different `value` on
+5. ✅ Automaton with `jitter_targets = [:value]` produces different `value` on
    repeated fires but same `step_index` and `operator`.
-6. Procedure sigil `&Σ` expands at promotion to its registered chain.
-7. Unknown procedure sigil throws `SigilResolutionError` (no silent fallback).
+6. ✅ Procedure sigil `&Σ` expands at promotion to its registered chain.
+7. ✅ Unknown procedure sigil throws `SigilResolutionError` (no silent fallback).
+8. ✅ InputDecomposer detects compound queries via conjunction boundaries
+   ("also", "but", "and" with question markers) and multiple "?" markers.
+9. ✅ InputDecomposer assigns deterministic mp_1/mp_2/... group IDs.
+10. ✅ Integration: InputDecomposer → MultipartOrchestrator pipeline produces
+    one objective per sub-subject, each with its own :primary vote.
+11. ✅ ATP→automaton escalation hook: `maybe_escalate` returns trace when
+    family+confidence+rule match; returns nothing otherwise. LAST_ESCALATION_TRACE
+    stores result for downstream consumers without PredictionResult schema break.
+12. ✅ No regressions in existing test suite (sampled: smoke, vote_orchestrator,
+    arithmetic_engine, aiml_node_system, comprehensive, sigil_registry,
+    sigil_promoter, self_observer, v7_20, v7_21a, v7_21c1, v7_21c2).
 
 ## Done = green tests, no warnings beyond pre-existing, doc updated.
