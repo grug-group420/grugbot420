@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.22</title>
+    <title>GrugBot Neuromorphic Engine - Technical Whitepaper v7.22 + v2.6</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -189,12 +189,13 @@
 </head>
 <body>
 
-<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.22</span></h1>
+<h1>🧠 GrugBot Neuromorphic Engine <span class="version-tag">v7.22 + v2.6</span></h1>
 
 <p><strong>Technical Whitepaper & Architecture Reference</strong><br>
 A Julia-based neuromorphic AI engine featuring stochastic pattern scanning, multi-lobe cognitive partitioning,
 lobe-aware prefrontal cortex orchestration, pipe-delimited action packets with inline negatives,
-and self-maintaining phagy cycles.</p>
+self-maintaining phagy cycles, <strong>and a sigil-routing rail for multi-step linguistic reasoning
+(arithmetic, multi-clause questions, structured instructions)</strong>.</p>
 
 <div class="grug-box">
     Cave brain think different from computer brain. Computer brain is IF-ELSE waterfall.
@@ -241,7 +242,11 @@ and self-maintaining phagy cycles.</p>
         <li><a href="#nonjitter-tag">15.20 Per-Node NONJITTER Tag + End-Confidence Snap-Back Jitter</a> <span class="new-badge">v7.20</span></li>
         <li><a href="#nonjitter-systemwide">15.21 System-Wide NONJITTER Honor (relational dialectics, attachment relay, full-lobe scanner)</a> <span class="new-badge">v7.21</span></li>
         <li><a href="#strength-solidify">15.22 Strength-Driven Solidification (auto-NONJITTER at threshold)</a> <span class="new-badge">v7.22</span></li>
-        <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7</span></li>
+        <li><a href="#self-observer">15.23 SelfObserver: Subconscious Microlog (fuzzy time-cues, throttled)</a> <span class="new-badge">v7.16+</span></li>
+        <li><a href="#tonal-buildup">15.24 Tonal Build-Up + Per-Prediction Lorenz Snap-Back</a> <span class="new-badge">v7.16+</span></li>
+        <li><a href="#sparse-active">15.25 Sparse-Active Fire Gate at the Engine Fire Site</a> <span class="new-badge">v7.16+</span></li>
+        <li><a href="#sigil-rail">15.26 Sigil Routing Rail: Multi-Step Linguistic Reasoning (math, multipart, instruction)</a> <span class="new-badge">v2.6</span></li>
+        <li><a href="#specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore</a> <span class="new-badge">v7.7 / v2.5 / v2.6</span></li>
         <li><a href="#math">17. Formal Mathematics</a></li>
         <li><a href="#ambient-signal">17.5 Signal Presence & Instant Activation</a> <span class="new-badge">v7</span></li>
         <li><a href="#cli">18. CLI Command Reference</a></li>
@@ -2715,8 +2720,309 @@ the same rule. No node type is special-cased.</p>
 </ul>
 
 <!-- ================================================================ -->
+<h2 id="self-observer">15.23 SelfObserver: Subconscious Microlog <span class="new-badge">v7.16+</span></h2>
+
+<div class="grug-box">
+    <p>Grug brain not only think loud thoughts. Sometimes Grug remember weather from yesterday or
+    smell of berry from many sleeps ago without trying. Subconscious is QUIET memory drawer.
+    Stochastic write (not every observation goes in), throttled read (not every recall hits the drawer),
+    fuzzy time-cues (<code>:just_now</code>, <code>:earlier_today</code>, <code>:yesterday_ish</code>,
+    <code>:long_ago</code>) instead of raw timestamps. Drawer never returns confidence numbers.
+    Drawer never returns Float64 from public API &mdash; structural guarantee enforced by tests.</p>
+</div>
+
+<h3>What it does</h3>
+<p>Process-wide singleton observation store, ported from <code>main</code> branch and made first-class on
+<code>v7.15-updates</code>. Reads/writes the cave's "subconscious" &mdash; a separate channel from the loud
+vote pool that captures fuzzy long-tail context.</p>
+
+<ul>
+    <li><strong>Stochastic write</strong>: each observation has a configurable probability of actually
+        landing in the drawer. The system never gets to "always remember" anything &mdash; that's the
+        loud-thought channel's job.</li>
+    <li><strong>Globally serialized read</strong> with token-bucket throttle and hard timeout.</li>
+    <li><strong>Fuzzy time buckets</strong>: <code>:just_now</code>, <code>:earlier_today</code>,
+        <code>:yesterday_ish</code>, <code>:days_ago</code>, <code>:long_ago</code>.</li>
+    <li><strong>Structural Float64 ban</strong>: nothing in this module's public API returns a
+        <code>Float64</code>. <code>test_self_observer.jl</code> enforces this with type assertions
+        across every exported function.</li>
+</ul>
+
+<h3>Persistence</h3>
+<p>Wired into save format v2.5: <code>"subconscious"</code> top-level key. The wipe phase resets the
+singleton on <code>/loadSpecimen</code> before restoring; absent-key (older) specimens load to clean
+defaults.</p>
+
+<h3>Tests</h3>
+<p><code>test/test_self_observer.jl</code> &mdash; <strong>129 assertions, all pass</strong>.</p>
+
 <!-- ================================================================ -->
-<h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7</span></h2>
+<h2 id="tonal-buildup">15.24 Tonal Build-Up + Per-Prediction Lorenz Snap-Back <span class="new-badge">v7.16+</span></h2>
+
+<div class="grug-box">
+    <p>One angry word from cave-mate is annoyance. Five angry words in a row is FIGHT. Mood STACKS
+    when the same tone keeps coming. But mood also COOLS when the conversation goes quiet for a while.
+    And every prediction gets a tiny shake of the dice so identical inputs don't produce bit-identical
+    outputs. Two independent dynamics, both bounded, both leave the existing distribution invariants
+    untouched (sum-to-1, every family in [0,1], no NaN/Inf).</p>
+</div>
+
+<h3>A. Tonal build-up over consecutive same-tone predictions</h3>
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>TONAL_BUILDUP_INCREMENT</code></td><td>0.20</td><td>Each consecutive same-tone hit adds <code>0.20 &times; (1 - current_buildup)</code></td></tr>
+    <tr><td><code>TONAL_BUILDUP_HALFLIFE_S</code></td><td>30.0</td><td>Cool-down halflife when same tone is not refreshed</td></tr>
+    <tr><td><code>TONAL_BUILDUP_AROUSAL_GAIN</code></td><td>0.6</td><td>Multiplies <code>arousal_nudge</code> by <code>(1 + GAIN &times; buildup)</code></td></tr>
+</table>
+
+<ul>
+    <li><strong>State</strong>: a single-slot <code>(tone, buildup, ts)</code> accumulator with a
+        <code>ReentrantLock</code>. NOT the trajectory ring buffer &mdash; separate concern.</li>
+    <li><strong>Same tone twice</strong> &rarr; mood stacks: someone making consecutive hostile remarks
+        gets a stronger arousal push than a one-off insult.</li>
+    <li><strong>Tone change</strong> &rarr; mood snaps back: build-up of the <em>old</em> tone is dropped,
+        the new tone seeds at 0.05.</li>
+    <li><strong>Long quiet</strong> &rarr; exponential cool-down (~30s halflife).</li>
+    <li><strong>Sign preserved</strong>: gain multiplier never flips the sign of the cold nudge.
+        HOSTILE/URGENT (positive nudge) gets pushed more positive; REFLECTIVE (negative nudge) gets
+        pushed more negative.</li>
+</ul>
+
+<h3>B. Per-prediction Lorenz snap-back</h3>
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>LORENZ_SNAPBACK_JITTER</code></td><td>0.025</td><td>&plusmn;2.5% multiplicative noise per family before snap</td></tr>
+    <tr><td><code>LORENZ_SNAPBACK_PULL</code></td><td>0.05</td><td>Pull each family 5% of the way toward 1/N</td></tr>
+</table>
+
+<p>Always-on, runs after the existing trajectory-buffer Lorenz damper and before winner pick.
+Per-family multiplicative jitter, then pull each family toward the uniform <code>1/N</code> baseline,
+then renormalize so values sum to 1.0. Identical inputs no longer produce bit-identical curves.</p>
+
+<h3>Public API</h3>
+<ul>
+    <li><code>reset_tonal_buildup!()</code> &mdash; wipe the accumulator. Called automatically by
+        <code>reset_trajectory!</code>.</li>
+    <li><code>get_tonal_buildup() -&gt; NamedTuple{(:tone, :buildup, :ts), &hellip;}</code> &mdash;
+        read-only diagnostic snapshot.</li>
+</ul>
+
+<h3>Tests</h3>
+<p><code>test/test_tonal_buildup_and_snapback.jl</code> &mdash; <strong>9 testsets, 268 assertions</strong>
+covering constants ranges, reset behavior, build-up growth, tone-change snap-back, jitter
+non-determinism, sum-to-1 invariant, value bounds, and cool-down structure.</p>
+
+<!-- ================================================================ -->
+<h2 id="sparse-active">15.25 Sparse-Active Fire Gate at the Engine Fire Site <span class="new-badge">v7.16+</span></h2>
+
+<div class="grug-box">
+    <p><strong>User directive (verbatim):</strong> <em>"a pattern bind below a high threshold shouldn't
+    even fire really. its sparse active. shouldn't handle that from the aiml layer."</em></p>
+    <p>Right layer matters. AIML's job is picking winners from a pool of fired specimens. If sub-threshold
+    noise is in the pool, AIML can suppress it but the FIRE SLOT has already been spent &mdash;
+    <code>ACTIVE_FIRE_CAP = 1000</code> is finite. Cull at the fire site, not after.</p>
+</div>
+
+<h3>Where it fires</h3>
+<table>
+    <tr><th>Constant</th><th>Default</th><th>Layer interaction</th></tr>
+    <tr><td><code>SPARSE_ACTIVE_FIRE_FLOOR</code></td><td>0.20</td><td>Above relay hard floor (0.10) so attachments still get a voice; below AIML lock-in floor (0.50) so the lock-in machinery is untouched; below <code>AIML_CONFIDENCE_THRESHOLD</code> so the two-tier band logic is untouched</td></tr>
+</table>
+
+<ol>
+    <li><strong><code>scan_specimens</code> &rarr; <code>fire_one</code> closure</strong> (engine.jl).
+        Gate runs <em>after</em> action-tone weighting, so the value the gate sees is the same value the
+        vote pool would have seen. On cull: tally a skip, return <code>nothing</code>, do NOT claim from
+        <code>FireCounter</code>.</li>
+    <li><strong><code>fire_attachments!</code></strong>. The relay's own hard floor (0.1) still applies
+        first; a <code>max(0.1, &hellip;)</code> clamp on a genuinely weak base is just noise riding the
+        connector &mdash; culled.</li>
+</ol>
+
+<h3>Public API</h3>
+<ul>
+    <li><code>SPARSE_ACTIVE_FIRE_FLOOR</code> &mdash; const</li>
+    <li><code>should_fire_sparse_active(confidence::Real) -&gt; Bool</code> &mdash; false for NaN/Inf,
+        true iff <code>confidence &ge; FLOOR</code></li>
+    <li><code>tally_sparse_active_skip!()</code> &mdash; atomic counter</li>
+    <li><code>get_sparse_active_skip_count()::Int</code></li>
+    <li><code>reset_sparse_active_skip_count!()</code></li>
+</ul>
+
+<h3>Tests</h3>
+<p><code>test/test_sparse_active_fire.jl</code> &mdash; <strong>24 assertions</strong>: threshold,
+NaN/Inf rejection, integer confidences, thread-safe counter increment under
+<code>Threads.@threads</code>, relay-floor interaction.</p>
+
+<!-- ================================================================ -->
+<h2 id="sigil-rail">15.26 Sigil Routing Rail: Multi-Step Linguistic Reasoning <span class="new-badge">v2.6</span></h2>
+
+<div class="grug-box">
+    <p><strong>User directive (verbatim):</strong> <em>"nodes now do pattern reaction which suffices for
+    most tasks. but lets say a user asks something more intermediate linguistically not even just math.
+    like a multi part question or instruction"</em></p>
+    <p><em>"when user input is sent and is detected to have math syntax or certain linguistics that
+    require sigils. like lets say 2+2 is in the input. it is replaced with sigil notation this way the
+    pattern bind phase need not change. now for nodes that have things like this... the node can fire
+    more than one vote. all votes inherit the same confidence from pattern bind phase... user input that
+    is like this should be routed directly to node types like this in fact those node types have a
+    special tag so its simple to figure out."</em></p>
+</div>
+
+<h3>What this rail solves</h3>
+<p>Pattern-bind is <em>reactive</em>: input &rarr; match &rarr; action. That suffices for ~95% of inputs.
+But <em>structural</em> inputs &mdash; multi-step arithmetic, multi-clause questions, structured
+instructions &mdash; need a node to do more than fire a single vote. The sigil rail is the second
+fire path: input &rarr; rewrite to canonical sigil form &rarr; recognize structure &rarr; emit one vote
+per reasoning step. Both rails share the same vote pool, the same lock-in floor, the same
+relation-gated support band. <strong>The sigil rail is purely additive &mdash; every pre-v2.6 node and
+every pre-v2.6 specimen continue to behave identically.</strong></p>
+
+<h3>Architecture (front-door &rarr; vote pool)</h3>
+<pre><code>raw input
+   │
+   ▼
+SigilPromoter._tokenize       (strip punctuation, normalize whitespace)
+   │
+   ▼
+Layer 1: language canon       ("two" → "2", "plus" → "+")
+   │
+   ▼
+Layer 2: shape promotion      ("2" → &n=2, "+" → &op=plus, "and" → &conj=and)
+   │
+   ▼
+SigilMediator.mediate         returns SigilMediation(original, rewritten, bindings, kinds)
+   │                            kinds ⊆ [:math, :multipart], deterministic order
+   ▼
+Pattern-bind phase            sees the REWRITTEN form — `&n &op &n` matches normally
+   │
+   ▼
+Direct routing                for each k in kinds: list_sigil_node_ids(k) injected
+   │                            with inject_conf = max(0.4, max_primary_conf × 0.5)
+   ▼
+cast_sigil_votes              dispatches by node kind tag:
+   │                              :math → ArithmeticEngine, one Vote per step + headline
+   │                              :multipart → slice on &conj, one Vote per clause
+   │                              :instruction → reserved (SigilFireError(:reserved))
+   │                              :none → cast_vote (existing single-vote path)
+   ▼
+Vote pool                     same pool as pattern-reactive rail
+   │
+   ▼
+Lock-in floor + relation gate (unchanged from v7.16.3)
+   │
+   ▼
+COMMANDS[primary_vote.action] + concat(primary_vote.payload)</code></pre>
+
+<h3>Vote.payload field</h3>
+<p>The <code>Vote</code> struct gained a <code>payload::String</code> field. <strong>Inner constructor
+defaults <code>payload=""</code> so all 17+ existing 7-arg call sites compile unchanged.</strong>
+Sigil-routed votes set <code>action</code> to the opener command name (e.g. <code>"calculate"</code>)
+and stuff the structured answer (e.g. <code>"4"</code>) into <code>payload</code>. The orchestrator
+concatenates payload after <code>COMMANDS[action]</code> renders. This is how the computed answer rides
+alongside the action key without breaking the <code>COMMANDS[&hellip;]</code> lookup contract.</p>
+
+<h3>Tagging convention on <code>Node.drop_table</code></h3>
+<table>
+    <tr><th>Tag</th><th>Behavior</th><th>Status</th></tr>
+    <tr><td><code>@sigil:math</code></td><td>Node answers arithmetic via <code>ArithmeticEngine</code>; emits one vote per <code>ComputationStep</code> plus a final headline vote</td><td>✅ live</td></tr>
+    <tr><td><code>@sigil:multipart</code></td><td>Node answers multi-clause input by slicing on <code>&amp;conj</code> boundaries; emits one vote per non-empty clause</td><td>✅ live</td></tr>
+    <tr><td><code>@sigil:instruction</code></td><td>Stage-3 instruction-decomposition. Currently raises <code>SigilFireError(:reserved)</code> if a node tries to fire with this tag</td><td>🟡 reserved</td></tr>
+</table>
+
+<p>Helpers (engine.jl):</p>
+<ul>
+    <li><code>node_sigil_kind(node) -&gt; Symbol</code> &mdash; scans <code>drop_table</code> for the
+        <code>@sigil:</code> prefix, returns <code>:none</code> if no tag</li>
+    <li><code>has_sigil_tag(node) -&gt; Bool</code></li>
+    <li><code>create_sigil_node(pattern, packet, data, drop_table; kind, &hellip;)</code> &mdash;
+        convenience wrapper that prepends the tag, dedups if already present</li>
+    <li><code>list_sigil_node_ids(kind=:any) -&gt; Vector{String}</code> &mdash; walks <code>NODE_MAP</code>,
+        <strong>skips graved nodes</strong>, returns ids in deterministic sorted order</li>
+</ul>
+
+<p><code>collect_drop_table_neighbors</code> filters <code>@</code>-prefixed entries so existing
+neighbor-cluster logic doesn't treat sigil tags as content tokens.</p>
+
+<h3>The <code>&amp;conj</code> macro (new in v2.6)</h3>
+<p>Added to <code>default_registry()</code>. Lexicon: <code>["and", "then", "also", "plus", "but", "or"]</code>,
+<code>promote_at_tokenize=true</code>. This is what the multipart clause-slicer keys off. Default-registry
+size grew from 5 to 6 sigils.</p>
+
+<p><code>&amp;punct</code> was considered and dropped &mdash; <code>SigilPromoter._tokenize</code> strips
+punctuation before binding runs, so a <code>&amp;punct</code> macro would be dead infrastructure.</p>
+
+<h3>SigilFireError</h3>
+<p>Loud failure when something goes structurally wrong. Carries
+<code>(kind::Symbol, node_id::String, reason::String)</code> with a clean <code>showerror</code>.
+<code>cast_vote</code>'s peek-and-fanout has a try/catch fallback to the plain single-vote path so a
+broken sigil node degrades to one vote rather than killing the whole fire batch.</p>
+
+<h3>Engine-default sigil-tagged seed nodes</h3>
+<p>Three sigil-tagged seeds in <code>Main.jl</code> boot block. A fresh cave can answer arithmetic and
+multipart inputs out of the box without the user having to teach a node first.</p>
+
+<table>
+    <tr><th>Pattern</th><th>Action packet</th><th>Kind</th></tr>
+    <tr><td><code>&amp;n &amp;op &amp;n</code></td><td><code>calculate^4 | reason^2 | analyze^1</code></td><td><code>:math</code></td></tr>
+    <tr><td><code>&amp;n &amp;op &amp;n &amp;op &amp;n</code></td><td><code>calculate^4 | reason^2 | ponder^1</code></td><td><code>:math</code></td></tr>
+    <tr><td><code>&amp;conj</code></td><td><code>explain^4 | describe^2 | elaborate^1</code></td><td><code>:multipart</code></td></tr>
+</table>
+
+<p>The math seed patterns match the canonical sigil-rewritten form, so they also light up via normal
+pattern-bind on rewritten input. The multipart seed pattern is just <code>&amp;conj</code> &mdash; it
+ONLY pattern-binds when the input contains a conjunction token, avoiding greedy <code>&amp;word</code>
+matches against arbitrary single-clause text. Direct routing also injects each kind's tagged nodes
+whenever <code>SigilMediator</code> detects that kind.</p>
+
+<h3>End-to-end smoke (verified)</h3>
+<pre><code>"what is two plus two"
+   → SigilMediator.mediate kinds=[:math]
+   → rewritten "what is &n &op &n"
+   → math seed `&n &op &n` binds on rewrite
+   → cast_sigil_votes invokes ArithmeticEngine.evaluate
+   → primary vote action="calculate" payload="4"
+   → COMMANDS["calculate"] renders + concat("4")
+   → output ends with "4"</code></pre>
+
+<h3>Save format v2.6</h3>
+<p>The full sigil registry serializes as a top-level <code>"sigils"</code> block. Lambda predicates
+(the actual matcher functions) <strong>never serialize</strong> &mdash; they re-attach via
+<code>merge_registry!(table, default_registry(); conflict=:keep)</code> inside
+<code>restore_table!</code>. Restored entries win on conflict; defaults fill any gaps. The merge is
+hoisted into a closure that runs even on the empty-entries early-return path, so engine defaults are
+guaranteed present after any restore (including v2.5 specimens with no <code>"sigils"</code> key &mdash;
+they load to clean defaults).</p>
+
+<p>Save scroll prints <code>🔣 Sigil registry restored (N sigils)</code>. Validation allowlist
+extended; unknown keys still fail loud.</p>
+
+<h3>Tests</h3>
+<p><code>test/test_sigil_pipeline.jl</code> &mdash; <strong>17 testsets, 123 assertions, all pass</strong>:</p>
+<ol>
+    <li>SigilMediator.mediate happy path + kind detection</li>
+    <li>kinds_for_bindings deterministic ordering + no false positives</li>
+    <li>Tagging helpers (node_sigil_kind, has_sigil_tag, list_sigil_node_ids)</li>
+    <li>create_sigil_node rejects :none, dedups existing tag</li>
+    <li>cast_sigil_votes for :math single-step</li>
+    <li>cast_sigil_votes for :math multi-step (per-step votes + headline)</li>
+    <li>cast_sigil_votes for :multipart clause slicing</li>
+    <li>:instruction reserved → SigilFireError(:reserved)</li>
+    <li>:none delegates to cast_vote</li>
+    <li>Unknown kind → SigilFireError(:unknown_kind)</li>
+    <li>SigilFireError fields + showerror</li>
+    <li>Vote.payload field default + 7-arg backward compat</li>
+    <li>End-to-end process_mission stdout: "two plus two" produces output containing "4"</li>
+    <li>Save / load v2.6 round-trip preserves custom sigils</li>
+    <li>v2.5 backward compat (no "sigils" key → defaults)</li>
+    <li>Singleton lifecycle (reset / register / serialize / restore) + bad-input tolerance</li>
+    <li>list_sigil_node_ids skips graved nodes</li>
+</ol>
+<p>Full suite: <strong>48 / 48 testfiles pass, ~4m52s, zero regressions</strong>.</p>
+
+<!-- ================================================================ -->
+<!-- ================================================================ -->
+<h2 id="specimen-persistence">16. Specimen Persistence: Full Cave Save/Restore <span class="new-badge">v7 / v2.5 / v2.6</span></h2>
 
 <div class="grug-box">
     <p>Grug build cave for YEARS. Thousands of rocks. Hundreds of rules. Brain full of knowledge.
@@ -2738,30 +3044,43 @@ time, share it with others, or restore it later on a different machine.</p>
     <tr><td><code>/loadSpecimen <filepath></code></td><td>Restore entire cave state from a specimen file (<strong>destructive</strong> — wipes current state)</td></tr>
 </table>
 
-<h3>State Categories (21 total, v2.4) <span class="new-badge">v7.7</span></h3>
+<h3>State Categories (28 total, v2.6) <span class="new-badge">v7.7 / v2.5 / v2.6</span></h3>
+<p><strong>Format string:</strong> <code>"grugbot420-specimen-v2.6"</code>. Backward-compatible: v2.5 and
+v2.4 specimens load cleanly &mdash; absent categories restore to clean defaults (concept-class seeds
+re-built, sigil registry re-seeded from <code>default_registry()</code>).</p>
 <table>
     <tr><th>#</th><th>Category</th><th>Description</th></tr>
-    <tr><td>1</td><td><strong>nodes</strong></td><td>Full Node structs — id, pattern, signal, action_packet, strength, neighbors, graves, drop_table, response_times, hopfield_key, relational_patterns, throttle, json_data</td></tr>
+    <tr><td>1</td><td><strong>nodes</strong></td><td>Full Node structs &mdash; id, pattern, signal, action_packet, strength, neighbors, graves, drop_table (incl. <code>@sigil:&lt;kind&gt;</code> tags in v2.6), response_times, hopfield_key, relational_patterns, throttle, json_data</td></tr>
     <tr><td>2</td><td><strong>hopfield_cache</strong></td><td>Familiar input fast-path cache with hit counts (UInt64 hash &rarr; node IDs)</td></tr>
     <tr><td>3</td><td><strong>rules</strong></td><td>AIML_DROP_TABLE stochastic orchestration rules (text + fire probability)</td></tr>
     <tr><td>4</td><td><strong>message_history</strong></td><td>Up to 10,000 ChatMessage entries with pin flags preserved</td></tr>
-    <tr><td>5</td><td><strong>lobes</strong></td><td>LOBE_REGISTRY — subject, node_ids, connected_lobe_ids, fire/inhibit counts</td></tr>
+    <tr><td>5</td><td><strong>lobes</strong></td><td>LOBE_REGISTRY &mdash; subject, node_ids, connected_lobe_ids, fire/inhibit counts</td></tr>
     <tr><td>6</td><td><strong>node_to_lobe_idx</strong></td><td>NODE_TO_LOBE_IDX reverse index (node &rarr; lobe mapping)</td></tr>
     <tr><td>7</td><td><strong>lobe_tables</strong></td><td>LOBE_TABLE_REGISTRY with all chunks and NodeRef objects</td></tr>
-    <tr><td>8</td><td><strong>verb_registry</strong></td><td>SemanticVerbs — all verb classes, verbs, and synonym normalizations</td></tr>
+    <tr><td>8</td><td><strong>verb_registry</strong></td><td>SemanticVerbs &mdash; all verb classes, verbs, and synonym normalizations</td></tr>
     <tr><td>9</td><td><strong>thesaurus_seeds</strong></td><td>Thesaurus SYNONYM_SEED_MAP (hardcoded defaults + runtime additions)</td></tr>
     <tr><td>10</td><td><strong>inhibitions</strong></td><td>InputQueue NegativeThesaurus entries (word, reason, timestamp)</td></tr>
     <tr><td>11</td><td><strong>arousal</strong></td><td>EyeSystem arousal state (level, decay_rate, baseline)</td></tr>
-    <tr><td>11.5</td><td><strong>eye_state</strong></td><td>EyeSystem tracking — attention_enabled, blur_enabled, last centroid, last_arousal</td></tr>
+    <tr><td>11.5</td><td><strong>eye_state</strong></td><td>EyeSystem tracking &mdash; attention_enabled, blur_enabled, last centroid, last_arousal</td></tr>
     <tr><td>12</td><td><strong>id_counters</strong></td><td>NODE ID_COUNTER and MSG_ID_COUNTER atomic values</td></tr>
-    <tr><td>12.5</td><td><strong>last_voters</strong></td><td>LAST_VOTER_IDS — node IDs that voted in last cycle (for /wrong feedback)</td></tr>
+    <tr><td>12.5</td><td><strong>last_voters</strong></td><td>LAST_VOTER_IDS &mdash; node IDs that voted in last cycle (for /wrong feedback)</td></tr>
     <tr><td>13</td><td><strong>brainstem</strong></td><td>BrainStem dispatch count and propagation history</td></tr>
-    <tr><td>14</td><td><strong>attachments</strong></td><td>ATTACHMENT_MAP — target&rarr;attached node mappings with patterns and signals</td></tr>
-    <tr><td>15</td><td><strong>trajectory</strong></td><td>ActionTonePredictor ring buffer + config — behavioral inertia</td></tr>
+    <tr><td>14</td><td><strong>attachments</strong></td><td>ATTACHMENT_MAP &mdash; target&rarr;attached node mappings with patterns and signals</td></tr>
+    <tr><td>15</td><td><strong>trajectory</strong></td><td>ActionTonePredictor ring buffer + config &mdash; behavioral inertia</td></tr>
     <tr><td>16</td><td><strong>temporal_coherence</strong></td><td>ImageSDF timing patterns and coherence scores</td></tr>
     <tr><td>17</td><td><strong>morph_cooldowns</strong></td><td>ChatterMode 24h morph cooldown timestamps</td></tr>
-    <tr><td>18</td><td><strong>immune_system</strong></td><td>ImmuneSystem Hopfield memory + ledger — safe/funky signatures</td></tr>
-    <tr><td>19</td><td><strong>aiml_system</strong></td><td>AIMLNodeSystem per-lobe tribes — AIML nodes, templates, strength</td></tr>
+    <tr><td>18</td><td><strong>immune_system</strong></td><td>ImmuneSystem Hopfield memory + ledger &mdash; safe/funky signatures</td></tr>
+    <tr><td>19</td><td><strong>aiml_system</strong></td><td>AIMLNodeSystem per-lobe tribes &mdash; AIML nodes, templates, strength</td></tr>
+    <tr><td colspan="3" style="text-align:center; background:#1a3a1a;"><strong>v2.5 additions (May 2026)</strong></td></tr>
+    <tr><td>20</td><td><strong>tonal_buildup</strong></td><td>ActionTonePredictor single-slot accumulator <code>(tone, buildup, ts)</code> &mdash; persists mood stack across save/load instead of cold-starting every reload</td></tr>
+    <tr><td>21</td><td><strong>concept_classes</strong></td><td>Thesaurus CONCEPT_CLASS_MEMBERS &mdash; user-managed via <code>/conceptClass add/remove</code></td></tr>
+    <tr><td>22</td><td><strong>concept_inhibitions</strong></td><td>InputQueue _NEG_CONCEPT_BANS &mdash; sibling of <code>inhibitions</code>, user-managed concept-level bans</td></tr>
+    <tr><td>23</td><td><strong>groups</strong></td><td>GroupRegistry _REGISTRY &mdash; v7.15 group registry, previously persisted via separate <code>group_registry.json.gz</code> file (now folded into the unified specimen)</td></tr>
+    <tr><td>24</td><td><strong>crystalize</strong></td><td>CrystalizeTag user-issued + auto-promoted "lock me forever" sets</td></tr>
+    <tr><td>25</td><td><strong>chatter_swap_cooldowns</strong></td><td>ChatterVoteSwap _COOLDOWN_MAP &mdash; 1-hour cooldown timestamps (parity with morph_cooldowns)</td></tr>
+    <tr><td>26</td><td><strong>subconscious</strong></td><td>SelfObserver _GLOBAL_STORE &mdash; the process-wide subconscious microlog</td></tr>
+    <tr><td colspan="3" style="text-align:center; background:#1a3a1a;"><strong>v2.6 additions</strong></td></tr>
+    <tr><td>27</td><td><strong>sigils</strong></td><td>SigilRegistry full registry (label + entries). Lambda predicates re-attach via <code>merge_registry!(:keep)</code> on restore so engine-default sigils with closure predicates survive serialization</td></tr>
 </table>
 
 <h3>Usage Example</h3>
@@ -3289,6 +3608,111 @@ fails the parent <code>@testset</code>.
 <!-- ================================================================ -->
 <div style="margin-top: 60px; border-top: 2px solid #333; padding-top: 30px;">
     <h2 style="color: #00ff88; border: none; padding: 0;">Changelog</h2>
+
+    <h3>v2.6 &mdash; Sigil Routing Rail (multi-step linguistic reasoning) <span class="new-badge">NEW</span></h3>
+    <ul>
+        <li><strong>Second fire path activated.</strong> The Sigil/Promoter/Arithmetic kernel ported in
+            the v7.16+ round was dormant infrastructure &mdash; the modules existed but were never wired
+            into the engine fire path. v2.6 wires the entire rail end-to-end: <code>SigilMediator</code>
+            sits between front-door and pattern-bind, structural inputs (math syntax, multi-clause
+            language) get rewritten to canonical sigil form, and tagged nodes can emit one vote per
+            reasoning step.</li>
+        <li><strong>New module: <code>SigilMediator.jl</code></strong> &mdash; thin coordinator returning
+            <code>SigilMediation(original, rewritten, bindings, kinds)</code>. Deterministic kinds
+            ordering: <code>[:math, :multipart]</code>.</li>
+        <li><strong>New macro: <code>&amp;conj</code></strong> &mdash; lexicon
+            <code>["and", "then", "also", "plus", "but", "or"]</code>,
+            <code>promote_at_tokenize=true</code>. Default-registry size 5 &rarr; 6.</li>
+        <li><strong>Tagging convention on <code>Node.drop_table</code></strong>:
+            <code>@sigil:math</code> (live), <code>@sigil:multipart</code> (live),
+            <code>@sigil:instruction</code> (reserved). Helpers: <code>node_sigil_kind</code>,
+            <code>has_sigil_tag</code>, <code>create_sigil_node</code>,
+            <code>list_sigil_node_ids(kind)</code> (skips graved nodes, deterministic order).</li>
+        <li><strong><code>Vote.payload::String</code> field</strong> &mdash; structured content rides
+            alongside the action key. Inner constructor defaults to empty string so all 17+ existing
+            7-arg call sites compile unchanged.</li>
+        <li><strong><code>cast_sigil_votes</code></strong> &mdash; multi-vote fire path. Math &rarr;
+            one Vote per <code>ComputationStep</code> + headline. Multipart &rarr; one Vote per
+            <code>&amp;conj</code>-sliced clause. Instruction &rarr; <code>SigilFireError(:reserved)</code>.
+            Unknown &rarr; <code>SigilFireError(:unknown_kind)</code>. <code>cast_vote</code> peeks
+            <code>has_sigil_tag</code> and fans out, with try/catch fallback to plain path.</li>
+        <li><strong>Direct routing in <code>process_mission</code></strong>: post-scan, pre-DONE, walks
+            <code>list_sigil_node_ids(kind)</code> for each kind in
+            <code>SigilMediator.kinds</code> and injects missing tagged nodes into the candidate pool
+            with <code>inject_conf = max(0.4, max_primary_conf &times; 0.5)</code>.</li>
+        <li><strong>Engine-default sigil-tagged seed nodes</strong>: <code>&amp;n &amp;op &amp;n</code>
+            and <code>&amp;n &amp;op &amp;n &amp;op &amp;n</code> (<code>:math</code>),
+            <code>&amp;conj</code> (<code>:multipart</code>). A fresh cave can answer
+            <code>"what is two plus two"</code> with <code>4</code> out of the box.</li>
+        <li><strong>Save format v2.5 &rarr; v2.6</strong>. New top-level <code>"sigils"</code> block
+            (label + entries). Lambda predicates re-attach via
+            <code>merge_registry!(:keep)</code> in <code>restore_table!</code>; the merge runs even on
+            empty-input early-return so engine defaults are guaranteed present after every restore.
+            v2.5 specimens load cleanly. Save scroll prints
+            <code>🔣 Sigil registry restored (N sigils)</code>.</li>
+        <li><strong>Full test coverage</strong>: <code>test/test_sigil_pipeline.jl</code> &mdash;
+            17 testsets, 123 assertions, all pass. <code>test_save_coverage_v25.jl</code> bumped
+            87 &rarr; 89 assertions to cover the new sigils block. Full suite:
+            <strong>48 / 48 testfiles pass, ~4m52s, zero regressions</strong>.</li>
+        <li><strong>Why this layer</strong>: pattern-bind is reactive, sigil routing is structural.
+            Both rails share the same vote pool, lock-in floor, and relation-gated support band.
+            Purely additive &mdash; every pre-v2.6 node and specimen continue to behave identically.</li>
+    </ul>
+
+    <h3>v2.5 &mdash; Save Coverage (seven persistence holes plugged)</h3>
+    <ul>
+        <li><strong>Audit-driven completion.</strong> User directive: <em>"i think there are quite a few
+            features that save to disc rn that arent part of the save file system. so yea check that
+            ... sub conscious writing isn't in the file either. lets get it all wired up"</em>.
+            Audit found seven categories of live runtime state being silently dropped by
+            <code>/saveSpecimen</code>.</li>
+        <li><strong>Format bumped 2.4 &rarr; 2.5.</strong> Backward-compatible: v2.4 specimens load with
+            new categories at clean defaults (concept-class seeds rebuilt automatically).</li>
+        <li><strong>Seven new top-level keys</strong>: <code>tonal_buildup</code>,
+            <code>concept_classes</code>, <code>concept_inhibitions</code>, <code>groups</code>,
+            <code>crystalize</code>, <code>chatter_swap_cooldowns</code>, <code>subconscious</code>.</li>
+        <li><strong>Disk-write fragmentation fixed</strong>: <code>GroupRegistry</code>'s separate
+            <code>group_registry.json.gz</code> external file is no longer the primary persistence path
+            for groups (still callable for ops use). Everything goes through the unified specimen.</li>
+        <li><strong>Per-module API surface</strong>: each affected module gained matched
+            <code>serialize_*</code> / <code>restore_*</code> helpers so the persistence concern lives
+            near the type. Validation allowlist extended; unknown keys still fail loud.</li>
+        <li><strong>Coverage</strong>: <code>test/test_save_coverage_v25.jl</code> &mdash; 9 testsets,
+            87 assertions (now 89 in v2.6) including a full
+            save-decompress-wipe-load-verify integration round-trip.</li>
+    </ul>
+
+    <h3>v7.16+ ports &mdash; SelfObserver, Sigil kernel, ArithmeticEngine, Tonal Build-Up, Sparse-Active Fire</h3>
+    <ul>
+        <li><strong>SelfObserver</strong> (subconscious microlog): fuzzy time-cue API, throttled,
+            structurally bans <code>Float64</code> from public surface, process-wide singleton.
+            <code>test_self_observer.jl</code> &mdash; 129 assertions.</li>
+        <li><strong>SigilRegistry / SigilPromoter / ArithmeticEngine</strong>: typed symbolic handles
+            (<code>&amp;n</code>, <code>&amp;op</code>, <code>&amp;word</code>, <code>&amp;noun</code>,
+            <code>&amp;rest</code>), front-door rewriter (<code>"two plus two"</code> &rarr;
+            <code>"&amp;n &amp;op &amp;n"</code>), multi-step arithmetic via
+            <code>ArithmeticEngine.evaluate</code>. Idempotent. Zero runtime cost when no sigils used.
+            All three ported from <code>main</code> as additive infrastructure; wired into the engine
+            fire path in v2.6 (see above).</li>
+        <li><strong>Tonal build-up</strong> over consecutive same-tone predictions
+            (<code>0.20 &times; (1 - buildup)</code> per hit, 30s halflife, 0.6 arousal gain).
+            Same tone twice &rarr; mood stacks; tone change &rarr; snap-back; long quiet &rarr;
+            exponential cool-down. Sign of arousal nudge preserved.</li>
+        <li><strong>Per-prediction Lorenz snap-back</strong>: &plusmn;2.5% multiplicative jitter +
+            5% pull toward <code>1/N</code> baseline + renormalize. Identical inputs no longer produce
+            bit-identical curves. Bounded, fast, unconditional. Runs after the trajectory damper and
+            before winner pick.</li>
+        <li><strong>Sparse-active fire gate</strong> at the engine fire site (<code>scan_specimens</code>
+            + <code>fire_attachments!</code>). Confidence below
+            <code>SPARSE_ACTIVE_FIRE_FLOOR (0.20)</code> is culled BEFORE claiming a fire slot.
+            User directive: <em>"a pattern bind below a high threshold shouldn't even fire really.
+            its sparse active. shouldn't handle that from the aiml layer."</em></li>
+        <li><strong>Coverage</strong>: <code>test_tonal_buildup_and_snapback.jl</code> (268 assertions),
+            <code>test_sparse_active_fire.jl</code> (24 assertions),
+            <code>test_sigil_registry.jl</code> (183 assertions in v2.6 with <code>&amp;conj</code>),
+            <code>test_sigil_promoter.jl</code> (284 assertions),
+            <code>test_arithmetic_engine.jl</code> (111 assertions).</li>
+    </ul>
 
     <h3>v7.22 &mdash; Strength-Driven Solidification</h3>
     <ul>

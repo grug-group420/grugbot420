@@ -5103,6 +5103,61 @@ try
     create_node("grug hits rock and makes fire",
         "analyze[dont panic]^5 | ponder^2",
         relational_ctx, String[])
+
+    # =========================================================================
+    # GRUG v2.6: Engine-default sigil-tagged seeds.
+    # ------------------------------------------------------------------------
+    # Why: pattern-bind nodes above handle reactive cases. These three handle
+    # the *structured* rail -- math syntax + multi-clause linguistic structure
+    # -- so a fresh cave can answer "2 + 2" or "tell me X and explain Y" out
+    # of the box without the user having to teach a node first.
+    #
+    # Direct routing in process_mission walks list_sigil_node_ids(kind) and
+    # injects these into the candidate pool when the SigilMediator detects
+    # the matching kind in the input. The :math nodes pattern-match the
+    # canonical sigil-rewritten form (&n &op &n / &n &op &n &op &n) so they
+    # also light up via normal pattern-bind on rewritten input.
+    #
+    # cast_sigil_votes consumes node.drop_table to dispatch to the right
+    # multi-vote builder; Vote.payload carries the structured answer that
+    # the orchestrator concatenates after COMMANDS[action] renders.
+    # =========================================================================
+    math_ctx = Dict{String, Any}(
+        "system_prompt" => "Sigil-bound arithmetic engine: solve the rewritten &n &op &n form step-by-step.",
+        "sigil_kind"    => "math",
+    )
+    multipart_ctx = Dict{String, Any}(
+        "system_prompt" => "Sigil-bound multipart handler: split the input on &conj boundaries and answer each clause.",
+        "sigil_kind"    => "multipart",
+    )
+
+    # Math seed #1: simple two-operand form (covers "2 + 2", "two plus two", etc.)
+    create_sigil_node(
+        "&n &op &n",
+        "calculate^4 | reason^2 | analyze^1",
+        math_ctx, String[];
+        kind = :math,
+    )
+
+    # Math seed #2: three-operand form (covers "2 + 3 + 4", "two plus three times four", etc.)
+    create_sigil_node(
+        "&n &op &n &op &n",
+        "calculate^4 | reason^2 | ponder^1",
+        math_ctx, String[];
+        kind = :math,
+    )
+
+    # Multipart seed: triggers when SigilMediator detects a &conj token in the
+    # rewritten input. Pattern is just "&conj" so it ONLY pattern-binds on
+    # rewritten inputs that contain a conjunction -- avoiding greedy &word
+    # matches against arbitrary single-clause text. Direct routing also
+    # injects this whenever :multipart is in the detected kinds set.
+    create_sigil_node(
+        "&conj",
+        "explain^4 | describe^2 | elaborate^1",
+        multipart_ctx, String[];
+        kind = :multipart,
+    )
 catch e
     println("!!! FATAL: Grug failed to plant initial seeds in cave !!!")
     Base.show_backtrace(stdout, catch_backtrace())

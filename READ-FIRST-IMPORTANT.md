@@ -31,6 +31,9 @@
 | **Tonal build-up over consecutive same-tone predictions** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
 | **Per-prediction Lorenz snap-back (jitter + entropy tug)** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
 | **Sparse-active fire gate at the engine fire site** | `VoteOrchestrator.jl` + `engine.jl` | ✅ (NEW v7.16+) |
+| **Sigil routing rail (multi-step + multi-clause linguistic reasoning)** | `SigilMediator.jl` + `engine.jl` + `Main.jl` | ✅ (NEW v2.6) |
+| **Engine-default sigil-tagged seed nodes (fresh cave answers `2+2`)** | `Main.jl` boot seeds | ✅ (NEW v2.6) |
+| **Save format v2.6 (sigil registry persists across save/load)** | `SigilRegistry.jl` + `Main.jl` | ✅ (NEW v2.6) |
 
 **Hopfield networks were commented out long ago.** The ghost references in
 `PhagyMode.jl` (`CACHE_VALIDATOR` etc.) are stubbed; nothing in the live
@@ -273,6 +276,241 @@ groups, crystalize sets, swap cooldowns, subconscious keys).
 
 ---
 
+## NEW in this round — v2.6 sigil routing rail (multi-step linguistic reasoning)
+
+> **User directive (verbatim):** *"nodes now do pattern reaction which suffices
+> for most tasks. but lets say a user asks something more intermediate
+> linguistically not even just math. like a multi part question or
+> instruction"*
+>
+> *"when user input is sent and is detected to have math syntax or certain
+> linguistics that require sigils. like lets say 2+2 is in the input. it is
+> replaced with sigil notation this way the pattern bind phase need not
+> change. now for nodes that have things like this... the node can fire
+> more than one vote. all votes inherit the same confidence from pattern
+> bind phase... user input that is like this should be routed directly to
+> node types like this in fact those node types have a special tag so its
+> simple to figure out."*
+
+The Sigil/Promoter/Arithmetic kernel ported earlier was **dormant
+infrastructure** — the modules existed but were never wired into the engine
+fire path. This round wires the entire rail end-to-end. Math is the
+cleanest first instance; the same machinery handles any input that needs
+linguistic-structure parsing before answering (multi-part questions /
+instructions).
+
+### What changed at a glance
+
+| Layer | Before v2.6 | After v2.6 |
+|---|---|---|
+| Front-door | SigilPromoter rewrites tokens, but bindings died at the boundary | `SigilMediator.mediate(raw)` produces structured `(original, rewritten, bindings, kinds)` consumed by Main.jl |
+| Pattern-bind | Pattern-reactive only — no way to mark "answer with structure" | Nodes can carry `@sigil:<kind>` tags on `drop_table`. Fully back-compat: untagged nodes behave identically |
+| Vote casting | One vote per fire | `cast_sigil_votes` lets tagged nodes emit **N votes per fire**, one per reasoning step (math) or per clause (multipart). All votes inherit the pattern-bind confidence — voting is per-step, the confidence math is unchanged |
+| Vote payload | `Vote.action` = command-name only | New `Vote.payload::String` carries structured content (e.g. the computed answer `4`). Orchestrator concatenates it after `COMMANDS[action]` renders. **8-arg constructor; backward-compat 7-arg constructor defaults payload to `""` so all existing call sites compile unchanged** |
+| Routing | Tagged nodes had to win pattern-bind to fire | `list_sigil_node_ids(kind)` walked at scan time — when SigilMediator detects `:math` / `:multipart` in the input, matching tagged nodes are **directly injected** into the candidate pool with `inject_conf = max(0.4, max_primary_conf × 0.5)` |
+| Persistence | Sigil registry rebuilt from defaults every boot | Save format **v2.5 → v2.6**: full registry serialized as a `"sigils"` block. Engine-default sigils with lambda predicates re-attach via `merge_registry!(:keep)` so v2.5 specimens load cleanly |
+| Boot seeds | Three pattern-reactive seeds (greet / reason / relational) | Three pattern-reactive seeds **plus three sigil-tagged seeds**: `&n &op &n` and `&n &op &n &op &n` (math), `&conj` (multipart). A fresh cave can answer `"what is two plus two"` with `4` out of the box |
+
+### New module: `src/SigilMediator.jl`
+
+Thin coordinator. Calls `SigilPromoter.promote_input(raw)`, then walks the
+returned bindings to determine which routing kinds apply. Deterministic
+order on the kinds vector: `[:math, :multipart]`.
+
+```julia
+struct SigilMediation
+    original::String         # exactly what the user typed
+    rewritten::String        # canonical sigil form (e.g. "&n &op &n")
+    bindings::Vector{SigilBinding}
+    kinds::Vector{Symbol}    # subset of [:math, :multipart], deterministic order
+end
+
+mediate(raw::String) -> SigilMediation
+has_math(bindings) -> Bool       # ≥2 &n + ≥1 &op
+has_multipart(bindings) -> Bool  # ≥1 &conj
+kinds_for_bindings(bindings) -> Vector{Symbol}
+```
+
+`process_mission` calls `mediate(mission_text)` after image detection in a
+non-fatal try/catch — sigil failures degrade to plain pattern-bind, never
+abort the mission.
+
+### New macro: `&conj`
+
+Added to `default_registry()`. Lexicon: `["and", "then", "also", "plus",
+"but", "or"]`, `promote_at_tokenize=true`. This is what the multipart
+clause-slicer keys off. Default-registry size: 5 → 6 sigils.
+
+`&punct` was considered and **dropped** — `SigilPromoter._tokenize` strips
+punctuation before binding runs, so a `&punct` macro would be dead infrastructure.
+
+### New tagging convention on `Node.drop_table`
+
+| Tag | Meaning | Status |
+|---|---|---|
+| `@sigil:math` | Node answers arithmetic via `ArithmeticEngine`; emits one vote per `ComputationStep` plus a final headline vote | ✅ live |
+| `@sigil:multipart` | Node answers multi-clause input by slicing on `&conj` boundaries; emits one vote per non-empty clause | ✅ live |
+| `@sigil:instruction` | Reserved for Stage-3 instruction-decomposition. Currently raises `SigilFireError` if a node tries to fire with this tag | 🟡 reserved |
+
+Helpers (all in `engine.jl`):
+- `node_sigil_kind(node) -> Symbol` — returns the kind (or `:none`) by scanning `drop_table` for the `@sigil:` prefix
+- `has_sigil_tag(node) -> Bool`
+- `create_sigil_node(pattern, packet, data, drop_table; kind, ...)` — convenience wrapper that prepends the tag
+- `list_sigil_node_ids(kind=:any) -> Vector{String}` — walks `NODE_MAP`, **skips graved nodes**, returns ids in deterministic sorted order
+
+`collect_drop_table_neighbors` was updated to filter `@`-prefixed entries so
+the existing neighbor-cluster logic doesn't try to treat sigil tags as
+content tokens.
+
+### New fire path: `cast_sigil_votes`
+
+```julia
+cast_sigil_votes(
+    id::String,
+    conf::Float64,
+    bindings::Vector{SigilBinding},
+    original_text::String,
+    u_trips::Vector{RelationalTriple},
+    n_trips::Vector{RelationalTriple},
+)::Vector{Vote}
+```
+
+Dispatches on `node_sigil_kind(node)`:
+- **`:math`** → `_cast_math_votes` runs `ArithmeticEngine.evaluate(bindings)`, emits one `Vote` per `ComputationStep` (action = first opener from action packet, payload = the step's text rendering). For multi-step problems the final headline vote carries the full answer; for single-step problems just one vote with the answer in payload.
+- **`:multipart`** → `_cast_multipart_votes` slices `original_text` at every `&conj` binding's `raw_position` (0-based per SigilPromoter contract — `+1` for Julia indexing), emits one vote per non-empty clause, each with the clause text as payload.
+- **`:instruction`** → currently throws `SigilFireError(:reserved, ...)`.
+- **`:none`** → delegates to `cast_vote` (the existing single-vote path).
+- **Unknown kind** → throws `SigilFireError(:unknown_kind, ...)`. Loud failure, no silent fallback.
+
+`SigilFireError <: Exception` carries `(kind, node_id, reason)` and a clean
+`showerror` so traceback noise is bounded.
+
+In the engine fire site, `cast_vote` now peeks `has_sigil_tag(node)` and
+fans out to `cast_sigil_votes` when set, with a try/catch fallback to the
+plain path so a broken sigil node degrades to one vote rather than killing
+the whole fire batch.
+
+### Vote.payload + orchestrator concatenation
+
+The `Vote` struct gained a `payload::String` field with an inner
+constructor that defaults `payload=""`. **All 17+ existing 7-arg call
+sites compile unchanged.** In `ephemeral_aiml_orchestrator` (Main.jl
+~line 2105), after `COMMANDS[primary_vote.action]` produces its output,
+`primary_vote.payload` is concatenated when non-empty. This is how the
+computed `4` rides alongside the `calculate` action key without breaking
+the `COMMANDS[...]` lookup contract.
+
+### Direct routing in `process_mission`
+
+Post-scan, pre-DONE: for each kind in `sigil_mediation.kinds`, walk
+`list_sigil_node_ids(kind)` and inject any tagged node that didn't
+already win pattern-bind, with `inject_conf = max(0.4, max_primary_conf × 0.5)`.
+This means a fresh cave with sigil-tagged seeds can answer math and
+multipart inputs even before the user has trained any pattern-reactive
+nodes for them.
+
+### Save format v2.6
+
+```jsonc
+{
+  "format": "grugbot420-specimen-v2.6",
+  "version": "2.6",
+  // ... all v2.5 keys ...
+  "sigils": {
+    "label": "default_with_runtime_additions",
+    "entries": [
+      {"name": "n",    "class": "lambda", "applies_at": "tokenize", "sigil_type": "ord", "promote_at_tokenize": true,  "provenance": "default", "lexicon": null},
+      {"name": "op",   "class": "lambda", "applies_at": "tokenize", "sigil_type": "ord", "promote_at_tokenize": true,  "provenance": "default", "lexicon": null},
+      {"name": "word", "class": "lambda", "applies_at": "bind",     "sigil_type": null,  "promote_at_tokenize": false, "provenance": "default", "lexicon": null},
+      {"name": "rest", "class": "lambda", "applies_at": "bind",     "sigil_type": null,  "promote_at_tokenize": false, "provenance": "default", "lexicon": null},
+      {"name": "noun", "class": "tag",    "applies_at": "bind",     "sigil_type": null,  "promote_at_tokenize": false, "provenance": "default", "lexicon": null},
+      {"name": "conj", "class": "macro",  "applies_at": "tokenize", "sigil_type": null,  "promote_at_tokenize": true,  "provenance": "default", "lexicon": ["and","then","also","plus","but","or"]}
+    ]
+  }
+}
+```
+
+- Lambda predicates (the actual matcher functions) **never serialize** — they
+  re-attach via `merge_registry!(table, default_registry(); conflict=:keep)`
+  inside `restore_table!`. Restored entries win on conflict; defaults fill
+  any gaps. **The merge is now hoisted into a closure that runs even on the
+  empty-entries early-return path** so engine defaults are guaranteed
+  present after any restore — fix landed in commit `b604a86`.
+- v2.5 specimens (no `"sigils"` key) load cleanly: the wipe phase calls
+  `SigilRegistry.reset_default_table!()`, the absent key leaves clean
+  defaults, no error.
+- Save scroll prints `🔣 Sigil registry restored (N sigils)`.
+- Validation allowlist extended; unknown keys still fail loud.
+
+### Engine-default sigil seeds
+
+Three sigil-tagged seeds in `Main.jl` boot block. Pattern-bind matches the
+canonical sigil-rewritten form, so they also light up via normal pattern-bind:
+
+```julia
+# Math: simple two-operand
+create_sigil_node("&n &op &n",
+                  "calculate^4 | reason^2 | analyze^1",
+                  Dict("system_prompt" => "Sigil-bound arithmetic engine: solve the rewritten &n &op &n form step-by-step.",
+                       "sigil_kind" => "math"),
+                  String[]; kind = :math)
+
+# Math: three-operand
+create_sigil_node("&n &op &n &op &n",
+                  "calculate^4 | reason^2 | ponder^1",
+                  ..., kind = :math)
+
+# Multipart: pattern is just "&conj" so it ONLY pattern-binds when a
+# conjunction token is present in rewritten input -- avoids greedy matches.
+create_sigil_node("&conj",
+                  "explain^4 | describe^2 | elaborate^1",
+                  ..., kind = :multipart)
+```
+
+End-to-end smoke verified: `"what is two plus two"` → SigilMediator returns
+`kinds=[:math]` → math seeds bind on rewritten `"what is &n &op &n"` →
+`cast_sigil_votes` invokes `ArithmeticEngine` → primary vote action=`calculate`
+payload=`"4"` → orchestrator output ends with `4`.
+
+### Tests
+
+`test/test_sigil_pipeline.jl` — **17 testsets, 123 assertions, all pass**:
+
+1. `SigilMediator.mediate` happy path + kind detection
+2. `kinds_for_bindings` deterministic ordering + no false positives
+3. Tagging helpers (`node_sigil_kind`, `has_sigil_tag`, `list_sigil_node_ids`)
+4. `create_sigil_node` rejects `:none`, dedups existing tag
+5. `cast_sigil_votes` for `:math` single-step
+6. `cast_sigil_votes` for `:math` multi-step (per-step votes + headline)
+7. `cast_sigil_votes` for `:multipart` clause slicing
+8. `:instruction` reserved → `SigilFireError(:reserved, ...)`
+9. `:none` delegates to `cast_vote`
+10. Unknown kind → `SigilFireError(:unknown_kind, ...)`
+11. `SigilFireError` fields + `showerror`
+12. `Vote.payload` field default + 7-arg backward compat
+13. End-to-end `process_mission` stdout capture: `"two plus two"` produces output containing `4`
+14. Save / load v2.6 round-trip preserves custom sigils
+15. v2.5 backward compat (no `"sigils"` key → defaults)
+16. Singleton lifecycle (reset / register / serialize / restore)
+17. `restore_table!` bad-input tolerance (skip non-Dict + empty-name with warning, throw on non-array entries) + `list_sigil_node_ids` skips graved nodes
+
+`test/test_save_coverage_v25.jl` was bumped from 87 to **89 assertions**
+(asserts `"format" == "grugbot420-specimen-v2.6"`, `"version" == "2.6"`,
+and presence of the `"sigils"` block).
+
+Full suite: **48 / 48 testfiles pass, ~4m52s, zero regressions**.
+
+### Why this layer
+
+Pattern-bind is reactive: input → match → action. Sigil routing is
+**structural**: input → rewrite → recognize structure → emit one vote per
+reasoning step. The two paths share the same vote pool, the same lock-in
+floor, the same relation-gated support band. The sigil rail is purely
+additive — every pre-v2.6 node and every pre-v2.6 specimen continue to
+behave identically.
+
+---
+
 ## What was NOT ported (and why)
 
 | From `origin/main` | Why not |
@@ -292,19 +530,25 @@ cd grugbot420
 julia --project=. test/runtests.jl
 ```
 
-Expected: `GrugBot420 Tests | 45 45 ~4m`. Zero failures.
+Expected: `GrugBot420 Tests | 48 48 ~4m52s`. Zero failures.
 
 Module-by-module:
 
 ```bash
 # Ported modules
 julia --project=. test/test_self_observer.jl       # 129 assertions
-julia --project=. test/test_sigil_registry.jl      # 177 assertions
+julia --project=. test/test_sigil_registry.jl      # 183 assertions (v2.6: +&conj)
 julia --project=. test/test_sigil_promoter.jl      # 284 assertions
 julia --project=. test/test_arithmetic_engine.jl   # 111 assertions
 
+# v2.6 sigil routing rail
+julia --project=. test/test_sigil_pipeline.jl      # 123 assertions
+
 # New tonal dynamics
 julia --project=. test/test_tonal_buildup_and_snapback.jl  # 268 assertions
+
+# v2.5/v2.6 save coverage
+julia --project=. test/test_save_coverage_v25.jl   # 89 assertions
 ```
 
 ---
@@ -336,24 +580,26 @@ grugbot420/
 │   ├── ArithmeticEngine.jl               ← NEW (ported from main)
 │   ├── ChatterVoteSwap.jl                ← MODIFIED: v2.5 cooldown ser/de
 │   ├── CrystalizeTag.jl                  ← MODIFIED: v2.5 state ser/de
-│   ├── engine.jl                         ← MODIFIED: sparse-active fire gate at 2 sites
+│   ├── engine.jl                         ← MODIFIED: sparse-active fire gate + v2.6 sigil tagging + cast_sigil_votes + Vote.payload
 │   ├── GroupRegistry.jl                  ← MODIFIED: v2.5 in-memory state ser/de
-│   ├── GrugBot420.jl                     ← MODIFIED: 4 new module includes
+│   ├── GrugBot420.jl                     ← MODIFIED: 4 new module includes + SigilMediator
 │   ├── InputQueue.jl                     ← MODIFIED: v2.5 concept-inhibitions ser/de
-│   ├── Main.jl                           ← MODIFIED: save/load wired for v2.5 (7 new keys)
+│   ├── Main.jl                           ← MODIFIED: save/load wired for v2.5/v2.6 + sigil direct routing + sigil-tagged seeds + payload concat
 │   ├── SelfObserver.jl                   ← MODIFIED: process-wide singleton + v2.5 ser/de
+│   ├── SigilMediator.jl                  ← NEW (v2.6 routing coordinator)
 │   ├── SigilPromoter.jl                  ← NEW (ported from main)
-│   ├── SigilRegistry.jl                  ← NEW (ported from main)
+│   ├── SigilRegistry.jl                  ← MODIFIED: process-wide singleton + ser/de + &conj macro + restore default-merge closure
 │   ├── Thesaurus.jl                      ← MODIFIED: v2.5 concept-class ser/de
 │   └── VoteOrchestrator.jl               ← MODIFIED: sparse-active gate API + constants
 └── test/
-    ├── runtests.jl                       ← MODIFIED: 7 new entries in ALL_TESTS
+    ├── runtests.jl                       ← MODIFIED: 8 new entries in ALL_TESTS (v2.5 + v2.6)
     ├── test_arithmetic_engine.jl         ← NEW (ported from main)
     ├── test_dynamic_action_tone.jl       ← MODIFIED: tolerances for jitter+build-up
-    ├── test_save_coverage_v25.jl         ← NEW (v2.5 save coverage round-trip)
+    ├── test_save_coverage_v25.jl         ← NEW (v2.5/v2.6 save coverage round-trip)
     ├── test_self_observer.jl             ← NEW (ported from main)
+    ├── test_sigil_pipeline.jl            ← NEW (v2.6 sigil routing rail — 17 testsets, 123 assertions)
     ├── test_sigil_promoter.jl            ← NEW (ported from main)
-    ├── test_sigil_registry.jl            ← NEW (ported from main)
+    ├── test_sigil_registry.jl            ← NEW (ported from main, +&conj coverage in v2.6)
     ├── test_sparse_active_fire.jl        ← NEW (sparse-active gate coverage)
     └── test_tonal_buildup_and_snapback.jl ← NEW (NEW DYNAMICS COVERAGE)
 ```
