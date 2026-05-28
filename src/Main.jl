@@ -2416,11 +2416,13 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     node_drop_table = String[]
     node_required = String[]
     node_triples_obj = RelationalTriple[]
+    winner_pattern_is_scaffolding = false
     if winning_node !== nothing
         node_pattern     = winning_node.pattern
         node_drop_table  = [lowercase(strip(w)) for w in winning_node.drop_table]
         node_required    = [lowercase(strip(r)) for r in winning_node.required_relations]
         node_triples_obj = winning_node.relational_patterns
+        winner_pattern_is_scaffolding = pattern_is_macro_scaffolding(winning_node.pattern)
     else
         @error "[MAIN v7.16 synthesis] winning node $(primary_vote.node_id) vanished between vote and synthesis — reply will be minimal."
     end
@@ -2455,8 +2457,25 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # use it (that IS the seeded answer). If not (shouldn't happen —
     # /lobeGrow enforces pattern), we fall back to a generic frame
     # around the mission so we never emit an empty reply.
+    #
+    # GRUG v2.6+ SIGIL FIX: If the winner is a sigil-tagged node, its
+    # `pattern` is macro scaffolding (e.g. "&n &op &n", "&conj") -- those
+    # tokens are for the binder, NOT for the user. The macro's job is to
+    # compute a value (already in primary_vote.payload); AIML's job is
+    # to wrap that value in language. So for sigil winners we anchor the
+    # CLAIM on the ORIGINAL mission text the user actually said. The
+    # macro's computed answer gets concatenated onto the final output by
+    # the sigil payload concat step in process_mission, so the value
+    # still reaches the user -- it just doesn't fight the macro tokens
+    # for the claim slot. Macro tokens never reach the user-visible reply.
     # -------------------------------------------------------------------
-    claim_raw = isempty(node_pattern) ? "the mission \"$mission\" touches unseeded territory" : node_pattern
+    claim_raw = if winner_pattern_is_scaffolding
+        strip(mission)
+    elseif isempty(node_pattern)
+        "the mission \"$mission\" touches unseeded territory"
+    else
+        node_pattern
+    end
     claim = _swap_words_in(String(claim_raw), node_drop_table, node_required)
 
     # -------------------------------------------------------------------
@@ -2515,14 +2534,15 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         push!(support_pieces, " The link is clear: $subj_swapped $rel_swapped $obj_swapped.")
     end
 
-    # (b) Sure companion \u2192 supporting claim from the TOP band. Only if we have
+    # (b) Sure companion → supporting claim from the TOP band. Only if we have
     # at least one tied alternative AND it has a pattern different from the
     # primary. This keeps the reply from repeating itself.
     if !isempty(tied_alternatives)
         companion = tied_alternatives[1]
         comp_node = lock(() -> get(NODE_MAP, companion.node_id, nothing), NODE_LOCK)
         if comp_node !== nothing && !isempty(comp_node.pattern) &&
-           comp_node.pattern != node_pattern
+           comp_node.pattern != node_pattern &&
+           !pattern_is_macro_scaffolding(comp_node.pattern)  # GRUG v2.6: skip macro scaffolds; their value already flows via payload
             comp_claim = _swap_words_in(String(comp_node.pattern),
                                          node_drop_table, node_required)
             push!(support_pieces, " A companion frame: $comp_claim.")
@@ -2543,6 +2563,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             sn === nothing && continue
             isempty(sn.pattern) && continue
             sn.pattern in seen_patterns && continue
+            pattern_is_macro_scaffolding(sn.pattern) && continue  # GRUG v2.6: skip pure macro patterns
             support_claim = _swap_words_in(String(sn.pattern),
                                             node_drop_table, node_required)
 
@@ -2592,6 +2613,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             un === nothing && continue
             isempty(un.pattern) && continue
             un.pattern in seen_patterns && continue
+            pattern_is_macro_scaffolding(un.pattern) && continue  # GRUG v2.6: skip pure macro patterns
             un_claim = _swap_words_in(String(un.pattern),
                                        node_drop_table, node_required)
             push!(support_pieces, " Grug heard this strongly too but is not sure it fits here (take with caution): $un_claim.")
@@ -5123,11 +5145,11 @@ try
     # the orchestrator concatenates after COMMANDS[action] renders.
     # =========================================================================
     math_ctx = Dict{String, Any}(
-        "system_prompt" => "Sigil-bound arithmetic engine: solve the rewritten &n &op &n form step-by-step.",
+        "system_prompt" => "Arithmetic reasoning voice",
         "sigil_kind"    => "math",
     )
     multipart_ctx = Dict{String, Any}(
-        "system_prompt" => "Sigil-bound multipart handler: split the input on &conj boundaries and answer each clause.",
+        "system_prompt" => "Multi-clause reasoning voice",
         "sigil_kind"    => "multipart",
     )
 

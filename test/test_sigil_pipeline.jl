@@ -624,3 +624,27 @@ using GrugBot420.ArithmeticEngine
     end
 
 end  # @testset SIGIL PIPELINE
+
+# =============================================================================
+# Macro-scaffolding detector  -- verify spoken-text gate
+# =============================================================================
+@testset "pattern_is_macro_scaffolding -- macros never reach the user" begin
+    using GrugBot420: pattern_is_macro_scaffolding
+
+    # pure scaffolding -> true (these must be filtered out of CLAIM/SUPPORT)
+    @test  pattern_is_macro_scaffolding("&n &op &n")
+    @test  pattern_is_macro_scaffolding("&n &op &n &op &n")
+    @test  pattern_is_macro_scaffolding("&conj")
+    @test  pattern_is_macro_scaffolding("&word &word")
+    @test  pattern_is_macro_scaffolding("  &n   &op   &n  ")  # whitespace ok
+
+    # mixed or natural -> false (these are spoken-friendly)
+    @test !pattern_is_macro_scaffolding("compute &n now")
+    @test !pattern_is_macro_scaffolding("hello hi greeting")
+    @test !pattern_is_macro_scaffolding("count number sum total")
+    @test !pattern_is_macro_scaffolding("&n plus &n equals")  # has 'plus'/'equals' -- speakable
+
+    # edge cases
+    @test !pattern_is_macro_scaffolding("")
+    @test !pattern_is_macro_scaffolding("   ")
+end

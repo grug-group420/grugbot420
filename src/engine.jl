@@ -2041,6 +2041,30 @@ Convenience predicate: true when the node carries any "@sigil:*" tag.
 has_sigil_tag(node::Node)::Bool = node_sigil_kind(node) !== :none
 
 """
+    pattern_is_macro_scaffolding(pattern::AbstractString) -> Bool
+
+GRUG: True iff the pattern is *purely* macro scaffolding -- i.e. every
+non-empty token starts with `&`. Patterns like `"&n &op &n"`, `"&conj"`,
+`"&n &op &n &op &n"` are scaffolding; the macro engine binds them to a
+form, computes a value, and the value flows back through `Vote.payload`.
+
+These tokens are NEVER meant to be spoken to the user. Any code that
+renders text (CLAIM/SUPPORT in `generate_aiml_payload`) should skip
+nodes whose pattern is pure scaffolding -- AIML's job is to wrap the
+*computed value* in language, not to echo the binder's ASCII.
+
+A pattern with a mix (e.g. `"compute &n now"`) is NOT pure scaffolding
+and remains spoken-friendly.
+"""
+function pattern_is_macro_scaffolding(pattern::AbstractString)::Bool
+    s = strip(pattern)
+    isempty(s) && return false
+    toks = split(s)
+    isempty(toks) && return false
+    return all(startswith(t, "&") for t in toks)
+end
+
+"""
     create_sigil_node(pattern, action_packet, data, drop_table; kind, ...) -> String
 
 Convenience wrapper around `create_node` that prepends the
@@ -3258,6 +3282,8 @@ function _cast_math_votes(
     # GRUG: per-step votes (only emitted for chained ops where len(steps) > 1).
     # action stays the opener command name (so COMMANDS lookup works);
     # payload carries the structured "lhs op rhs = result" string.
+    # These are SUPPORT votes -- the orchestrator may render them as backup
+    # context, but the headline vote below is what speaks first.
     if length(result.steps) > 1
         for step in result.steps
             step_payload = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
@@ -3265,9 +3291,15 @@ function _cast_math_votes(
         end
     end
 
-    # GRUG: final vote = opener command + answer payload. This is the
-    # "headline" vote; orchestrator's selector normally picks this when
-    # multiple sigil-routed votes survive thresholding.
+    # GRUG: macros are SCAFFOLDING. They compute an outcome and hand it
+    # back as a value -- nothing more. The macro must NOT do the language
+    # work itself (no "Answer: X", no inline narration). AIML's static
+    # skeletons own the linguistic wrapping; the macro just provides the
+    # number to plug in. So payload = the bare answer string.
+    #
+    # Multi-step problems: per-step votes above carry the worked steps as
+    # SUPPORT context for AIML to weave in if it wants. The headline still
+    # carries only the final value -- AIML decides whether to show steps.
     push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, result.answer_str))
 
     return out

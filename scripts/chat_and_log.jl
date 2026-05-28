@@ -123,8 +123,11 @@ function extract_response(captured::AbstractString)::String
 
     # The cave's user-visible answer is the "AIML Output Scaffold" block,
     # which sits between "🤖 AIML Output Scaffold:" and "--- DEBUG TELEMETRY".
-    # Below the debug block, a final numeric/short line may carry the math answer
-    # (e.g. "========================================= 4").
+    # The arithmetic engine (when sigil math fires) appends a short numeric
+    # answer line at the very end of the captured stdout, of the form
+    # "==... <answer>" -- but only when the answer is purely numeric or
+    # boolean. We pull that ONLY if it parses as a number to avoid grabbing
+    # debug-bar artifacts that happen to start with '='.
     scaffold = String[]
     in_scaffold = false
     for ln in lines
@@ -141,15 +144,20 @@ function extract_response(captured::AbstractString)::String
         end
     end
 
-    # Look for an arithmetic answer line (very last short line containing digits
-    # after a long bar of '=' characters)
+    # Look for an arithmetic answer line: only accept if the trailing token
+    # is purely numeric (int or float, optionally negative) -- this is what
+    # the math macro emits as a final stdout line. Anything else is debug.
     math_tail = ""
     for ln in Iterators.reverse(lines)
         s = strip(ln)
         s == "" && continue
-        m = match(r"^=+\s*(.+)$", s)
+        m = match(r"^=+\s*(-?\d+(?:\.\d+)?)\s*$", s)
         if m !== nothing
             math_tail = strip(m.captures[1])
+            break
+        end
+        # stop scanning once we hit non-trivial content lines
+        if length(s) > 4 && !startswith(s, "===") && !startswith(s, "---")
             break
         end
     end
