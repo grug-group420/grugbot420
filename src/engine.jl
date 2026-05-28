@@ -478,6 +478,25 @@ struct Vote
     user_triples::Vector{RelationalTriple}
     node_triples::Vector{RelationalTriple}
     antimatch::Bool
+    # GRUG v7.16+: optional payload string for sigil-routed multi-vote nodes.
+    # When non-empty, command renderers concatenate "<action_output> <payload>"
+    # so `action` stays a valid COMMANDS key while structured content (e.g.
+    # arithmetic answer "= 4", clause text) rides along.
+    # All existing 7-arg call sites (cast_vote, cast_explicit_vote, every
+    # test fixture) work unchanged via the inner constructor's default.
+    payload::String
+
+    Vote(node_id::AbstractString,
+         action::AbstractString,
+         confidence::Real,
+         negatives::Vector{String},
+         user_triples::Vector{RelationalTriple},
+         node_triples::Vector{RelationalTriple},
+         antimatch::Bool,
+         payload::AbstractString = "") = new(
+            String(node_id), String(action), Float64(confidence),
+            negatives, user_triples, node_triples, antimatch, String(payload),
+         )
 end
 
 const NODE_MAP  = Dict{String, Node}()
@@ -3237,20 +3256,19 @@ function _cast_math_votes(
     out = Vote[]
 
     # GRUG: per-step votes (only emitted for chained ops where len(steps) > 1).
-    # Each step's textual form is "<lhs> <op> <rhs> = <result>".
+    # action stays the opener command name (so COMMANDS lookup works);
+    # payload carries the structured "lhs op rhs = result" string.
     if length(result.steps) > 1
         for step in result.steps
-            step_text = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
-            push!(out, Vote(node.id, step_text, conf, negatives, u_trips, n_trips, false))
+            step_payload = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
+            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, step_payload))
         end
     end
 
-    # GRUG: final vote = opener + answer. This is the "headline" vote; the
-    # orchestrator's top-tier selector will normally pick this one when
-    # multiple sigil-routed votes survive thresholding, because it carries
-    # the node's voice (opener) plus the answer.
-    final_text = "$(opener) $(result.answer_str)"
-    push!(out, Vote(node.id, final_text, conf, negatives, u_trips, n_trips, false))
+    # GRUG: final vote = opener command + answer payload. This is the
+    # "headline" vote; orchestrator's selector normally picks this when
+    # multiple sigil-routed votes survive thresholding.
+    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, result.answer_str))
 
     return out
 end
@@ -3285,8 +3303,8 @@ function _cast_multipart_votes(
 
     if isempty(conj_positions)
         # GRUG: no clause boundaries -> single vote with full text echo.
-        return Vote[Vote(node.id, "$(opener) $(strip(original_text))",
-                         conf, negatives, u_trips, n_trips, false)]
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+                         strip(original_text) |> String)]
     end
 
     # GRUG: split original text on word-index boundaries. raw_position is the
@@ -3304,8 +3322,8 @@ function _cast_multipart_votes(
         if clause_end >= start_idx
             clause_text = strip(join(tokens[start_idx:clause_end], " "))
             if !isempty(clause_text)
-                push!(out, Vote(node.id, "$(opener) $(clause_text)",
-                                conf, negatives, u_trips, n_trips, false))
+                push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+                                String(clause_text)))
             end
         end
         start_idx = cp_clamped + 1
@@ -3314,16 +3332,16 @@ function _cast_multipart_votes(
     if start_idx <= n_toks
         tail_text = strip(join(tokens[start_idx:n_toks], " "))
         if !isempty(tail_text)
-            push!(out, Vote(node.id, "$(opener) $(tail_text)",
-                            conf, negatives, u_trips, n_trips, false))
+            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+                            String(tail_text)))
         end
     end
 
     # GRUG: edge case -- if all clauses got dropped (e.g. text was just a
     # bare "and"), emit the fallback single-vote so the node still speaks.
     if isempty(out)
-        push!(out, Vote(node.id, "$(opener) $(strip(original_text))",
-                        conf, negatives, u_trips, n_trips, false))
+        push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+                        strip(original_text) |> String))
     end
 
     return out

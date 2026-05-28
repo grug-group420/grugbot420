@@ -2120,6 +2120,19 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         end
     end
 
+    # GRUG v7.16+: SIGIL PAYLOAD CONCAT.
+    # When the winning vote is sigil-routed (math answer, multipart clause,
+    # etc.) the structured content lives in primary_vote.payload. Concatenate
+    # it onto whatever the COMMANDS renderer produced, so the user sees both
+    # the node's voice (from the action_packet command) and the structured
+    # answer. Empty payload (the default for normal pattern-bind votes)
+    # leaves output unchanged.
+    if !isempty(primary_vote.payload)
+        output = isempty(strip(String(output))) ?
+                 primary_vote.payload :
+                 string(rstrip(String(output)), " ", primary_vote.payload)
+    end
+
     # GRUG: Return output along with contributing votes (sure + unsure)
     # These are the votes that actually contributed to generating output
     return output, sure_votes, unsure_votes
@@ -3313,6 +3326,49 @@ function process_mission(mission_text::String)
             @error "[MAIN] Scan sub-process FAILED: $e"
         end
         rethrow(e)
+    end
+
+    # GRUG v7.16+: SIGIL-ROUTED DIRECT FIRE.
+    # When the input carries structured-reasoning sigils (e.g. &n &op &n
+    # for math, &conj for multipart), make sure the @sigil:<kind>-tagged
+    # nodes get a guaranteed look this cycle even if their pattern didn't
+    # bind under normal scan. The architecture spec calls for this:
+    # "user input that is like this should be routed directly to node
+    # types like this." We use a discounted confidence (matches the
+    # cross-lobe cascade pattern) so sigil-routed nodes don't dominate
+    # ordinary pattern-bind winners but still always participate.
+    #
+    # Confidence: max(0.4, max_primary_conf * 0.5) — half the strongest
+    # bound node, floored at 0.4 so a weak normal scan still gives sigil
+    # nodes meaningful pull. Tagged nodes whose pattern DID bind keep
+    # their original (higher) conf; we only inject missing ones.
+    if !isnothing(sigil_mediation) && !isempty(sigil_mediation.kinds)
+        try
+            already_in = Set(s[1] for s in valid_specimens)
+            max_conf = isempty(valid_specimens) ? 0.0 :
+                       maximum(s[2] for s in valid_specimens)
+            inject_conf = max(0.4, max_conf * 0.5)
+            injected = 0
+            for kind in sigil_mediation.kinds
+                for node_id in list_sigil_node_ids(kind)
+                    node_id in already_in && continue
+                    node = lock(() -> get(NODE_MAP, node_id, nothing), NODE_LOCK)
+                    isnothing(node) && continue
+                    push!(valid_specimens, (
+                        node_id, inject_conf, false,
+                        RelationalTriple[],         # u_trips: no triples extracted for sigil routing
+                        node.relational_patterns,
+                    ))
+                    push!(already_in, node_id)
+                    injected += 1
+                end
+            end
+            if injected > 0
+                @info "[MAIN] 🔣 Sigil router injected $injected node(s) for kinds=$(sigil_mediation.kinds) (inject_conf=$(round(inject_conf; digits=3)))"
+            end
+        catch e
+            @warn "[MAIN] Sigil direct-routing failed (non-fatal, normal scan results preserved): $e"
+        end
     end
 
     # GRUG: LOBE FIRING COMPLETE → emit DONE to the orchestrator layer.
