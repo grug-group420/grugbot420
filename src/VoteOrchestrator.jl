@@ -105,6 +105,86 @@ const AIML_SUPPORT_RELATION_FLOOR = 2
 # still primary-strength claims, they just aren't "tied" with the primary.
 const AIML_TOP_TIER_WINDOW = 0.05
 
+# GRUG v7.16+: SPARSE-ACTIVE FIRE FLOOR.
+# A node whose post-weighting fire confidence is below this floor does NOT
+# fire at all. The gate runs at the engine fire site (and the attachment
+# relay fire site) — BEFORE the vote is added to the pool, BEFORE any
+# downstream lock-in / orchestration / AIML logic gets to see it.
+#
+# Why this lives at the fire site, not the AIML layer:
+#   - Filtering at AIML means every sub-threshold vote still claims a
+#     fire-counter slot (against the 1000-cap), still gets thrown into
+#     parallel batch results, still inflates the orchestrator's working
+#     set, and only THEN gets discarded. That's wasted attention.
+#   - Filtering at the fire site means the pool stays lean: the attention
+#     budget is spent on votes that have a real chance of mattering.
+#   - This is the "sparse-active" property: only nodes whose evidence
+#     clears a minimum activation floor compete for the pool. Below the
+#     floor, the node is effectively silent on this cycle.
+#
+# Threshold choice (0.20):
+#   - Well below AIML_TOP_LOCKIN_FLOOR (0.50) — cannot interfere with the
+#     lock-in machinery. A vote that COULD have locked in is not at risk.
+#   - Well above the relay hard floor (0.10) — that floor exists to keep
+#     biological-noise voices in the conversation, but a relay vote at
+#     0.10–0.19 is pure noise and earns its silence here.
+#   - Above the cheap-scan PASS threshold post-jitter (0.6 raw before
+#     length-normalization yields ~0.15–0.30 in token_conf land), so a
+#     legitimate weak match still has a chance to clear if the scan was
+#     real evidence.
+const SPARSE_ACTIVE_FIRE_FLOOR = 0.20
+
+# GRUG v7.16+: SPARSE-ACTIVE FIRE TELEMETRY.
+# Atomic counter incremented every time the floor culls a fire. Read with
+# `get_sparse_active_skip_count()` for diagnostics; reset with
+# `reset_sparse_active_skip_count!()`. Per-cycle interpretation is the
+# caller's responsibility (e.g. Main.jl can snapshot before/after a scan).
+const _SPARSE_ACTIVE_SKIP_COUNT = Threads.Atomic{Int}(0)
+
+"""
+    should_fire_sparse_active(confidence::Real)::Bool
+
+GRUG: Return `true` iff `confidence` clears the sparse-active fire floor.
+On `false`, the caller MUST not fire and SHOULD increment the skip counter
+via `tally_sparse_active_skip!()` for telemetry. NaN/Inf is rejected
+(returns false; caller protects itself).
+"""
+function should_fire_sparse_active(confidence::Real)::Bool
+    if !isfinite(confidence)
+        return false
+    end
+    return Float64(confidence) >= SPARSE_ACTIVE_FIRE_FLOOR
+end
+
+"""
+    tally_sparse_active_skip!()
+
+GRUG: Increment the global "fires culled by sparse-active floor" counter.
+Atomic — safe to call from parallel fire batches.
+"""
+function tally_sparse_active_skip!()
+    Threads.atomic_add!(_SPARSE_ACTIVE_SKIP_COUNT, 1)
+    return nothing
+end
+
+"""
+    get_sparse_active_skip_count()::Int
+
+GRUG: Read the current skip count. Useful for tests and per-cycle
+telemetry deltas. Does NOT reset.
+"""
+get_sparse_active_skip_count() = _SPARSE_ACTIVE_SKIP_COUNT[]
+
+"""
+    reset_sparse_active_skip_count!()
+
+GRUG: Reset the skip counter to 0. Tests use this to isolate cycles.
+"""
+function reset_sparse_active_skip_count!()
+    Threads.atomic_xchg!(_SPARSE_ACTIVE_SKIP_COUNT, 0)
+    return nothing
+end
+
 # GRUG v7.16.3: ABSOLUTE TOP-TIER LOCK-IN FLOOR.
 # Replaces the old "within 0.05 of max" relative gate. A vote enters TOP tier
 # when its COMBINED SCORE (confidence + semantic_weight * linkage_to_peers)
@@ -798,6 +878,11 @@ export AIML_SUPPORT_RELATION_FLOOR
 export AIML_TOP_LOCKIN_FLOOR, AIML_SEMANTIC_WEIGHT, AIML_RELATION_SCORE_MAX
 export AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
 export DONE_SIGNAL_TIMEOUT_S, DEFAULT_TASK_TIMEOUT_S, FIRE_BATCH_TIMEOUT_S
+
+# Sparse-active fire gate (enforced at the engine fire site, not in AIML layer)
+export SPARSE_ACTIVE_FIRE_FLOOR
+export should_fire_sparse_active, tally_sparse_active_skip!
+export get_sparse_active_skip_count, reset_sparse_active_skip_count!
 
 # Task dispatch (with timeouts)
 export next_task_id, dispatch_task, dispatch_task_with_timeout

@@ -81,6 +81,11 @@ const ALL_TESTS = [
     # + per-prediction Lorenz snap-back jitter. Locks in the new dynamics
     # added on top of the v7.15-updates ActionTonePredictor.
     "test_tonal_buildup_and_snapback.jl",
+    # GRUG (v7.16+): sparse-active fire gate at the engine fire site. Pattern
+    # binds whose post-weighting confidence falls below
+    # SPARSE_ACTIVE_FIRE_FLOOR (0.20) are culled BEFORE claiming a fire slot.
+    # Per user directive \u2014 not the AIML layer's job.
+    "test_sparse_active_fire.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

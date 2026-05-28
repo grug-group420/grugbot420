@@ -30,6 +30,7 @@
 | **Sigil-bound arithmetic ("two plus two" → 4)** | `ArithmeticEngine.jl` | ✅ (ported from main) |
 | **Tonal build-up over consecutive same-tone predictions** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
 | **Per-prediction Lorenz snap-back (jitter + entropy tug)** | `ActionTonePredictor.jl` | ✅ (NEW v7.16+) |
+| **Sparse-active fire gate at the engine fire site** | `VoteOrchestrator.jl` + `engine.jl` | ✅ (NEW v7.16+) |
 
 **Hopfield networks were commented out long ago.** The ghost references in
 `PhagyMode.jl` (`CACHE_VALIDATOR` etc.) are stubbed; nothing in the live
@@ -156,6 +157,54 @@ asserted exactly. **No other test in the suite needed changes.**
 
 ---
 
+## NEW in this round — sparse-active fire gate
+
+> **User directive (verbatim):** *"a pattern bind below a high threshold
+> shouldn't even fire really. its sparse active. shouldn't handle that from
+> the aiml layer."*
+
+The fix lives at the **engine fire site**, not in the AIML layer.
+
+### What changed
+| Constant | Default | Meaning |
+|---|---|---|
+| `SPARSE_ACTIVE_FIRE_FLOOR` | `0.20` | Post-action-tone-weighted confidence below this is culled BEFORE claiming a fire slot |
+
+- Above the relay hard floor (`0.10` — "always have SOME voice")
+- Below the AIML lock-in floor (`0.50`) so the lock-in machinery is untouched
+- Below `AIML_CONFIDENCE_THRESHOLD` so the two-tier band logic is untouched
+
+### Where it fires
+1. **`scan_specimens` → `fire_one` closure** (`engine.jl` ~line 2682). The
+   gate runs **after** action-tone weighting, so the value the gate sees is
+   the same value the vote pool would have seen. On cull: tally a skip,
+   return `nothing`, do **not** claim from `FireCounter`. Saves attention
+   budget for genuinely confident specimens.
+2. **`fire_attachments!`** (`engine.jl` ~line 1624). The relay's own hard
+   floor of `0.1` still applies first, but a `max(0.1, ...)` clamp on a
+   genuinely weak base is just noise riding the connector — culled.
+
+### Public API
+- `SPARSE_ACTIVE_FIRE_FLOOR` (const)
+- `should_fire_sparse_active(confidence::Real)::Bool` — `false` for NaN/Inf, `true` iff `confidence ≥ FLOOR`
+- `tally_sparse_active_skip!()` — atomic increment of a thread-safe counter
+- `get_sparse_active_skip_count()::Int` — read counter
+- `reset_sparse_active_skip_count!()` — reset for new cycle / test isolation
+
+### Tests
+`test/test_sparse_active_fire.jl` — 24 assertions covering threshold
+behavior, NaN/Inf rejection, integer confidences, thread-safe counter
+increment under `Threads.@threads`, and the relay-floor interaction.
+
+### Why this is the right layer
+The AIML layer's job is to pick winners from a pool of fired specimens. If
+sub-threshold noise is in the pool, the AIML layer can suppress it but the
+fire slot has already been spent — `ACTIVE_FIRE_CAP` (1000) is a finite
+budget. Culling at the fire site keeps the budget for signals that actually
+crossed sparse-active threshold.
+
+---
+
 ## What was NOT ported (and why)
 
 | From `origin/main` | Why not |
@@ -217,16 +266,19 @@ grugbot420/
 ├── src/
 │   ├── ActionTonePredictor.jl            ← MODIFIED: tonal build-up + Lorenz snap-back
 │   ├── ArithmeticEngine.jl               ← NEW (ported from main)
+│   ├── engine.jl                         ← MODIFIED: sparse-active fire gate at 2 sites
 │   ├── GrugBot420.jl                     ← MODIFIED: 4 new module includes
 │   ├── SelfObserver.jl                   ← NEW (ported from main)
 │   ├── SigilPromoter.jl                  ← NEW (ported from main)
-│   └── SigilRegistry.jl                  ← NEW (ported from main)
+│   ├── SigilRegistry.jl                  ← NEW (ported from main)
+│   └── VoteOrchestrator.jl               ← MODIFIED: sparse-active gate API + constants
 └── test/
-    ├── runtests.jl                       ← MODIFIED: 5 new entries in ALL_TESTS
+    ├── runtests.jl                       ← MODIFIED: 6 new entries in ALL_TESTS
     ├── test_arithmetic_engine.jl         ← NEW (ported from main)
     ├── test_dynamic_action_tone.jl       ← MODIFIED: tolerances for jitter+build-up
     ├── test_self_observer.jl             ← NEW (ported from main)
     ├── test_sigil_promoter.jl            ← NEW (ported from main)
     ├── test_sigil_registry.jl            ← NEW (ported from main)
+    ├── test_sparse_active_fire.jl        ← NEW (sparse-active gate coverage)
     └── test_tonal_buildup_and_snapback.jl ← NEW (NEW DYNAMICS COVERAGE)
 ```

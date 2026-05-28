@@ -1623,6 +1623,19 @@ function fire_attachments!(target_id::String, active_count::Int, active_cap::Int
             jitter = is_nonjitter(attach_node_ref) ? 0.0 : randn() * RELAY_CONF_JITTER_SIGMA
             confidence = max(0.1, att.base_confidence + jitter)
 
+            # GRUG: SPARSE-ACTIVE FIRE GATE on the attachment relay path.
+            # The relay's own hard floor is 0.1 ("always have SOME voice")
+            # which is intentionally below SPARSE_ACTIVE_FIRE_FLOOR (0.20).
+            # That hard floor still wins for genuinely-confident attachments
+            # post-jitter, but a base_confidence that's noisy enough to land
+            # below the sparse-active threshold is just noise riding the
+            # connector \u2014 cull it here so it never enters the vote pool.
+            # AIML layer should NOT be the place that filters this.
+            if !VoteOrchestrator.should_fire_sparse_active(confidence)
+                VoteOrchestrator.tally_sparse_active_skip!()
+                continue
+            end
+
             # GRUG: Return the connector pattern so generative knows WHY this relay fired.
             push!(fired, (att.node_id, confidence, att.pattern))
             current_active += 1
@@ -2680,8 +2693,22 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
 
         if token_conf > 0 || rel_conf > 0
+            # GRUG: SPARSE-ACTIVE FIRE GATE (post action-tone weighting).
+            # Per user directive: "a pattern bind below a high threshold
+            # shouldn't even fire really. its sparse active. shouldn't handle
+            # that from the aiml layer." The AIML layer used to filter this
+            # downstream, which wasted a fire slot on noise. Now the engine
+            # culls sub-threshold binds at the fire site itself BEFORE
+            # claiming a slot from FireCounter \u2014 saves attention budget
+            # for genuinely confident specimens. Threshold is
+            # SPARSE_ACTIVE_FIRE_FLOOR (0.20) \u2014 well above the relay
+            # hard-floor (0.1) and well below the AIML lock-in floor (0.50).
+            if !VoteOrchestrator.should_fire_sparse_active(confidence)
+                VoteOrchestrator.tally_sparse_active_skip!()
+                return nothing
+            end
             # GRUG: Node wants to fire. Claim a slot from the shared FireCounter.
-            # If cap reached, skip — hard cap applies to ALL fire paths.
+            # If cap reached, skip \u2014 hard cap applies to ALL fire paths.
             if !VoteOrchestrator.try_claim_fire_slot!(fc)
                 return nothing
             end
