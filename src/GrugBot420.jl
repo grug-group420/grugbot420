@@ -206,6 +206,11 @@ using .SigilPromoter
 include("ArithmeticEngine.jl")
 using .ArithmeticEngine
 
+# SigilMediator is the engine-level coordinator on top of Registry/Promoter/Arith.
+# Must come after all three (it `using`s each).
+include("SigilMediator.jl")
+using .SigilMediator
+
 include("engine.jl")
 include("Main.jl")
 

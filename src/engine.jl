@@ -1973,6 +1973,106 @@ function create_node(
 end
 
 # ==============================================================================
+# SIGIL TAG CONVENTION  -  GRUG v7.16+
+# ==============================================================================
+# GRUG: Sigil-routed nodes carry a tag in their drop_table vector. The tag
+# format is "@sigil:<kind>" where <kind> is one of the SigilMediator routing
+# kinds (currently :math, :multipart, :instruction-reserved). drop_table is
+# overloaded for this on purpose \u2014 it's already a free-form Vector{String}
+# attached to every node, persisted by the save system, and editable from
+# specimen JSON. No schema change needed.
+#
+# WHY OVERLOAD drop_table:
+#   - Zero schema change to Node, save format, or specimen JSON
+#   - drop_table semantics (cross-firing) are orthogonal to tags; tag strings
+#     starting with '@' are filtered out of cross-fire neighbor resolution
+#     by collect_drop_table_neighbors (NODE_MAP lookup naturally excludes
+#     them because no node id starts with '@')
+#   - Specimens can author tags by simply listing them in drop_table
+#
+# READING TAGS: use node_sigil_kind(node) which returns Symbol or :none.
+# WRITING TAGS: use create_sigil_node(pattern, packet, kind=:math, ...) which
+# wraps create_node and injects the right tag.
+
+const SIGIL_TAG_PREFIX = "@sigil:"
+
+"""
+    node_sigil_kind(node) -> Symbol
+
+Inspect `node.drop_table` for a "@sigil:<kind>" tag and return the kind as
+a Symbol (e.g. :math, :multipart). Returns :none if no sigil tag is found.
+If multiple sigil tags are present (rare; would be a specimen authoring
+mistake), returns the first one in drop_table order.
+"""
+function node_sigil_kind(node::Node)::Symbol
+    for entry in node.drop_table
+        if startswith(entry, SIGIL_TAG_PREFIX)
+            kind_str = entry[length(SIGIL_TAG_PREFIX)+1:end]
+            return isempty(kind_str) ? :none : Symbol(kind_str)
+        end
+    end
+    return :none
+end
+
+"""
+    has_sigil_tag(node) -> Bool
+
+Convenience predicate: true when the node carries any "@sigil:*" tag.
+"""
+has_sigil_tag(node::Node)::Bool = node_sigil_kind(node) !== :none
+
+"""
+    create_sigil_node(pattern, action_packet, data, drop_table; kind, ...) -> String
+
+Convenience wrapper around `create_node` that prepends the
+"@sigil:<kind>" tag to drop_table. `kind` must be a Symbol; other kwargs
+forward to create_node unchanged. Returns the new node id.
+"""
+function create_sigil_node(
+    pattern::String,
+    action_packet::String,
+    data::Dict,
+    drop_table::Vector{String};
+    kind::Symbol,
+    is_image_node::Bool = false,
+    initial_strength::Float64 = 1.0,
+)::String
+    if kind === :none
+        error("!!! FATAL: create_sigil_node requires a non-:none kind !!!")
+    end
+    tag = SIGIL_TAG_PREFIX * String(kind)
+    # GRUG: prepend the tag, dedup if specimen already added it.
+    new_drop = tag in drop_table ? drop_table : vcat([tag], drop_table)
+    return create_node(pattern, action_packet, data, new_drop;
+                       is_image_node = is_image_node,
+                       initial_strength = initial_strength)
+end
+
+"""
+    list_sigil_node_ids(kind=:any) -> Vector{String}
+
+Walk NODE_MAP and return ids of all live (non-grave) nodes carrying a
+sigil tag. If `kind` is :any, returns all sigil-tagged nodes; otherwise
+returns only nodes whose tag matches `kind`. Used by the engine fire
+path for direct routing of structured input.
+"""
+function list_sigil_node_ids(kind::Symbol = :any)::Vector{String}
+    out = String[]
+    lock(NODE_LOCK) do
+        for (id, node) in NODE_MAP
+            node.is_grave && continue
+            k = node_sigil_kind(node)
+            k === :none && continue
+            if kind === :any || k === kind
+                push!(out, id)
+            end
+        end
+    end
+    sort!(out)  # deterministic order
+    return out
+end
+
+# ==============================================================================
 # STOCHASTIC PACKET PARSER
 # ==============================================================================
 
@@ -2395,6 +2495,11 @@ function collect_drop_table_neighbors(node::Node)::Vector{String}
 
     lock(NODE_LOCK) do
         for drop_id in all_drop_ids
+            # GRUG v7.16+: drop_table is overloaded to also carry "@sigil:*"
+            # routing tags. Skip those here \u2014 they are NOT node ids and
+            # node_sigil_kind() handles the read side. Faster than letting
+            # them fall through to the NODE_MAP miss path, and clearer intent.
+            startswith(drop_id, "@") && continue
             if haskey(NODE_MAP, drop_id)
                 neighbor = NODE_MAP[drop_id]
                 # GRUG: Only activate non-grave drop table neighbors
