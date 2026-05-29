@@ -1511,14 +1511,14 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     pull_fresh = if !isempty(requesting_nodes)
         pull_fresh_reason = "winning node(s) requested context: " * join(requesting_nodes, ", ")
         true
-    elseif vote_certainty == "UNSURE"
-        pull_fresh_reason = "vote certainty=UNSURE — context helps disambiguate"
-        true
-    elseif primary_vote.confidence < CONTEXT_TRUST_FLOOR
-        pull_fresh_reason = "primary confidence=$(round(primary_vote.confidence, digits=2)) < trust floor $(CONTEXT_TRUST_FLOOR)"
-        true
     else
-        pull_fresh_reason = "SURE vote (conf=$(round(primary_vote.confidence, digits=2))) and no winning node requested context — fresh memory withheld"
+        # GRUG v7.23: ONLY pull fresh memory when a winning node asks for it.
+        # The old safety nets (UNSURE certainty, CONTEXT_TRUST_FLOOR) forced
+        # history into every low-confidence reply, making GrugBot hang up on
+        # past events instead of answering the current question. The votes ARE
+        # the answer. Low confidence = low-confidence answer, not a history
+        # dump. If a node needs continuity, it opts in via wants_context=true.
+        pull_fresh_reason = "no winning node requested context — fresh memory withheld (confidence=$(round(primary_vote.confidence, digits=2)), certainty=$(vote_certainty))"
         false
     end
 
