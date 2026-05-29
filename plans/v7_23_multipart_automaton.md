@@ -239,12 +239,10 @@ using `sub.role` as the vote role would cause MultipartError.
   behavior (reward all) is reasonable since `/right` implicitly confirms the whole
   response.
 
-- **Objective-scoped votes in COMMANDS calls**: The `ephemeral_aiml_orchestrator`
-  passes ALL votes to each objective's COMMANDS handler. Ideally, each objective
-  would only receive its own group's votes. However, the COMMANDS interface is
-  used broadly, and changing it would require updating all handlers. The current
-  approach works because COMMANDS already receives the primary + sure/unsure from
-  the objective, and the full vote list is just background context.
+- ~~**Objective-scoped votes in COMMANDS calls**~~: FIXED by HippocampalModulator.
+  The `ephemeral_aiml_orchestrator` now builds an ActionLog, and each entry carries
+  only its objective's scoped votes. COMMANDS handlers receive `entry.scoped_votes`
+  instead of the full vote pile. No cross-group leakage.
 
 - **LAST_ESCALATION_TRACE is a global Ref**: No thread-safety guarantees. This is
   acceptable for now since GrugBot runs single-threaded per cycle, but a future
@@ -304,3 +302,106 @@ coinflip this cycle (`gained_this_cycle == false`).
 9. Confidence=1.0 always rewarded (unsure tier)
 10. Confidence=0.0 never rewarded (unsure tier)
 11. Locked vote at low confidence still guaranteed
+
+---
+
+## v7.23 — HippocampalModulator: Semantic Ordering & Vote Scoping
+
+### Design (from user)
+
+The user identified that objective-scoped votes in COMMANDS calls is an **orchestration problem, not an engine problem**. The insight: votes should write to a log system instead of being submitted directly to AIML. The log becomes an action list with numbered entries — what comes first, what depends on what — and the log is wiped every cycle (same pattern as `gained_this_cycle`, `fired_this_cycle`).
+
+The user framed this as **hippocampal modulation**: the hippocampus doesn't process — it sequences, prioritizes, contextualizes. The modulator shapes WHEN and HOW AIML fires, not WHAT it does. It's a semantic system for nothing but ordering of things, and it's user-extensible (soft preferences slot exists, not yet built).
+
+The thin wedge: ActionLog + HippocampalModulator now (objective scoping + basic sequencing + context carry-forward). User-extensible soft preferences deferred.
+
+### Architecture
+
+#### ActionLog
+
+An ordered, numbered buffer that votes write to instead of being submitted directly to AIML. Each entry carries only its objective's scoped votes. Wiped every cycle.
+
+Fields:
+- `entries::Vector{ActionEntry}` — ordered list of execution steps
+- `objective_outputs::Dict{String,String}` — completed outputs keyed by objective_id
+
+Lifecycle: `create_action_log!()` at cycle start → populate → execute entries → `wipe_action_log!()` at cycle end.
+
+#### ActionEntry
+
+A single step in the execution plan.
+
+Fields:
+- `sequence_number::Int` — execution order (1, 2, 3...). Determined by modulator.
+- `objective_id::String` — group ID from MultipartOrchestrator, or "" for singletons
+- `scoped_votes::Vector{Any}` — ONLY the votes belonging to this objective
+- `sure_votes::Vector{Any}` — locked-in votes (primary + locked_supports)
+- `unsure_votes::Vector{Any}` — unsure votes (unsure_supports)
+- `prior_context::Vector{String}` — outputs from earlier entries this one depends on
+- `dependencies::Vector{Int}` — sequence numbers of entries this entry depends on
+- `status::ActionLogStatus` — PENDING / EXECUTING / DONE / FAILED
+- `output::String` — result after AIML executes this entry
+
+#### ActionLogStatus enum
+
+`ENTRY_PENDING` → `ENTRY_EXECUTING` → `ENTRY_DONE` or `ENTRY_FAILED`
+
+#### modulate_objectives!(log, objectives; prior_outputs)
+
+Builds ActionLog entries from MultipartOrchestrator output. Ordering: singletons first (no dependencies among them), then multipart objectives in group_id order. Multipart objectives depend on ALL prior multipart objectives (conservative step-coherence default — later objectives can reference earlier ones via pronouns like "its", "they", etc.). `prior_outputs` supports cross-cycle context carry-forward if needed.
+
+#### next_pending!(log)
+
+AIML's "give me the next thing to do" call. Returns the next ENTRY_PENDING entry whose dependencies are all ENTRY_DONE. Marks it ENTRY_EXECUTING. Returns nothing if no eligible entry exists.
+
+#### complete_entry!(log, seq, output)
+
+Marks an entry DONE with its output. Stores output in `objective_outputs` for context carry-forward by later entries.
+
+### Integration in Main.jl
+
+The `ephemeral_aiml_orchestrator` multipart branch now:
+
+1. Creates an ActionLog via `HippocampalModulator.create_action_log!()`
+2. Builds entries via `HippocampalModulator.modulate_objectives!(action_log, objectives)`
+3. Loops reading `next_pending!(action_log)` — each entry gets only its `entry.scoped_votes`
+4. Calls `COMMANDS[...](..., entry.scoped_votes)` instead of the old `COMMANDS[...](..., votes)` which passed ALL votes
+5. On success: `complete_entry!(action_log, seq, output)`; on failure: `fail_entry!(action_log, seq)`
+6. Wipes the log at cycle end via `wipe_action_log!(action_log)`
+
+**This fixes the known limitation**: each COMMANDS handler now receives only its objective's votes — no cross-group leakage.
+
+### Files Added
+
+- `src/HippocampalModulator.jl` — ~300 lines, the full module
+- `test/test_hippocampal_modulator.jl` — 14 test sets
+
+### Files Modified
+
+- `src/GrugBot420.jl` — added HippocampalModulator include + using + exports
+- `src/Main.jl` — `ephemeral_aiml_orchestrator` multipart branch uses ActionLog
+- `test/runtests.jl` — added test_hippocampal_modulator.jl
+
+### Test Coverage
+
+`test/test_hippocampal_modulator.jl` — 14 test sets:
+1. Create and wipe log
+2. Auto-sequence numbering
+3. next_pending! respects dependencies
+4. complete_entry! stores output
+5. Singletons only, no deps
+6. Multipart objectives get dependencies
+7. Singletons first, multipart after with deps
+8. Context carry-forward
+9. Vote scoping: no cross-group leakage
+10. log_summary output
+11. fail_entry! marks failed
+12. Singleton sure/unsure split
+13. Full execution flow
+14. Cycle wipe resets state
+
+### Known Limitations (updated)
+
+- **Objective-scoped votes**: ~~FIXED~~ — HippocampalModulator now scopes votes per-objective. Each ActionEntry carries only its objective's votes. The old "all votes to every handler" behavior is gone.
+
+- **User-extensible soft ordering preferences**: The HippocampalModulator's `modulate_objectives!` currently uses a conservative default (multipart objectives depend on all prior multipart objectives). A future enhancement will allow users to define soft ordering rules (e.g., "objective B should come before objective A if B is a prerequisite"). The slot exists — `dependencies` and `prior_context` fields support arbitrary dependency graphs — but the soft-preference rule system is not yet built.

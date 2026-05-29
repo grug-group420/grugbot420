@@ -1339,33 +1339,54 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         end
 
         if objectives !== nothing && !isempty(objectives)
-            # GRUG: Generate output for each objective.
+            # GRUG v7.23: ACTION LOG — votes write to a log, AIML reads from it.
+            # The HippocampalModulator builds an ActionLog from MultipartOrchestrator's
+            # output. Each log entry carries ONLY its objective's scoped votes —
+            # no more passing the full vote pile to every COMMANDS handler.
+            # Entries are numbered and sequenced with dependencies + context carry-forward.
+            action_log = HippocampalModulator.create_action_log!()
+            HippocampalModulator.modulate_objectives!(action_log, objectives)
+            println("[HIPPOCAMPAL] Action log built:\n$(HippocampalModulator.log_summary(action_log))")
+
+            # GRUG: Execute entries from the log one at a time. Each entry
+            # gets only its own scoped votes — no cross-group leakage.
             output_parts = String[]
             all_sure = Vote[]
             all_unsure = Vote[]
 
-            for obj in objectives
-                obj_primary = obj.primary
-                obj_node = lock(() -> get(NODE_MAP, obj_primary.node_id, nothing), NODE_LOCK)
-                if isnothing(obj_node)
-                    @warn "[ORCHESTRATOR] Multipart objective primary node $(obj_primary.node_id) vanished, skipping"
+            while true
+                entry = HippocampalModulator.next_pending!(action_log)
+                isnothing(entry) && break
+
+                # GRUG: Extract the primary vote for this entry (first sure vote).
+                entry_primary = entry.sure_votes[1]
+                entry_node = lock(() -> get(NODE_MAP, entry_primary.node_id, nothing), NODE_LOCK)
+                if isnothing(entry_node)
+                    @warn "[ORCHESTRATOR] ActionLog entry $(entry.sequence_number) primary node $(entry_primary.node_id) vanished, skipping"
+                    HippocampalModulator.fail_entry!(action_log, entry.sequence_number)
                     continue
                 end
 
-                # GRUG: Build sure/unsure from the objective's internal structure.
-                obj_sure = Vote[obj_primary]
-                append!(obj_sure, obj.locked_supports)
-                obj_unsure = Vote[obj.unsure_supports...]
+                # GRUG: Generate output for this entry using ONLY its scoped votes.
+                # This is the key fix: COMMANDS no longer receives the full vote pile.
+                entry_sure = Vote[entry.sure_votes...]
+                entry_unsure = Vote[entry.unsure_votes...]
+                entry_output = COMMANDS[entry_primary.action](mission, entry_node, entry_primary, entry_sure, entry_unsure, entry.scoped_votes)
 
-                # GRUG: Generate output for this objective.
-                obj_output = COMMANDS[obj_primary.action](mission, obj_node, obj_primary, obj_sure, obj_unsure, votes)
-
-                if !isempty(obj_output)
-                    push!(output_parts, obj_output)
+                # GRUG: Mark entry complete — output stored for context carry-forward.
+                if !isempty(entry_output)
+                    HippocampalModulator.complete_entry!(action_log, entry.sequence_number, entry_output)
+                    push!(output_parts, entry_output)
+                else
+                    HippocampalModulator.fail_entry!(action_log, entry.sequence_number)
                 end
-                append!(all_sure, obj_sure)
-                append!(all_unsure, obj_unsure)
+
+                append!(all_sure, entry_sure)
+                append!(all_unsure, entry_unsure)
             end
+
+            # GRUG: Wipe log at end of cycle — ephemeral by nature.
+            HippocampalModulator.wipe_action_log!(action_log)
 
             # GRUG: Combine all objective outputs into one response.
             # If multiple parts, join with a separator that looks natural.

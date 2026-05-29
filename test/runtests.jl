@@ -63,6 +63,7 @@ const ALL_TESTS = [
     "test_atp_escalation.jl",
     "test_multipart_integration.jl",
     "test_right_feedback_tiered.jl",
+    "test_hippocampal_modulator.jl",
 ]
 
 @testset "GrugBot420 Tests" begin

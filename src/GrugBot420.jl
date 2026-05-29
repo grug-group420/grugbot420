@@ -171,6 +171,15 @@ using .EphemeralAutomaton
 include("InputDecomposer.jl")
 using .InputDecomposer
 
+# GRUG: v7.23 — HippocampalModulator. Semantic ordering and vote scoping.
+# Votes write to an ActionLog (ordered, numbered entries) instead of being
+# submitted directly to AIML. Each entry carries only its objective's scoped
+# votes. The modulator sequences entries with dependencies and context
+# carry-forward. Log is wiped every cycle — ephemeral by nature.
+# Depends on MultipartOrchestrator (for MultipartObjective type).
+include("HippocampalModulator.jl")
+using .HippocampalModulator
+
 include("engine.jl")
 include("Main.jl")
 
