@@ -1313,12 +1313,15 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     end
 
     # GRUG v7.23: MULTIPART OBJECTIVE ORCHESTRATION.
-    # If any votes carry multipart_group != "", use MultipartOrchestrator
-    # to build objectives and generate output per-objective. Singleton
-    # objectives (group="") flow through the old COMMANDS path unchanged.
+    # GRUG v7.23: If any votes carry multipart_group != "" OR non-empty
+    # input_chunks, use MultipartOrchestrator to build objectives and
+    # generate output per-objective. Chunked affinities mean votes know
+    # which part of the input they resolved — the orchestrator groups
+    # them by chunk overlap instead of decomposer tags.
+    # Singleton objectives (group="") flow through the old COMMANDS path unchanged.
     # Multipart objectives get their own output generation and are combined
     # into one coherent response.
-    has_multipart = any(v -> !isempty(v.multipart_group), votes)
+    has_multipart = any(v -> !isempty(v.multipart_group) || !isempty(v.input_chunks), votes)
 
     if has_multipart
         # GRUG: Build objectives from ALL votes — singletons AND multipart groups.
@@ -2807,6 +2810,13 @@ function process_mission(mission_text::String)
     # For compound inputs, scan each sub-subject independently and merge
     # the specimen pools. Each sub-subject's specimens carry the
     # multipart_group ID so votes can be stamped correctly.
+    #
+    # v7.23 CHUNKED AFFINITIES: scan_and_expand now returns 6-tuples with
+    # input_chunks::Vector{Int] as the 6th element. When chunks are provided
+    # (via the InputDecomposer path), each specimen knows which part of the
+    # input it resolved. For compound inputs, each sub-subject's scan gets
+    # chunk boundaries computed from that sub-subject's text. For singleton
+    # inputs, chunk boundaries are computed from the full mission text.
     all_specimens = if is_image
         # GRUG: Image inputs don't decompose — single scan path.
         println("[IMAGE] 🔍  Routing to image node scan path...")
@@ -2827,15 +2837,25 @@ function process_mission(mission_text::String)
             rethrow(e)
         end
         # GRUG: Image specimens are singletons — no multipart stamping.
-        [(spec..., "", :singleton) for spec in specimens]
+        # v7.23: Image specimens carry Int[] for input_chunks (6th element).
+        [(id, conf, antimatch, u_trips, n_trips, ichunks, "", :singleton)
+         for (id, conf, antimatch, u_trips, n_trips, ichunks) in specimens]
     elseif is_compound_input
         # GRUG: COMPOUND INPUT — scan each sub-subject independently.
         # Each scan produces specimens tagged with the sub-subject's
         # multipart_group and role. Merged into one pool for voting.
-        merged = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, String, Symbol}[]
+        merged = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}, String, Symbol}[]
         for sub in sub_subjects
+            # GRUG v7.23: Compute chunk boundaries for this sub-subject.
+            # Each sub-subject gets its own chunk resolution pass.
+            sub_chunks = try
+                InputDecomposer.chunk_boundaries(sub.text)
+            catch e
+                @warn "[MAIN] chunk_boundaries failed for sub-subject (using empty): $e"
+                InputDecomposer.InputChunk[]
+            end
             sub_task_name, sub_task = VoteOrchestrator.dispatch_task_with_timeout(
-                () -> scan_and_expand(sub.text),
+                () -> scan_and_expand(sub.text; chunks=sub_chunks),
                 "scan_$(sub.multipart_group)",
                 30.0;
                 context = "run_mission.scan.$(sub.multipart_group)"
@@ -2851,15 +2871,24 @@ function process_mission(mission_text::String)
             # group. The decomposer's .role field (:primary/:support) is for OUTPUT
             # ORDERING in the combined response, NOT for vote role. Each group is
             # independent — MultipartOrchestrator requires exactly one :primary per group.
-            for (id, conf, antimatch, u_trips, n_trips) in sub_specimens
-                push!(merged, (id, conf, antimatch, u_trips, n_trips, sub.multipart_group, :primary))
+            # v7.23: Carry input_chunks through to the merged pool.
+            for (id, conf, antimatch, u_trips, n_trips, ichunks) in sub_specimens
+                push!(merged, (id, conf, antimatch, u_trips, n_trips, ichunks, sub.multipart_group, :primary))
             end
         end
         merged
     else
         # GRUG: SINGLETON INPUT — old path, one scan, no multipart stamping.
+        # v7.23: Compute chunk boundaries for the full mission text so
+        # chunked affinities work even on singleton (non-compound) inputs.
+        singleton_chunks = try
+            InputDecomposer.chunk_boundaries(mission_text)
+        catch e
+            @warn "[MAIN] chunk_boundaries failed (using empty): $e"
+            InputDecomposer.InputChunk[]
+        end
         scan_task_name, scan_task = VoteOrchestrator.dispatch_task_with_timeout(
-            () -> scan_and_expand(mission_text),
+            () -> scan_and_expand(mission_text; chunks=singleton_chunks),
             "scan_cycle",
             30.0;
             context = "run_mission.scan"
@@ -2875,7 +2904,9 @@ function process_mission(mission_text::String)
             rethrow(e)
         end
         # GRUG: Singleton specimens — no multipart stamping.
-        [(spec..., "", :singleton) for spec in specimens]
+        # v7.23: Carry input_chunks through.
+        [(id, conf, antimatch, u_trips, n_trips, ichunks, "", :singleton)
+         for (id, conf, antimatch, u_trips, n_trips, ichunks) in specimens]
     end
 
     # GRUG: LOBE FIRING COMPLETE → emit DONE to the orchestrator layer.
@@ -2955,12 +2986,19 @@ function process_mission(mission_text::String)
     cast_votes_task_name, cast_votes_task = VoteOrchestrator.dispatch_task_with_timeout(
         () -> begin
             out = Vote[]
-            # GRUG v7.23: Specimens now carry multipart_group and multipart_role.
-            # Use cast_vote_with_group to stamp votes with the correct group.
+            # GRUG v7.23: Specimens now carry input_chunks as well as
+            # multipart_group and multipart_role. When input_chunks is non-empty,
+            # use cast_vote_chunked to stamp the vote with chunk-aware grouping.
+            # When input_chunks is empty (old behavior, image nodes, expansion
+            # nodes with no position info), fall back to cast_vote_with_group.
             # Singleton specimens (group="", role=:singleton) produce the same
             # Vote as the old cast_vote — zero behavioral change for simple inputs.
-            for (id, conf, is_antimatch, u_trips, n_trips, mp_group, mp_role) in all_specimens
-                push!(out, cast_vote_with_group(id, conf, is_antimatch, u_trips, n_trips, mp_group, mp_role))
+            for (id, conf, is_antimatch, u_trips, n_trips, ichunks, mp_group, mp_role) in all_specimens
+                if !isempty(ichunks)
+                    push!(out, cast_vote_chunked(id, conf, is_antimatch, u_trips, n_trips, ichunks))
+                else
+                    push!(out, cast_vote_with_group(id, conf, is_antimatch, u_trips, n_trips, mp_group, mp_role))
+                end
             end
             return out
         end,
@@ -3090,14 +3128,16 @@ _scan_image_specimens(img_signal::Vector{Float64})::Vector{Tuple{...}}
 
 GRUG: Scan only image nodes using SDF signal vector.
 Text nodes are skipped. Image nodes use their stored SDF signal for comparison.
-Returns same tuple format as scan_specimens for uniform downstream processing.
+Returns same tuple format as scan_and_expand for uniform downstream processing.
+v7.23: Image specimens carry Int[] for input_chunks (no chunk resolution for
+image scans — SDF signals don't have token positions).
 """
 function _scan_image_specimens(img_signal::Vector{Float64})
     if isempty(img_signal)
         error("!!! FATAL: _scan_image_specimens got empty img_signal! !!!")
     end
 
-    results = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    results = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}[]
 
     lock(NODE_LOCK) do
         for (id, node) in NODE_MAP
@@ -3118,7 +3158,9 @@ function _scan_image_specimens(img_signal::Vector{Float64})
             try
                 target = length(img_signal) >= length(node.signal) ? img_signal : continue
                 _, conf = cheap_scan(target, node.signal; threshold=0.25)
-                push!(results, (id, conf, false, RelationalTriple[], node.relational_patterns))
+                # GRUG v7.23: Image specimens carry Int[] for input_chunks.
+                # SDF signals don't have token positions, so no chunk resolution.
+                push!(results, (id, conf, false, RelationalTriple[], node.relational_patterns, Int[]))
             catch e
                 if e isa PatternNotFoundError
                     continue

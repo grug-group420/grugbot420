@@ -21,12 +21,14 @@ module _MultipartTestParent
     # reads via `getfield`. This isolates the test from engine.jl's heavyweight
     # dependencies while exercising the exact field-access path the production
     # code uses.
+    # v7.23: Added input_chunks field for chunked affinities support.
     struct TestVote
         node_id::String
         action::String
         confidence::Float64
         multipart_group::String
         multipart_role::Symbol
+        input_chunks::Vector{Int}
     end
 end
 
@@ -34,7 +36,7 @@ using ._MultipartTestParent: TestVote
 using ._MultipartTestParent.MultipartOrchestrator
 
 @testset "MultipartOrchestrator — singleton passthrough" begin
-    v = TestVote("node_a", "reason", 0.7, "", :singleton)
+    v = TestVote("node_a", "reason", 0.7, "", :singleton, Int[])
     objs = build_objectives([v])
     @test length(objs) == 1
     @test objs[1].is_multipart == false
@@ -50,10 +52,10 @@ end
     # the RNG so the test is deterministic across the runtests harness.
     Random.seed!(0x6e75)
 
-    primary  = TestVote("node_x", "explain_force", 0.85, "g1", :primary)
-    s_lock   = TestVote("node_x", "note_mass",     0.84, "g1", :support)
-    s_unsure = TestVote("node_x", "note_acc",      0.55, "g1", :support)
-    s_drop   = TestVote("node_x", "note_irrelevant", 0.05, "g1", :support)
+    primary  = TestVote("node_x", "explain_force", 0.85, "g1", :primary, Int[])
+    s_lock   = TestVote("node_x", "note_mass",     0.84, "g1", :support, Int[])
+    s_unsure = TestVote("node_x", "note_acc",      0.55, "g1", :support, Int[])
+    s_drop   = TestVote("node_x", "note_irrelevant", 0.05, "g1", :support, Int[])
 
     objs = build_objectives([primary, s_lock, s_unsure, s_drop];
                             strength_of = _ -> 10.0,
@@ -83,8 +85,8 @@ end
     # GRUG: explicit version — force the coin to keep by seeding tightly,
     # to verify the unsure bucket carries the support that was below the
     # lock window but above threshold.
-    primary = TestVote("node_x", "p", 0.85, "g1", :primary)
-    s_unsure = TestVote("node_x", "u", 0.55, "g1", :support)
+    primary = TestVote("node_x", "p", 0.85, "g1", :primary, Int[])
+    s_unsure = TestVote("node_x", "u", 0.55, "g1", :support, Int[])
     # Run many trials; with strength=10, ~90% retention rate => well over
     # half should keep s_unsure across N=200.
     keeps = 0
@@ -101,12 +103,12 @@ end
 end
 
 @testset "MultipartOrchestrator — mixed singletons + group" begin
-    s1  = TestVote("a", "greet", 0.6, "",   :singleton)
-    p   = TestVote("b", "plan",  0.9, "g2", :primary)
+    s1  = TestVote("a", "greet", 0.6, "",   :singleton, Int[])
+    p   = TestVote("b", "plan",  0.9, "g2", :primary, Int[])
     # Pick support confidence inside the lock window so this test is
     # deterministic regardless of the strength-biased coinflip.
-    sup = TestVote("b", "step",  0.88, "g2", :support)
-    s2  = TestVote("c", "smile", 0.5, "",   :singleton)
+    sup = TestVote("b", "step",  0.88, "g2", :support, Int[])
+    s2  = TestVote("c", "smile", 0.5, "",   :singleton, Int[])
 
     objs = build_objectives([s1, p, sup, s2]; strength_of = _ -> 10.0)
     @test length(objs) == 3
@@ -117,20 +119,20 @@ end
 end
 
 @testset "MultipartOrchestrator — malformed group: zero primaries" begin
-    s1 = TestVote("a", "x", 0.7, "bad", :support)
-    s2 = TestVote("a", "y", 0.6, "bad", :support)
+    s1 = TestVote("a", "x", 0.7, "bad", :support, Int[])
+    s2 = TestVote("a", "y", 0.6, "bad", :support, Int[])
     @test_throws MultipartError build_objectives([s1, s2])
 end
 
 @testset "MultipartOrchestrator — malformed group: two primaries" begin
-    p1 = TestVote("a", "x", 0.7, "bad", :primary)
-    p2 = TestVote("a", "y", 0.7, "bad", :primary)
+    p1 = TestVote("a", "x", 0.7, "bad", :primary, Int[])
+    p2 = TestVote("a", "y", 0.7, "bad", :primary, Int[])
     @test_throws MultipartError build_objectives([p1, p2])
 end
 
 @testset "MultipartOrchestrator — group_votes_by_multipart partition" begin
-    a = TestVote("a", "act", 0.5, "",  :singleton)
-    b = TestVote("b", "act", 0.5, "G", :primary)
+    a = TestVote("a", "act", 0.5, "",  :singleton, Int[])
+    b = TestVote("b", "act", 0.5, "G", :primary, Int[])
     sing, grp = group_votes_by_multipart([a, b])
     @test length(sing) == 1 && getfield(sing[1], :node_id) == "a"
     @test haskey(grp, "G") && length(grp["G"]) == 1

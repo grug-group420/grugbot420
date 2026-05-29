@@ -53,6 +53,7 @@
 module InputDecomposer
 
 export DecomposedSubSubject, decompose_input, is_compound
+export InputChunk, chunk_boundaries
 
 # ==============================================================================
 # STRUCTS
@@ -74,6 +75,133 @@ struct DecomposedSubSubject
     role::Symbol
     index::Int
 end
+
+# ==============================================================================
+# INPUT CHUNK — token-range scope for pattern bind phase
+# ==============================================================================
+
+#=
+    InputChunk — a contiguous token range in the input.
+
+    When the decomposer splits a compound input, each sub-subject covers a
+    span of the original tokenized input. InputChunk captures that span as
+    (first_token, last_token) indices into the whitespace-split token array,
+    plus a chunk_index for fast comparison.
+
+    The scanner already returns best_idx (1-based token position) from
+    cheap_scan / medium_scan / high_res_scan. By cross-referencing best_idx
+    against InputChunk boundaries, the scan phase can determine which chunk(s)
+    a match covers and stamp the resulting vote with input_chunks.
+
+    Bio-coherence: place cells fire for a specific location, not "the
+    environment." Object cells fire for a specific object, not "the scene."
+    A vote that knows which chunk it resolved is a place-cell vote — it
+    carries its own scope instead of relying on an external tag.
+=#
+struct InputChunk
+    first_token::Int    # 1-based index of first token in this chunk
+    last_token::Int     # 1-based index of last token in this chunk
+    chunk_index::Int    # which chunk this is (1, 2, 3...)
+    text::String        # the sub-string this chunk covers (for diagnostics)
+end
+
+# ==============================================================================
+# CHUNK BOUNDARIES — compute InputChunks from decomposed sub-subjects
+# ==============================================================================
+
+#=
+    chunk_boundaries(input_text) -> Vector{InputChunk}
+
+    Decompose the input, then compute token ranges for each sub-subject.
+    Returns a vector of InputChunk, one per sub-subject. For singleton
+    inputs, returns one chunk spanning the entire input.
+
+    The token ranges are computed by matching each sub-subject's text
+    against the full input's token stream. This is a simple left-to-right
+    greedy match — we find where each chunk's tokens start in the full
+    input and track the end.
+
+    This is the bridge between the decomposer's text-level splitting and
+    the scanner's token-level matching. The scanner works in token space
+    (the signal is one Float64 per token); the chunks tell the scanner
+    which token ranges correspond to which sub-subject.
+=#
+function chunk_boundaries(input_text::String)::Vector{InputChunk}
+    if isempty(strip(input_text))
+        # Empty input — one chunk spanning nothing
+        return [InputChunk(1, 0, 1, "")]
+    end
+
+    # Decompose the input first
+    subs = decompose_input(input_text)
+
+    # Singleton — one chunk spanning everything
+    if length(subs) == 1
+        n_tokens = length(split(input_text))
+        return [InputChunk(1, n_tokens, 1, input_text)]
+    end
+
+    # Compound — compute token ranges for each sub-subject.
+    # Tokenize the full input once, then find each sub-subject's tokens.
+    full_tokens = split(input_text)
+    n_full = length(full_tokens)
+
+    # GRUG: Build a mapping from (lowercased token, position) for the full
+    # input so we can find where each sub-subject starts.
+    # Strategy: walk the full token stream left-to-right. For each
+    # sub-subject, find its first token in the remaining full stream,
+    # then track how many tokens it covers.
+    chunks = InputChunk[]
+    full_idx = 1  # current position in full token stream
+
+    for (i, sub) in enumerate(subs)
+        sub_tokens = split(sub.text)
+        isempty(sub_tokens) && continue
+
+        # GRUG: Find where this sub-subject starts in the full token stream.
+        # The sub-subject's tokens are a contiguous subsequence of the full
+        # token stream (because decomposition splits at boundaries, it doesn't
+        # reorder). We search from full_idx forward.
+        first_tok = lowercase(strip(sub_tokens[1], punctuation_chars))
+        start_idx = full_idx
+
+        # Scan forward to find the start of this sub-subject
+        found = false
+        for fi in full_idx:n_full
+            ft = lowercase(strip(full_tokens[fi], punctuation_chars))
+            if ft == first_tok
+                start_idx = fi
+                found = true
+                break
+            end
+        end
+
+        if !found
+            # Fallback: can't find sub-subject start. Use current position.
+            start_idx = full_idx
+        end
+
+        # GRUG: The sub-subject covers len(sub_tokens) tokens starting
+        # from start_idx. But we need to handle the case where the
+        # conjunction that was split on appears in the full stream but
+        # not in the sub-subject's text.
+        end_idx = min(start_idx + length(sub_tokens) - 1, n_full)
+
+        push!(chunks, InputChunk(start_idx, end_idx, i, sub.text))
+        full_idx = end_idx + 1
+    end
+
+    # GRUG: If we failed to produce any chunks, fall back to singleton.
+    if isempty(chunks)
+        return [InputChunk(1, n_full, 1, input_text)]
+    end
+
+    return chunks
+end
+
+# GRUG: Characters to strip when matching sub-subject tokens against
+# full-input tokens. Decomposition may remove trailing punctuation.
+const punctuation_chars = [',', '.', ';', ':', '!', '?', '-', '—']
 
 # ==============================================================================
 # CONJUNCTION DETECTION CONSTANTS

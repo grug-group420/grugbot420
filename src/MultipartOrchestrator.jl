@@ -40,7 +40,7 @@ using ..VoteOrchestrator: AIML_CONFIDENCE_THRESHOLD, AIML_TOP_TIER_WINDOW,
                           AIML_SUBTOP_BASE_PROB, AIML_SUBTOP_BONUS_PROB
 
 export MultipartObjective, MultipartError
-export group_votes_by_multipart, build_objectives, summarize_objective
+export group_votes_by_multipart, group_votes_by_chunks, build_objectives, summarize_objective
 
 # ==============================================================================
 # ERRORS — NO SILENT FAILURES
@@ -108,6 +108,183 @@ function group_votes_by_multipart(votes::AbstractVector)
 end
 
 # ==============================================================================
+# CHUNK-AWARE GROUPING (v7.23 chunked affinities)
+# ==============================================================================
+
+#=
+    _union_find_root(parent, x) -> Int
+
+Find the root of x in a union-find structure. Path compression
+for amortized near-constant time.
+=#
+function _union_find_root(parent::Dict{Int, Int}, x::Int)::Int
+    while parent[x] != x
+        parent[x] = parent[parent[x]]   # path compression
+        x = parent[x]
+    end
+    return x
+end
+
+#=
+    _union_find_union!(parent, rank, a, b)
+
+Union two sets in the union-find structure. Union by rank
+for balanced trees.
+=#
+function _union_find_union!(parent::Dict{Int, Int}, rank::Dict{Int, Int},
+                            a::Int, b::Int)
+    ra = _union_find_root(parent, a)
+    rb = _union_find_root(parent, b)
+    ra == rb && return nothing
+    if rank[ra] < rank[rb]
+        ra, rb = rb, ra
+    end
+    parent[rb] = ra
+    rank[ra] == rank[rb] && (rank[ra] += 1)
+    return nothing
+end
+
+#=
+    _connected_components(edges) -> Vector{Vector{Int}}
+
+Given a vector of (Set of Int), compute connected components using
+union-find. Each edge is a set of chunk indices that overlap.
+Returns groups of chunk indices that are transitively connected.
+=#
+function _connected_components(chunk_sets::Vector{Set{Int}})::Vector{Vector{Int}}
+    isempty(chunk_sets) && return Vector{Int}[]
+
+    # Collect all unique chunk indices
+    all_chunks = Set{Int}()
+    for cs in chunk_sets
+        union!(all_chunks, cs)
+    end
+    isempty(all_chunks) && return Vector{Int}[]
+
+    # Initialize union-find
+    parent = Dict{Int, Int}(c => c for c in all_chunks)
+    rank   = Dict{Int, Int}(c => 0 for c in all_chunks)
+
+    # Union all chunks within each chunk set
+    for cs in chunk_sets
+        arr = collect(cs)
+        for i in 2:length(arr)
+            _union_find_union!(parent, rank, arr[1], arr[i])
+        end
+    end
+
+    # Collect components
+    components = Dict{Int, Vector{Int}}()
+    for c in all_chunks
+        root = _union_find_root(parent, c)
+        push!(get!(components, root, Int[]), c)
+    end
+
+    return collect(values(components))
+end
+
+"""
+    group_votes_by_chunks(votes) -> (singletons, groups)
+
+GRUG: Old way group by multipart_group string. New way: when vote know which
+chunk of input it resolved (input_chunks non-empty), group by CHUNK OVERLAP.
+Two votes covering chunks [1,2] and [2,3] share chunk 2 — they are in the
+SAME group because they talk about the same part of the input. That is the
+place-cell way: cell fires for a LOCATION, not "the environment."
+
+Algorithm:
+  1. Partition votes into chunked (non-empty input_chunks) and unchunked.
+  2. Among chunked votes: compute connected components via union-find on
+     chunk overlap. Two votes are connected if their input_chunks share
+     any chunk index. Transitive closure means [1,2] + [2,3] + [3,4] all
+     land in one group even though the first and last share no chunk directly.
+  3. Each component becomes a group. group_id = "chk_{sorted_chunks_joined}".
+  4. Unchunked votes fall back to the old multipart_group grouping.
+  5. Singletons are votes with no group (empty input_chunks AND empty
+     multipart_group).
+
+The group_id format differs from old "mp_X" to make it easy to distinguish
+chunk-derived groups from decomposer-derived groups: "chk_1_2_3" vs "mp_1".
+"""
+function group_votes_by_chunks(votes::AbstractVector)
+    chunked   = eltype(votes)[]   # votes with non-empty input_chunks
+    unchunked = eltype(votes)[]   # votes without input_chunks
+
+    for v in votes
+        ic = getfield(v, :input_chunks)
+        if !isempty(ic)
+            push!(chunked, v)
+        else
+            push!(unchunked, v)
+        end
+    end
+
+    # --- Chunked votes: connected components by chunk overlap ---
+    chunk_groups = Dict{String, Vector{eltype(votes)}}()
+
+    if !isempty(chunked)
+        # Collect the chunk sets for connected-component computation
+        chunk_sets = [Set(getfield(v, :input_chunks)) for v in chunked]
+        components = _connected_components(chunk_sets)
+
+        # Map each component to a group_id, then assign votes
+        for comp in components
+            sorted = sort(comp)
+            gid = "chk_" * join(sorted, "_")
+            chunk_groups[gid] = eltype(votes)[]
+        end
+
+        # Assign each chunked vote to its component's group
+        for (i, v) in enumerate(chunked)
+            v_chunks = getfield(v, :input_chunks)
+            # Find which component this vote belongs to
+            assigned = false
+            for (gid, _) in chunk_groups
+                # Extract chunk indices from group_id: "chk_1_2_3" -> [1,2,3]
+                gid_chunks = Set(parse.(Int, split(gid[5:end], "_")))
+                # Vote belongs to this group if any of its chunks are in the component
+                if !isempty(intersect(Set(v_chunks), gid_chunks))
+                    push!(chunk_groups[gid], v)
+                    assigned = true
+                    break
+                end
+            end
+            if !assigned
+                # Should never happen if components are computed correctly,
+                # but as safety: make a group from the vote's own chunks
+                sorted = sort(v_chunks)
+                gid = "chk_" * join(sorted, "_")
+                if !haskey(chunk_groups, gid)
+                    chunk_groups[gid] = eltype(votes)[v]
+                else
+                    push!(chunk_groups[gid], v)
+                end
+            end
+        end
+    end
+
+    # --- Unchunked votes: fall back to multipart_group grouping ---
+    singletons = eltype(votes)[]
+    mp_groups  = Dict{String, Vector{eltype(votes)}}()
+
+    for v in unchunked
+        gid = getfield(v, :multipart_group)
+        if isempty(gid)
+            push!(singletons, v)
+        else
+            push!(get!(mp_groups, gid, eltype(votes)[]), v)
+        end
+    end
+
+    # Merge chunk-derived groups with multipart-derived groups.
+    # Chunk-derived groups take precedence if there's a key collision
+    # (unlikely since "chk_X" vs "mp_X" naming differs, but be safe).
+    all_groups = merge(mp_groups, chunk_groups)
+
+    return singletons, all_groups
+end
+
+# ==============================================================================
 # OBJECTIVE CONSTRUCTION
 # ==============================================================================
 
@@ -128,6 +305,95 @@ end
 """
 function _objective_from_singleton(v)
     return MultipartObjective("", v, Any[], Any[], false)
+end
+
+# ==============================================================================
+# CHUNK-DERIVED OBJECTIVE CONSTRUCTION
+# ==============================================================================
+
+#=
+    _reassign_roles!(group_votes) -> (primary, supports)
+
+GRUG v7.23: When grouping by chunk overlap, all chunked votes carry :primary
+role (because cast_vote_chunked always stamps :primary). But an objective
+needs exactly ONE primary. So: pick the highest-confidence vote as primary,
+the rest become supports. Their original :primary role is preserved in the
+vote's own data — we just change how the objective treats them.
+
+This is the chunked-affinities way: the GROUP is determined by chunk overlap
+(not by a decomposer tag), and the primary is determined by confidence
+(not by a role assigned at cast time).
+=#
+function _reassign_roles!(gvotes::AbstractVector)
+    if isempty(gvotes)
+        _throw("chunk group has zero votes", "_reassign_roles!")
+    end
+
+    # Find the highest-confidence vote. Ties broken by first occurrence.
+    best_idx = 1
+    best_conf = getfield(gvotes[1], :confidence)
+    for i in 2:length(gvotes)
+        c = getfield(gvotes[i], :confidence)
+        if c > best_conf
+            best_conf = c
+            best_idx = i
+        end
+    end
+
+    primary = gvotes[best_idx]
+    supports = [gvotes[i] for i in 1:length(gvotes) if i != best_idx]
+    return primary, supports
+end
+
+"""
+    _objective_from_chunk_group(group_id, group_votes; threshold, top_window, strength_of, strength_cap)
+
+Build an objective from a chunk-derived group. Unlike `_objective_from_group`
+(which expects exactly one :primary vote from the decomposer path), this
+function handles the case where all votes carry :primary (because
+cast_vote_chunked stamps them that way). It reassigns roles: highest-
+confidence vote becomes the objective's primary, the rest become supports.
+
+The rest of the logic (locked vs unsure partitioning) is the same as
+`_objective_from_group`.
+"""
+function _objective_from_chunk_group(group_id::String, gvotes::AbstractVector;
+                                     threshold::Float64 = AIML_CONFIDENCE_THRESHOLD,
+                                     top_window::Float64 = AIML_TOP_TIER_WINDOW,
+                                     strength_of::Function = _ -> 5.0,
+                                     strength_cap::Float64 = 10.0)
+    if isempty(gvotes)
+        _throw("chunk group '$group_id' has zero votes", "_objective_from_chunk_group")
+    end
+
+    # Single vote in group: it's the primary, no supports needed.
+    if length(gvotes) == 1
+        return MultipartObjective(group_id, gvotes[1], Any[], Any[], true)
+    end
+
+    # Reassign roles: highest confidence = primary, rest = supports.
+    primary, supports = _reassign_roles!(gvotes)
+    pri_conf = getfield(primary, :confidence)
+
+    # Below-threshold supports are dropped.
+    surviving = [s for s in supports if getfield(s, :confidence) >= threshold]
+
+    locked = eltype(supports)[]
+    unsure = eltype(supports)[]
+    for s in surviving
+        sc = getfield(s, :confidence)
+        if sc >= pri_conf - top_window
+            push!(locked, s)
+        else
+            str = strength_of(s)
+            if _strength_biased_coin(str, strength_cap)
+                push!(unsure, s)
+            end
+        end
+    end
+
+    return MultipartObjective(group_id, primary, Any[s for s in locked],
+                              Any[s for s in unsure], true)
 end
 
 """
@@ -195,9 +461,16 @@ end
         -> Vector{MultipartObjective}
 
 Top-level entry. Partitions votes, builds one objective per singleton and
-one objective per multipart group. Singletons are emitted in input order;
-multipart objectives follow, sorted by group_id for deterministic output
-(individual tie-breaking inside groups is still stochastic by design).
+one objective per multipart group. When any votes carry non-empty
+`input_chunks`, uses `group_votes_by_chunks` (chunk-overlap connected
+components) instead of the legacy `group_votes_by_multipart`. This is the
+chunked-affinities path: votes that know which part of the input they
+resolved are grouped by shared chunk overlap, not by the decomposer's
+multipart_group tag.
+
+Singletons are emitted in input order; multipart objectives follow, sorted
+by group_id for deterministic output (individual tie-breaking inside groups
+is still stochastic by design).
 
 Throws MultipartError if any group is malformed (zero or >1 :primary, or
 votes with unknown roles). Never silently drops a multipart group.
@@ -207,17 +480,40 @@ function build_objectives(votes::AbstractVector;
                           top_window::Float64   = AIML_TOP_TIER_WINDOW,
                           strength_of::Function = _ -> 5.0,
                           strength_cap::Float64 = 10.0)::Vector{MultipartObjective}
-    singletons, groups = group_votes_by_multipart(votes)
+    # GRUG v7.23: If any vote has chunk info, use chunk-aware grouping.
+    # Otherwise fall back to old multipart_group grouping. Chunk-aware
+    # grouping uses connected components on chunk overlap — two votes
+    # that touch the same input chunk are in the same group.
+    has_chunks = any(v -> !isempty(getfield(v, :input_chunks)), votes)
+
+    singletons, groups = if has_chunks
+        group_votes_by_chunks(votes)
+    else
+        group_votes_by_multipart(votes)
+    end
+
     out = MultipartObjective[]
     for v in singletons
         push!(out, _objective_from_singleton(v))
     end
     for gid in sort(collect(keys(groups)))
-        push!(out, _objective_from_group(gid, groups[gid];
-                                         threshold = threshold,
-                                         top_window = top_window,
-                                         strength_of = strength_of,
-                                         strength_cap = strength_cap))
+        # GRUG v7.23: Chunk-derived groups ("chk_*") use their own objective
+        # builder that handles multi-primary votes from cast_vote_chunked.
+        # Legacy multipart groups ("mp_*") use the original builder that
+        # expects exactly one :primary from the decomposer.
+        if startswith(gid, "chk_")
+            push!(out, _objective_from_chunk_group(gid, groups[gid];
+                                             threshold = threshold,
+                                             top_window = top_window,
+                                             strength_of = strength_of,
+                                             strength_cap = strength_cap))
+        else
+            push!(out, _objective_from_group(gid, groups[gid];
+                                             threshold = threshold,
+                                             top_window = top_window,
+                                             strength_of = strength_of,
+                                             strength_cap = strength_cap))
+        end
     end
     return out
 end
@@ -236,9 +532,11 @@ function summarize_objective(obj::MultipartObjective)::String
     pid    = getfield(p, :node_id)
     pact   = getfield(p, :action)
     pconf  = getfield(p, :confidence)
+    pchunks = getfield(p, :input_chunks)
+    chunk_str = isempty(pchunks) ? "" : " chunks=$(pchunks)"
     head   = obj.is_multipart ?
-        "[multipart $(obj.group_id)] primary=$(pact)@$(round(pconf, digits=3)) by $(pid)" :
-        "[singleton] $(pact)@$(round(pconf, digits=3)) by $(pid)"
+        "[multipart $(obj.group_id)] primary=$(pact)@$(round(pconf, digits=3)) by $(pid)$(chunk_str)" :
+        "[singleton] $(pact)@$(round(pconf, digits=3)) by $(pid)$(chunk_str)"
     locked_part = isempty(obj.locked_supports) ? "" :
         " | locked=" * join([getfield(s, :action) for s in obj.locked_supports], ",")
     unsure_part = isempty(obj.unsure_supports) ? "" :

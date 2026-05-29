@@ -240,7 +240,7 @@ function process_mission(mission_text::String)
     end
 
     cast_votes = Vote[]
-    for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
+    for (id, conf, is_antimatch, u_trips, n_trips, ichunks) in valid_specimens
         push!(cast_votes, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
     end
 

@@ -305,6 +305,19 @@ end
 # ==============================================================================
 
 #=
+    _chunks_from_group_id(group_id) -> Set{Int}
+
+Extract chunk indices from a chunk-derived group_id.
+"chk_1_2_3" -> Set([1,2,3]). Returns empty set for non-chunk IDs.
+=#
+function _chunks_from_group_id(gid::String)::Set{Int}
+    if !startswith(gid, "chk_")
+        return Set{Int}()
+    end
+    return Set(parse.(Int, split(gid[5:end], "_")))
+end
+
+#=
     modulate_objectives!(log::ActionLog, objectives; prior_outputs)
 
 Build ActionLog entries from MultipartOrchestrator output.
@@ -315,13 +328,20 @@ For each MultipartObjective:
   - unsure_votes = [unsure_supports...]
   - objective_id = objective.group_id (or "" for singletons)
   - prior_context = outputs from earlier multipart objectives (if any)
-  - dependencies = [sequence numbers of prior multipart entries]
+  - dependencies = [sequence numbers of prior multipart entries that
+                    share chunk overlap, or all prior for legacy groups]
 
 Ordering: singletons first (no dependencies among them), then multipart
-objectives in group_id order. Multipart objectives depend on ALL prior
-multipart objectives (conservative default — later objectives can reference
-earlier ones via pronouns like "its", "they", etc.). This can be refined
-later when the semantic ordering system adds actual dependency detection.
+objectives in group_id order.
+
+v7.23 CHUNK-AWARE DEPENDENCIES: When objectives carry chunk-derived group IDs
+("chk_*"), dependencies are computed from chunk OVERLAP rather than the
+conservative "depend on all prior" default. Two objectives whose chunks
+don't overlap are independent — they resolved different parts of the input
+and don't need to reference each other's output. This enables parallelism:
+independent objectives can execute concurrently since neither references
+the other. For legacy "mp_*" groups, the old conservative behavior is
+preserved (depend on all prior multipart entries).
 
 `prior_outputs` is an optional Dict{String, String} of objective_id -> output
 from a previous cycle. This supports cross-cycle context carry-forward if
@@ -353,27 +373,47 @@ function modulate_objectives!(log::ActionLog, objectives::AbstractVector;
         )
     end
 
-    # GRUG: Write multipart entries. Each multipart depends on all prior
-    # multipart entries (conservative step coherence). If multipart objective
-    # B references "its" from multipart objective A, B must come after A.
-    # This is the safe default — actual dependency detection can refine later.
+    # GRUG v7.23: Write multipart entries with chunk-aware dependencies.
+    # For chunk-derived groups ("chk_*"), only depend on prior objectives
+    # whose chunks OVERLAP with this one. Objectives about different parts
+    # of the input are independent — they can run in parallel.
+    # For legacy groups ("mp_*"), keep the conservative "depend on all prior"
+    # behavior (we don't know which parts they reference).
     multipart_seq_numbers = Int[]
+    multipart_chunk_sets  = Set{Int}[]    # parallel to multipart_seq_numbers
+
     for obj in multipart
         all_votes = vcat([obj.primary], obj.locked_supports, obj.unsure_supports)
         sure = vcat([obj.primary], obj.locked_supports)
         unsure = Any[obj.unsure_supports...]
 
-        # GRUG: Context from prior multipart objectives. If any prior
-        # multipart entry has completed, its output is available here.
+        # GRUG v7.23: Compute chunk-aware dependencies.
+        my_chunks = _chunks_from_group_id(obj.group_id)
+
+        if !isempty(my_chunks)
+            # CHUNK-AWARE: Only depend on prior objectives that share chunks.
+            # Two objectives about different parts of the input are independent.
+            deps = Int[]
+            for (idx, prior_seq) in enumerate(multipart_seq_numbers)
+                prior_chunks = multipart_chunk_sets[idx]
+                if !isempty(intersect(my_chunks, prior_chunks))
+                    push!(deps, prior_seq)
+                end
+            end
+        else
+            # LEGACY: Conservative — depend on all prior multipart entries.
+            deps = copy(multipart_seq_numbers)
+        end
+
+        # GRUG: Context from dependency entries (not ALL prior entries).
+        # Only entries we depend on provide prior context.
         prior_ctx = String[]
-        for ps in multipart_seq_numbers
-            # Check if this prior entry has output in objective_outputs
+        for ps in deps
             prior_entry = get_entry(log, ps)
             key = isempty(prior_entry.objective_id) ? string(ps) : prior_entry.objective_id
             if haskey(log.objective_outputs, key)
                 push!(prior_ctx, log.objective_outputs[key])
             elseif haskey(prior_outputs, key)
-                # Fall back to cross-cycle prior_outputs if provided
                 push!(prior_ctx, prior_outputs[key])
             end
         end
@@ -384,9 +424,10 @@ function modulate_objectives!(log::ActionLog, objectives::AbstractVector;
             sure_votes     = sure,
             unsure_votes   = unsure,
             prior_context  = prior_ctx,
-            dependencies   = copy(multipart_seq_numbers),
+            dependencies   = deps,
         )
         push!(multipart_seq_numbers, entry.sequence_number)
+        push!(multipart_chunk_sets, my_chunks)
     end
 
     return log

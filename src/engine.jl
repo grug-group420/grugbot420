@@ -643,10 +643,18 @@ struct Vote
     # marker for the historical case (no multipart).
     multipart_group::String
     multipart_role::Symbol
+    # ---- v7.23 chunked affinity field -------------------------------------
+    # GRUG: which input chunks this vote resolved. Empty = old behavior
+    # (unchunked input, or vote was created before chunk-aware pipeline).
+    # When chunked affinities are active, each vote knows which part(s)
+    # of the input it matched — like a place cell that fires for a specific
+    # location, not "the environment." MultipartOrchestrator uses this for
+    # grouping instead of the multipart_group tag when available.
+    input_chunks::Vector{Int}
 end
 
 # GRUG: 7-arg outer constructor preserves every existing call site.
-# Supplies "" / :singleton for the new fields. Old code is bit-exact.
+# Supplies "" / :singleton / empty Int[] for the new fields. Old code is bit-exact.
 function Vote(node_id::String,
               action::String,
               confidence::Float64,
@@ -656,7 +664,23 @@ function Vote(node_id::String,
               antimatch::Bool)
     return Vote(node_id, action, confidence, negatives,
                 user_triples, node_triples, antimatch,
-                "", :singleton)
+                "", :singleton, Int[])
+end
+
+# GRUG: 9-arg constructor for multipart_group + multipart_role (pre-chunked-affinity).
+# Supplies empty Int[] for input_chunks. Preserves existing cast_vote_with_group sites.
+function Vote(node_id::String,
+              action::String,
+              confidence::Float64,
+              negatives::Vector{String},
+              user_triples::Vector{RelationalTriple},
+              node_triples::Vector{RelationalTriple},
+              antimatch::Bool,
+              multipart_group::String,
+              multipart_role::Symbol)
+    return Vote(node_id, action, confidence, negatives,
+                user_triples, node_triples, antimatch,
+                multipart_group, multipart_role, Int[])
 end
 
 const NODE_MAP  = Dict{String, Node}()
@@ -2853,23 +2877,65 @@ function strength_biased_scan_coinflip(node::Node)::Bool
 end
 
 # ==============================================================================
+# CHUNK RESOLUTION — map scanner best_idx to InputChunk indices
+# ==============================================================================
+
+#=
+    _match_to_chunks(best_idx, pat_len, chunks) -> Vector{Int}
+
+GRUG v7.23: Given a scanner's best_idx (1-based token position where the
+match starts) and the pattern's signal length (how many tokens the match
+covers), determine which InputChunk(s) the match range overlaps.
+
+The match covers tokens [best_idx, best_idx + pat_len - 1].
+A chunk overlaps if [chunk.first_token, chunk.last_token] intersects
+that range. Returns the chunk_index of each overlapping chunk.
+
+If best_idx is 0 (unknown position) or chunks is empty, returns Int[].
+=#
+function _match_to_chunks(best_idx::Int, pat_len::Int,
+                          chunks::Vector{InputDecomposer.InputChunk})::Vector{Int}
+    if best_idx <= 0 || isempty(chunks) || pat_len <= 0
+        return Int[]
+    end
+
+    match_first = best_idx
+    match_last  = best_idx + pat_len - 1
+    result = Int[]
+
+    for chunk in chunks
+        # Two ranges overlap iff: max(first1, first2) <= min(last1, last2)
+        overlap_first = max(match_first, chunk.first_token)
+        overlap_last  = min(match_last, chunk.last_token)
+        if overlap_first <= overlap_last
+            push!(result, chunk.chunk_index)
+        end
+    end
+
+    return result
+end
+
+# ==============================================================================
 # MAIN SCAN FUNCTION
 # ==============================================================================
 
 """
-scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Int}}
 
 GRUG: Main scan entry point. Converts input text to signal, extracts relational
 triples, runs ActionTonePredictor, checks Hopfield fast-path, then scans all
 nodes for matches. Returns vector of (id, confidence, antimatch, user_triples,
-node_triples) tuples. Throws on empty input — NO SILENT FAILURES.
+node_triples, best_idx) tuples. The best_idx is the 1-based token position in
+the input signal where the scanner found the best match — this is the chunked-
+affinity channel. When a scanner can't report a position (e.g. image nodes,
+or fallback paths), best_idx is 0. Throws on empty input — NO SILENT FAILURES.
 """
-function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Int}}
     if strip(input_text) == ""
         error("!!! FATAL: Grug cannot scan empty air! Input text is blank! !!!")
     end
 
-    all_valid_specimens = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    all_valid_specimens = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Int}[]
     
     # GRUG: Convert input to number rocks!
     target_signal = words_to_signal(input_text)
@@ -3131,6 +3197,12 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             end
         end
 
+        # GRUG v7.23 CHUNKED AFFINITIES: best_idx tracks WHERE in the input
+        # signal the scanner found the best match. This is the 1-based token
+        # position. When no scan succeeds (fallback paths), best_idx stays 0.
+        # Downstream, scan_and_expand cross-references this against InputChunk
+        # boundaries to stamp each specimen with input_chunks::Vector{Int}.
+        best_idx = 0
         token_conf = 0.0
         try
             if node.is_image_node
@@ -3160,10 +3232,17 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                 # combined behavior is "high-conf solid: silent; low-conf solid:
                 # still jitters; unsolid: always jitters." See jitter_allowed_for.
                 #
+                # v7.23 CHUNKED AFFINITIES: capture best_idx from the scanner.
+                # This is the token position where the match starts — used to
+                # determine which input chunk(s) this vote resolves.
+                #
                 # BUG-004: When pattern is longer than input, swap arg roles so
                 # the (smaller) input acts as the pattern and the (larger) node
                 # signal acts as the target. The cheap scan loops `(length(target)
                 # - pat_len + 1)` and would otherwise have an empty range.
+                # NOTE: In BUG-004 mode, best_idx refers to the node signal, not
+                # the input signal — so it's not meaningful for chunk resolution.
+                # We keep best_idx=0 in that case (set below after the scan).
                 if long_pattern_short_input
                     _, token_conf = _bidirectional_cheap_scan(
                         node.signal, target_signal;
@@ -3171,8 +3250,10 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                         nonjitter=is_nonjitter(node),
                         jitter_floor=JITTER_CONFIDENCE_FLOOR
                     )
+                    # BUG-004 path: best_idx is in node-signal space, not input-
+                    # signal space. Not useful for chunk resolution, leave as 0.
                 else
-                    _, token_conf = _bidirectional_cheap_scan(
+                    best_idx, token_conf = _bidirectional_cheap_scan(
                         target_signal, node.signal;
                         threshold=CHEAP_SCAN_THRESHOLD,
                         nonjitter=is_nonjitter(node),
@@ -3180,9 +3261,9 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                     )
                 end
             elseif effective_mode == 2
-                _, token_conf = medium_scan(target_signal, node.signal; threshold=MEDIUM_SCAN_THRESHOLD)
+                best_idx, token_conf = medium_scan(target_signal, node.signal; threshold=MEDIUM_SCAN_THRESHOLD)
             else
-                _, token_conf = high_res_scan(target_signal, node.signal; threshold=HIGH_SCAN_THRESHOLD)
+                best_idx, token_conf = high_res_scan(target_signal, node.signal; threshold=HIGH_SCAN_THRESHOLD)
             end
         catch e
             if e isa PatternNotFoundError
@@ -3204,6 +3285,11 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                 # the node a fair shot at the vote pool instead of dropping it.
                 if literal_hit
                     token_conf = literal_jaccard
+                    # GRUG v7.23: Scanner didn't find a clean window, so we have
+                    # no meaningful best_idx for chunk resolution. The literal
+                    # token gate confirmed a real hit, but we can't pinpoint WHERE.
+                    # best_idx stays 0 — downstream will treat this as "unknown position."
+                    best_idx = 0
                 else
                     return nothing
                 end
@@ -3264,7 +3350,7 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
                 catch
                 end
             end
-            return (id, confidence, is_antimatch, user_triples, node.relational_patterns)
+            return (id, confidence, is_antimatch, user_triples, node.relational_patterns, best_idx)
         end
         return nothing
     end
@@ -3314,7 +3400,7 @@ end
 # ==============================================================================
 
 """
-scan_and_expand(input_text)
+scan_and_expand(input_text; chunks)
 
 GRUG: Run scan_specimens then expand results in two passes:
 
@@ -3336,8 +3422,19 @@ Pass 2 — Lobe cascade expansion (cross-lobe bridge activation):
   while killing the indiscriminate flood.
   Cascade threshold: 0.15 (soft gate on cascade_conf).
   Cascade confidence: 60% of the highest primary confidence (cross-lobe discount).
+
+v7.23 CHUNKED AFFINITIES:
+  When `chunks` is provided (Vector{InputChunk}), each primary specimen's
+  `best_idx` from the scanner is cross-referenced against chunk boundaries
+  to produce `input_chunks::Vector{Int}` — which input chunk(s) this vote
+  resolved. Expansion specimens (drop-table, cascade, relay) inherit the
+  activating node's input_chunks; if no activating context, input_chunks
+  is Int[]. When `chunks` is empty or not provided, all specimens get
+  Int[] (backward compatible — old behavior).
 """
-function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+function scan_and_expand(input_text::String;
+                         chunks::Vector{InputDecomposer.InputChunk} = InputDecomposer.InputChunk[]
+                         )::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}}
     # ──────────────────────────────────────────────────────────────────────
     # STAGE 1.5a — FRONT-DOOR SIGIL PROMOTION
     # ──────────────────────────────────────────────────────────────────────
@@ -3378,7 +3475,45 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     primary_results = scan_specimens(promoted_text)
 
     if isempty(primary_results)
-        return primary_results
+        # GRUG: Return empty vector with the correct 6-tuple element type.
+        return Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}[]
+    end
+
+    # GRUG v7.23 CHUNKED AFFINITIES: Resolve best_idx -> input_chunks.
+    # Each specimen now carries best_idx (6th element) from the scanner.
+    # Cross-reference against InputChunk boundaries to determine which
+    # chunk(s) this specimen's match covers. The match covers tokens
+    # [best_idx, best_idx + pattern_length - 1]; a chunk overlaps if
+    # its [first_token, last_token] range intersects that match range.
+    # When no chunks are provided (backward compat), all get Int[].
+    if !isempty(chunks)
+        # GRUG: We need the pattern length for each specimen to compute
+        # the match range. Read node.signal length from NODE_MAP.
+        # If best_idx is 0 (scanner fallback) or node not found,
+        # input_chunks is Int[] (unknown position).
+        resolved_results = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}[]
+        for (id, conf, antimatch, u_trips, n_trips, bidx) in primary_results
+            ichunks = if bidx > 0
+                node_for_range = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+                pat_len = if !isnothing(node_for_range)
+                    length(node_for_range.signal)
+                else
+                    1  # Fallback: assume single-token match
+                end
+                _match_to_chunks(bidx, pat_len, chunks)
+            else
+                Int[]  # best_idx=0 means unknown position
+            end
+            push!(resolved_results, (id, conf, antimatch, u_trips, n_trips, ichunks))
+        end
+        primary_results = resolved_results
+    else
+        # GRUG: No chunks provided — backward compat. All get Int[].
+        resolved_results = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}[]
+        for (id, conf, antimatch, u_trips, n_trips, bidx) in primary_results
+            push!(resolved_results, (id, conf, antimatch, u_trips, n_trips, Int[]))
+        end
+        primary_results = resolved_results
     end
 
     # GRUG: Pre-compute input CONTENT TOKEN SET once for cascade overlap gate.
@@ -3406,7 +3541,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     max_primary_conf = maximum(r[2] for r in primary_results)
 
     # ── PASS 1: Drop-table expansion (same lobe, 80% confidence discount) ──────
-    for (id, conf, antimatch, u_trips, n_trips) in primary_results
+    for (id, conf, antimatch, u_trips, n_trips, ichunks) in primary_results
         activating_node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
         isnothing(activating_node) && continue
 
@@ -3417,8 +3552,11 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                 isnothing(drop_node) && continue
 
                 # GRUG: Drop-table neighbor gets discounted confidence (80% of activator)
+                # v7.23: Drop-table neighbors inherit the activating node's input_chunks.
+                # They fire alongside the activator in the same lobe, so they resolve
+                # the same part of the input.
                 drop_conf = conf * 0.8
-                push!(expanded, (drop_id, drop_conf, false, user_triples, drop_node.relational_patterns))
+                push!(expanded, (drop_id, drop_conf, false, user_triples, drop_node.relational_patterns, ichunks))
                 push!(already_included, drop_id)
             end
         end
@@ -3433,7 +3571,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         if cascade_conf >= 0.15
             # GRUG: Collect lobes that own the primary firing nodes
             primary_lobe_names = Set{String}()
-            for (id, conf, _, _, _) in primary_results
+            for (id, conf, _, _, _, _) in primary_results
                 lobe_name = Lobe.find_lobe_for_node(id)
                 !isnothing(lobe_name) && push!(primary_lobe_names, lobe_name)
             end
@@ -3489,7 +3627,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                             continue  # GRUG: No shared content token → skip.
                         end
 
-                        push!(expanded, (node_id, cascade_conf, false, user_triples, cascade_node.relational_patterns))
+                        push!(expanded, (node_id, cascade_conf, false, user_triples, cascade_node.relational_patterns, Int[]))
                         push!(already_included, node_id)
                     end
                 end
@@ -3519,9 +3657,9 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         shared_fc = VoteOrchestrator.FireCounter("relay_fallback#$(hash(input_text))", VoteOrchestrator.ACTIVE_FIRE_CAP)
     end
     relay_cap   = shared_fc.cap
-    relay_additions = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    relay_additions = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}, Vector{Int}}[]
 
-    for (id, conf, antimatch, u_trips, n_trips) in expanded
+    for (id, conf, antimatch, u_trips, n_trips, ichunks) in expanded
         # GRUG: Stop firing attachments if global cap is already hit. Hard cap
         # applies across ALL fire paths — no bypass for attachments!
         if VoteOrchestrator.fire_cap_reached(shared_fc)
@@ -3545,7 +3683,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                 #   subject=target_id, relation="relay_attached", object=connector_pattern
                 relay_triple = RelationalTriple(id, "relay_attached", connector_pattern)
                 relay_triples = vcat(fired_node.relational_patterns, [relay_triple])
-                push!(relay_additions, (fired_id, fired_conf, false, user_triples, relay_triples))
+                push!(relay_additions, (fired_id, fired_conf, false, user_triples, relay_triples, Int[]))
                 push!(already_included, fired_id)
             end
         end
@@ -3662,6 +3800,45 @@ function cast_vote_with_group(id, conf, antimatch, u_trips, n_trips,
 
     return Vote(id, winning_action, conf, negatives, u_trips, n_trips, antimatch,
                 multipart_group, multipart_role)
+end
+
+#=
+    cast_vote_chunked(id, conf, antimatch, u_trips, n_trips, input_chunks)
+
+GRUG v7.23: Cast a vote that knows which input chunk(s) it resolved.
+This is the chunked-affinity path — the vote carries its own scope
+instead of relying on a multipart_group tag. Used when the pattern
+bind phase has chunk boundaries and can determine which part of the
+input the node matched.
+
+The vote's multipart_group is derived from input_chunks: if there's
+exactly one chunk, group_id = "mp_{chunk_index}". If multiple chunks,
+group_id = "mp_{first_chunk}" (primary chunk). If no chunks, group_id
+= "" (singleton). multipart_role is always :primary for the winning
+vote within its chunk group — same as the InputDecomposer path.
+=#
+function cast_vote_chunked(id, conf, antimatch, u_trips, n_trips,
+                           input_chunks::Vector{Int})
+    if strip(id) == "" error("!!! FATAL: Need real node ID to cast vote! !!!") end
+
+    node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+    isnothing(node) && error("!!! FATAL: Node [$id] vanished before vote! !!!")
+
+    winning_action, negatives = select_action(node.action_packet)
+
+    if !haskey(COMMANDS, winning_action)
+        error("!!! FATAL: Grug rolled unknown action [$(winning_action)]! Not in COMMANDS dictionary !!!")
+    end
+
+    bump_strength!(node)
+
+    # GRUG: Derive multipart_group from input_chunks.
+    # Single chunk -> group "mp_{chunk}". Multiple -> group "mp_{first}".
+    # No chunks -> "" (singleton / old behavior).
+    group_id = isempty(input_chunks) ? "" : "mp_$(input_chunks[1])"
+
+    return Vote(id, winning_action, conf, negatives, u_trips, n_trips, antimatch,
+                group_id, :primary, input_chunks)
 end
 
 # ==============================================================================

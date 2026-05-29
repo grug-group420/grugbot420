@@ -58,6 +58,8 @@ include(joinpath(SRC_DIR, "FullLobeScanner.jl"))
 using .FullLobeScanner
 include(joinpath(SRC_DIR, "AIMLNodeSystem.jl"))
 using .AIMLNodeSystem
+include(joinpath(SRC_DIR, "InputDecomposer.jl"))
+using .InputDecomposer
 include(joinpath(SRC_DIR, "engine.jl"))
 
 using .RelationalJitter
