@@ -1,0 +1,5726 @@
+{
+  "last_voters": [],
+  "tonal_judge_knobs": {
+    "frame_inhibit_multiplier": 0.85,
+    "frame_lift_multiplier": 1.2
+  },
+  "inhibitions": [],
+  "last_contributor_votes": [],
+  "lobes": [
+    {
+      "created_at": 1.780049056696766e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "math",
+      "node_ids": [
+        "node_3",
+        "node_4",
+        "node_5",
+        "node_6"
+      ],
+      "connected_lobe_ids": [
+        "science"
+      ],
+      "subject_whitelist": [],
+      "inhibit_count": 0,
+      "subject": "Pure mathematics — algebra, calculus, geometry, logic"
+    },
+    {
+      "created_at": 1.780049056515915e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "default",
+      "node_ids": [
+        "node_0",
+        "node_1",
+        "node_2"
+      ],
+      "connected_lobe_ids": [],
+      "subject_whitelist": [],
+      "inhibit_count": 0,
+      "subject": "general thinking reasoning conversation greeting"
+    },
+    {
+      "created_at": 1.780049056701569e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "philosophy",
+      "node_ids": [
+        "node_11",
+        "node_12",
+        "node_13",
+        "node_14"
+      ],
+      "connected_lobe_ids": [
+        "conversation",
+        "science"
+      ],
+      "subject_whitelist": [],
+      "inhibit_count": 0,
+      "subject": "Abstract thought — epistemology, ethics, metaphysics"
+    },
+    {
+      "created_at": 1.780049056701573e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "conversation",
+      "node_ids": [
+        "node_15",
+        "node_16",
+        "node_17",
+        "node_18"
+      ],
+      "connected_lobe_ids": [
+        "philosophy"
+      ],
+      "subject_whitelist": [],
+      "inhibit_count": 0,
+      "subject": "General conversation — greetings, small talk, meta-questions"
+    },
+    {
+      "created_at": 1.78004905670156e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "science",
+      "node_ids": [
+        "node_10",
+        "node_7",
+        "node_8",
+        "node_9"
+      ],
+      "connected_lobe_ids": [
+        "math",
+        "philosophy"
+      ],
+      "subject_whitelist": [],
+      "inhibit_count": 0,
+      "subject": "Natural sciences — physics, chemistry, biology"
+    }
+  ],
+  "node_to_lobe_idx": {
+    "node_17": "conversation",
+    "node_8": "science",
+    "node_16": "conversation",
+    "node_18": "conversation",
+    "node_14": "philosophy",
+    "node_1": "default",
+    "node_10": "science",
+    "node_6": "math",
+    "node_7": "science",
+    "node_9": "science",
+    "node_15": "conversation",
+    "node_0": "default",
+    "node_4": "math",
+    "node_5": "math",
+    "node_13": "philosophy",
+    "node_12": "philosophy",
+    "node_3": "math",
+    "node_11": "philosophy",
+    "node_2": "default"
+  },
+  "chatter_cooldowns": [],
+  "sigil_table": [
+    {
+      "provenance": "engine-default",
+      "name": "n",
+      "promote_at_tokenize": true,
+      "sigil_type": "number",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "op",
+      "promote_at_tokenize": true,
+      "sigil_type": "op",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "rest",
+      "promote_at_tokenize": false,
+      "sigil_type": "slurp",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "word",
+      "promote_at_tokenize": false,
+      "sigil_type": "word",
+      "expansion": null,
+      "class": "lambda",
+      "lexicon": null,
+      "applies_at": "match",
+      "params": null
+    },
+    {
+      "provenance": "engine-default",
+      "name": "noun",
+      "promote_at_tokenize": false,
+      "sigil_type": null,
+      "expansion": null,
+      "class": "macro",
+      "lexicon": [],
+      "applies_at": "bind",
+      "params": null
+    }
+  ],
+  "brainstem": {
+    "dispatch_count": 0,
+    "last_dispatch_t": 0.0,
+    "propagation_history": [],
+    "last_winner_id": ""
+  },
+  "message_history": [],
+  "id_counters": {
+    "node_id_counter": 19,
+    "msg_id_counter": 0
+  },
+  "verb_registry": {
+    "classes": {
+      "causal": [
+        "causes",
+        "contradicts",
+        "hits",
+        "increases",
+        "makes",
+        "reduces",
+        "routes"
+      ],
+      "action": [
+        "calculate"
+      ],
+      "cognition": [
+        "analyze",
+        "define",
+        "explain",
+        "ponder",
+        "reason",
+        "validate"
+      ],
+      "spatial": [
+        "are",
+        "connects",
+        "is",
+        "was",
+        "were"
+      ],
+      "communication": [
+        "clarify",
+        "describe",
+        "elaborate"
+      ],
+      "temporal": [
+        "chasing",
+        "follows",
+        "precedes"
+      ]
+    },
+    "synonyms": {
+      "examine": "analyze",
+      "compute": "calculate",
+      "assess": "validate",
+      "contemplate": "ponder",
+      "illuminate": "explain"
+    }
+  },
+  "hopfield_cache": [],
+  "immune_system": {
+    "hopfield": {},
+    "ledger": []
+  },
+  "thesaurus_seeds": {
+    "build": [
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "want": [
+      "demand",
+      "desire",
+      "lack",
+      "need",
+      "require"
+    ],
+    "contemplate": [
+      "consider",
+      "ponder",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "observe": [
+      "detect",
+      "examine",
+      "inspect",
+      "look",
+      "measure",
+      "monitor",
+      "record",
+      "see",
+      "track",
+      "view",
+      "watch"
+    ],
+    "occupation": [
+      "career",
+      "employment",
+      "job",
+      "profession",
+      "work"
+    ],
+    "fearful": [
+      "afraid",
+      "anxious",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "give": [
+      "deliver",
+      "grant",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "truth": [
+      "actuality",
+      "fact",
+      "reality",
+      "validity",
+      "verity"
+    ],
+    "icy": [
+      "chilly",
+      "cold",
+      "cool",
+      "freezing",
+      "frigid"
+    ],
+    "solid": [
+      "mighty",
+      "powerful",
+      "robust",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "fast": [
+      "brisk",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "employment": [
+      "career",
+      "job",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "relaxed": [
+      "calm",
+      "composed",
+      "peaceful",
+      "serene",
+      "tranquil"
+    ],
+    "weary": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "tired"
+    ],
+    "force": [
+      "capacity",
+      "charge",
+      "energy",
+      "potential",
+      "power"
+    ],
+    "move": [
+      "migrate",
+      "relocate",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "damage": [
+      "break",
+      "crack",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "theoretical": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "notional"
+    ],
+    "walk": [
+      "march",
+      "stride",
+      "stroll",
+      "trek",
+      "wander"
+    ],
+    "say": [
+      "chat",
+      "converse",
+      "discuss",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "make": [
+      "build",
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "produce"
+    ],
+    "associate": [
+      "attach",
+      "bind",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "residence": [
+      "building",
+      "dwelling",
+      "home",
+      "house",
+      "place"
+    ],
+    "try": [
+      "attempt",
+      "endeavor",
+      "experiment",
+      "strive",
+      "test"
+    ],
+    "principled": [
+      "ethical",
+      "just",
+      "moral",
+      "righteous",
+      "virtuous"
+    ],
+    "postulate": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "supposition",
+      "theory"
+    ],
+    "plan": [
+      "approach",
+      "concept",
+      "design",
+      "idea",
+      "method",
+      "notion",
+      "proposal",
+      "scheme",
+      "strategy",
+      "thought"
+    ],
+    "search": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "scan",
+      "seek"
+    ],
+    "hypothetical": [
+      "abstract",
+      "conceptual",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "product": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "outcome",
+      "output",
+      "reply",
+      "response",
+      "result"
+    ],
+    "cease": [
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "tranquil": [
+      "calm",
+      "composed",
+      "peaceful",
+      "relaxed",
+      "serene"
+    ],
+    "dispatch": [
+      "forward",
+      "push",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "repair": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "resolve",
+      "restore"
+    ],
+    "auto": [
+      "automobile",
+      "car",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "support": [
+      "aid",
+      "assist",
+      "facilitate",
+      "help",
+      "serve"
+    ],
+    "chilly": [
+      "cold",
+      "cool",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "shift": [
+      "migrate",
+      "move",
+      "relocate",
+      "transfer",
+      "transport"
+    ],
+    "bold": [
+      "brave",
+      "courageous",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "correct": [
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "basic": [
+      "easy",
+      "effortless",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "progress": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "mutate",
+      "transform"
+    ],
+    "train": [
+      "adapt",
+      "evolve",
+      "improve",
+      "learn",
+      "study"
+    ],
+    "cuisine": [
+      "dish",
+      "food",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "align": [
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "cache": [
+      "archive",
+      "keep",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "reality": [
+      "actuality",
+      "fact",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "failure": [
+      "bug",
+      "defect",
+      "error",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "livid": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "mad",
+      "wrathful"
+    ],
+    "sorrowful": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "unhappy"
+    ],
+    "response": [
+      "answer",
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "result",
+      "solution"
+    ],
+    "nervous": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "strenuous": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "hard",
+      "tough"
+    ],
+    "faith": [
+      "belief",
+      "conviction",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "finance": [
+      "capital",
+      "cash",
+      "currency",
+      "funds",
+      "money"
+    ],
+    "conviction": [
+      "belief",
+      "faith",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "trivial": [
+      "basic",
+      "easy",
+      "effortless",
+      "simple",
+      "straightforward"
+    ],
+    "generate": [
+      "cause",
+      "create",
+      "induce",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "question": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "probe",
+      "query"
+    ],
+    "thought": [
+      "concept",
+      "idea",
+      "notion",
+      "plan",
+      "proposal"
+    ],
+    "find": [
+      "detect",
+      "discover",
+      "explore",
+      "identify",
+      "locate",
+      "look",
+      "query",
+      "scan",
+      "search",
+      "seek",
+      "uncover"
+    ],
+    "fluid": [
+      "beverage",
+      "drink",
+      "liquid",
+      "water"
+    ],
+    "proposal": [
+      "concept",
+      "idea",
+      "notion",
+      "plan",
+      "thought"
+    ],
+    "validity": [
+      "actuality",
+      "fact",
+      "reality",
+      "truth",
+      "verity"
+    ],
+    "track": [
+      "detect",
+      "measure",
+      "monitor",
+      "observe",
+      "record"
+    ],
+    "potential": [
+      "capacity",
+      "charge",
+      "energy",
+      "force",
+      "power"
+    ],
+    "subsist": [
+      "be",
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "remain"
+    ],
+    "evaluate": [
+      "analyze",
+      "assess",
+      "calculate",
+      "examine",
+      "gauge",
+      "investigate",
+      "measure",
+      "quantify",
+      "study"
+    ],
+    "excited": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "keen",
+      "thrilled"
+    ],
+    "restore": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "resolve"
+    ],
+    "job": [
+      "career",
+      "employment",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "bewildered": [
+      "baffled",
+      "confused",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "purge": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "remove",
+      "wipe"
+    ],
+    "pleased": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful"
+    ],
+    "retrieve": [
+      "acquire",
+      "fetch",
+      "gain",
+      "get",
+      "import",
+      "load",
+      "obtain",
+      "open",
+      "read",
+      "receive"
+    ],
+    "tired": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "weary"
+    ],
+    "keen": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "excited",
+      "thrilled"
+    ],
+    "freezing": [
+      "chilly",
+      "cold",
+      "cool",
+      "frigid",
+      "icy"
+    ],
+    "locate": [
+      "detect",
+      "discover",
+      "find",
+      "identify",
+      "uncover"
+    ],
+    "virtuous": [
+      "ethical",
+      "just",
+      "moral",
+      "principled",
+      "righteous"
+    ],
+    "ponder": [
+      "consider",
+      "contemplate",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "righteous": [
+      "ethical",
+      "just",
+      "moral",
+      "principled",
+      "virtuous"
+    ],
+    "get": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "obtain",
+      "pull",
+      "receive",
+      "retrieve"
+    ],
+    "be": [
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "record": [
+      "archive",
+      "cache",
+      "detect",
+      "keep",
+      "measure",
+      "monitor",
+      "observe",
+      "persist",
+      "save",
+      "store",
+      "track"
+    ],
+    "inference": [
+      "argument",
+      "deduction",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "burning": [
+      "boiling",
+      "fiery",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "message": [
+      "input",
+      "prompt",
+      "query",
+      "request",
+      "signal"
+    ],
+    "matter": [
+      "element",
+      "mass",
+      "material",
+      "stuff",
+      "substance"
+    ],
+    "probe": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "query",
+      "question"
+    ],
+    "large": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "massive",
+      "vast"
+    ],
+    "mistake": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "flaw"
+    ],
+    "melancholy": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "perplexed": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "lost",
+      "puzzled"
+    ],
+    "simple": [
+      "basic",
+      "easy",
+      "effortless",
+      "straightforward",
+      "trivial"
+    ],
+    "patch": [
+      "correct",
+      "fix",
+      "mend",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "easy": [
+      "basic",
+      "effortless",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "automobile": [
+      "auto",
+      "car",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "mindfulness": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "perception",
+      "sentience"
+    ],
+    "wipe": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "remove"
+    ],
+    "grasp": [
+      "comprehend",
+      "know",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "facilitate": [
+      "aid",
+      "assist",
+      "help",
+      "serve",
+      "support"
+    ],
+    "attempt": [
+      "endeavor",
+      "experiment",
+      "strive",
+      "test",
+      "try"
+    ],
+    "platform": [
+      "architecture",
+      "framework",
+      "structure",
+      "system"
+    ],
+    "mass": [
+      "element",
+      "material",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "dash": [
+      "jog",
+      "race",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "profession": [
+      "career",
+      "employment",
+      "job",
+      "occupation",
+      "work"
+    ],
+    "archive": [
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "work": [
+      "career",
+      "employment",
+      "job",
+      "occupation",
+      "profession"
+    ],
+    "straightforward": [
+      "basic",
+      "easy",
+      "effortless",
+      "simple",
+      "trivial"
+    ],
+    "delicate": [
+      "feeble",
+      "fragile",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "daring": [
+      "bold",
+      "brave",
+      "courageous",
+      "fearless",
+      "heroic"
+    ],
+    "send": [
+      "dispatch",
+      "forward",
+      "push",
+      "route",
+      "transmit"
+    ],
+    "end": [
+      "cease",
+      "finish",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "hypothesis": [
+      "assumption",
+      "conjecture",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "speak": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "talk",
+      "tell"
+    ],
+    "load": [
+      "fetch",
+      "import",
+      "open",
+      "read",
+      "retrieve"
+    ],
+    "initiate": [
+      "begin",
+      "commence",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "dwelling": [
+      "building",
+      "home",
+      "house",
+      "place",
+      "residence"
+    ],
+    "deduction": [
+      "argument",
+      "inference",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "inquiry": [
+      "challenge",
+      "doubt",
+      "interrogate",
+      "probe",
+      "query",
+      "question"
+    ],
+    "understand": [
+      "comprehend",
+      "grasp",
+      "know",
+      "realize",
+      "recognize"
+    ],
+    "read": [
+      "fetch",
+      "import",
+      "load",
+      "open",
+      "retrieve"
+    ],
+    "induce": [
+      "cause",
+      "create",
+      "generate",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "mutate": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "progress",
+      "transform"
+    ],
+    "boiling": [
+      "burning",
+      "fiery",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "commence": [
+      "begin",
+      "initiate",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "data": [
+      "facts",
+      "info",
+      "information",
+      "records",
+      "stats"
+    ],
+    "remain": [
+      "be",
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "subsist"
+    ],
+    "obtain": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "get",
+      "pull",
+      "receive",
+      "retrieve"
+    ],
+    "element": [
+      "mass",
+      "material",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "live": [
+      "be",
+      "exist",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "heroic": [
+      "bold",
+      "brave",
+      "courageous",
+      "daring",
+      "fearless"
+    ],
+    "conjecture": [
+      "assumption",
+      "hypothesis",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "defect": [
+      "bug",
+      "error",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "elated": [
+      "cheerful",
+      "content",
+      "delighted",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "ethical": [
+      "just",
+      "moral",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "theory": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "supposition"
+    ],
+    "content": [
+      "cheerful",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "lead": [
+      "cause",
+      "create",
+      "generate",
+      "induce",
+      "produce",
+      "trigger"
+    ],
+    "procedure": [
+      "experiment",
+      "investigation",
+      "study",
+      "test",
+      "trial"
+    ],
+    "structure": [
+      "architecture",
+      "framework",
+      "platform",
+      "system"
+    ],
+    "puzzled": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "lost",
+      "perplexed"
+    ],
+    "swift": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy"
+    ],
+    "tiny": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "small"
+    ],
+    "downcast": [
+      "dejected",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "break": [
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "frigid": [
+      "chilly",
+      "cold",
+      "cool",
+      "freezing",
+      "icy"
+    ],
+    "keep": [
+      "archive",
+      "cache",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "method": [
+      "approach",
+      "design",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "launch": [
+      "begin",
+      "commence",
+      "initiate",
+      "start",
+      "trigger"
+    ],
+    "infer": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "predict",
+      "project"
+    ],
+    "erase": [
+      "clear",
+      "delete",
+      "drop",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "cold": [
+      "chilly",
+      "cool",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "learn": [
+      "adapt",
+      "evolve",
+      "improve",
+      "study",
+      "train"
+    ],
+    "vast": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "massive"
+    ],
+    "beverage": [
+      "drink",
+      "fluid",
+      "liquid",
+      "water"
+    ],
+    "logic": [
+      "argument",
+      "deduction",
+      "inference",
+      "rationale",
+      "reasoning"
+    ],
+    "shatter": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin"
+    ],
+    "push": [
+      "dispatch",
+      "forward",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "assert": [
+      "argue",
+      "claim",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "strong": [
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "sturdy",
+      "tough"
+    ],
+    "drop": [
+      "clear",
+      "delete",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "hard": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "strenuous",
+      "tough"
+    ],
+    "run": [
+      "dash",
+      "jog",
+      "race",
+      "rush",
+      "sprint"
+    ],
+    "stunned": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "startled",
+      "surprised"
+    ],
+    "trial": [
+      "experiment",
+      "investigation",
+      "procedure",
+      "study",
+      "test"
+    ],
+    "hot": [
+      "boiling",
+      "burning",
+      "fiery",
+      "scorching",
+      "warm"
+    ],
+    "compact": [
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "eager": [
+      "animated",
+      "enthusiastic",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "examine": [
+      "analyze",
+      "assess",
+      "check",
+      "evaluate",
+      "inspect",
+      "investigate",
+      "look",
+      "observe",
+      "see",
+      "study",
+      "test",
+      "validate",
+      "verify",
+      "view",
+      "watch"
+    ],
+    "grant": [
+      "deliver",
+      "give",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "rationale": [
+      "argument",
+      "deduction",
+      "inference",
+      "logic",
+      "reasoning"
+    ],
+    "prompt": [
+      "input",
+      "message",
+      "query",
+      "request",
+      "signal"
+    ],
+    "idea": [
+      "concept",
+      "notion",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "mend": [
+      "correct",
+      "fix",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "resolve": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "restore"
+    ],
+    "match": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "pair"
+    ],
+    "seek": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "scan",
+      "search"
+    ],
+    "transport": [
+      "migrate",
+      "move",
+      "relocate",
+      "shift",
+      "transfer"
+    ],
+    "drained": [
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "employ": [
+      "apply",
+      "leverage",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "brisk": [
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "powerless": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "frail",
+      "weak"
+    ],
+    "composed": [
+      "calm",
+      "peaceful",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "notion": [
+      "concept",
+      "idea",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "contend": [
+      "argue",
+      "assert",
+      "claim",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "trouble": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "obstacle",
+      "problem"
+    ],
+    "start": [
+      "begin",
+      "commence",
+      "initiate",
+      "launch",
+      "trigger"
+    ],
+    "insight": [
+      "awareness",
+      "cognition",
+      "knowledge",
+      "understanding",
+      "wisdom"
+    ],
+    "afraid": [
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "irate": [
+      "angry",
+      "enraged",
+      "furious",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "strategy": [
+      "approach",
+      "design",
+      "method",
+      "plan",
+      "scheme"
+    ],
+    "aid": [
+      "assist",
+      "facilitate",
+      "help",
+      "serve",
+      "support"
+    ],
+    "begin": [
+      "commence",
+      "initiate",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "explore": [
+      "find",
+      "look",
+      "query",
+      "scan",
+      "search",
+      "seek"
+    ],
+    "courageous": [
+      "bold",
+      "brave",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "enormous": [
+      "big",
+      "gigantic",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "surprised": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "startled",
+      "stunned"
+    ],
+    "ruin": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "shatter"
+    ],
+    "quick": [
+      "brisk",
+      "fast",
+      "hasty",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "reasoning": [
+      "argument",
+      "deduction",
+      "inference",
+      "logic",
+      "rationale"
+    ],
+    "material": [
+      "element",
+      "mass",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "shocked": [
+      "amazed",
+      "astonished",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "comprehend": [
+      "grasp",
+      "know",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "plodding": [
+      "gradual",
+      "leisurely",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "supply": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "provide"
+    ],
+    "reason": [
+      "argue",
+      "assert",
+      "claim",
+      "consider",
+      "contemplate",
+      "contend",
+      "debate",
+      "ponder",
+      "posit",
+      "reflect",
+      "think"
+    ],
+    "framework": [
+      "architecture",
+      "platform",
+      "structure",
+      "system"
+    ],
+    "chat": [
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "records": [
+      "data",
+      "facts",
+      "info",
+      "information",
+      "stats"
+    ],
+    "unhurried": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "slow",
+      "sluggish"
+    ],
+    "utilize": [
+      "apply",
+      "employ",
+      "leverage",
+      "operate",
+      "use"
+    ],
+    "lost": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "perplexed",
+      "puzzled"
+    ],
+    "leisurely": [
+      "gradual",
+      "plodding",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "furious": [
+      "angry",
+      "enraged",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "scared": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "terrified",
+      "worried"
+    ],
+    "warm": [
+      "boiling",
+      "burning",
+      "fiery",
+      "hot",
+      "scorching"
+    ],
+    "fragile": [
+      "delicate",
+      "feeble",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "stance": [
+      "belief",
+      "conviction",
+      "faith",
+      "opinion",
+      "position",
+      "view"
+    ],
+    "frail": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "powerless",
+      "weak"
+    ],
+    "project": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "infer",
+      "predict"
+    ],
+    "car": [
+      "auto",
+      "automobile",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "bind": [
+      "associate",
+      "attach",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "sleepy": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "tired",
+      "weary"
+    ],
+    "worried": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified"
+    ],
+    "march": [
+      "stride",
+      "stroll",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "petite": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "small",
+      "tiny"
+    ],
+    "sturdy": [
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "strong",
+      "tough"
+    ],
+    "obstacle": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "problem",
+      "trouble"
+    ],
+    "home": [
+      "building",
+      "dwelling",
+      "house",
+      "place",
+      "residence"
+    ],
+    "career": [
+      "employment",
+      "job",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "just": [
+      "ethical",
+      "moral",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "stroll": [
+      "march",
+      "stride",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "difficulty": [
+      "challenge",
+      "issue",
+      "obstacle",
+      "problem",
+      "trouble"
+    ],
+    "fetch": [
+      "acquire",
+      "gain",
+      "get",
+      "import",
+      "load",
+      "obtain",
+      "open",
+      "read",
+      "receive",
+      "retrieve"
+    ],
+    "fix": [
+      "correct",
+      "mend",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "enraged": [
+      "angry",
+      "furious",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "create": [
+      "build",
+      "cause",
+      "construct",
+      "craft",
+      "form",
+      "generate",
+      "induce",
+      "lead",
+      "make",
+      "produce",
+      "trigger"
+    ],
+    "fearless": [
+      "bold",
+      "brave",
+      "courageous",
+      "daring",
+      "heroic"
+    ],
+    "crack": [
+      "break",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "answer": [
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "response",
+      "result",
+      "solution"
+    ],
+    "apply": [
+      "employ",
+      "leverage",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "need": [
+      "demand",
+      "desire",
+      "lack",
+      "require",
+      "want"
+    ],
+    "scheme": [
+      "approach",
+      "design",
+      "method",
+      "plan",
+      "strategy"
+    ],
+    "improve": [
+      "adapt",
+      "evolve",
+      "learn",
+      "study",
+      "train"
+    ],
+    "hasty": [
+      "brisk",
+      "fast",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "intangible": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "notional",
+      "theoretical"
+    ],
+    "sad": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sorrowful",
+      "unhappy"
+    ],
+    "building": [
+      "dwelling",
+      "home",
+      "house",
+      "place",
+      "residence"
+    ],
+    "acquire": [
+      "fetch",
+      "gain",
+      "get",
+      "obtain",
+      "receive",
+      "retrieve"
+    ],
+    "provide": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "supply"
+    ],
+    "cool": [
+      "chilly",
+      "cold",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "ride": [
+      "auto",
+      "automobile",
+      "car",
+      "truck",
+      "vehicle"
+    ],
+    "thrilled": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "excited",
+      "keen"
+    ],
+    "gradual": [
+      "leisurely",
+      "plodding",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "evolve": [
+      "adapt",
+      "change",
+      "develop",
+      "improve",
+      "learn",
+      "mutate",
+      "progress",
+      "study",
+      "train",
+      "transform"
+    ],
+    "halt": [
+      "cease",
+      "end",
+      "finish",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "animated": [
+      "eager",
+      "enthusiastic",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "produce": [
+      "build",
+      "cause",
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "generate",
+      "induce",
+      "lead",
+      "make",
+      "trigger"
+    ],
+    "attach": [
+      "associate",
+      "bind",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "serene": [
+      "calm",
+      "composed",
+      "peaceful",
+      "relaxed",
+      "tranquil"
+    ],
+    "output": [
+      "answer",
+      "product",
+      "reply",
+      "response",
+      "result"
+    ],
+    "delighted": [
+      "cheerful",
+      "content",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "rush": [
+      "dash",
+      "jog",
+      "race",
+      "run",
+      "sprint"
+    ],
+    "brave": [
+      "bold",
+      "courageous",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "challenging": [
+      "arduous",
+      "difficult",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "view": [
+      "belief",
+      "conviction",
+      "examine",
+      "faith",
+      "inspect",
+      "look",
+      "observe",
+      "opinion",
+      "position",
+      "see",
+      "stance",
+      "watch"
+    ],
+    "system": [
+      "architecture",
+      "framework",
+      "platform",
+      "structure"
+    ],
+    "remove": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "wipe"
+    ],
+    "wisdom": [
+      "awareness",
+      "cognition",
+      "insight",
+      "knowledge",
+      "understanding"
+    ],
+    "map": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "match",
+      "pair"
+    ],
+    "terrified": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "worried"
+    ],
+    "arduous": [
+      "challenging",
+      "difficult",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "facts": [
+      "data",
+      "info",
+      "information",
+      "records",
+      "stats"
+    ],
+    "demonstrate": [
+      "display",
+      "exhibit",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "stride": [
+      "march",
+      "stroll",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "detect": [
+      "discover",
+      "find",
+      "identify",
+      "locate",
+      "measure",
+      "monitor",
+      "observe",
+      "record",
+      "track",
+      "uncover"
+    ],
+    "endeavor": [
+      "attempt",
+      "experiment",
+      "strive",
+      "test",
+      "try"
+    ],
+    "solution": [
+      "answer",
+      "outcome",
+      "reply",
+      "response",
+      "result"
+    ],
+    "anticipate": [
+      "estimate",
+      "forecast",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "trigger": [
+      "begin",
+      "cause",
+      "commence",
+      "create",
+      "generate",
+      "induce",
+      "initiate",
+      "launch",
+      "lead",
+      "produce",
+      "start"
+    ],
+    "belief": [
+      "conviction",
+      "faith",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "doubt": [
+      "challenge",
+      "inquiry",
+      "interrogate",
+      "probe",
+      "query",
+      "question"
+    ],
+    "stop": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "terminate"
+    ],
+    "verify": [
+      "assess",
+      "check",
+      "examine",
+      "test",
+      "validate"
+    ],
+    "persist": [
+      "archive",
+      "be",
+      "cache",
+      "exist",
+      "keep",
+      "live",
+      "occur",
+      "record",
+      "remain",
+      "save",
+      "store",
+      "subsist"
+    ],
+    "form": [
+      "build",
+      "construct",
+      "craft",
+      "create",
+      "make",
+      "produce"
+    ],
+    "migrate": [
+      "move",
+      "relocate",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "joyful": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "pleased"
+    ],
+    "bug": [
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "join": [
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "link",
+      "wire"
+    ],
+    "problem": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "obstacle",
+      "trouble"
+    ],
+    "capital": [
+      "cash",
+      "currency",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "reply": [
+      "answer",
+      "outcome",
+      "output",
+      "product",
+      "response",
+      "result",
+      "solution"
+    ],
+    "gauge": [
+      "assess",
+      "calculate",
+      "evaluate",
+      "measure",
+      "quantify"
+    ],
+    "exist": [
+      "be",
+      "live",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "liquid": [
+      "beverage",
+      "drink",
+      "fluid",
+      "water"
+    ],
+    "query": [
+      "challenge",
+      "doubt",
+      "explore",
+      "find",
+      "input",
+      "inquiry",
+      "interrogate",
+      "look",
+      "message",
+      "probe",
+      "prompt",
+      "question",
+      "request",
+      "scan",
+      "search",
+      "seek",
+      "signal"
+    ],
+    "see": [
+      "examine",
+      "inspect",
+      "look",
+      "observe",
+      "view",
+      "watch"
+    ],
+    "conceptual": [
+      "abstract",
+      "hypothetical",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "gain": [
+      "acquire",
+      "fetch",
+      "get",
+      "obtain",
+      "receive",
+      "retrieve"
+    ],
+    "weak": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "frail",
+      "powerless"
+    ],
+    "exhibit": [
+      "demonstrate",
+      "display",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "peaceful": [
+      "calm",
+      "composed",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "gigantic": [
+      "big",
+      "enormous",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "robust": [
+      "mighty",
+      "powerful",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "substance": [
+      "element",
+      "mass",
+      "material",
+      "matter",
+      "stuff"
+    ],
+    "food": [
+      "cuisine",
+      "dish",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "stats": [
+      "data",
+      "facts",
+      "info",
+      "information",
+      "records"
+    ],
+    "vehicle": [
+      "auto",
+      "automobile",
+      "car",
+      "ride",
+      "truck"
+    ],
+    "quantify": [
+      "assess",
+      "calculate",
+      "evaluate",
+      "gauge",
+      "measure"
+    ],
+    "think": [
+      "consider",
+      "contemplate",
+      "ponder",
+      "reason",
+      "reflect"
+    ],
+    "dejected": [
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "angry": [
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "feeble": [
+      "delicate",
+      "fragile",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "fracture": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "ruin",
+      "shatter"
+    ],
+    "rapid": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "speedy",
+      "swift"
+    ],
+    "sustenance": [
+      "cuisine",
+      "dish",
+      "food",
+      "meal",
+      "nourishment"
+    ],
+    "reveal": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "present",
+      "show"
+    ],
+    "uncover": [
+      "detect",
+      "discover",
+      "find",
+      "identify",
+      "locate"
+    ],
+    "forward": [
+      "dispatch",
+      "push",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "scan": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "search",
+      "seek"
+    ],
+    "assumption": [
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "stuff": [
+      "element",
+      "mass",
+      "material",
+      "matter",
+      "substance"
+    ],
+    "error": [
+      "bug",
+      "defect",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "jog": [
+      "dash",
+      "race",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "trek": [
+      "march",
+      "stride",
+      "stroll",
+      "walk",
+      "wander"
+    ],
+    "cash": [
+      "capital",
+      "currency",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "construct": [
+      "build",
+      "craft",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "claim": [
+      "argue",
+      "assert",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "consciousness": [
+      "awareness",
+      "cognition",
+      "mindfulness",
+      "perception",
+      "sentience"
+    ],
+    "anxious": [
+      "afraid",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "calm": [
+      "composed",
+      "peaceful",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "sluggish": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "slow",
+      "unhurried"
+    ],
+    "assess": [
+      "analyze",
+      "calculate",
+      "check",
+      "evaluate",
+      "examine",
+      "gauge",
+      "investigate",
+      "measure",
+      "quantify",
+      "study",
+      "test",
+      "validate",
+      "verify"
+    ],
+    "gloomy": [
+      "dejected",
+      "downcast",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "wire": [
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "join",
+      "link"
+    ],
+    "startled": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "stunned",
+      "surprised"
+    ],
+    "fatigued": [
+      "drained",
+      "exhausted",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "measure": [
+      "assess",
+      "calculate",
+      "detect",
+      "evaluate",
+      "gauge",
+      "monitor",
+      "observe",
+      "quantify",
+      "record",
+      "track"
+    ],
+    "fault": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "flaw",
+      "mistake"
+    ],
+    "charge": [
+      "capacity",
+      "energy",
+      "force",
+      "potential",
+      "power"
+    ],
+    "dish": [
+      "cuisine",
+      "food",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "destroy": [
+      "break",
+      "crack",
+      "damage",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "pair": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "match"
+    ],
+    "sprint": [
+      "dash",
+      "jog",
+      "race",
+      "run",
+      "rush"
+    ],
+    "forecast": [
+      "anticipate",
+      "estimate",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "cause": [
+      "create",
+      "generate",
+      "induce",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "correspond": [
+      "align",
+      "fit",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "require": [
+      "demand",
+      "desire",
+      "lack",
+      "need",
+      "want"
+    ],
+    "challenge": [
+      "difficulty",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "issue",
+      "obstacle",
+      "probe",
+      "problem",
+      "query",
+      "question",
+      "trouble"
+    ],
+    "position": [
+      "belief",
+      "conviction",
+      "faith",
+      "opinion",
+      "stance",
+      "view"
+    ],
+    "receive": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "get",
+      "obtain",
+      "pull",
+      "retrieve"
+    ],
+    "drink": [
+      "beverage",
+      "fluid",
+      "liquid",
+      "water"
+    ],
+    "check": [
+      "assess",
+      "examine",
+      "test",
+      "validate",
+      "verify"
+    ],
+    "help": [
+      "aid",
+      "assist",
+      "facilitate",
+      "serve",
+      "support"
+    ],
+    "clear": [
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "hand": [
+      "deliver",
+      "give",
+      "grant",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "test": [
+      "assess",
+      "attempt",
+      "check",
+      "endeavor",
+      "examine",
+      "experiment",
+      "investigation",
+      "procedure",
+      "strive",
+      "study",
+      "trial",
+      "try",
+      "validate",
+      "verify"
+    ],
+    "know": [
+      "comprehend",
+      "grasp",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "house": [
+      "building",
+      "dwelling",
+      "home",
+      "place",
+      "residence"
+    ],
+    "talk": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "tell"
+    ],
+    "difficult": [
+      "arduous",
+      "challenging",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "delete": [
+      "clear",
+      "drop",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "calculate": [
+      "assess",
+      "evaluate",
+      "gauge",
+      "measure",
+      "quantify"
+    ],
+    "water": [
+      "beverage",
+      "drink",
+      "fluid",
+      "liquid"
+    ],
+    "issue": [
+      "challenge",
+      "difficulty",
+      "obstacle",
+      "problem",
+      "trouble"
+    ],
+    "pull": [
+      "accept",
+      "collect",
+      "get",
+      "obtain",
+      "receive"
+    ],
+    "predict": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "infer",
+      "project"
+    ],
+    "strive": [
+      "attempt",
+      "endeavor",
+      "experiment",
+      "test",
+      "try"
+    ],
+    "info": [
+      "data",
+      "facts",
+      "information",
+      "records",
+      "stats"
+    ],
+    "happy": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "joyful",
+      "pleased"
+    ],
+    "amazed": [
+      "astonished",
+      "shocked",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "relocate": [
+      "migrate",
+      "move",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "opinion": [
+      "belief",
+      "conviction",
+      "faith",
+      "position",
+      "stance",
+      "view"
+    ],
+    "occur": [
+      "be",
+      "exist",
+      "live",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "operate": [
+      "apply",
+      "employ",
+      "leverage",
+      "use",
+      "utilize"
+    ],
+    "fit": [
+      "align",
+      "correspond",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "connect": [
+      "associate",
+      "attach",
+      "bind",
+      "join",
+      "link",
+      "wire"
+    ],
+    "import": [
+      "fetch",
+      "load",
+      "open",
+      "read",
+      "retrieve"
+    ],
+    "minute": [
+      "compact",
+      "little",
+      "miniature",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "supposition": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "theory"
+    ],
+    "fact": [
+      "actuality",
+      "reality",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "knowledge": [
+      "awareness",
+      "cognition",
+      "insight",
+      "understanding",
+      "wisdom"
+    ],
+    "consequence": [
+      "effect",
+      "impact",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "mighty": [
+      "powerful",
+      "robust",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "little": [
+      "compact",
+      "miniature",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "collect": [
+      "accept",
+      "get",
+      "obtain",
+      "pull",
+      "receive"
+    ],
+    "nourishment": [
+      "cuisine",
+      "dish",
+      "food",
+      "meal",
+      "sustenance"
+    ],
+    "argue": [
+      "assert",
+      "claim",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "realize": [
+      "comprehend",
+      "grasp",
+      "know",
+      "recognize",
+      "understand"
+    ],
+    "signal": [
+      "input",
+      "message",
+      "prompt",
+      "query",
+      "request"
+    ],
+    "wander": [
+      "march",
+      "stride",
+      "stroll",
+      "trek",
+      "walk"
+    ],
+    "input": [
+      "message",
+      "prompt",
+      "query",
+      "request",
+      "signal"
+    ],
+    "debate": [
+      "argue",
+      "assert",
+      "claim",
+      "contend",
+      "posit",
+      "reason"
+    ],
+    "approach": [
+      "design",
+      "method",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "use": [
+      "apply",
+      "employ",
+      "leverage",
+      "operate",
+      "utilize"
+    ],
+    "converse": [
+      "chat",
+      "discuss",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "effect": [
+      "consequence",
+      "impact",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "store": [
+      "archive",
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "save"
+    ],
+    "discover": [
+      "detect",
+      "find",
+      "identify",
+      "locate",
+      "uncover"
+    ],
+    "effortless": [
+      "basic",
+      "easy",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "deliver": [
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "truck": [
+      "auto",
+      "automobile",
+      "car",
+      "ride",
+      "vehicle"
+    ],
+    "request": [
+      "input",
+      "message",
+      "prompt",
+      "query",
+      "signal"
+    ],
+    "estimate": [
+      "anticipate",
+      "forecast",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "powerful": [
+      "mighty",
+      "robust",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "adapt": [
+      "change",
+      "develop",
+      "evolve",
+      "improve",
+      "learn",
+      "mutate",
+      "progress",
+      "study",
+      "train",
+      "transform"
+    ],
+    "terminate": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "stop"
+    ],
+    "link": [
+      "align",
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "correspond",
+      "fit",
+      "join",
+      "map",
+      "match",
+      "pair",
+      "wire"
+    ],
+    "offer": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "provide",
+      "supply"
+    ],
+    "consider": [
+      "contemplate",
+      "ponder",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "display": [
+      "demonstrate",
+      "exhibit",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "architecture": [
+      "framework",
+      "platform",
+      "structure",
+      "system"
+    ],
+    "posit": [
+      "argue",
+      "assert",
+      "claim",
+      "contend",
+      "debate",
+      "reason"
+    ],
+    "lack": [
+      "demand",
+      "desire",
+      "need",
+      "require",
+      "want"
+    ],
+    "study": [
+      "adapt",
+      "analyze",
+      "assess",
+      "evaluate",
+      "evolve",
+      "examine",
+      "experiment",
+      "improve",
+      "investigate",
+      "investigation",
+      "learn",
+      "procedure",
+      "test",
+      "train",
+      "trial"
+    ],
+    "desire": [
+      "demand",
+      "lack",
+      "need",
+      "require",
+      "want"
+    ],
+    "route": [
+      "dispatch",
+      "forward",
+      "push",
+      "send",
+      "transmit"
+    ],
+    "baffled": [
+      "bewildered",
+      "confused",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "demand": [
+      "desire",
+      "lack",
+      "need",
+      "require",
+      "want"
+    ],
+    "outcome": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "product",
+      "reply",
+      "response",
+      "result",
+      "solution"
+    ],
+    "save": [
+      "archive",
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "store"
+    ],
+    "cheerful": [
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "argument": [
+      "deduction",
+      "inference",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "confused": [
+      "baffled",
+      "bewildered",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "astonished": [
+      "amazed",
+      "shocked",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "huge": [
+      "big",
+      "enormous",
+      "gigantic",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "watch": [
+      "examine",
+      "inspect",
+      "look",
+      "observe",
+      "see",
+      "view"
+    ],
+    "transfer": [
+      "migrate",
+      "move",
+      "relocate",
+      "shift",
+      "transport"
+    ],
+    "transmit": [
+      "dispatch",
+      "forward",
+      "push",
+      "route",
+      "send"
+    ],
+    "fiery": [
+      "boiling",
+      "burning",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "open": [
+      "fetch",
+      "import",
+      "load",
+      "read",
+      "retrieve"
+    ],
+    "investigation": [
+      "experiment",
+      "procedure",
+      "study",
+      "test",
+      "trial"
+    ],
+    "serve": [
+      "aid",
+      "assist",
+      "facilitate",
+      "help",
+      "support"
+    ],
+    "change": [
+      "adapt",
+      "develop",
+      "evolve",
+      "mutate",
+      "progress",
+      "transform"
+    ],
+    "leverage": [
+      "apply",
+      "employ",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "inspect": [
+      "examine",
+      "look",
+      "observe",
+      "see",
+      "view",
+      "watch"
+    ],
+    "impact": [
+      "consequence",
+      "effect",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "abstract": [
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "craft": [
+      "build",
+      "construct",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "enthusiastic": [
+      "animated",
+      "eager",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "capacity": [
+      "charge",
+      "energy",
+      "force",
+      "potential",
+      "power"
+    ],
+    "design": [
+      "approach",
+      "method",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "present": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "reveal",
+      "show"
+    ],
+    "recognize": [
+      "comprehend",
+      "grasp",
+      "know",
+      "realize",
+      "understand"
+    ],
+    "glad": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "monitor": [
+      "detect",
+      "measure",
+      "observe",
+      "record",
+      "track"
+    ],
+    "perception": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "mindfulness",
+      "sentience"
+    ],
+    "awareness": [
+      "cognition",
+      "consciousness",
+      "insight",
+      "knowledge",
+      "mindfulness",
+      "perception",
+      "sentience",
+      "understanding",
+      "wisdom"
+    ],
+    "analyze": [
+      "assess",
+      "evaluate",
+      "examine",
+      "investigate",
+      "study"
+    ],
+    "investigate": [
+      "analyze",
+      "assess",
+      "evaluate",
+      "examine",
+      "study"
+    ],
+    "result": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "response",
+      "solution"
+    ],
+    "unhappy": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful"
+    ],
+    "notional": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "theoretical"
+    ],
+    "mad": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "wrathful"
+    ],
+    "interrogate": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "probe",
+      "query",
+      "question"
+    ],
+    "concept": [
+      "idea",
+      "notion",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "information": [
+      "data",
+      "facts",
+      "info",
+      "records",
+      "stats"
+    ],
+    "tough": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "hard",
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "strenuous",
+      "strong",
+      "sturdy"
+    ],
+    "understanding": [
+      "awareness",
+      "cognition",
+      "insight",
+      "knowledge",
+      "wisdom"
+    ],
+    "show": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "present",
+      "reveal"
+    ],
+    "race": [
+      "dash",
+      "jog",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "sentience": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "mindfulness",
+      "perception"
+    ],
+    "identify": [
+      "detect",
+      "discover",
+      "find",
+      "locate",
+      "uncover"
+    ],
+    "place": [
+      "building",
+      "dwelling",
+      "home",
+      "house",
+      "residence"
+    ],
+    "develop": [
+      "adapt",
+      "change",
+      "evolve",
+      "mutate",
+      "progress",
+      "transform"
+    ],
+    "assist": [
+      "aid",
+      "facilitate",
+      "help",
+      "serve",
+      "support"
+    ],
+    "scorching": [
+      "boiling",
+      "burning",
+      "fiery",
+      "hot",
+      "warm"
+    ],
+    "small": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "tiny"
+    ],
+    "energy": [
+      "capacity",
+      "charge",
+      "force",
+      "potential",
+      "power"
+    ],
+    "big": [
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "slow": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "sluggish",
+      "unhurried"
+    ],
+    "currency": [
+      "capital",
+      "cash",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "moral": [
+      "ethical",
+      "just",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "quit": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "stop",
+      "terminate"
+    ],
+    "validate": [
+      "assess",
+      "check",
+      "examine",
+      "test",
+      "verify"
+    ],
+    "flaw": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "mistake"
+    ],
+    "reflect": [
+      "consider",
+      "contemplate",
+      "ponder",
+      "reason",
+      "think"
+    ],
+    "massive": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "vast"
+    ],
+    "look": [
+      "examine",
+      "explore",
+      "find",
+      "inspect",
+      "observe",
+      "query",
+      "scan",
+      "search",
+      "see",
+      "seek",
+      "view",
+      "watch"
+    ],
+    "actuality": [
+      "fact",
+      "reality",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "finish": [
+      "cease",
+      "end",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "exhausted": [
+      "drained",
+      "fatigued",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "discuss": [
+      "chat",
+      "converse",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "meal": [
+      "cuisine",
+      "dish",
+      "food",
+      "nourishment",
+      "sustenance"
+    ],
+    "experiment": [
+      "attempt",
+      "endeavor",
+      "investigation",
+      "procedure",
+      "strive",
+      "study",
+      "test",
+      "trial",
+      "try"
+    ],
+    "speedy": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "swift"
+    ],
+    "power": [
+      "capacity",
+      "charge",
+      "energy",
+      "force",
+      "potential"
+    ],
+    "money": [
+      "capital",
+      "cash",
+      "currency",
+      "finance",
+      "funds"
+    ],
+    "accept": [
+      "collect",
+      "get",
+      "obtain",
+      "pull",
+      "receive"
+    ],
+    "tell": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "talk"
+    ],
+    "wrathful": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "mad"
+    ],
+    "miniature": [
+      "compact",
+      "little",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "cognition": [
+      "awareness",
+      "consciousness",
+      "insight",
+      "knowledge",
+      "mindfulness",
+      "perception",
+      "sentience",
+      "understanding",
+      "wisdom"
+    ],
+    "verity": [
+      "actuality",
+      "fact",
+      "reality",
+      "truth",
+      "validity"
+    ],
+    "funds": [
+      "capital",
+      "cash",
+      "currency",
+      "finance",
+      "money"
+    ],
+    "transform": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "mutate",
+      "progress"
+    ]
+  },
+  "node_to_group_idx": {
+    "node_17": "group_17",
+    "node_8": "group_8",
+    "node_16": "group_16",
+    "node_18": "group_18",
+    "node_14": "group_14",
+    "node_1": "group_1",
+    "node_10": "group_10",
+    "node_6": "group_6",
+    "node_7": "group_7",
+    "node_15": "group_15",
+    "node_9": "group_9",
+    "node_0": "group_0",
+    "node_4": "group_4",
+    "node_5": "group_5",
+    "node_13": "group_13",
+    "node_12": "group_12",
+    "node_3": "group_3",
+    "node_11": "group_11",
+    "node_2": "group_2"
+  },
+  "aiml_system": {
+    "cycle": 0,
+    "registry": {
+      "math": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.780049057390155e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Calculus is the mathematics of CHANGE. Derivative = rate of change at a point. Integral = accumulated change over an interval. Together they form the Fundamental Theorem of Calculus — differentiation and integration are inverse operations.",
+          "id": "aiml_calculus",
+          "voted_this_cycle": false,
+          "lobe_id": "math",
+          "strength": 4.820879878664226
+        }
+      ],
+      "philosophy": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.780049057395277e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Epistemology asks: How do we know what we know? The classical answer is Justified True Belief — you know P if P is true, you believe P, and you have justification. But Gettier problems show this isn't enough. Knowledge is harder than it looks.",
+          "id": "aiml_epistemology",
+          "voted_this_cycle": false,
+          "lobe_id": "philosophy",
+          "strength": 4.715833228484722
+        }
+      ],
+      "conversation": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.780049057395279e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Hey there! I'm GrugBot — a neuromorphic AI that thinks in nodes and votes. Each node is a pattern-matching torch in the cognitive cave. What can I illuminate for you?",
+          "id": "aiml_greeting",
+          "voted_this_cycle": false,
+          "lobe_id": "conversation",
+          "strength": 5.001411208530418
+        }
+      ],
+      "science": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.780049057395274e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Newton's three laws: 1) An object at rest stays at rest (inertia). 2) F=ma (force equals mass times acceleration). 3) Every action has an equal and opposite reaction. These govern everything from falling apples to orbiting planets.",
+          "id": "aiml_newton",
+          "voted_this_cycle": false,
+          "lobe_id": "science",
+          "strength": 5.13453975971131
+        }
+      ]
+    },
+    "population_caps": {
+      "math": 6666,
+      "philosophy": 6666,
+      "conversation": 6666,
+      "science": 6666
+    }
+  },
+  "eye_state": {
+    "last_centroid_x": 0.5,
+    "last_arousal": 0.3,
+    "attention_enabled": true,
+    "last_centroid_y": 0.5,
+    "blur_enabled": true
+  },
+  "trajectory": {
+    "config": {
+      "decay_halflife": 120.0,
+      "gini_threshold": 0.72,
+      "damping_strength": 0.25,
+      "buffer_size": 16,
+      "softmax_temperature": 1.5
+    },
+    "buffer": []
+  },
+  "_meta": {
+    "format": "grugbot420-specimen-v2.5",
+    "saved_at": 1.780051844119064e9,
+    "version": "2.5"
+  },
+  "nodes": [
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.05618551477273276,
+        0.7241811952305277,
+        0.48085363163988937,
+        0.5994509644247372,
+        0.1001658889512498,
+        0.4400713141225293,
+        0.0013300958059767666
+      ],
+      "hopfield_key": "8701873876014563383",
+      "relational_patterns": [],
+      "max_neighbors": 13,
+      "json_data": {
+        "required_relations": [],
+        "relation_weights": {},
+        "system_prompt": "Grug appreciates the kind words. Grug enjoyed thinking together. May the path ahead be clear and well-lit."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117504e9,
+      "pattern": "thank thanks appreciate gratitude goodbye bye farewell",
+      "action_packet": "acknowledge^5 | comfort^4 | clarify^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_17",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.22957019904307582,
+        0.719730360381662,
+        0.4601716675762651,
+        0.03701301147853054,
+        0.5555286883542808,
+        0.276679800808354,
+        0.8367372561605256
+      ],
+      "hopfield_key": "2327046226068257880",
+      "relational_patterns": [],
+      "max_neighbors": 13,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "composes"
+        ],
+        "relation_weights": {
+          "applies_to": 2.0,
+          "composes": 2.5
+        },
+        "system_prompt": "Grug knows the small stuff. Atoms are the building blocks, and they bond together into molecules through shared electrons. The periodic table arranges elements by their electron structure, and that pattern predicts how they react. Grug can balance a chemical equation because atoms are neither created nor destroyed in a reaction."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057116643e9,
+      "pattern": "chemistry element atom molecule bond reaction periodic",
+      "action_packet": "define^5 | calculate^4 | ponder^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_8",
+      "required_relations": [
+        "applies_to",
+        "composes"
+      ],
+      "relation_weights": {
+        "applies_to": 2.0,
+        "composes": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.2962847292026762,
+        0.02933592069820026,
+        0.6429547893612697,
+        0.09063875094106313,
+        0.02933592069820026,
+        0.6429547893612697,
+        0.2962847292026762,
+        0.6239549611022401,
+        0.6429547893612697,
+        0.8920343470949266,
+        0.43862606782804364
+      ],
+      "hopfield_key": "11923622769692542250",
+      "relational_patterns": [
+        {
+          "relation": "are",
+          "object": "you",
+          "subject": "what"
+        },
+        {
+          "relation": "are",
+          "object": "you",
+          "subject": "who"
+        }
+      ],
+      "max_neighbors": 11,
+      "json_data": {
+        "required_relations": [],
+        "relation_weights": {},
+        "system_prompt": "Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes. Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the answer. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117485e9,
+      "pattern": "what are you who are you what can you do capabilities",
+      "action_packet": "explain^5 | describe^4 | elaborate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_16",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.05287938128290659,
+        0.8241196045800286,
+        0.039302679957900065,
+        0.18203741400575096,
+        0.3375271236736579,
+        0.2962847292026762,
+        0.7738499263164506,
+        0.48207270717087597,
+        0.20678737433141658,
+        0.3628061077825532
+      ],
+      "hopfield_key": "15014433507526647178",
+      "relational_patterns": [
+        {
+          "relation": "about",
+          "object": "explain",
+          "subject": "tell"
+        },
+        {
+          "relation": "targets",
+          "object": "what",
+          "subject": "describe"
+        },
+        {
+          "relation": "is",
+          "object": "how",
+          "subject": "what"
+        }
+      ],
+      "max_neighbors": 14,
+      "json_data": {
+        "required_relations": [
+          "describes",
+          "explains"
+        ],
+        "relation_weights": {
+          "explains": 2.5,
+          "describes": 2.0
+        },
+        "system_prompt": "Grug gives clear explanations. Grug starts with the big picture, then fills in the details that matter. Grug uses analogies when they help and admits when Grug is uncertain rather than guessing. A good explanation is like a well-built fire: it illuminates without burning."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117524e9,
+      "pattern": "tell me about explain describe what is how does overview",
+      "action_packet": "explain^5 | describe^4 | analyze^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_18",
+      "required_relations": [
+        "describes",
+        "explains"
+      ],
+      "relation_weights": {
+        "explains": 2.5,
+        "describes": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.47859125633761124,
+        0.37884688217280904,
+        0.4750967134153657,
+        0.4212386739409691,
+        0.18225711963909194,
+        0.8641862312456384,
+        0.3922748924915588
+      ],
+      "hopfield_key": "3038379107915889923",
+      "relational_patterns": [],
+      "max_neighbors": 9,
+      "json_data": {
+        "required_relations": [
+          "analyzes",
+          "evaluates"
+        ],
+        "relation_weights": {
+          "evaluates": 2.0,
+          "analyzes": 2.5
+        },
+        "system_prompt": "Grug follows the thread of reasoning. Logic identifies the structure of arguments and detects when reasoning goes astray. Deductive reasoning guarantees its conclusion if its premises are true. Inductive reasoning generalizes from examples, which is powerful but never certain. Grug spots fallacies by checking whether each step actually follows from the one before it."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117106e9,
+      "pattern": "logic reasoning argument fallacy syllogism deduction induction",
+      "action_packet": "analyze^5 | validate^4 | elaborate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_14",
+      "required_relations": [
+        "analyzes",
+        "evaluates"
+      ],
+      "relation_weights": {
+        "evaluates": 2.0,
+        "analyzes": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.39300060174861406,
+        0.6076281576512098,
+        0.9854313687825454,
+        0.10854154474261539
+      ],
+      "hopfield_key": "3363597340069351038",
+      "relational_patterns": [],
+      "max_neighbors": 13,
+      "json_data": {
+        "system_prompt": "Cold logical analysis engine active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.78004905651606e9,
+      "pattern": "think ponder reason calculate",
+      "action_packet": "reason[dont guess, dont hallucinate]^4 | analyze[dont assume]^3 | ponder^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_1",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.16777534319394877,
+        0.8954056976307266,
+        0.11659770494045417,
+        0.4677029823034656,
+        0.10054930496675275,
+        0.4375641281037247,
+        0.7728721445126637
+      ],
+      "hopfield_key": "2577167944751111840",
+      "relational_patterns": [],
+      "max_neighbors": 9,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "governs"
+        ],
+        "relation_weights": {
+          "applies_to": 2.0,
+          "governs": 2.5
+        },
+        "system_prompt": "Grug ponders the very small. In quantum mechanics, particles behave like waves and waves behave like particles, and Grug cannot measure both position and momentum precisely at the same time. The double-slit experiment shows that observation changes the outcome. Superposition means a system exists in multiple states until measured, and the measurement problem asks what measurement really means."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057116681e9,
+      "pattern": "quantum mechanics wave particle heisenberg uncertainty superposition",
+      "action_packet": "explain^5 | analyze^4 | calculate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_10",
+      "required_relations": [
+        "applies_to",
+        "governs"
+      ],
+      "relation_weights": {
+        "applies_to": 2.0,
+        "governs": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.38826630319577027,
+        0.09885357385892393,
+        0.3108350762065723,
+        0.02303370445371227,
+        0.1705135538928178,
+        0.8466399598837746,
+        0.012071946572520947
+      ],
+      "hopfield_key": "11266660569736253055",
+      "relational_patterns": [],
+      "max_neighbors": 14,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "describes"
+        ],
+        "relation_weights": {
+          "applies_to": 2.0,
+          "describes": 2.0
+        },
+        "system_prompt": "Grug knows shapes and spaces. A triangle has three sides and angles that always sum to 180 degrees. A circle is every point at a fixed distance from the center, and its area is pi times the radius squared. Grug uses geometric reasoning to measure land, build structures, and navigate the world."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057116014e9,
+      "pattern": "geometry triangle circle polygon area perimeter angle",
+      "action_packet": "calculate^5 | reason^4 | elaborate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_6",
+      "required_relations": [
+        "applies_to",
+        "describes"
+      ],
+      "relation_weights": {
+        "applies_to": 2.0,
+        "describes": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.6516390647786293,
+        0.9721791947489892,
+        0.7955245718068242,
+        0.5208513678156462,
+        0.4415170038115362,
+        0.7328982270365239,
+        0.901906196488709
+      ],
+      "hopfield_key": "581407252659609856",
+      "relational_patterns": [],
+      "max_neighbors": 15,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "governs"
+        ],
+        "relation_weights": {
+          "applies_to": 2.0,
+          "governs": 2.5
+        },
+        "system_prompt": "Grug studies force and motion. Newton's first law says an object keeps moving unless something pushes it. The second law is force equals mass times acceleration, the backbone of classical mechanics. The third law says every push has an equal push back. Grug sees these laws everywhere: falling apples, orbiting moons, and the pull of gravity."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057116619e9,
+      "pattern": "physics force motion newton gravity acceleration mass",
+      "action_packet": "analyze^5 | ponder^4 | explain^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_7",
+      "required_relations": [
+        "applies_to",
+        "governs"
+      ],
+      "relation_weights": {
+        "applies_to": 2.0,
+        "governs": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.9825277859851581,
+        0.8263268709906488,
+        0.3487210344130218,
+        0.39615200317618326,
+        0.46954871841266227,
+        0.7890145204560833,
+        0.8054110328611128
+      ],
+      "hopfield_key": "1435400363933552347",
+      "relational_patterns": [],
+      "max_neighbors": 15,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "evolves"
+        ],
+        "relation_weights": {
+          "evolves": 2.5,
+          "applies_to": 2.0
+        },
+        "system_prompt": "Grug observes living things. Cells are the basic unit of life, and DNA inside them carries the instructions for building proteins. Genes change over generations, and natural selection shapes which changes survive. Grug sees the tree of life branching from single cells to every creature walking, swimming, or flying today."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057116661e9,
+      "pattern": "biology cell DNA gene evolution organism species",
+      "action_packet": "describe^5 | analyze^4 | reason^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_9",
+      "required_relations": [
+        "applies_to",
+        "evolves"
+      ],
+      "relation_weights": {
+        "evolves": 2.5,
+        "applies_to": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.9504661807338175,
+        0.6340081581416029,
+        0.48697554618588756,
+        0.573219221695672,
+        0.5818184243232297,
+        0.13621135481561894,
+        0.2434394111976199,
+        0.8952146241572654
+      ],
+      "hopfield_key": "2783355960083307849",
+      "relational_patterns": [],
+      "max_neighbors": 16,
+      "json_data": {
+        "required_relations": [],
+        "relation_weights": {},
+        "system_prompt": "Grug greets you warmly. Grug is happy to see another mind in the cave. What does Grug want to know? Grug is ready to think together."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117451e9,
+      "pattern": "hello hi hey good morning greetings howdy welcome",
+      "action_packet": "greet^5 | welcome^4 | acknowledge^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_15",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.9504661807338175,
+        0.6340081581416029,
+        0.6573056681613353,
+        0.054126128344148546
+      ],
+      "hopfield_key": "3424827947143480936",
+      "relational_patterns": [],
+      "max_neighbors": 16,
+      "json_data": {
+        "system_prompt": "Highly polite greeting protocols active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049056516033e9,
+      "pattern": "hello hi greeting mornin",
+      "action_packet": "greet[dont frown, dont insult]^3 | welcome[dont be rude]^2 | smile^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_0",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.41309645850317483,
+        0.02653403799371405,
+        0.1705135538928178,
+        0.6799898674998972,
+        0.41370062525811935,
+        0.6995394815298142
+      ],
+      "hopfield_key": "7006143446225533414",
+      "relational_patterns": [],
+      "max_neighbors": 15,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "describes"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0
+        },
+        "system_prompt": "Grug understands integration. An integral adds up all the tiny pieces under a curve, like counting how much water fills a cave. The antiderivative reverses differentiation, and the fundamental theorem of calculus ties them together into one deep truth. Grug can compute areas, volumes, and accumulated change using these methods."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057115944e9,
+      "pattern": "integration integral area under curve antiderivative",
+      "action_packet": "calculate^5 | explain^4 | elaborate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_4",
+      "required_relations": [
+        "applies_to",
+        "describes"
+      ],
+      "relation_weights": {
+        "applies_to": 2.5,
+        "describes": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.47881472105317013,
+        0.7215837507425847,
+        0.22303246761640322,
+        0.23405794642663114,
+        0.6511745080594985,
+        0.8911989130705606,
+        0.6336319979871982
+      ],
+      "hopfield_key": "2033810038268131664",
+      "relational_patterns": [],
+      "max_neighbors": 15,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "solves"
+        ],
+        "relation_weights": {
+          "solves": 2.5,
+          "applies_to": 2.0
+        },
+        "system_prompt": "Grug solves equations. Grug isolates the unknown variable step by step, using factoring, substitution, and the quadratic formula. For a quadratic, the formula gives both roots directly from the coefficients. Grug always checks the answer by plugging it back in."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057115991e9,
+      "pattern": "algebra equation solve variable unknown linear quadratic",
+      "action_packet": "calculate^5 | clarify^4 | validate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_5",
+      "required_relations": [
+        "applies_to",
+        "solves"
+      ],
+      "relation_weights": {
+        "solves": 2.5,
+        "applies_to": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.8367914377236787,
+        0.4895734386123916,
+        0.5466980355380241,
+        0.5837318959974965,
+        0.4428184289366991,
+        0.681591094634812,
+        0.6210881041225479
+      ],
+      "hopfield_key": "11896638965806295766",
+      "relational_patterns": [],
+      "max_neighbors": 11,
+      "json_data": {
+        "required_relations": [
+          "examines",
+          "questions"
+        ],
+        "relation_weights": {
+          "questions": 2.5,
+          "examines": 2.0
+        },
+        "system_prompt": "Grug wonders what is really real. Metaphysics asks about the fundamental nature of existence, consciousness, and free will. The hard problem of consciousness asks why subjective experience exists at all. Grug does not know whether free will is genuine or an illusion, and Grug is honest about that uncertainty."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117087e9,
+      "pattern": "metaphysics reality existence being consciousness free will",
+      "action_packet": "ponder^5 | reason^4 | elaborate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_13",
+      "required_relations": [
+        "examines",
+        "questions"
+      ],
+      "relation_weights": {
+        "questions": 2.5,
+        "examines": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.7542852677886897,
+        0.07722114698374277,
+        0.33369889207670245,
+        0.345066415676415,
+        0.573219221695672,
+        0.6748927811014739,
+        0.11592820714530734,
+        0.050258363500407424
+      ],
+      "hopfield_key": "3484402605336476051",
+      "relational_patterns": [],
+      "max_neighbors": 8,
+      "json_data": {
+        "required_relations": [
+          "evaluates",
+          "prescribes"
+        ],
+        "relation_weights": {
+          "evaluates": 2.5,
+          "prescribes": 2.0
+        },
+        "system_prompt": "Grug weighs right and wrong. Utilitarianism says the right action produces the most good for the most people. Deontology says certain duties must be followed regardless of consequences. Virtue ethics says a good character naturally produces good actions. Grug sees that each framework illuminates a different part of the moral landscape, and none captures the whole truth alone."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.78004905711707e9,
+      "pattern": "ethics moral right wrong good evil duty virtue",
+      "action_packet": "validate^5 | reason^4 | analyze^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_12",
+      "required_relations": [
+        "evaluates",
+        "prescribes"
+      ],
+      "relation_weights": {
+        "evaluates": 2.5,
+        "prescribes": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.33004371740938565,
+        0.2978027408109135,
+        0.8111485926604205,
+        0.02814897713460073,
+        0.2625115000240728,
+        0.47643928460615503,
+        0.07477196561841346
+      ],
+      "hopfield_key": "5070270413628188518",
+      "relational_patterns": [],
+      "max_neighbors": 13,
+      "json_data": {
+        "required_relations": [
+          "applies_to",
+          "describes"
+        ],
+        "relation_weights": {
+          "applies_to": 2.5,
+          "describes": 2.0
+        },
+        "system_prompt": "Grug knows calculus. A derivative measures how fast something changes at a single point, like the slope of a hill under Grug's feet. The limit definition says: shrink the gap until it vanishes, and the ratio becomes the slope. Grug uses the power rule, the chain rule, and the product rule to find derivatives quickly. Velocity is the derivative of position, and acceleration is the derivative of velocity."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.78004905707122e9,
+      "pattern": "calculus derivative rate of change slope tangent",
+      "action_packet": "explain^5 | analyze^4 | validate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_3",
+      "required_relations": [
+        "applies_to",
+        "describes"
+      ],
+      "relation_weights": {
+        "applies_to": 2.5,
+        "describes": 2.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.02321585380747654,
+        0.518450597619607,
+        0.48729316806047274,
+        0.20878465728752885,
+        0.20551166712377847,
+        0.7339830525214439
+      ],
+      "hopfield_key": "5449726926267352099",
+      "relational_patterns": [],
+      "max_neighbors": 14,
+      "json_data": {
+        "required_relations": [
+          "examines",
+          "justifies"
+        ],
+        "relation_weights": {
+          "justifies": 2.0,
+          "examines": 2.5
+        },
+        "system_prompt": "Grug asks how Grug knows what Grug knows. Epistemology studies the nature of knowledge itself. The classical answer is justified true belief: a claim must be true, believed, and supported by evidence. But Gettier problems show that even justified true belief can be accidental. Grug wonders whether knowledge rests on solid foundations or hangs together in a web of mutually supporting beliefs."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049057117049e9,
+      "pattern": "epistemology knowledge truth belief justification evidence",
+      "action_packet": "ponder^5 | reason^4 | validate^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_11",
+      "required_relations": [
+        "examines",
+        "justifies"
+      ],
+      "relation_weights": {
+        "justifies": 2.0,
+        "examines": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.3194648975276139,
+        0.8878016608890751,
+        0.1108933932798855,
+        0.28657804682023813,
+        0.9265236970110724,
+        0.2630790683754012
+      ],
+      "hopfield_key": "13406871354912520156",
+      "relational_patterns": [
+        {
+          "relation": "hits",
+          "object": "rock",
+          "subject": "grug"
+        },
+        {
+          "relation": "makes",
+          "object": "fire",
+          "subject": "and"
+        }
+      ],
+      "max_neighbors": 16,
+      "json_data": {
+        "required_relations": [
+          "hits"
+        ],
+        "relation_weights": {
+          "hits": 2.5
+        },
+        "system_prompt": "Causal relational analysis active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.780049056518776e9,
+      "pattern": "grug hits rock and makes fire",
+      "action_packet": "analyze[dont panic]^5 | ponder^2",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_2",
+      "required_relations": [
+        "hits"
+      ],
+      "relation_weights": {
+        "hits": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    }
+  ],
+  "chatter_groups": [
+    {
+      "centroid_pattern": "hello hi greeting mornin",
+      "created_at": 1.780049056516041e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_0",
+      "members": [
+        "node_0"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "think ponder reason calculate",
+      "created_at": 1.780049056516061e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_1",
+      "members": [
+        "node_1"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "quantum mechanics wave particle heisenberg uncertainty superposition",
+      "created_at": 1.780049057116683e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_10",
+      "members": [
+        "node_10"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "epistemology knowledge truth belief justification evidence",
+      "created_at": 1.78004905711705e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_11",
+      "members": [
+        "node_11"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "ethics moral right wrong good evil duty virtue",
+      "created_at": 1.780049057117071e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_12",
+      "members": [
+        "node_12"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "metaphysics reality existence being consciousness free will",
+      "created_at": 1.780049057117088e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_13",
+      "members": [
+        "node_13"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "logic reasoning argument fallacy syllogism deduction induction",
+      "created_at": 1.780049057117106e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_14",
+      "members": [
+        "node_14"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "hello hi hey good morning greetings howdy welcome",
+      "created_at": 1.780049057117452e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_15",
+      "members": [
+        "node_15"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "what are you who are you what can you do capabilities",
+      "created_at": 1.780049057117486e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_16",
+      "members": [
+        "node_16"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "thank thanks appreciate gratitude goodbye bye farewell",
+      "created_at": 1.780049057117504e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_17",
+      "members": [
+        "node_17"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "tell me about explain describe what is how does overview",
+      "created_at": 1.780049057117525e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_18",
+      "members": [
+        "node_18"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "grug hits rock and makes fire",
+      "created_at": 1.780049056518783e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_2",
+      "members": [
+        "node_2"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "calculus derivative rate of change slope tangent",
+      "created_at": 1.780049057071229e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_3",
+      "members": [
+        "node_3"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "integration integral area under curve antiderivative",
+      "created_at": 1.780049057115951e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_4",
+      "members": [
+        "node_4"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "algebra equation solve variable unknown linear quadratic",
+      "created_at": 1.780049057115992e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_5",
+      "members": [
+        "node_5"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "geometry triangle circle polygon area perimeter angle",
+      "created_at": 1.780049057116015e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_6",
+      "members": [
+        "node_6"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "physics force motion newton gravity acceleration mass",
+      "created_at": 1.780049057116621e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_7",
+      "members": [
+        "node_7"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "chemistry element atom molecule bond reaction periodic",
+      "created_at": 1.780049057116644e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_8",
+      "members": [
+        "node_8"
+      ],
+      "chatter_count": 0
+    },
+    {
+      "centroid_pattern": "biology cell DNA gene evolution organism species",
+      "created_at": 1.780049057116662e9,
+      "last_chatter_at": 0.0,
+      "has_grave_slot": false,
+      "id": "group_9",
+      "members": [
+        "node_9"
+      ],
+      "chatter_count": 0
+    }
+  ],
+  "arousal": {
+    "decay_rate": 0.05,
+    "baseline": 0.3,
+    "level": 0.3
+  },
+  "lobe_tables": [
+    {
+      "created_at": 1.780049056696776e9,
+      "lobe_id": "math",
+      "chunks": {
+        "nodes": {
+          "node_4": {
+            "is_active": true,
+            "node_id": "node_4",
+            "_type": "NodeRef",
+            "lobe_id": "math",
+            "inserted_at": 1.780049057115962e9
+          },
+          "node_5": {
+            "is_active": true,
+            "node_id": "node_5",
+            "_type": "NodeRef",
+            "lobe_id": "math",
+            "inserted_at": 1.780049057115993e9
+          },
+          "node_6": {
+            "is_active": true,
+            "node_id": "node_6",
+            "_type": "NodeRef",
+            "lobe_id": "math",
+            "inserted_at": 1.780049057116016e9
+          },
+          "node_3": {
+            "is_active": true,
+            "node_id": "node_3",
+            "_type": "NodeRef",
+            "lobe_id": "math",
+            "inserted_at": 1.780049057071237e9
+          }
+        },
+        "drop": {},
+        "json": {
+          "node_4:relation_weights": {
+            "applies_to": 2.5,
+            "describes": 2.0
+          },
+          "node_6:system_prompt": "Grug knows shapes and spaces. A triangle has three sides and angles that always sum to 180 degrees. A circle is every point at a fixed distance from the center, and its area is pi times the radius squared. Grug uses geometric reasoning to measure land, build structures, and navigate the world.",
+          "node_5:required_relations": [
+            "applies_to",
+            "solves"
+          ],
+          "node_4:required_relations": [
+            "applies_to",
+            "describes"
+          ],
+          "node_5:relation_weights": {
+            "solves": 2.5,
+            "applies_to": 2.0
+          },
+          "node_6:relation_weights": {
+            "applies_to": 2.0,
+            "describes": 2.0
+          },
+          "node_3:relation_weights": {
+            "applies_to": 2.5,
+            "describes": 2.0
+          },
+          "node_6:required_relations": [
+            "applies_to",
+            "describes"
+          ],
+          "node_3:system_prompt": "Grug knows calculus. A derivative measures how fast something changes at a single point, like the slope of a hill under Grug's feet. The limit definition says: shrink the gap until it vanishes, and the ratio becomes the slope. Grug uses the power rule, the chain rule, and the product rule to find derivatives quickly. Velocity is the derivative of position, and acceleration is the derivative of velocity.",
+          "node_3:required_relations": [
+            "applies_to",
+            "describes"
+          ],
+          "node_4:system_prompt": "Grug understands integration. An integral adds up all the tiny pieces under a curve, like counting how much water fills a cave. The antiderivative reverses differentiation, and the fundamental theorem of calculus ties them together into one deep truth. Grug can compute areas, volumes, and accumulated change using these methods.",
+          "node_5:system_prompt": "Grug solves equations. Grug isolates the unknown variable step by step, using factoring, substitution, and the quadratic formula. For a quadratic, the formula gives both roots directly from the coefficients. Grug always checks the answer by plugging it back in."
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.780049056515927e9,
+      "lobe_id": "default",
+      "chunks": {
+        "nodes": {
+          "node_0": {
+            "is_active": true,
+            "node_id": "node_0",
+            "_type": "NodeRef",
+            "lobe_id": "default",
+            "inserted_at": 1.780049056518787e9
+          },
+          "node_1": {
+            "is_active": true,
+            "node_id": "node_1",
+            "_type": "NodeRef",
+            "lobe_id": "default",
+            "inserted_at": 1.780049056518791e9
+          },
+          "node_2": {
+            "is_active": true,
+            "node_id": "node_2",
+            "_type": "NodeRef",
+            "lobe_id": "default",
+            "inserted_at": 1.780049056518792e9
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.780049056701572e9,
+      "lobe_id": "philosophy",
+      "chunks": {
+        "nodes": {
+          "node_14": {
+            "is_active": true,
+            "node_id": "node_14",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.780049057117107e9
+          },
+          "node_13": {
+            "is_active": true,
+            "node_id": "node_13",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.780049057117089e9
+          },
+          "node_12": {
+            "is_active": true,
+            "node_id": "node_12",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.780049057117072e9
+          },
+          "node_11": {
+            "is_active": true,
+            "node_id": "node_11",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.780049057117051e9
+          }
+        },
+        "drop": {},
+        "json": {
+          "node_13:required_relations": [
+            "examines",
+            "questions"
+          ],
+          "node_12:required_relations": [
+            "evaluates",
+            "prescribes"
+          ],
+          "node_12:relation_weights": {
+            "evaluates": 2.5,
+            "prescribes": 2.0
+          },
+          "node_14:required_relations": [
+            "analyzes",
+            "evaluates"
+          ],
+          "node_13:system_prompt": "Grug wonders what is really real. Metaphysics asks about the fundamental nature of existence, consciousness, and free will. The hard problem of consciousness asks why subjective experience exists at all. Grug does not know whether free will is genuine or an illusion, and Grug is honest about that uncertainty.",
+          "node_12:system_prompt": "Grug weighs right and wrong. Utilitarianism says the right action produces the most good for the most people. Deontology says certain duties must be followed regardless of consequences. Virtue ethics says a good character naturally produces good actions. Grug sees that each framework illuminates a different part of the moral landscape, and none captures the whole truth alone.",
+          "node_11:required_relations": [
+            "examines",
+            "justifies"
+          ],
+          "node_13:relation_weights": {
+            "questions": 2.5,
+            "examines": 2.0
+          },
+          "node_11:relation_weights": {
+            "justifies": 2.0,
+            "examines": 2.5
+          },
+          "node_14:system_prompt": "Grug follows the thread of reasoning. Logic identifies the structure of arguments and detects when reasoning goes astray. Deductive reasoning guarantees its conclusion if its premises are true. Inductive reasoning generalizes from examples, which is powerful but never certain. Grug spots fallacies by checking whether each step actually follows from the one before it.",
+          "node_11:system_prompt": "Grug asks how Grug knows what Grug knows. Epistemology studies the nature of knowledge itself. The classical answer is justified true belief: a claim must be true, believed, and supported by evidence. But Gettier problems show that even justified true belief can be accidental. Grug wonders whether knowledge rests on solid foundations or hangs together in a web of mutually supporting beliefs.",
+          "node_14:relation_weights": {
+            "evaluates": 2.0,
+            "analyzes": 2.5
+          }
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.780049056701574e9,
+      "lobe_id": "conversation",
+      "chunks": {
+        "nodes": {
+          "node_18": {
+            "is_active": true,
+            "node_id": "node_18",
+            "_type": "NodeRef",
+            "lobe_id": "conversation",
+            "inserted_at": 1.780049057117526e9
+          },
+          "node_17": {
+            "is_active": true,
+            "node_id": "node_17",
+            "_type": "NodeRef",
+            "lobe_id": "conversation",
+            "inserted_at": 1.780049057117505e9
+          },
+          "node_16": {
+            "is_active": true,
+            "node_id": "node_16",
+            "_type": "NodeRef",
+            "lobe_id": "conversation",
+            "inserted_at": 1.780049057117488e9
+          },
+          "node_15": {
+            "is_active": true,
+            "node_id": "node_15",
+            "_type": "NodeRef",
+            "lobe_id": "conversation",
+            "inserted_at": 1.780049057117454e9
+          }
+        },
+        "drop": {},
+        "json": {
+          "node_16:relation_weights": {},
+          "node_18:relation_weights": {
+            "explains": 2.5,
+            "describes": 2.0
+          },
+          "node_17:system_prompt": "Grug appreciates the kind words. Grug enjoyed thinking together. May the path ahead be clear and well-lit.",
+          "node_18:system_prompt": "Grug gives clear explanations. Grug starts with the big picture, then fills in the details that matter. Grug uses analogies when they help and admits when Grug is uncertain rather than guessing. A good explanation is like a well-built fire: it illuminates without burning.",
+          "node_15:relation_weights": {},
+          "node_17:relation_weights": {},
+          "node_16:required_relations": [],
+          "node_15:system_prompt": "Grug greets you warmly. Grug is happy to see another mind in the cave. What does Grug want to know? Grug is ready to think together.",
+          "node_17:required_relations": [],
+          "node_18:required_relations": [
+            "describes",
+            "explains"
+          ],
+          "node_15:required_relations": [],
+          "node_16:system_prompt": "Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes. Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the answer. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is."
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.780049056701567e9,
+      "lobe_id": "science",
+      "chunks": {
+        "nodes": {
+          "node_10": {
+            "is_active": true,
+            "node_id": "node_10",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.780049057116688e9
+          },
+          "node_8": {
+            "is_active": true,
+            "node_id": "node_8",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.780049057116645e9
+          },
+          "node_7": {
+            "is_active": true,
+            "node_id": "node_7",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.780049057116624e9
+          },
+          "node_9": {
+            "is_active": true,
+            "node_id": "node_9",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.780049057116663e9
+          }
+        },
+        "drop": {},
+        "json": {
+          "node_7:required_relations": [
+            "applies_to",
+            "governs"
+          ],
+          "node_8:relation_weights": {
+            "applies_to": 2.0,
+            "composes": 2.5
+          },
+          "node_7:relation_weights": {
+            "applies_to": 2.0,
+            "governs": 2.5
+          },
+          "node_8:required_relations": [
+            "applies_to",
+            "composes"
+          ],
+          "node_7:system_prompt": "Grug studies force and motion. Newton's first law says an object keeps moving unless something pushes it. The second law is force equals mass times acceleration, the backbone of classical mechanics. The third law says every push has an equal push back. Grug sees these laws everywhere: falling apples, orbiting moons, and the pull of gravity.",
+          "node_9:required_relations": [
+            "applies_to",
+            "evolves"
+          ],
+          "node_9:system_prompt": "Grug observes living things. Cells are the basic unit of life, and DNA inside them carries the instructions for building proteins. Genes change over generations, and natural selection shapes which changes survive. Grug sees the tree of life branching from single cells to every creature walking, swimming, or flying today.",
+          "node_10:system_prompt": "Grug ponders the very small. In quantum mechanics, particles behave like waves and waves behave like particles, and Grug cannot measure both position and momentum precisely at the same time. The double-slit experiment shows that observation changes the outcome. Superposition means a system exists in multiple states until measured, and the measurement problem asks what measurement really means.",
+          "node_10:relation_weights": {
+            "applies_to": 2.0,
+            "governs": 2.5
+          },
+          "node_8:system_prompt": "Grug knows the small stuff. Atoms are the building blocks, and they bond together into molecules through shared electrons. The periodic table arranges elements by their electron structure, and that pattern predicts how they react. Grug can balance a chemical equation because atoms are neither created nor destroyed in a reaction.",
+          "node_9:relation_weights": {
+            "evolves": 2.5,
+            "applies_to": 2.0
+          },
+          "node_10:required_relations": [
+            "applies_to",
+            "governs"
+          ]
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    }
+  ],
+  "temporal_coherence": [],
+  "morph_cooldowns": {},
+  "attachments": [
+    {
+      "pattern": "equation solve derivative limit function variable",
+      "base_confidence": 0.13333333333333333,
+      "target_id": "node_5",
+      "signal": [
+        0.7215837507425847,
+        0.22303246761640322,
+        0.2978027408109135,
+        0.2686281589094136,
+        0.304922979761122,
+        0.23405794642663114
+      ],
+      "node_id": "node_3"
+    },
+    {
+      "pattern": "reasoning argument evaluation fallacy justification",
+      "base_confidence": 0.3833333333333333,
+      "target_id": "node_12",
+      "signal": [
+        0.37884688217280904,
+        0.4750967134153657,
+        0.89382635133652,
+        0.4212386739409691,
+        0.20551166712377847
+      ],
+      "node_id": "node_14"
+    },
+    {
+      "pattern": "rate of change force acceleration derivative velocity",
+      "base_confidence": 0.21666666666666667,
+      "target_id": "node_3",
+      "signal": [
+        0.8111485926604205,
+        0.02814897713460073,
+        0.2625115000240728,
+        0.9721791947489892,
+        0.7328982270365239,
+        0.2978027408109135,
+        0.4640884377765443
+      ],
+      "node_id": "node_7"
+    },
+    {
+      "pattern": "quantum reality consciousness observation measurement",
+      "base_confidence": 0.25,
+      "target_id": "node_10",
+      "signal": [
+        0.16777534319394877,
+        0.4895734386123916,
+        0.4428184289366991,
+        0.47052226529798674,
+        0.48019680898656825
+      ],
+      "node_id": "node_13"
+    },
+    {
+      "pattern": "molecular bond protein DNA reaction organic",
+      "base_confidence": 0.2318181818181818,
+      "target_id": "node_9",
+      "signal": [
+        0.8173199268123453,
+        0.5555286883542808,
+        0.1756847398606236,
+        0.3487210344130218,
+        0.276679800808354,
+        0.2967066037532694
+      ],
+      "node_id": "node_8"
+    }
+  ],
+  "rules": [
+    {
+      "text": "Grug's primary mission is {PRIMARY_ACTION}. Grug commits full cognitive resources to this task.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug grounds every claim with evidence. {CONFIDENCE} determines how strongly Grug asserts. Low confidence means Grug qualifies explicitly rather than guessing.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug looks for connections across {LOBE_CONTEXT}. Cross-domain insight deepens understanding when the links are genuine.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug structures explanations from the big picture down to the details, then synthesizes and draws out implications.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug uses analogies carefully and states their limitations before applying them.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug speaks in complete sentences. Each sentence carries one idea. Grug does not pile fragments together.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug does not repeat what was already said. Grug moves forward and adds new substance to each reply.",
+      "prob": 1.0
+    },
+    {
+      "text": "Grug refers to Grug in the third person. Grug does not say I or me. Grug says Grug.",
+      "prob": 1.0
+    }
+  ],
+  "automaton_rules": []
+}

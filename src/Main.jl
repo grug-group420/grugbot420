@@ -431,17 +431,24 @@ function append_to_save_file(json_str::String, save_filepath::String)::String
         
         json_out = JSON.json(specimen)
         
-        # GRUG: Use system gzip like save_specimen_to_file! - no extra packages needed
+        # GRUG: Auto-detect format — .gz for compressed, .json for plain (Windows-friendly)
+        _ws_is_gz = lowercase(strip(save_filepath)[max(1, end-2):end]) == ".gz"
         try
-            open(save_filepath, "w") do io
-                proc = open(`gzip -c`, "r+")
-                write(proc, json_out)
-                close(proc.in)
-                compressed = read(proc)
-                write(io, compressed)
+            if _ws_is_gz
+                open(save_filepath, "w") do io
+                    proc = open(`gzip -c`, "r+")
+                    write(proc, json_out)
+                    close(proc.in)
+                    compressed = read(proc)
+                    write(io, compressed)
+                end
+            else
+                open(save_filepath, "w") do io
+                    write(io, json_out)
+                end
             end
         catch e
-            error("!!! FATAL: /writeSave failed to write compressed file '$save_filepath': $e !!!")
+            error("!!! FATAL: /writeSave failed to write file '$save_filepath': $e !!!")
         end
         
         return "✅ Created new save file: $save_filepath with appended JSON."
@@ -449,8 +456,13 @@ function append_to_save_file(json_str::String, save_filepath::String)::String
     
     # GRUG: File exists - read, merge, write back
     try
-        # GRUG: Decompress existing file using system gunzip
-        json_str_existing = read(`gunzip -c $save_filepath`, String)
+        # GRUG: Read existing file — .gz needs gunzip, .json is plain text
+        _ws_rd_is_gz = lowercase(strip(save_filepath)[max(1, end-2):end]) == ".gz"
+        json_str_existing = if _ws_rd_is_gz
+            read(`gunzip -c $save_filepath`, String)
+        else
+            read(save_filepath, String)
+        end
         existing = JSON.parse(json_str_existing)
         
         # GRUG: Merge/append the new data
@@ -482,14 +494,20 @@ function append_to_save_file(json_str::String, save_filepath::String)::String
             existing["custom_append_$(round(Int, time()))"] = new_data
         end
         
-        # GRUG: Write back using system gzip
+        # GRUG: Write back — same format as original file
         json_out = JSON.json(existing)
-        open(save_filepath, "w") do io
-            proc = open(`gzip -c`, "r+")
-            write(proc, json_out)
-            close(proc.in)
-            compressed = read(proc)
-            write(io, compressed)
+        if _ws_rd_is_gz
+            open(save_filepath, "w") do io
+                proc = open(`gzip -c`, "r+")
+                write(proc, json_out)
+                close(proc.in)
+                compressed = read(proc)
+                write(io, compressed)
+            end
+        else
+            open(save_filepath, "w") do io
+                write(io, json_out)
+            end
         end
         
         return "✅ Appended JSON to save file: $save_filepath"
@@ -2546,8 +2564,8 @@ ImgAttach: /imgnodeAttach <lobe> <tgt> <id> <b64> [w h] (attach image node with 
          : /attachments                         (show all node attachments)
 Crystal  : /crystalize <lobe> <target> <attach>        (💎 mark attachment as sticky/user-locked)
          : /decrystalize <lobe> <target> <attach>      (🔓 remove sticky flag, restore coinflip)
-Specimen : /saveSpecimen <filepath>            (save full cave state to compressed file)
-         : /loadSpecimen <filepath>            (restore full cave state from compressed file)
+Specimen : /saveSpecimen <filepath>            (save full cave state — .json or .gz)
+         : /loadSpecimen <filepath>            (restore full cave state — .json or .gz)
 Help     : /help                               (full command reference)
 
 ╔══════════════════════════════════════════════════════════════════╗
@@ -2648,8 +2666,8 @@ const HELP_MSG = """
 ║  /decrystalize <lobe> <tgt> <attach>   🔓 unmark sticky      ║
 ║                                                              ║
 ║  SPECIMEN PERSISTENCE                                        ║
-║  /saveSpecimen <filepath>    Save full cave to compressed gz ║
-║  /loadSpecimen <filepath>    Restore full cave from gz file  ║
+│  /saveSpecimen <filepath>    Save cave (.json or .gz)       │
+│  /loadSpecimen <filepath>    Restore cave (.json or .gz)     │
 ║    Saves/restores: nodes, lobes, lobe tables, Hopfield,     ║
 ║    rules, messages+pins, verbs, thesaurus, inhibitions,     ║
 ║    arousal, ID counters, brainstem state, attachments        ║
@@ -3181,7 +3199,7 @@ end
 # SPECIMEN PERSISTENCE (SAVE / LOAD FULL CAVE STATE FROM COMPRESSED FILE)
 # ==============================================================================
 
-# GRUG: /saveSpecimen writes the ENTIRE cave state to a gzip-compressed JSON file.
+# GRUG: /saveSpecimen writes the ENTIRE cave state to a JSON file (.json) or gzip-compressed file (.gz).
 # /loadSpecimen reads that file back and RESTORES the ENTIRE cave from scratch.
 # This is LONG-TERM STORAGE. Not "add a few nodes" — this is "freeze the whole brain,
 # put it in a jar, thaw it later with every neuron exactly where Grug left it."
@@ -3191,7 +3209,8 @@ end
 """
 save_specimen_to_file!(filepath::String)::String
 
-GRUG: Serialize the ENTIRE cave state to a gzip-compressed JSON file.
+GRUG: Serialize the ENTIRE cave state to a JSON or gzip-compressed JSON file.
+Use .json extension for plain JSON (cross-platform, no gzip needed) or .gz for compression.
 Captures ALL mutable state across all modules:
   - nodes       (full Node struct: strengths, patterns, neighbors, graves, etc.)
   - hopfield    (HOPFIELD_CACHE + hit counts)
@@ -3678,27 +3697,35 @@ function save_specimen_to_file!(filepath::String)::String
         "format"     => "grugbot420-specimen-v2.5"
     )
 
-    # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
-    # GRUG: Convert to JSON string, then gzip compress to file.
-    # Use system gzip via pipeline — no extra packages needed. Grug like simple.
+    # ── SERIALIZE ────────────────────────────────────────────────────
+    # GRUG: Convert to JSON string. If filepath ends in .gz, gzip compress.
+    # If .json (or anything else), write plain JSON — no gzip needed, works
+    # on Windows without any extra CLI tools. Grug like cross-platform.
     json_str = JSON.json(specimen, 2)  # pretty-print with indent=2
+    is_gz = lowercase(strip(filepath)[max(1, end-2):end]) == ".gz"
 
     try
-        proc = open(`gzip -c`, "r+")
-        write(proc, json_str)
-        close(proc.in)
-        compressed = read(proc)
-        open(filepath, "w") do io
-            write(io, compressed)
+        if is_gz
+            proc = open(`gzip -c`, "r+")
+            write(proc, json_str)
+            close(proc.in)
+            compressed = read(proc)
+            open(filepath, "w") do io
+                write(io, compressed)
+            end
+        else
+            open(filepath, "w") do io
+                write(io, json_str)
+            end
         end
     catch e
-        error("!!! FATAL: /saveSpecimen failed to write compressed file '$filepath': $e !!!")
+        error("!!! FATAL: /saveSpecimen failed to write file '$filepath': $e !!!")
     end
 
     elapsed = round(time() - t_start, digits=2)
     file_size = filesize(filepath)
     json_size = sizeof(json_str)
-    ratio = json_size > 0 ? round(100.0 * (1.0 - file_size / json_size), digits=1) : 0.0
+    ratio = is_gz && json_size > 0 ? round(100.0 * (1.0 - file_size / json_size), digits=1) : 0.0
 
     # GRUG: Build the victory scroll
     lines = String[]
@@ -3707,7 +3734,11 @@ function save_specimen_to_file!(filepath::String)::String
     push!(lines, "╠══════════════════════════════════════════════════════════════╣")
     push!(lines, "  📁  File             : $filepath")
     push!(lines, "  📦  JSON size        : $(json_size) bytes")
-    push!(lines, "  🗜️   Compressed size  : $(file_size) bytes ($(ratio)% smaller)")
+    if is_gz
+        push!(lines, "  🗜️   Compressed size  : $(file_size) bytes ($(ratio)% smaller)")
+    else
+        push!(lines, "  📄  File size        : $(file_size) bytes (plain JSON)")
+    end
     push!(lines, "  ⏱️   Time             : $(elapsed)s")
     push!(lines, "  ─────────────────────────────────────────────")
     push!(lines, "  🌱  Nodes            : $(length(node_list))")
@@ -3750,7 +3781,8 @@ end
 """
 load_specimen_from_file!(filepath::String)::String
 
-GRUG: Read a gzip-compressed JSON specimen file and RESTORE the ENTIRE cave state.
+GRUG: Read a JSON (.json) or gzip-compressed (.gz) specimen file and RESTORE the ENTIRE cave state.
+Auto-detects format by file extension. .json files work on Windows without gzip.
 This is a DESTRUCTIVE operation — current cave state is WIPED and replaced with
 the specimen contents. Think of it as brain transplant, not brain addition.
 
@@ -3775,23 +3807,45 @@ function load_specimen_from_file!(filepath::String)::String
     file_size = filesize(filepath)
 
     # ══════════════════════════════════════════════════════════════════════
-    # PHASE 1: READ + DECOMPRESS + PARSE
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════════
+    # PHASE 1: READ + PARSE (auto-detect .gz vs .json)
+    # ════════════════════════════════════════════════════════════════════════
 
-    # GRUG: Read compressed file and decompress via pipeline to gunzip.
-    # No extra packages needed — just shell out to gunzip. Grug like simple.
-    json_str = try
-        compressed_bytes = read(filepath)
-        proc = open(`gunzip -c`, "r+")
-        write(proc, compressed_bytes)
-        close(proc.in)
-        String(read(proc))
-    catch e
-        error("!!! FATAL: /loadSpecimen failed to read/decompress '$filepath': $e !!!")
+    # GRUG: If filepath ends in .gz, decompress via gunzip pipeline.
+    # Otherwise read as plain JSON — works on Windows without gzip CLI.
+    # Grug like cross-platform. If extension is ambiguous, try gunzip
+    # first (backward compat with old .specimen.gz files), fall back
+    # to plain JSON if that fails.
+    is_gz = lowercase(strip(filepath)[max(1, end-2):end]) == ".gz"
+    json_str = if is_gz
+        try
+            compressed_bytes = read(filepath)
+            proc = open(`gunzip -c`, "r+")
+            write(proc, compressed_bytes)
+            close(proc.in)
+            String(read(proc))
+        catch e
+            error("!!! FATAL: /loadSpecimen failed to decompress '$filepath': $e !!!")
+        end
+    else
+        try
+            read(filepath, String)
+        catch e
+            # Fallback: maybe it's actually gzipped despite no .gz extension
+            try
+                compressed_bytes = read(filepath)
+                proc = open(`gunzip -c`, "r+")
+                write(proc, compressed_bytes)
+                close(proc.in)
+                String(read(proc))
+            catch e2
+                error("!!! FATAL: /loadSpecimen failed to read '$filepath': $e !!!")
+            end
+        end
     end
 
     if strip(json_str) == ""
-        error("!!! FATAL: /loadSpecimen decompressed file is empty! Bad specimen jar! !!!")
+        error("!!! FATAL: /loadSpecimen file is empty! Bad specimen jar! !!!")
     end
 
     specimen = try
@@ -4810,8 +4864,8 @@ function load_specimen_from_file!(filepath::String)::String
     push!(lines, "║            🧬 SPECIMEN LOADED SUCCESSFULLY                   ║")
     push!(lines, "╠══════════════════════════════════════════════════════════════╣")
     push!(lines, "  📁  File             : $filepath")
-    push!(lines, "  📦  Compressed size  : $(file_size) bytes")
-    push!(lines, "  📄  JSON size        : $(json_size) bytes")
+    push!(lines, "  📄  File size        : $(file_size) bytes")
+    push!(lines, "  📦  JSON size        : $(json_size) bytes")
     push!(lines, "  ⏱️   Time             : $(elapsed)s")
     push!(lines, "  ─────────────────────────────────────────────")
     push!(lines, "  🌱  Nodes            : $(get(counts, "nodes", 0))")
@@ -4890,14 +4944,17 @@ try
     # ============================================================
     # DEFAULT SPECIMEN AUTO-LOAD (BUG-009 + ship-with-grug)
     # ============================================================
-    # If `grug-binary/default.specimen.gz` (or env-overridden path) exists and
+    # If `grug-binary/default.specimen.json` (or env-overridden path) exists and
     # auto-load is not disabled by `GRUG_NO_AUTOLOAD=1`, restore from it.
-    # Otherwise plant a minimal hardcoded boot-seed set so grug can talk on
-    # first run with zero setup. The auto-load gives newcomers a 20-node /
-    # 7-lobe brain out of the box; the hardcoded fallback guarantees grug
-    # never starts empty.
+    # Prefers .json (cross-platform, no gzip needed). Falls back to .gz if
+    # .json is absent. Otherwise plant a minimal hardcoded boot-seed set so
+    # grug can talk on first run with zero setup. The auto-load gives newcomers
+    # a brain out of the box; the hardcoded fallback guarantees grug never
+    # starts empty.
+    _json_path = joinpath(@__DIR__, "..", "grug-binary", "default.specimen.json")
+    _gz_path   = joinpath(@__DIR__, "..", "grug-binary", "default.specimen.gz")
     default_specimen_path = get(ENV, "GRUG_DEFAULT_SPECIMEN",
-                                 joinpath(@__DIR__, "..", "grug-binary", "default.specimen.gz"))
+                                 isfile(_json_path) ? _json_path : _gz_path)
     autoload_disabled = get(ENV, "GRUG_NO_AUTOLOAD", "") == "1"
 
     if !autoload_disabled && isfile(default_specimen_path)
@@ -6024,7 +6081,7 @@ elseif !isnothing(m_right)
 
             elseif !isnothing(m_savespecimen)
                 # GRUG: /saveSpecimen <filepath> — freeze the entire cave state to a
-                # gzip-compressed JSON file. Every node, lobe, rule, message, verb,
+                # JSON file (.json or .gz). Every node, lobe, rule, message, verb,
                 # thesaurus entry, inhibition, arousal level — EVERYTHING.
                 spec_path = String(strip(m_savespecimen.captures[1]))
                 add_message_to_history!("System", "/saveSpecimen $spec_path", false)
@@ -6460,6 +6517,6 @@ end
 # brainstem → attachments → trajectory → temporal_coherence → morph_cooldowns.
 # Each restore step is individually wrapped in try/catch with FATAL error
 # reporting. v2.1 keys are optional on load for backward compat with v2.0.
-# File format: gzip-compressed JSON (system gzip/gunzip via pipeline,
-# no extra Julia packages required).
+# File format: JSON (.json, plain text, cross-platform) or gzip-compressed
+# JSON (.gz, requires system gzip/gunzip). Auto-detected by extension.
 # ==============================================================================
