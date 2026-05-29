@@ -3708,7 +3708,8 @@ function scan_and_expand(input_text::String;
         if isempty(expanded)
             expanded
         else
-            orders = LobeOrchestrator.score_lobes(expanded, Lobe.find_lobe_for_node)
+            orders = LobeOrchestrator.score_lobes(expanded, Lobe.find_lobe_for_node;
+                input_tokens=collect(String, split(lowercase(strip(input_text)))))
             if isempty(orders)
                 # No lobe cleared (would only happen with totally empty pool).
                 # Return empty — downstream prints "Cave is silent" cleanly.

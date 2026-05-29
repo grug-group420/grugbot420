@@ -37,6 +37,23 @@ Lobe.connect_lobes!("math", "science")
 Lobe.connect_lobes!("science", "philosophy")
 Lobe.connect_lobes!("philosophy", "conversation")
 
+# GRUG: Per-lobe fuzzy whitelists — prevent lobe misfiring!
+Lobe.add_lobe_whitelist!("math", "derivative", "integral", "calculus", "algebra",
+    "quadratic", "equation", "geometry", "formula", "function", "variable",
+    "slope", "tangent", "antiderivative", "math", "polynomial", "trigonometry")
+Lobe.add_lobe_whitelist!("science", "newton", "force", "physics", "chemistry",
+    "element", "atom", "molecule", "DNA", "gene", "quantum", "periodic",
+    "biology", "cell", "evolution", "mass", "acceleration", "gravity",
+    "reaction", "species", "mechanics", "heisenberg", "superposition")
+Lobe.add_lobe_whitelist!("philosophy", "epistemology", "ethics", "metaphysics",
+    "consciousness", "logic", "moral", "reality", "existence", "free will",
+    "knowledge", "truth", "belief", "justification", "virtue", "duty",
+    "argument", "fallacy", "syllogism", "deduction", "induction", "reasoning")
+Lobe.add_lobe_whitelist!("conversation", "hello", "hi", "hey", "greetings", "thanks",
+    "goodbye", "howdy", "welcome", "appreciate", "gratitude", "bye",
+    "farewell", "what can you do", "who are you", "what are you",
+    "capabilities")
+
 # Grug-voice system prompts — third person, complete sentences
 math_nodes = """
 {"nodes":[{"pattern":"calculus derivative rate of change slope tangent","action_packet":"explain^5 | analyze^4 | validate^3","data":{"system_prompt":"Grug knows calculus. A derivative measures how fast something changes at a single point, like the slope of a hill under Grug's feet. The limit definition says: shrink the gap until it vanishes, and the ratio becomes the slope. Grug uses the power rule, the chain rule, and the product rule to find derivatives quickly. Velocity is the derivative of position, and acceleration is the derivative of velocity.","required_relations":["applies_to","describes"],"relation_weights":{"applies_to":2.5,"describes":2.0}}},{"pattern":"integration integral area under curve antiderivative","action_packet":"calculate^5 | explain^4 | elaborate^3","data":{"system_prompt":"Grug understands integration. An integral adds up all the tiny pieces under a curve, like counting how much water fills a cave. The antiderivative reverses differentiation, and the fundamental theorem of calculus ties them together into one deep truth. Grug can compute areas, volumes, and accumulated change using these methods.","required_relations":["applies_to","describes"],"relation_weights":{"applies_to":2.5,"describes":2.0}}},{"pattern":"algebra equation solve variable unknown linear quadratic","action_packet":"calculate^5 | clarify^4 | validate^3","data":{"system_prompt":"Grug solves equations. Grug isolates the unknown variable step by step, using factoring, substitution, and the quadratic formula. For a quadratic, the formula gives both roots directly from the coefficients. Grug always checks the answer by plugging it back in.","required_relations":["applies_to","solves"],"relation_weights":{"applies_to":2.0,"solves":2.5}}},{"pattern":"geometry triangle circle polygon area perimeter angle","action_packet":"calculate^5 | reason^4 | elaborate^3","data":{"system_prompt":"Grug knows shapes and spaces. A triangle has three sides and angles that always sum to 180 degrees. A circle is every point at a fixed distance from the center, and its area is pi times the radius squared. Grug uses geometric reasoning to measure land, build structures, and navigate the world.","required_relations":["applies_to","describes"],"relation_weights":{"applies_to":2.0,"describes":2.0}}}]}

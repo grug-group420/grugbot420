@@ -52,6 +52,7 @@ mutable struct LobeRecord
     fire_count         ::Int
     inhibit_count      ::Int
     created_at         ::Float64
+    subject_whitelist  ::Set{String}   # GRUG: fuzzy whitelist — lobes only fire when input matches
 end
 
 # ============================================================================
@@ -70,7 +71,7 @@ const NODE_TO_LOBE_IDX = Dict{String, String}()
 # CREATE LOBE - Make new cave bucket
 # ============================================================================
 
-function create_lobe!(id::String, subject::String; node_cap::Int = LOBE_NODE_CAP)::LobeRecord
+function create_lobe!(id::String, subject::String; node_cap::Int = LOBE_NODE_CAP, subject_whitelist::Set{String} = Set{String}())::LobeRecord
     if isempty(strip(id))
         throw_lobe_error("Lobe id cannot be empty", "create_lobe!")
     end
@@ -95,7 +96,8 @@ function create_lobe!(id::String, subject::String; node_cap::Int = LOBE_NODE_CAP
             node_cap,
             0,
             0,
-            time()
+            time(),
+            Set{String}(strip.(subject_whitelist))
         )
         LOBE_REGISTRY[id] = rec
         # GRUG: Init LobeTable for this lobe immediately on creation.
@@ -363,6 +365,156 @@ function get_node_to_lobe_snapshot()::Dict{String, String}
 end
 
 # ============================================================================
+# SUBJECT WHITELIST - GRUG: Fuzzy gate for lobe selection!
+# GRUG say: "what is" should NOT fire conversation lobe!
+# Only lobes whose whitelist matches the subject tokens can win.
+# Empty whitelist = accept everything (backward compatible).
+# ============================================================================
+
+"""
+    add_lobe_whitelist!(lobe_id::String, entries::String...)
+
+GRUG: Add entries to a lobe's subject whitelist. These are the acceptable
+subject nouns/phrases that this lobe is allowed to win on. When the
+LobeOrchestrator computes scores, lobes with a non-empty whitelist are
+vetoed if no input token matches any whitelist entry. Empty whitelist means
+the lobe accepts all inputs (backward compatible).
+
+Entries are stored lowercase and stripped. Matching is case-insensitive
+substring: whitelist entry "quadr" matches "quadratic" in the input.
+"""
+function add_lobe_whitelist!(lobe_id::String, entries::String...)
+    if isempty(strip(lobe_id))
+        throw_lobe_error("Lobe id cannot be empty", "add_lobe_whitelist!")
+    end
+    if isempty(entries)
+        throw_lobe_error("Must provide at least one whitelist entry", "add_lobe_whitelist!")
+    end
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found. Cannot add whitelist.", "add_lobe_whitelist!")
+        end
+        for entry in entries
+            cleaned = lowercase(strip(entry))
+            if !isempty(cleaned)
+                push!(LOBE_REGISTRY[lobe_id].subject_whitelist, cleaned)
+            end
+        end
+    end
+    return length(LOBE_REGISTRY[lobe_id].subject_whitelist)
+end
+
+"""
+    remove_lobe_whitelist!(lobe_id::String, entries::String...)
+
+GRUG: Remove entries from a lobe's subject whitelist. If the whitelist
+becomes empty, the lobe returns to accepting all inputs (backward compatible).
+"""
+function remove_lobe_whitelist!(lobe_id::String, entries::String...)
+    if isempty(strip(lobe_id))
+        throw_lobe_error("Lobe id cannot be empty", "remove_lobe_whitelist!")
+    end
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found.", "remove_lobe_whitelist!")
+        end
+        for entry in entries
+            cleaned = lowercase(strip(entry))
+            delete!(LOBE_REGISTRY[lobe_id].subject_whitelist, cleaned)
+        end
+    end
+    return length(LOBE_REGISTRY[lobe_id].subject_whitelist)
+end
+
+"""
+    get_lobe_whitelist(lobe_id::String) -> Set{String}
+
+GRUG: Get a copy of a lobe's subject whitelist. Returns empty set for
+lobes with no whitelist (which means they accept all inputs).
+"""
+function get_lobe_whitelist(lobe_id::String)::Set{String}
+    if isempty(strip(lobe_id))
+        throw_lobe_error("Lobe id cannot be empty", "get_lobe_whitelist")
+    end
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found.", "get_lobe_whitelist")
+        end
+        return copy(LOBE_REGISTRY[lobe_id].subject_whitelist)
+    end
+end
+
+"""
+    lobe_can_accept_subject(lobe_id::String, input_tokens::AbstractVector) -> Bool
+
+GRUG: The fuzzy whitelist gate! Check whether a lobe is allowed to win
+for the given input tokens. Rules:
+
+  1. If the lobe has an EMPTY whitelist → always accept (backward compatible).
+     Grug didn't set a whitelist, so Grug doesn't gate this lobe.
+  2. If the lobe has a NON-EMPTY whitelist → at least one whitelist entry
+     must match at least one input token via case-insensitive substring match.
+     "quadr" in whitelist matches "quadratic" in input.
+     "derivative" in whitelist matches "derivative" in input.
+
+This is the HARD RULE that prevents "What is the quadratic formula" from
+misfiring into the conversation lobe. The conversation lobe's whitelist
+only has greeting/meta tokens, so "quadratic" and "formula" won't match,
+and the lobe is vetoed even if "what" gives it token overlap.
+"""
+function lobe_can_accept_subject(lobe_id::String, input_tokens::AbstractVector)::Bool
+    if isempty(strip(lobe_id))
+        throw_lobe_error("Lobe id cannot be empty", "lobe_can_accept_subject")
+    end
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            # GRUG: Unknown lobe? Don't gate it — let it through.
+            # This is the safe default for orphan nodes in "-" bucket.
+            return true
+        end
+        wl = LOBE_REGISTRY[lobe_id].subject_whitelist
+        # Empty whitelist = no gate, accept everything
+        if isempty(wl)
+            return true
+        end
+        # Normalize input tokens to lowercase for matching
+        lower_tokens = [lowercase(strip(t)) for t in input_tokens if !isempty(strip(t))]
+        if isempty(lower_tokens)
+            # No tokens to match against — allow through (safe default)
+            return true
+        end
+        # Fuzzy substring match: at least one whitelist entry must be a
+        # substring of at least one input token. This is the ONE-DIRECTIONAL
+        # check: whitelist entry ⊆ input token. We do NOT match if the
+        # input token is merely a substring of the whitelist entry, because
+        # that would let "what" match the whitelist phrase "what can you"
+        # and defeat the purpose of the whitelist entirely.
+        # "quadr" in whitelist → matches "quadratic" in input ✓
+        # "derivative" in whitelist → matches "derivative" in input ✓
+        # "what can you" in whitelist → only matches if an input token
+        #   contains "what can you" as a substring, which a single word won't.
+        # Multi-word whitelist entries: we also check if the entry is a
+        # substring of the JOINED input (space-separated), so "free will"
+        # matches "what is free will about" → joined = "what is free will about".
+        joined_input = join(lower_tokens, " ")
+        for wl_entry in wl
+            # Single-word whitelist entry: check against individual tokens
+            for token in lower_tokens
+                if occursin(wl_entry, token)
+                    return true
+                end
+            end
+            # Multi-word whitelist entry: check against joined input
+            if occursin(' ', wl_entry) && occursin(wl_entry, joined_input)
+                return true
+            end
+        end
+        # No match found — this lobe is VETOED for this input
+        return false
+    end
+end
+
+# ============================================================================
 # LOBE STATUS SUMMARY - For /status and /lobes commands
 # ============================================================================
 
@@ -377,6 +529,7 @@ function get_lobe_status_summary()::String
         for (id, rec) in sort(collect(LOBE_REGISTRY), by = x -> x[1])
             fullness  = "$(length(rec.node_ids))/$(rec.node_cap)"
             connected = isempty(rec.connected_lobe_ids) ? "none" : join(sort(collect(rec.connected_lobe_ids)), ",")
+            wl_info   = isempty(rec.subject_whitelist) ? "whitelist=open" : "whitelist=[" * join(sort(collect(rec.subject_whitelist)), ",") * "]"
             # GRUG: Show table chunk sizes alongside lobe info
             table_info = if LobeTable.table_exists(id)
                 node_sz    = LobeTable.table_size(id, LobeTable.CHUNK_NODES)
@@ -387,7 +540,7 @@ function get_lobe_status_summary()::String
             else
                 "tbl[NO TABLE]"
             end
-            push!(lines, "  $id | subject='$(rec.subject)' | nodes=$fullness | fires=$(rec.fire_count) | inhibits=$(rec.inhibit_count) | connected=[$connected] | $table_info")
+            push!(lines, "  $id | subject='$(rec.subject)' | nodes=$fullness | fires=$(rec.fire_count) | inhibits=$(rec.inhibit_count) | connected=[$connected] | $wl_info | $table_info")
         end
     end
     return join(lines, "\n")

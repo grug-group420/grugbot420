@@ -157,7 +157,7 @@ function _compute_lobe_score(entries::AbstractVector)::Tuple{Float64, Float64, F
 end
 
 """
-    score_lobes(entries, lobe_lookup) -> Vector{LobeFireOrder}
+    score_lobes(entries, lobe_lookup; input_tokens=String[]) -> Vector{LobeFireOrder}
 
 GRUG: Replaces the hard mute gate. Returns lobes ordered by score (winner
 first), with runners-up that cleared the multi-lobe threshold flagged as
@@ -167,10 +167,16 @@ first), with runners-up that cleared the multi-lobe threshold flagged as
 orphans. Orphans are bucketed into a synthetic "-" lobe and competed alongside
 real lobes (no special-case fallback).
 
+`input_tokens` are the tokenized input words, used by the per-lobe fuzzy
+whitelist gate. If a lobe has a non-empty subject_whitelist and none of the
+input tokens match, the lobe is vetoed (score forced to 0). This prevents
+"What is the quadratic formula" from misfiring into the conversation lobe.
+Empty input_tokens disables the whitelist gate entirely (backward compatible).
+
 Tie handling: lobes with identical scores are ordered by a 50/50 coinflip
 between them (one of the two is randomly first). Both still fire.
 """
-function score_lobes(entries::AbstractVector, lobe_lookup)::Vector{LobeFireOrder}
+function score_lobes(entries::AbstractVector, lobe_lookup; input_tokens::AbstractVector=String[])::Vector{LobeFireOrder}
     reset_telemetry!()
 
     if isempty(entries)
@@ -187,6 +193,39 @@ function score_lobes(entries::AbstractVector, lobe_lookup)::Vector{LobeFireOrder
     scored = Tuple{String, Float64, Float64, Float64, Int, Vector}[]
     for (lobe_id, lobe_entries) in by_lobe
         base_avg, top_avg, score, hard_count = _compute_lobe_score(lobe_entries)
+
+        # GRUG: FUZZY WHITELIST VETO!
+        # If this lobe has a non-empty subject_whitelist and none of the
+        # input_tokens match, force score=0. This prevents misfiring lobes —
+        # e.g. "What is the quadratic formula" can't win the conversation lobe
+        # because the conversation lobe's whitelist only has greeting/meta tokens.
+        # Empty whitelist = no gate (backward compatible). Empty input_tokens = no gate.
+        if !isempty(input_tokens) && score > 0.0 && lobe_id != "-"
+            can_accept = try
+                # GRUG: Reach the Lobe module through the parent of lobe_lookup.
+                # lobe_lookup is Lobe.find_lobe_for_node, so its parent module
+                # is the Lobe module itself. We call lobe_can_accept_subject directly.
+                lobe_lookup_mod = typeof(lobe_lookup).name.module
+                if isdefined(lobe_lookup_mod, :lobe_can_accept_subject)
+                    lobe_lookup_mod.lobe_can_accept_subject(lobe_id, input_tokens)
+                elseif isdefined(lobe_lookup_mod, :Lobe) && isdefined(lobe_lookup_mod.Lobe, :lobe_can_accept_subject)
+                    lobe_lookup_mod.Lobe.lobe_can_accept_subject(lobe_id, input_tokens)
+                else
+                    # Fallback: try Main.Lobe directly
+                    Main.Lobe.lobe_can_accept_subject(lobe_id, input_tokens)
+                end
+            catch e
+                # GRUG: Whitelist check failed — don't veto on error, but warn.
+                @warn "[LOBE_ORCHESTRATOR] Whitelist check error for lobe '$lobe_id': $e — defaulting to accept"
+                true
+            end
+            if !can_accept
+                # GRUG: WHITELIST VETO — this lobe is NOT allowed to win for this input!
+                # Force score to 0 so it can't win or pass through.
+                score = 0.0
+            end
+        end
+
         push!(scored, (lobe_id, base_avg, top_avg, score, hard_count, lobe_entries))
         push!(LAST_LOBE_SCORES[], (lobe_id, base_avg, top_avg, score, hard_count))
     end
@@ -313,9 +352,14 @@ function last_summary()::String
         else
             "·"
         end
+        veto_tag = if score == 0.0 && base_avg > 0.0
+            " 🚫whitelist-veto"
+        else
+            ""
+        end
         push!(lines, "  $marker $lobe_id: base=$(round(base_avg, digits=3)) " *
                      "× top=$(round(top_avg, digits=3)) = $(round(score, digits=4)) " *
-                     "[hard_votes=$hard_count]")
+                     "[hard_votes=$hard_count]$veto_tag")
     end
     return join(lines, "\n")
 end

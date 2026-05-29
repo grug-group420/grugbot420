@@ -48,6 +48,33 @@ for (lid, subj) in lobes_config
     println("  ✓ Created lobe: $(lid)")
 end
 
+# GRUG: Per-lobe fuzzy whitelists — hard rules to prevent lobe misfiring!
+# Each lobe only wins when input tokens match its domain. Empty whitelist
+# would mean "accept everything" (backward compatible), but we set explicit
+# whitelists here so "What is the quadratic formula" can't win the conversation
+# lobe just because "what" overlaps with conversation node patterns.
+math_whitelist = ["derivative", "integral", "calculus", "algebra", "quadratic",
+    "equation", "geometry", "formula", "function", "variable", "slope",
+    "tangent", "antiderivative", "math", "polynomial", "trigonometry"]
+science_whitelist = ["newton", "force", "physics", "chemistry", "element",
+    "atom", "molecule", "DNA", "gene", "quantum", "periodic", "biology",
+    "cell", "evolution", "mass", "acceleration", "gravity", "reaction",
+    "species", "mechanics", "heisenberg", "superposition"]
+philosophy_whitelist = ["epistemology", "ethics", "metaphysics", "consciousness",
+    "logic", "moral", "reality", "existence", "free will", "knowledge",
+    "truth", "belief", "justification", "virtue", "duty", "argument",
+    "fallacy", "syllogism", "deduction", "induction", "reasoning"]
+conversation_whitelist = ["hello", "hi", "hey", "greetings", "thanks",
+    "goodbye", "howdy", "welcome", "appreciate", "gratitude", "bye",
+    "farewell", "what can you do", "who are you", "what are you",
+    "capabilities"]
+
+Lobe.add_lobe_whitelist!("math", math_whitelist...)
+Lobe.add_lobe_whitelist!("science", science_whitelist...)
+Lobe.add_lobe_whitelist!("philosophy", philosophy_whitelist...)
+Lobe.add_lobe_whitelist!("conversation", conversation_whitelist...)
+println("  ✓ Set fuzzy whitelists for all lobes")
+
 Lobe.connect_lobes!("math", "science")
 Lobe.connect_lobes!("science", "philosophy")
 Lobe.connect_lobes!("philosophy", "conversation")
