@@ -3197,7 +3197,7 @@ Captures ALL mutable state across all modules:
   - hopfield    (HOPFIELD_CACHE + hit counts)
   - rules       (AIML_DROP_TABLE stochastic rules)
   - messages    (up to 10k message history with pin flags)
-  - lobes       (LOBE_REGISTRY: fire/inhibit counts, connections, node assignments)
+  - lobes       (LOBE_REGISTRY: fire/inhibit counts, connections, node assignments, whitelists)
   - lobe_tables (LOBE_TABLE_REGISTRY: all chunks with NodeRef objects)
   - verbs       (verb classes + verbs + synonyms from SemanticVerbs)
   - thesaurus   (SYNONYM_SEED_MAP runtime additions from Thesaurus)
@@ -3211,8 +3211,13 @@ Captures ALL mutable state across all modules:
   - trajectory  (ActionTonePredictor ring buffer + config)
   - temporal    (ImageSDF TEMPORAL_COHERENCE_LEDGER timing patterns)
   - cooldowns   (ChatterMode MORPH_COOLDOWN_MAP 24h morph timestamps)
+  - sigils      (_ENGINE_SIGIL_TABLE entries: &noun lexicons, custom sigils)
+  - automatons  (EphemeralAutomaton._AUTOMATON_REGISTRY multi-step rules)
+  - contributor_votes (LAST_CONTRIBUTOR_VOTES for /right feedback)
+  - node_to_group (NODE_TO_GROUP reverse index)
+  - tonal_knobs (TonalJudge _FRAME_LIFT/INHIBIT_MULTIPLIER runtime knobs)
 
-Format: v2.4 (backward-compatible with v2.0+ on load).
+Format: v2.5 (backward-compatible with v2.0+ on load).
 Returns a formatted summary string.
 """
 function save_specimen_to_file!(filepath::String)::String
@@ -3305,7 +3310,8 @@ function save_specimen_to_file!(filepath::String)::String
                 "node_cap"           => rec.node_cap,
                 "fire_count"         => rec.fire_count,
                 "inhibit_count"      => rec.inhibit_count,
-                "created_at"         => rec.created_at
+                "created_at"         => rec.created_at,
+                "subject_whitelist"  => sort(collect(rec.subject_whitelist))
             ))
         end
     end
@@ -3568,10 +3574,108 @@ function save_specimen_to_file!(filepath::String)::String
     # the specimen forgets its learned AIML patterns and tribal structure.
     specimen["aiml_system"] = AIMLNodeSystem.serialize_aiml_state()
 
+    # ── 20. SIGIL TABLE (engine-level) ──────────────────────────────────────
+    # GRUG: Serialize the engine's SigilTable so specimen-merged &noun lexicons
+    # and any custom sigils survive save/load. Without this, a specimen that
+    # merged &noun=["derivative","integral"] loses the lexicon on reload and
+    # the sigil promoter stops recognizing those words as &noun captures.
+    sigil_list = Dict{String, Any}[]
+    for (name, entry) in _ENGINE_SIGIL_TABLE.entries
+        push!(sigil_list, Dict{String, Any}(
+            "name"                => entry.name,
+            "class"               => string(entry.class),
+            "applies_at"          => string(entry.applies_at),
+            "sigil_type"          => entry.sigil_type === nothing ? nothing : string(entry.sigil_type),
+            "lexicon"             => entry.lexicon === nothing ? nothing : sort(entry.lexicon),
+            "params"              => entry.params,
+            "expansion"           => entry.expansion,
+            "provenance"          => entry.provenance,
+            "promote_at_tokenize" => entry.promote_at_tokenize
+            # GRUG: promote_predicate is a Function — can't serialize.
+            # On load, only entries WITHOUT a predicate are restored.
+            # Predicate-bearing sigils (if any) are engine-builtins that
+            # default_registry() will recreate anyway.
+        ))
+    end
+    specimen["sigil_table"] = sigil_list
+
+    # ── 21. EPHEMERAL AUTOMATON REGISTRY ────────────────────────────────────
+    # GRUG: Serialize specimen-defined automaton rules. These are registered
+    # by /addAutomatonRule at runtime and contain multi-step op sequences.
+    # Without this, all automaton escalation rules are lost on reload.
+    automaton_list = Dict{String, Any}[]
+    lock(EphemeralAutomaton._AUTOMATON_REGISTRY_LOCK) do
+        for (id, rule) in EphemeralAutomaton._AUTOMATON_REGISTRY
+            step_list = Dict{String, Any}[]
+            for step in rule.steps
+                push!(step_list, Dict{String, Any}(
+                    "label"   => step.label,
+                    "op"      => string(step.op),
+                    "payload" => step.payload
+                ))
+            end
+            push!(automaton_list, Dict{String, Any}(
+                "id"              => rule.id,
+                "trigger_action"  => string(rule.trigger_action),
+                "steps"           => step_list,
+                "jitter_targets"  => sort(collect(rule.jitter_targets)),
+                "min_confidence"  => rule.min_confidence
+            ))
+        end
+    end
+    specimen["automaton_rules"] = automaton_list
+
+    # ── 22. LAST CONTRIBUTOR VOTES ─────────────────────────────────────────
+    # GRUG: Serialize the last contributor votes so /right works after reload.
+    # Vote structs contain node_id, action, confidence, negatives, triples,
+    # multipart fields, and input_chunks. Without this, /right has no idea
+    # who contributed after a reload.
+    vote_list = Dict{String, Any}[]
+    lock(LAST_VOTER_LOCK) do
+        for v in LAST_CONTRIBUTOR_VOTES
+            push!(vote_list, Dict{String, Any}(
+                "node_id"         => v.node_id,
+                "action"          => v.action,
+                "confidence"      => v.confidence,
+                "negatives"       => v.negatives,
+                "user_triples"    => [Dict("subject" => t.subject, "relation" => t.relation, "object" => t.object)
+                                      for t in v.user_triples],
+                "node_triples"    => [Dict("subject" => t.subject, "relation" => t.relation, "object" => t.object)
+                                      for t in v.node_triples],
+                "antimatch"       => v.antimatch,
+                "multipart_group" => v.multipart_group,
+                "multipart_role"  => string(v.multipart_role),
+                "input_chunks"    => v.input_chunks
+            ))
+        end
+    end
+    specimen["last_contributor_votes"] = vote_list
+
+    # ── 23. NODE_TO_GROUP INDEX ─────────────────────────────────────────────
+    # GRUG: Serialize the NODE_TO_GROUP reverse index explicitly. On load,
+    # chatter_groups restore rebuilds this, but saving it directly means we
+    # don't have to rely on group member lists being perfectly in sync.
+    node_group_idx = Dict{String, String}()
+    lock(GROUP_LOCK) do
+        for (nid, gid) in NODE_TO_GROUP
+            node_group_idx[nid] = gid
+        end
+    end
+    specimen["node_to_group_idx"] = node_group_idx
+
+    # ── 24. TONAL JUDGE TUNABLES ───────────────────────────────────────────
+    # GRUG: Save the TonalJudge runtime-adjustable knobs. These are Refs that
+    # can be tuned at runtime; losing them on reload means the specimen
+    # forgets its emotional calibration.
+    specimen["tonal_judge_knobs"] = Dict{String, Any}(
+        "frame_lift_multiplier"   => TonalJudge._FRAME_LIFT_MULTIPLIER[],
+        "frame_inhibit_multiplier" => TonalJudge._FRAME_INHIBIT_MULTIPLIER[]
+    )
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.4",
+        "version"    => "2.5",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.4"
+        "format"     => "grugbot420-specimen-v2.5"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -3633,6 +3737,10 @@ function save_specimen_to_file!(filepath::String)::String
     _aiml_registry = get(_aiml_data, "registry", Dict())
     _aiml_total_nodes = isempty(_aiml_registry) ? 0 : sum(length(v) for v in values(_aiml_registry))
     push!(lines, "  🤖  AIML nodes       : $(_aiml_total_nodes)")
+    push!(lines, "  🪄  Sigil entries    : $(length(sigil_list))")
+    push!(lines, "  ⚙️  Automaton rules  : $(length(automaton_list))")
+    push!(lines, "  🗳  Contributor votes : $(length(vote_list))")
+    push!(lines, "  🎭  Tonal knobs      : saved")
     push!(lines, "  👁   Arousal          : $(arousal_data["level"])")
     push!(lines, "╚══════════════════════════════════════════════════════════════╝")
     return join(lines, "\n")
@@ -3712,7 +3820,8 @@ function load_specimen_from_file!(filepath::String)::String
                         "verb_registry", "thesaurus_seeds", "inhibitions",
                         "arousal", "eye_state", "id_counters", "last_voters", "brainstem", "attachments",
                         "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system", "_meta",
-                        "chatter_groups", "chatter_cooldowns"])
+                        "chatter_groups", "chatter_cooldowns",
+                        "sigil_table", "automaton_rules", "last_contributor_votes", "node_to_group_idx", "tonal_judge_knobs"])
     for key in keys(specimen)
         if !(key in allowed_keys)
             push!(validation_errors, "Unknown top-level key '$key'")
@@ -3862,6 +3971,28 @@ function load_specimen_from_file!(filepath::String)::String
     # GRUG: Clear all immune memory. Specimen will bring its own.
     ImmuneSystem.reset_immune_state!()
 
+    # Wipe sigil table back to engine defaults
+    # GRUG: Specimen may have merged custom lexicons; reset to clean slate.
+    SigilRegistry.clear_registry!(_ENGINE_SIGIL_TABLE)
+    # Re-register engine-default sigils (bare table after clear)
+    for entry in SigilRegistry.default_registry().entries
+        _ENGINE_SIGIL_TABLE.entries[entry.first] = entry.second
+    end
+
+    # Wipe ephemeral automaton registry
+    lock(EphemeralAutomaton._AUTOMATON_REGISTRY_LOCK) do
+        empty!(EphemeralAutomaton._AUTOMATON_REGISTRY)
+    end
+
+    # Wipe last contributor votes
+    lock(LAST_VOTER_LOCK) do
+        empty!(LAST_CONTRIBUTOR_VOTES)
+    end
+
+    # Wipe TonalJudge knobs back to defaults
+    TonalJudge._FRAME_LIFT_MULTIPLIER[] = 1.20
+    TonalJudge._FRAME_INHIBIT_MULTIPLIER[] = 0.85
+
     println("  ✅ Cave wiped clean. Beginning restore...")
 
     # ══════════════════════════════════════════════════════════════════════
@@ -3981,7 +4112,8 @@ function load_specimen_from_file!(filepath::String)::String
                         Int(get(ldata, "node_cap", Lobe.LOBE_NODE_CAP)),
                         Int(get(ldata, "fire_count", 0)),
                         Int(get(ldata, "inhibit_count", 0)),
-                        Float64(get(ldata, "created_at", time()))
+                        Float64(get(ldata, "created_at", time())),
+                        Set{String}(String.(get(ldata, "subject_whitelist", String[])))
                     )
                     Lobe.LOBE_REGISTRY[rec.id] = rec
                     n_lobes += 1
@@ -4514,6 +4646,154 @@ function load_specimen_from_file!(filepath::String)::String
         counts["aiml_lobes"] = n_aiml_lobes
         counts["aiml_nodes"] = n_aiml_nodes
         println("  🤖 AIML system restored ($n_aiml_nodes nodes across $n_aiml_lobes lobes)")
+    end
+
+    # ── 4.20 SIGIL TABLE ────────────────────────────────────────────────────
+    # GRUG: Restore sigil entries that specimens merged on top of engine defaults.
+    # We only restore entries whose provenance is NOT "engine-default" (those
+    # are already in the table from the wipe+rebuild). This prevents duplicates
+    # while preserving specimen-specific &noun lexicons and custom sigils.
+    n_sigils = 0
+    if haskey(specimen, "sigil_table") && isa(specimen["sigil_table"], AbstractVector)
+        for sentry in specimen["sigil_table"]
+            try
+                name = String(sentry["name"])
+                # Skip engine-defaults — already in table from wipe+rebuild
+                prov = String(get(sentry, "provenance", ""))
+                if prov == "engine-default"
+                    continue
+                end
+                class_sym = Symbol(String(sentry["class"]))
+                applies_sym = Symbol(String(sentry["applies_at"]))
+                sig_type = get(sentry, "sigil_type", nothing)
+                sig_type_sym = sig_type === nothing ? nothing : Symbol(String(sig_type))
+                lexicon = get(sentry, "lexicon", nothing)
+                lexicon_vec = lexicon === nothing ? nothing : String.(lexicon)
+                params = get(sentry, "params", nothing)
+                expansion = get(sentry, "expansion", nothing)
+                promote = Bool(get(sentry, "promote_at_tokenize", false))
+
+                entry = SigilRegistry.SigilEntry(
+                    name, class_sym, applies_sym, sig_type_sym,
+                    lexicon_vec, params, expansion, prov, promote, nothing
+                )
+                _ENGINE_SIGIL_TABLE.entries[name] = entry
+                n_sigils += 1
+            catch e
+                @warn "loadSpecimen: skipping bad sigil entry: $e"
+            end
+        end
+        counts["sigils"] = n_sigils
+        if n_sigils > 0
+            println("  🪄 Sigils restored ($n_sigils specimen-specific)")
+        end
+    end
+
+    # ── 4.21 EPHEMERAL AUTOMATON RULES ──────────────────────────────────────
+    # GRUG: Restore specimen-defined automaton rules. Each rule has an id,
+    # trigger_action, steps, jitter_targets, and min_confidence.
+    n_automatons = 0
+    if haskey(specimen, "automaton_rules") && isa(specimen["automaton_rules"], AbstractVector)
+        lock(EphemeralAutomaton._AUTOMATON_REGISTRY_LOCK) do
+            for rentry in specimen["automaton_rules"]
+                try
+                    rule_id = String(rentry["id"])
+                    trigger = Symbol(String(rentry["trigger_action"]))
+                    min_conf = Float64(get(rentry, "min_confidence", 0.5))
+                    jitter = Set{String}(String.(get(rentry, "jitter_targets", String[])))
+
+                    steps = EphemeralAutomaton.AutomatonStep[]
+                    if haskey(rentry, "steps") && isa(rentry["steps"], AbstractVector)
+                        for s in rentry["steps"]
+                            push!(steps, EphemeralAutomaton.AutomatonStep(
+                                String(s["label"]),
+                                Symbol(String(s["op"])),
+                                s["payload"]
+                            ))
+                        end
+                    end
+
+                    rule = EphemeralAutomaton.AutomatonRule(rule_id, trigger, steps, jitter, min_conf)
+                    EphemeralAutomaton._AUTOMATON_REGISTRY[rule_id] = rule
+                    n_automatons += 1
+                catch e
+                    @warn "loadSpecimen: skipping bad automaton rule: $e"
+                end
+            end
+        end
+        counts["automaton_rules"] = n_automatons
+        if n_automatons > 0
+            println("  ⚙️  Automaton rules restored ($n_automatons)")
+        end
+    end
+
+    # ── 4.22 LAST CONTRIBUTOR VOTES ─────────────────────────────────────────
+    # GRUG: Restore contributor votes so /right works after reload.
+    n_votes = 0
+    if haskey(specimen, "last_contributor_votes") && isa(specimen["last_contributor_votes"], AbstractVector)
+        lock(LAST_VOTER_LOCK) do
+            empty!(LAST_CONTRIBUTOR_VOTES)
+            for ventry in specimen["last_contributor_votes"]
+                try
+                    user_trips = [RelationalTriple(String(t["subject"]), String(t["relation"]), String(t["object"]))
+                                  for t in get(ventry, "user_triples", [])]
+                    node_trips = [RelationalTriple(String(t["subject"]), String(t["relation"]), String(t["object"]))
+                                  for t in get(ventry, "node_triples", [])]
+                    mp_role = Symbol(String(get(ventry, "multipart_role", "singleton")))
+                    vote = Vote(
+                        String(ventry["node_id"]),
+                        String(ventry["action"]),
+                        Float64(ventry["confidence"]),
+                        String.(get(ventry, "negatives", String[])),
+                        user_trips,
+                        node_trips,
+                        Bool(get(ventry, "antimatch", false)),
+                        String(get(ventry, "multipart_group", "")),
+                        mp_role,
+                        Int.(get(ventry, "input_chunks", Int[]))
+                    )
+                    push!(LAST_CONTRIBUTOR_VOTES, vote)
+                    n_votes += 1
+                catch e
+                    @warn "loadSpecimen: skipping bad contributor vote: $e"
+                end
+            end
+        end
+        counts["contributor_votes"] = n_votes
+        if n_votes > 0
+            println("  🗳  Contributor votes restored ($n_votes)")
+        end
+    end
+
+    # ── 4.23 NODE_TO_GROUP INDEX ────────────────────────────────────────────
+    # GRUG: Restore NODE_TO_GROUP reverse index. chatter_groups restore
+    # (section 4.14b) already rebuilds this, but an explicit restore ensures
+    # consistency even if group member lists were somehow incomplete.
+    # We only fill in entries that are missing (chatter_groups restore may
+    # have already set some).
+    if haskey(specimen, "node_to_group_idx") && isa(specimen["node_to_group_idx"], Dict)
+        lock(GROUP_LOCK) do
+            for (nid, gid) in specimen["node_to_group_idx"]
+                n = String(nid)
+                if !haskey(NODE_TO_GROUP, n)
+                    NODE_TO_GROUP[n] = String(gid)
+                end
+            end
+        end
+    end
+
+    # ── 4.24 TONAL JUDGE TUNABLES ──────────────────────────────────────────
+    # GRUG: Restore the TonalJudge runtime knobs if present. Backward-compat:
+    # pre-v2.5 specimens lack this key — knobs stay at defaults.
+    if haskey(specimen, "tonal_judge_knobs") && isa(specimen["tonal_judge_knobs"], Dict)
+        tk = specimen["tonal_judge_knobs"]
+        if haskey(tk, "frame_lift_multiplier")
+            TonalJudge._FRAME_LIFT_MULTIPLIER[] = Float64(tk["frame_lift_multiplier"])
+        end
+        if haskey(tk, "frame_inhibit_multiplier")
+            TonalJudge._FRAME_INHIBIT_MULTIPLIER[] = Float64(tk["frame_inhibit_multiplier"])
+        end
+        println("  🎭 TonalJudge knobs restored (lift=$(TonalJudge._FRAME_LIFT_MULTIPLIER[]), inhibit=$(TonalJudge._FRAME_INHIBIT_MULTIPLIER[]))")
     end
 
 
