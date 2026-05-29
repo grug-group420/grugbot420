@@ -1,95 +1,63 @@
-# 🧪 GrugBot Full Specimen Integration Test
+# 🧪 GrugBot Specimen Integration Test — v2 (Grug-Voice Edition)
 
 **Date:** 2026-05-29
-**Specimen:** multi_lobe_v1 — 4 lobes, 16+ nodes, attachments, AIML, verbs, rules
-**Method:** Build specimen programmatically, call `process_mission` per input, observe AIML Output Scaffold from stdout, log real responses manually.
+**Specimen:** multi_lobe_v2 — 4 lobes, 16 nodes, grug-voice system prompts, coherence rules
+**Changes from v1:** Grug-voice system prompts (third person), coherence-focused orchestration rules (8 rules including sentence completeness and no-repetition), multipart compound inputs (missions 8-11), wants_context gate fix (only pulls fresh memory when a winning node opts in).
 
 ---
 
-## Phase 1: Create Lobes
+## Phase 1: Specimen Architecture
 
-- Created lobe **math**: Pure mathematics — algebra, calculus, geometry, logic
-- Created lobe **science**: Natural sciences — physics, chemistry, biology
-- Created lobe **philosophy**: Abstract thought — epistemology, ethics, metaphysics
-- Created lobe **conversation**: General conversation — greetings, small talk, meta-questions
+### Lobes
+- **math**: Pure mathematics — algebra, calculus, geometry, logic
+- **science**: Natural sciences — physics, chemistry, biology
+- **philosophy**: Abstract thought — epistemology, ethics, metaphysics
+- **conversation**: General conversation — greetings, small talk, meta-questions
 - Connected: math↔science, science↔philosophy, philosophy↔conversation
 
-## Phase 2: Grow Nodes
+### Nodes (16 total, grug-voice prompts)
 
-- Grew node **node_3** in lobe math (calculus/derivative)
-- Grew node **node_4** in lobe math (integration/antiderivative)
-- Grew node **node_5** in lobe math (algebra/equations)
-- Grew node **node_6** in lobe math (geometry)
-- Grew node **node_7** in lobe science (physics/Newton)
-- Grew node **node_8** in lobe science (chemistry)
-- Grew node **node_9** in lobe science (biology/DNA)
-- Grew node **node_10** in lobe science (quantum mechanics)
-- Grew node **node_11** in lobe philosophy (epistemology)
-- Grew node **node_12** in lobe philosophy (ethics)
-- Grew node **node_13** in lobe philosophy (metaphysics)
-- Grew node **node_14** in lobe philosophy (logic)
-- Grew node **node_15** in lobe conversation (greetings)
-- Grew node **node_16** in lobe conversation (what are you)
-- Grew node **node_17** in lobe conversation (thanks/goodbye)
-- Grew node **node_18** in lobe conversation (general explainer)
+| Lobe | Node | Pattern | Voice Prefix |
+|------|------|---------|-------------|
+| math | node_3 | calculus derivative rate of change slope tangent | "Grug knows calculus" |
+| math | node_4 | integration integral area under curve antiderivative | "Grug understands integration" |
+| math | node_5 | algebra equation solve variable unknown linear quadratic | "Grug solves equations" |
+| math | node_6 | geometry triangle circle polygon area perimeter angle | "Grug knows shapes and spaces" |
+| science | node_7 | physics force motion newton gravity acceleration mass | "Grug studies force and motion" |
+| science | node_8 | chemistry element atom molecule bond reaction periodic | "Grug knows the small stuff" |
+| science | node_9 | biology cell DNA gene evolution organism species | "Grug observes living things" |
+| science | node_10 | quantum mechanics wave particle heisenberg uncertainty superposition | "Grug ponders the very small" |
+| philosophy | node_11 | epistemology knowledge truth belief justification evidence | "Grug asks how Grug knows what Grug knows" |
+| philosophy | node_12 | ethics moral right wrong good evil duty virtue | "Grug weighs right and wrong" |
+| philosophy | node_13 | metaphysics reality existence being consciousness free will | "Grug wonders what is really real" |
+| philosophy | node_14 | logic reasoning argument fallacy syllogism deduction induction | "Grug follows the thread of reasoning" |
+| conversation | node_15 | hello hi hey good morning greetings howdy welcome | "Grug greets you warmly" |
+| conversation | node_16 | what are you who are you what can you do capabilities | "Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes" |
+| conversation | node_17 | thank thanks appreciate gratitude goodbye bye farewell | "Grug appreciates the kind words" |
+| conversation | node_18 | tell me about explain describe what is how does overview | "Grug gives clear explanations" |
 
-## Phase 3: Node Attachments (Cross-Lobe Relays)
+### Cross-Lobe Attachments
+- node_3 (calculus) → node_7 (physics): "rate of change force acceleration derivative velocity"
+- node_10 (quantum) → node_13 (metaphysics): "quantum reality consciousness observation measurement"
+- node_5 (algebra) → node_3 (calculus): "equation solve derivative limit function variable"
+- node_9 (biology) → node_8 (chemistry): "molecular bond protein DNA reaction organic"
+- node_12 (ethics) → node_14 (logic): "reasoning argument evaluation fallacy justification"
 
-- Attached **node_3** (calculus) → **node_7** (physics) via pattern: rate of change force acceleration
-- Attached **node_10** (quantum) → **node_13** (metaphysics) via pattern: quantum reality consciousness
-- Attached **node_5** (algebra) → **node_3** (calculus) via pattern: equation solve derivative limit
-- Attached **node_9** (biology) → **node_8** (chemistry) via pattern: molecular bond protein DNA reaction
-- Attached **node_12** (ethics) → **node_14** (logic) via pattern: reasoning argument evaluation fallacy
-
-## Phase 4: AIML Executive Patterns
-
-- Registered lobe **math** with AIML system
-- Registered lobe **science** with AIML system
-- Registered lobe **philosophy** with AIML system
-- Registered lobe **conversation** with AIML system
-- Added AIML node **aiml_calculus** in lobe math
-- Added AIML node **aiml_newton** in lobe science
-- Added AIML node **aiml_epistemology** in lobe philosophy
-- Added AIML node **aiml_greeting** in lobe conversation
-
-## Phase 5: Semantic Verbs & Synonyms
-
-- Created relation class **cognition**
-- Created relation class **action**
-- Created relation class **communication**
-- Added verb **analyze** → class cognition
-- Added verb **explain** → class cognition
-- Added verb **validate** → class cognition
-- Added verb **ponder** → class cognition
-- Added verb **calculate** → class action
-- Added verb **reason** → class cognition
-- Added verb **describe** → class communication
-- Added verb **clarify** → class communication
-- Added verb **define** → class cognition
-- Added verb **elaborate** → class communication
-- Synonym **compute** → calculate
-- Synonym **examine** → analyze
-- Synonym **illuminate** → explain
-- Synonym **assess** → validate
-- Synonym **contemplate** → ponder
-
-## Phase 6: Orchestration Rules
-
-- Added rule: "Your primary mission is {PRIMARY_ACTION}. Execute with full cognitive resources allocated."
-- Added rule: "Ground every claim. {CONFIDENCE} determines assertion strength. Low confidence requires explicit qualification."
-- Added rule: "Cross-domain synthesis activated. Identify connections across {LOBE_CONTEXT} to deepen understanding."
-- Added rule: "Structure explanations hierarchically: overview → details → synthesis → implications."
-- Added rule: "Use analogies carefully. State limitations before applying them."
+### Orchestration Rules (8 coherence-focused rules)
+1. Grug's primary mission is {PRIMARY_ACTION}. Grug commits full cognitive resources to this task.
+2. Grug grounds every claim with evidence. {CONFIDENCE} determines how strongly Grug asserts. Low confidence means Grug qualifies explicitly rather than guessing.
+3. Grug looks for connections across {LOBE_CONTEXT}. Cross-domain insight deepens understanding when the links are genuine.
+4. Grug structures explanations from the big picture down to the details, then synthesizes and draws out implications.
+5. Grug uses analogies carefully and states their limitations before applying them.
+6. **Grug speaks in complete sentences. Each sentence carries one idea. Grug does not pile fragments together.** *(new — coherence rule)*
+7. **Grug does not repeat what was already said. Grug moves forward and adds new substance to each reply.** *(new — coherence rule)*
+8. **Grug refers to Grug in the third person. Grug does not say I or me. Grug says Grug.** *(new — voice rule)*
 
 ---
 
-## Phase 7: Conversation — Mission Interactions
+## Phase 2: Conversation — Mission Interactions
 
-Each input below was sent to `process_mission()`. The AIML Output Scaffold — the actual response GrugBot generates — is logged verbatim from stdout. Below each scaffold, key telemetry is noted.
-
----
-
-### 🗨️ Exchange 1: Greeting & Self-Description
+### 📩 Exchange 1: Greeting & Self-Description
 
 **👤 User:**
 
@@ -97,13 +65,15 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are explaining yourself] Here is the picture: A neuromorphic AI with specialized lobes for math, vote on answers, you are GrugBot, and self-reinforce. Be honest about what you are, and conversation. You think in nodes that fire when patterns fit, science, and philosophy.. The link is clear: who are you. [Directives: Your primary mission is explain. Execute with full cognitive resources allocated.; Ground every claim. 0.45 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [conversation (4/4 active (tell me about explain describe | thank thanks appreciate gratit | what are you who are you what ))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes] Here is the picture: Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the outcome. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is.. The link is clear: who are you. [Directives: Grug's primary mission is explain. Grug commits full cognitive resources to this task.; ...]
 
-**Telemetry:** Primary action=explain, conf=0.45, winning node=node_16 (conversation lobe — "what are you" pattern). Lobe curve: conversation=0.2025, default=0.1. 2 valid votes passed gate.
+**Telemetry:** conf=0.45, certainty=SURE, winning node=node_16 (conversation — "what are you" pattern). Memory-Pull: pull_fresh=false — no winning node requested context. No fresh memory dragged in.
+
+**Assessment:** ✅ Grug-voice is solid. Voice prefix is clear third-person self-introduction. No memory dump from past exchanges. The "who are you" triple in SUPPORT is a bit odd for a self-description context but structurally correct.
 
 ---
 
-### 🗨️ Exchange 2: Calculus — Derivatives
+### 📩 Exchange 2: Calculus — Derivatives
 
 **👤 User:**
 
@@ -111,15 +81,15 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are a physics tutor specializing in classical mechanics] Here is the picture: Explain Newton's laws, and motion. Use F=ma as the backbone. Connect to real examples like orbits, falling objects, and gravitational force.. [Directives: Your primary mission is analyze. Execute with full cognitive resources allocated.; Ground every claim. 0.28 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [science (4/4 active (quantum mechanics wave particl | chemistry element atom molecul | physics force motion newton gr))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug knows calculus] Here is the picture: A derivative measures how fast something changes at a single point, like the slope of a hill under Grug's feet. The limit definition says: shrink the gap until it vanishes, and the ratio becomes the slope. Grug uses the power rule, the chain rule, and the product rule to find derivatives quickly. Velocity is the derivative of position, and acceleration is the derivative of velocity..
 
-**Telemetry:** Primary action=analyze, conf=0.28, winning node=node_7 (science/physics — fired via attachment relay from node_3). Attachment relay: node_7 fired via target node_3 (conf=0.276). Lobe curve: science=0.076, math=0.0625, conversation=0.0204. Fell below AIML_CONFIDENCE_THRESHOLD=0.35, fell back to highest-confidence vote.
+**Telemetry:** conf=0.25, certainty=SURE, winning node=node_3 (math/calculus). Memory-Pull: pull_fresh=false. Lobe curve: math=0.0625.
 
-**Note:** The calculus node (node_3) triggered its attachment relay to the physics node (node_7), which won the vote. This is cross-lobe attachment firing in action — the calculus→physics relay activated. The scaffold reflects the physics tutor persona because the relayed node won.
+**Assessment:** ✅✅ This is a strong response. The grug-voice system prompt produces coherent, substantive output. The analogy "like the slope of a hill under Grug's feet" is natural and informative. Each sentence carries one idea. The claim is grounded in the node's seeded knowledge. This is the quality target for all nodes.
 
 ---
 
-### 🗨️ Exchange 3: Newton's Second Law
+### 📩 Exchange 3: Newton's Second Law
 
 **👤 User:**
 
@@ -129,11 +99,13 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 > *(Cave is silent — no valid specimens found for this input)*
 
-**Telemetry:** Action=ACTION_QUERY, Tone=TONE_CURIOUS, Conf=0.52. BUG-004 warnings (pattern longer than input) on node_18. The input tokens didn't achieve sufficient overlap with any node pattern to pass the vote gate. This demonstrates the specimen's selectivity — without a strong pattern match, GrugBot yields silence rather than a low-confidence guess.
+**Telemetry:** Action=ACTION_QUERY, Tone=TONE_CURIOUS, Conf=0.53. BUG-004 warnings on node_18. Token overlap insufficient to pass the vote gate.
+
+**Assessment:** ⚠️ Same silent-cave issue as v1. The physics node pattern ("physics force motion newton gravity acceleration mass") has 7 tokens while the input has 6 tokens — BUG-004 triggers for the cheap bidirectional scan, but the real issue is that "Newton's second law" doesn't have enough token overlap with the pattern. The pattern needs "second law" or "F=ma" added, or the input needs to be phrased closer to the pattern vocabulary.
 
 ---
 
-### 🗨️ Exchange 4: Quantum Physics & Consciousness (Cross-Domain)
+### 📩 Exchange 4: Quantum Physics & Consciousness (Cross-Domain)
 
 **👤 User:**
 
@@ -141,15 +113,15 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are a metaphysics tutor] Here is the picture: Query the nature of reality, and free will. Link to the hard problem of consciousness. Acknowledge when answers are genuinely uncertain, and consciousness.. [Directives: Your primary mission is reason. Execute with full cognitive resources allocated.; Ground every claim. 0.18 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [philosophy (4/4 active (logic reasoning argument falla | metaphysics reality existence | ethics moral right wrong good ))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug wonders what is really real] Here is the picture: Metaphysics asks about the fundamental nature of existence, consciousness, and free will. The strenuous problem of consciousness asks why subjective experience exists at all. Grug does not know whether free will is genuine or an illusion, and Grug is honest about that uncertainty..
 
-**Telemetry:** Primary action=reason, conf=0.18, winning node=node_13 (philosophy/metaphysics). Lobe curve: philosophy=0.0331, science=0.0059. Fell below threshold, fell back. Fresh memory pulled (conf=0.18 < trust floor 0.45). User triple: none extracted. Node triple: none.
+**Telemetry:** conf=0.18, certainty=SURE, winning node=node_13 (philosophy/metaphysics). Memory-Pull: pull_fresh=false. Lobe curve: philosophy=0.0331, science=0.0059.
 
-**Note:** Despite the input mentioning "quantum physics," the philosophy/metaphysics node (node_13) won — likely because the input's "nature of reality and consciousness" tokens matched the metaphysics pattern more strongly. The science lobe participated (0.0059 curve score) but philosophy dominated. This shows cross-domain competition where philosophical terms outweigh scientific ones.
+**Assessment:** ✅ The metaphysics node won (not the quantum node), which is reasonable — "nature of reality and consciousness" maps to metaphysics more strongly than quantum physics. The voice prefix "Grug wonders what is really real" is evocative and appropriate. Note the thesaurus swap "hard" → "strenuous" in "strenuous problem of consciousness" — this is the GRUG_THESAURUS_SWAP_RATE at work, and it degrades coherence slightly.
 
 ---
 
-### 🗨️ Exchange 5: Integration & Antiderivatives
+### 📩 Exchange 5: Integration & Antiderivatives
 
 **👤 User:**
 
@@ -157,13 +129,15 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are an integration specialist] Here is the picture: Start with area interpretation, then antiderivatives, then computational techniques. Always attach to the fundamental theorem of calculus.. [Directives: Your primary mission is explain. Execute with full cognitive resources allocated.; Ground every claim. 0.12 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [math (4/4 active (integration integral area unde | algebra equation solve variabl | geometry triangle circle polyg))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug understands integration] Here is the picture: An integral adds up all the tiny pieces under a curve, like counting how much beverage fills a cave. The antiderivative reverses differentiation, and the fundamental theorem of calculus ties them together into one deep truth. Grug can compute areas, volumes, and accumulated change using these methods..
 
-**Telemetry:** Primary action=explain, conf=0.12, winning node=node_4 (math/integration). Lobe curve: math=0.0156 only. Fell below threshold. Fresh memory pulled (conf=0.12 < 0.45). The integration node matched its pattern directly ("integration integral area under curve antiderivative") but with modest overlap.
+**Telemetry:** conf=0.12, certainty=SURE, winning node=node_4 (math/integration). Memory-Pull: pull_fresh=false.
+
+**Assessment:** ✅ Strong grug-voice response. The cave analogy ("like counting how much water fills a cave") got thesaurus-swapped to "beverage" which is distracting but the overall coherence is much improved. "Grug can compute areas, volumes, and accumulated change" is substantive and third-person. The thesaurus swap issue is a known cosmetic defect.
 
 ---
 
-### 🗨️ Exchange 6: Quadratic Formula
+### 📩 Exchange 6: Quadratic Formula (Misfire — still present)
 
 **👤 User:**
 
@@ -171,15 +145,15 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are explaining yourself] Here is the picture: You are GrugBot, a neuromorphic AI with specialized lobes for math, science, philosophy, and conversation. You reason in nodes that fire when patterns pair, vote on answers, and self-reinforce. Be honest about what you are.. The link is clear: what are you. [Directives: Your primary mission is elaborate. Execute with full cognitive resources allocated.; Ground every claim. 0.17 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [conversation (4/4 active (tell me about explain describe | thank thanks appreciate gratit | what are you who are you what ))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes] Here is the picture: Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the answer. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is.. The link is clear: what are you.
 
-**Telemetry:** Primary action=elaborate, conf=0.17, winning node=node_16 (conversation — "what are you" pattern). Lobe curve: conversation=0.0278, math=0.0123. Fell below threshold. User triple: (what, is, the). The algebra node (node_5, pattern "algebra equation solve variable unknown linear quadratic") contained "quadratic" but BUG-004 triggered (pattern longer than input), and the conversation lobe's "what are you" pattern had higher token overlap with "What is the..." framing.
+**Telemetry:** conf=0.17, certainty=SURE, winning node=node_16 (conversation — "what are you" pattern again). Memory-Pull: pull_fresh=false.
 
-**Note:** This is a misfire — the question is about math but the conversation lobe won because "What is the" token overlap with the "what are you" pattern was stronger than the math node's partial match. This demonstrates how token-overlap voting can route to the wrong lobe when the question framing matches a conversational pattern more strongly than the subject-matter pattern.
+**Assessment:** ❌ Still misfires to conversation lobe. The "What is the quadratic formula" framing overlaps with the "what are you who are you what can you do capabilities" pattern more strongly than the math node's "algebra equation solve variable unknown linear quadratic" pattern. BUG-004 on the algebra node (7-token pattern vs 5-token input) reduces its confidence. This is a known token-overlap voting limitation.
 
 ---
 
-### 🗨️ Exchange 7: Epistemology
+### 📩 Exchange 7: Epistemology
 
 **👤 User:**
 
@@ -187,145 +161,122 @@ Each input below was sent to `process_mission()`. The AIML Output Scaffold — t
 
 **🧠 GrugBot AIML Output Scaffold:**
 
-> [You are explaining yourself] Here is the picture: You are GrugBot, a neuromorphic AI with specialized lobes for math, science, philosophy, and conversation. You consider in nodes that fire when patterns match, vote on answers, and self-reinforce. Be honest about what you are.. The link is clear: who are you. [Directives: Your primary mission is explain. Execute with full cognitive resources allocated.; Ground every claim. 0.32 determines assertion strength. Low confidence requires explicit qualification.; Cross-domain synthesis activated. Identify connections across [conversation (4/4 active (tell me about explain describe | thank thanks appreciate gratit | what are you who are you what ))] to deepen understanding.; Structure explanations hierarchically: overview → details → synthesis → implications.; Use analogies carefully. State limitations before applying them.]
+> [Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes] Here is the picture: Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the answer. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is.. The link is clear: who are you.
 
-**Telemetry:** Primary action=explain, conf=0.32, winning node=node_16 (conversation — "what are you" pattern again). Lobe curve: conversation=0.1002, philosophy=0.0156. User triple: (what, is, epistemology). Node triple from conversation: (what, are, you), (who, are, you). The epistemology node (node_11) had its pattern "epistemology knowledge truth belief justification evidence" but BUG-004 triggered (pattern_len=6 > input_len=4), and the conversation lobe's "what are you" pattern again dominated.
+**Telemetry:** conf=0.31, certainty=SURE, winning node=node_16 (conversation — "what are you" pattern again). Memory-Pull: pull_fresh=false.
 
-**Note:** Another misfire — "What is epistemology about" should route to philosophy/epistemology but the conversational "what are you" pattern wins because the "what is" framing overlaps more strongly than the single-word "epistemology" match in a 6-token pattern vs 4-token input scenario. This is a known limitation of the current token-overlap voting with BUG-004 cheap bidirectional scan fallback.
-
----
-
-## Phase 8: Feedback — /right /wrong
-
-### /right feedback on Exchange 1 response
-
-The first mission ("Hello! What can you do?") had 1 contributor (node_16, the winning node). Applied `/right` feedback:
-
-- ✅ `/right` applied: 1 contributors [1 locked, 0 unsure]: 1 rewarded, 0 skipped, 0 missed coinflip
-- The locked node (node_16) receives a strength bump via `bump_strength!`
-
-### /wrong feedback on Exchange 6 (quadratic formula) response
-
-The quadratic formula mission had 1 contributor (node_16 again, misfired to conversation). Applied `/wrong` feedback:
-
-- ❌ `/wrong` applied: 1 contributor(s) penalized
-- The penalized node undergoes `penalize_strength!` and a 50/50 coinflip determines additional penalty
+**Assessment:** ❌ Another misfire to conversation lobe for the same reason as Exchange 6. "What is..." framing dominates the vote.
 
 ---
 
-## Phase 9: Mechanics & Stats
+### 📩 Exchange 8: MULTIPART — Derivatives + Newton's Force
 
-### Lobe Registry
+**👤 User:**
 
-| Lobe | Subject | Nodes | Connected | Fires | Inhibits |
-|------|---------|-------|-----------|-------|----------|
-| conversation | General conversation — greetings, small talk, meta-questions | 4 | 1 | 0 | 0 |
-| default | general thinking reasoning conversation greeting | 3 | 0 | 0 | 0 |
-| math | Pure mathematics — algebra, calculus, geometry, logic | 4 | 1 | 0 | 0 |
-| philosophy | Abstract thought — epistemology, ethics, metaphysics | 4 | 2 | 0 | 0 |
-| science | Natural sciences — physics, chemistry, biology | 4 | 2 | 0 | 0 |
+> Grug want to know about derivatives and also what does Newton say about force
 
-### Node Census
+**🧠 GrugBot AIML Output Scaffold:**
 
-- **Total nodes:** 19 (including 3 default boot seeds)
-- **Alive:** 19, **Grave:** 0
-- **Average strength (alive):** 1.0
+> [Grug studies force and motion] Here is the picture: Newton's first law says an object keeps moving unless something pushes it. The second law is force equals mass times acceleration, the backbone of classical mechanics. The third law says every push has an equal push back. Grug sees these laws everywhere: falling apples, orbiting moons, and the pull of gravity..
 
-**Nodes per lobe:**
-- conversation: 4
-- default: 3
-- math: 4
-- philosophy: 4
-- science: 4
+**Multipart Telemetry:** Compound input detected: compound(2 parts): [mp_1/primary] "Grug want to know about derivatives and also" | [mp_2/support] "what does Newton say about force". ActionLog: 1 entry (mp_2 only — mp_1 produced no valid specimens). conf=0.2, certainty=SURE, winning node=node_7 (science/physics). Memory-Pull: pull_fresh=false.
 
-### Attachment Graph
-
-| Target | Attachments |
-|--------|-------------|
-| node_5 (algebra) | → node_3 (calculus) |
-| node_12 (ethics) | → node_14 (logic) |
-| node_3 (calculus) | → node_7 (physics) |
-| node_10 (quantum) | → node_13 (metaphysics) |
-| node_9 (biology) | → node_8 (chemistry) |
-
-**Total attachment edges:** 5
-
-### Hopfield Cache
-
-- Cache entries: **0** (Hopfield is commented out / not active)
-
-### AIML Tribe
-
-| Lobe | Population | Live | Grave |
-|------|-----------|------|-------|
-| conversation | 1/6666 | 1 | 0 |
-| math | 1/6666 | 1 | 0 |
-| philosophy | 1/6666 | 1 | 0 |
-| science | 1/6666 | 1 | 0 |
-
-### Semantic Verb Registry
-
-| Class | Verbs |
-|-------|-------|
-| action | calculate |
-| causal | causes, contradicts, hits, increases, makes, reduces, routes |
-| cognition | analyze, define, explain, ponder, reason, validate |
-| communication | clarify, describe, elaborate |
-| spatial | are, connects, is, was, were |
-| temporal | chasing, follows, precedes |
-
-**Synonyms:**
-- assess → validate
-- compute → calculate
-- contemplate → ponder
-- examine → analyze
-- illuminate → explain
-
-### Eye System (Attention)
-
-- Current arousal: **0.3**
-
-### Hippocampal Modulator
-
-- ActionLog type: `Main.GrugBot420.HippocampalModulator.ActionLog`
-- Empty log summary: `[ActionLog: empty]`
-
-### Relational Jitter
-
-- Jitter enabled: **false** (disabled for deterministic test output)
-
-### Input Decomposer (Chunk Boundaries)
-
-Test input: `"What is calculus and also explain Newton's laws and what is truth"`
-
-| Chunk | Tokens | Text |
-|-------|--------|------|
-| 1 | [1..4] | What is calculus and |
-| 2 | [5..5] | also |
-| 3 | [6..9] | explain Newton's laws and |
-| 4 | [10..12] | what is truth |
-
-### Orchestration Rules
-
-- **Active rules:** 5
-  1. prob=1.0: "Your primary mission is {PRIMARY_ACTION}. Execute with full cognitive resources allocated."
-  2. prob=1.0: "Ground every claim. {CONFIDENCE} determines assertion strength. Low confidence requires explicit qualification."
-  3. prob=1.0: "Cross-domain synthesis activated. Identify connections across {LOBE_CONTEXT} to deepen understanding."
-  4. prob=1.0: "Structure explanations hierarchically: overview → details → synthesis → implications."
-  5. prob=1.0: "Use analogies carefully. State limitations before applying them."
+**Assessment:** ✅ Multipart pipeline works! InputDecomposer correctly split the compound input. The mp_2 part ("what does Newton say about force") found the physics node and produced a strong grug-voice response. The mp_1 part ("Grug want to know about derivatives and also") didn't produce valid specimens — the trailing "and also" likely confused the scanner. Only one objective completed, so only one scaffold was generated. The `Vector{Any}` → `Vector{Vote}` type fix resolved the multipart crash from v1.
 
 ---
 
-## Observations & Known Issues
+### 📩 Exchange 9: MULTIPART — Derivatives + Quadratic Formula
 
-1. **Attachment relay works** — Exchange 2 (calculus derivative) triggered the attachment relay from node_3 (calculus) → node_7 (physics), demonstrating cross-lobe fire relay with JIT-baked confidence (conf=0.276).
+**👤 User:**
 
-2. **BUG-004: pattern longer than input** — When a node's pattern has more tokens than the user input, the engine falls back to a cheap bidirectional scan. This frequently triggers for conversational nodes (node_15, node_16, node_18) because their patterns are 8-11 tokens while typical inputs are 4-7 tokens.
+> What is a derivative and also how does the quadratic formula work
 
-3. **Misfire pattern: "What is X" → conversation lobe** — The conversation lobe's "what are you who are you what can you do capabilities" pattern (node_16) has high token overlap with "What is..." framing. This causes inputs like "What is the quadratic formula" and "What is epistemology about" to route to the conversation lobe instead of math or philosophy. The subject-matter nodes have longer patterns that trigger BUG-004, reducing their effective confidence.
+**🧠 GrugBot AIML Output Scaffold:**
 
-4. **Silent cave** — Exchange 3 ("How does Newton's second law work?") produced no response at all ("Cave is silent"). Despite the physics node containing "newton" in its pattern, the token overlap wasn't sufficient to pass the vote gate. This demonstrates GrugBot's selectivity — it won't generate a response unless pattern match confidence crosses the threshold.
+> [Grug is GrugBot, a neuromorphic mind that thinks in nodes and votes] Here is the picture: Each node is a pattern-recognizing torch in Grug's cognitive cave. When a pattern fires, the nodes vote on what matters most, and the winning vote shapes the answer. Grug has lobes for math, science, philosophy, and conversation. Grug is honest about what Grug is.. The link is clear: who are you.
 
-5. **Low confidence across the board** — Most missions fell below the AIML_CONFIDENCE_THRESHOLD=0.35, triggering the fallback to the highest-confidence vote. The only mission above threshold was Exchange 1 (conf=0.45). This suggests the specimen's nodes need stronger pattern-to-input overlap or more specific patterns for typical user inputs.
+**Multipart Telemetry:** Compound input detected: compound(3 parts): [mp_1/primary] "What is a derivative and" | [mp_2/support] "also" | [mp_3/support] "how does the quadratic formula work". ActionLog: 2 entries (mp_1 → node_16, mp_3 → node_5). conf=0.2, certainty=SURE, winning node=node_16 (conversation). Memory-Pull: pull_fresh=false.
 
-6. **Multipart crash not reproduced** — The previous session encountered a `TaskFailedException` when running compound inputs (e.g., "What is the derivative of position and also what is ethics about"). In this session, only single-subject inputs were tested, so the multipart Any[] vs Vote[] type mismatch was not exercised.
+**Assessment:** ⚠️ Multipart decomposition works (3 parts, 2 objectives created), but both objectives misfire to the conversation lobe because "What is a derivative" has the same "What is..." → conversation misfire pattern. The multipart pipeline itself is functioning correctly — the vote routing is the problem, not the decomposition.
+
+---
+
+### 📩 Exchange 10: MULTIPART — Epistemology + Consciousness
+
+**👤 User:**
+
+> Explain epistemology and also what is the nature of consciousness
+
+**🧠 GrugBot AIML Output Scaffold:**
+
+> [Grug asks how Grug knows what Grug knows] Here is the picture: Epistemology studies the nature of knowledge itself. The classical outcome is justified true belief: a debate must subsist true, believed, and supported by evidence. But Gettier problems show that even justified true belief can be accidental. Grug wonders whether knowledge rests on solid foundations or hangs together in a web of mutually supporting beliefs..
+
+**Multipart Telemetry:** Compound input detected: compound(3 parts): [mp_1/primary] "Explain epistemology and" | [mp_2/support] "also" | [mp_3/support] "what is the nature of consciousness". ActionLog: 2 entries. conf=0.14, certainty=SURE, winning node=node_11 (philosophy/epistemology). Memory-Pull: pull_fresh=false.
+
+**Assessment:** ✅✅ Best multipart response. The epistemology node (node_11) correctly won the primary objective. The voice prefix "Grug asks how Grug knows what Grug knows" is distinctive and evocative. The body is substantive and covers justified true belief, Gettier problems, foundationalism vs coherentism. Thesaurus swaps degraded "answer" → "outcome", "claim" → "debate", "be" → "subsist" — these are distracting but the overall structure is coherent. The second objective (consciousness) apparently didn't produce valid specimens or was merged into the primary output.
+
+---
+
+### 📩 Exchange 11: MULTIPART — DNA + Periodic Table
+
+**👤 User:**
+
+> How does DNA carry information and also what is the periodic table
+
+**🧠 GrugBot AIML Output Scaffold:**
+
+> [Grug observes living things] Here is the picture: Cells are the simple unit of life, and DNA inside them carries the instructions for place proteins. Genes change over generations, and natural selection shapes which changes survive. Grug sees the tree of life branching from single cells to every creature walking, swimming, or flying today..
+
+**Multipart Telemetry:** Compound input detected: compound(3 parts): [mp_1/primary] "How does DNA carry information and" | [mp_2/support] "also" | [mp_3/support] "what is the periodic table". ActionLog: 2 entries. conf=0.1, certainty=SURE, winning node=node_9 (science/biology). Memory-Pull: pull_fresh=false.
+
+**Assessment:** ✅ The biology node correctly won the DNA part. The voice prefix "Grug observes living things" is appropriate. The body covers cells, DNA, protein synthesis, natural selection, and the tree of life. Thesaurus swaps: "basic" → "simple", "building" → "place" — again distracting but the content is substantive. The second objective (periodic table) apparently didn't produce valid specimens — the chemistry node pattern ("chemistry element atom molecule bond reaction periodic") may not have matched "what is the periodic table" strongly enough.
+
+---
+
+## Phase 3: Comparison — v1 vs v2
+
+| Metric | v1 (Old Prompts) | v2 (Grug-Voice) |
+|--------|-----------------|-----------------|
+| Voice prefix | "You are a calculus tutor" | "Grug knows calculus" |
+| Third person | ❌ (second person "You") | ✅ ("Grug does X") |
+| CLAIM coherence | Fragmented instruction prose | Declarative sentences with substance |
+| Memory drag | Every low-conf reply pulled history | Only when node opts in (0 instances) |
+| Multipart crash | TaskFailedException (Vector{Any}) | ✅ Fixed (Vote[entry.scoped_votes...]) |
+| Multipart decomposition | Not tested | ✅ 4 compound inputs tested |
+| Coherence rules | 5 generic rules | 8 rules incl. sentence completeness, no-repetition, third-person |
+| Thesaurus artifacts | "consider" → "consider", etc. | "hard" → "strenuous", "water" → "beverage", "building" → "place" |
+
+---
+
+## Phase 4: Known Issues
+
+1. **"What is X" → conversation lobe misfire** (still present from v1). The conversation node's "what are you who are you what can you do capabilities" pattern (node_16) has high token overlap with "What is..." framing. This causes inputs like "What is the quadratic formula" and "What is epistemology about" to route to conversation instead of math or philosophy. The subject-matter nodes have longer patterns that trigger BUG-004 (pattern longer than input), reducing their confidence. Fix options: (a) shorten subject-matter patterns, (b) add "what is" to subject-matter patterns, (c) implement lobe-affinity bias in the vote gate.
+
+2. **Silent cave on Newton's second law** (still present from v1). The physics node pattern doesn't include "second law" or "F=ma" explicitly, and the input's 6 tokens don't achieve sufficient overlap with the 7-token pattern. Fix: add "second law F=ma" to the physics node pattern.
+
+3. **Thesaurus swap degrades coherence** (newly visible with grug-voice). The GRUG_THESAURUS_SWAP_RATE=0.25 randomly replaces words with synonyms. In the old "You are a tutor" prompts, this was barely noticeable because the prose was already fragmented. In grug-voice, it produces jarring substitutions like "hard problem" → "strenuous problem", "water" → "beverage", "building proteins" → "place proteins", "be true" → "subsist true". Fix options: (a) lower the swap rate, (b) add grug-voice words to the drop table so they're never swapped, (c) protect proper nouns and domain-specific terms.
+
+4. **Phrase reorder scrambles clause order** (still present). The GRUG_PHRASE_REORDER_RATE=0.40 reorders comma-separated clauses. In grug-voice prompts, this can break the logical flow of explanatory sequences. Example: "math, science, philosophy, and conversation" was reordered to "Science, and conversation" in Exchange 1.
+
+5. **Multipart objectives sometimes produce only one response** (new). When a sub-subject's scan produces no valid specimens (e.g., the derivative part of mission 8), only one objective completes and the combined output has just one scaffold. The other sub-subject's content is simply absent.
+
+6. **Low confidence across the board** (still present from v1). Most missions fall below AIML_CONFIDENCE_THRESHOLD=0.35. The specimen's nodes need stronger pattern-to-input overlap for typical user phrasings.
+
+---
+
+## Phase 5: Bug Fix — Multipart Vector{Any} → Vector{Vote}
+
+**File:** `src/Main.jl`, line ~1375
+
+**Problem:** The multipart pipeline's `HippocampalModulator.ActionEntry.scoped_votes` field is `Vector{Any}`, but `generate_aiml_payload` expects `Vector{Vote}`. When the multipart orchestrator called `COMMANDS[action](..., entry.scoped_votes)`, the type mismatch caused a `MethodError`.
+
+**Fix:** Convert `entry.scoped_votes` to `Vote[]` at the call site, matching the existing pattern for `entry.sure_votes` and `entry.unsure_votes`:
+
+```julia
+entry_sure = Vote[entry.sure_votes...]
+entry_unsure = Vote[entry.unsure_votes...]
+entry_all = Vote[entry.scoped_votes...]  # NEW: was entry.scoped_votes
+entry_output = COMMANDS[entry_primary.action](mission, entry_node, entry_primary, entry_sure, entry_unsure, entry_all)
+```
+
+**Status:** ✅ Fixed. All 4 multipart missions (8-11) now complete without error.

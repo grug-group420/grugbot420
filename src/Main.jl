@@ -1374,7 +1374,8 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 # This is the key fix: COMMANDS no longer receives the full vote pile.
                 entry_sure = Vote[entry.sure_votes...]
                 entry_unsure = Vote[entry.unsure_votes...]
-                entry_output = COMMANDS[entry_primary.action](mission, entry_node, entry_primary, entry_sure, entry_unsure, entry.scoped_votes)
+                entry_all = Vote[entry.scoped_votes...]
+                entry_output = COMMANDS[entry_primary.action](mission, entry_node, entry_primary, entry_sure, entry_unsure, entry_all)
 
                 # GRUG: Mark entry complete — output stored for context carry-forward.
                 if !isempty(entry_output)
