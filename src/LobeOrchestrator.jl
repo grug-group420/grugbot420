@@ -10,7 +10,8 @@ module LobeOrchestrator
 #   2. For each lobe compute:
 #        base_avg = mean of all vote confidences in that lobe
 #        top_avg  = mean of the hard-selected top-K confidences in that lobe
-#      Score: lobe_score = base_avg * top_avg     (the "curve")
+#      Score: lobe_score = sqrt(base_avg) * top_avg²  (the "curve")
+#      Top averages have exponentially more weight than base averages.
 #   3. Highest score wins the orchestration floor.
 #   4. Multi-lobe pass-through: a runner-up lobe also fires IF
 #         (a) lobe_score >= MIN_PASS_THROUGH_SCORE, AND
@@ -43,6 +44,7 @@ module LobeOrchestrator
 # ==============================================================================
 
 using Statistics: mean
+using Base.Math: sqrt
 
 # --- Tunables ----------------------------------------------------------------
 const HARD_FIRE_BATCH_CAP           = 1000
@@ -123,7 +125,7 @@ end
 GRUG: The averages curve.
   base_avg = mean of all confidences
   top_avg  = mean of the top TOP_K_FRACTION by confidence
-  score    = base_avg * top_avg                     <-- the curve
+  score    = sqrt(base_avg) * top_avg^2              <-- top-dominated curve
   hard_vote_count = how many entries have conf >= HARD_SELECTION_CONF_THRESHOLD
 """
 function _compute_lobe_score(entries::AbstractVector)::Tuple{Float64, Float64, Float64, Int}
@@ -138,19 +140,43 @@ function _compute_lobe_score(entries::AbstractVector)::Tuple{Float64, Float64, F
     sorted = sort(confs; rev = true)
     top_avg = mean(@view sorted[1:k])
 
-    # GRUG: PEAK-DOMINATED LOBE FIX.
-    # The averages curve (base_avg * top_avg) penalizes lobes that have one
-    # overwhelmingly strong node alongside weak siblings — the weak ones drag
-    # the average down even when the peak is decisive (e.g. node_88 scoring
-    # 0.949 alongside two 0.17 cousins gets averaged to ~0.4, losing to a
-    # consensus-mid lobe with three nodes at 0.6). We take max(curve, peak^2)
-    # so a single dominating node lifts its lobe to its peak's geometric tier.
-    # Squaring keeps the score on the same scale as base*top (both ∈ [0,1]),
-    # and the max() guarantees consensus lobes still win when their curve is
-    # higher than any singleton peak elsewhere.
+    # GRUG: TOP-DOMINATED CURVE — top vote averages have a MUCH larger
+    # influence on the score than base averages.
+    #
+    # The old formula was base_avg * top_avg (equal weight). That meant a
+    # lobe with many weak votes (high base_avg) and low hard selections
+    # (low top_avg) could beat a lobe with a few decisive hard votes and
+    # a low base_avg. For example, conversation lobe on "What is the quadratic
+    # formula" would get base_avg ≈ 0.27 from 4 nodes (some mediocre), while
+    # math lobe got base_avg ≈ 0.13 from 1-2 nodes — but math's top_avg was
+    # decisive. Equal weighting let conversation's broad mediocrity win over
+    # math's focused confidence.
+    #
+    # The fix: weight top_avg exponentially higher than base_avg.
+    #   curve = base_avg^0.5 * top_avg^2.0
+    #
+    # This means:
+    #   - base_avg is square-rooted: a lobe with many weak votes contributes
+    #     less (sqrt(0.27) ≈ 0.52 vs sqrt(0.13) ≈ 0.36 — not a 2× gap anymore).
+    #   - top_avg is squared: decisive hard selections dominate the curve.
+    #     A top_avg of 0.6 → 0.36, while 0.3 → 0.09 — a 4× gap.
+    #   - The net effect: lobes with confident hard selections win handily
+    #     over lobes with broad but weak consensus.
+    #
+    # The old max(curve, peak^2) override has been REMOVED. The new curve
+    # already rewards high top_avg (which includes the peak), so peak^2 is
+    # redundant and actually counterproductive — it overrides the curve in
+    # cases where the curve should matter (e.g., conversation peak=0.25
+    # gives peak^2=0.0625, which is higher than the curve for EITHER lobe,
+    # masking the curve's routing effect entirely).
+    #
+    # With this fix, the per-lobe fuzzy whitelist becomes a safety net rather
+    # than a primary gate. The curve itself should correctly route "What is
+    # the quadratic formula" to math, not conversation, because math's hard
+    # selections (node_5 at decent confidence) will dominate conversation's
+    # mediocre top_avg.
     peak = sorted[1]
-    curve = base_avg * top_avg
-    score = max(curve, peak * peak)
+    score = sqrt(base_avg) * (top_avg ^ 2)
 
     hard_count = count(c -> c >= HARD_SELECTION_CONF_THRESHOLD, confs)
     return (base_avg, top_avg, score, hard_count)
@@ -341,7 +367,7 @@ function last_summary()::String
     if isempty(LAST_LOBE_SCORES[])
         return "Lobe Curve: (no lobes scored)"
     end
-    lines = String["Lobe Curve (base × top = score):"]
+    lines = String["Lobe Curve (√base × top² = score):"]
     # Sort scores desc for the readout
     sorted = sort(LAST_LOBE_SCORES[]; by = x -> -x[4])
     for (lobe_id, base_avg, top_avg, score, hard_count) in sorted

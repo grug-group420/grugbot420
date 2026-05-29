@@ -1576,6 +1576,12 @@ const STOPWORDS = Set([
     "this", "that", "these", "those",
     "not", "no",
     "up", "down",
+    # GRUG: Question words — "what", "who", "how" etc. are closed-class
+    # function words that match nearly everything. Without them in STOPWORDS,
+    # "what" counts as a content token in the literal pre-gate, giving
+    # conversation nodes a literal_hit on "What is the quadratic formula"
+    # even though "what" carries zero domain signal.
+    "what", "who", "how", "why", "when", "where", "which",
 ])
 
 
