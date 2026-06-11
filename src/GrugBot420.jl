@@ -206,12 +206,23 @@ using .SigilPromoter
 include("ArithmeticEngine.jl")
 using .ArithmeticEngine
 
+# GRUG v7.17: InputDecomposer — splits compound inputs into independent clauses.
+# No module deps; pure text splitting. Lives BEFORE SigilMediator in the pipeline.
+include("InputDecomposer.jl")
+using .InputDecomposer
+
 # SigilMediator is the engine-level coordinator on top of Registry/Promoter/Arith.
 # Must come after all three (it `using`s each).
 include("SigilMediator.jl")
 using .SigilMediator
 
 include("engine.jl")
+
+# GRUG v7.17: MultipartOrchestrator — groups votes by objective_id for coherent
+# multipart responses. Must come AFTER engine.jl (needs Vote struct).
+include("MultipartOrchestrator.jl")
+using .MultipartOrchestrator
+
 include("Main.jl")
 
 # --------------------------------------------------------------------------

@@ -992,23 +992,41 @@ function restore_table!(table::SigilTable, data::AbstractDict)::Int
             "restore_table!: 'entries' must be a Vector, got $(typeof(raw_entries))",
             "entries"))
     end
+    # GRUG: helper — JSON null → Julia nothing, but get() returns nothing (not
+    # the default) when the key *exists* with value null.  Must guard every
+    # String()/Symbol()/Bool() conversion with isnothing().
+    _str(x) = isnothing(x) ? "" : String(x)
+    _sym(x) = isnothing(x) ? Symbol("") : Symbol(String(x))
+    _bool(x, def::Bool=false) = isnothing(x) ? def : Bool(x)
+
     n = 0
     for ent in raw_entries
         if !(ent isa AbstractDict)
             @warn "[SigilRegistry] restore_table!: skipping non-Dict entry"
             continue
         end
-        nm = String(get(ent, "name", ""))
+        nm = _str(get(ent, "name", ""))
         isempty(nm) && (@warn "[SigilRegistry] restore_table!: skipping entry with empty name"; continue)
-        cls = Symbol(String(get(ent, "class", "")))
-        ap  = Symbol(String(get(ent, "applies_at", "")))
-        stype_str = String(get(ent, "sigil_type", ""))
+        cls = _sym(get(ent, "class", ""))
+        ap  = _sym(get(ent, "applies_at", ""))
+        stype_str = _str(get(ent, "sigil_type", ""))
         sigil_type = isempty(stype_str) ? nothing : Symbol(stype_str)
         lex_raw = get(ent, "lexicon", nothing)
+        # GRUG: lexicon entries might themselves contain nulls — filter those
         lexicon = isnothing(lex_raw) ? nothing :
-                  (lex_raw isa AbstractVector ? collect(String.(lex_raw)) : nothing)
-        prov = String(get(ent, "provenance", "restored"))
-        pat  = Bool(get(ent, "promote_at_tokenize", false))
+                  (lex_raw isa AbstractVector ?
+                   collect(filter(!isnothing, String.(lex_raw))) : nothing)
+        prov = _str(get(ent, "provenance", "restored"))
+        pat  = _bool(get(ent, "promote_at_tokenize", false), false)
+        # GRUG: v3 specimens carry params (Dict) and expansion (Vector) on
+        # many entries; restore them so procedure chains survive reload.
+        params_raw = get(ent, "params", nothing)
+        params = isnothing(params_raw) ? nothing :
+                 (params_raw isa AbstractDict ? Dict{String,Any}(params_raw) : nothing)
+        exp_raw = get(ent, "expansion", nothing)
+        expansion = isnothing(exp_raw) ? nothing :
+                    (exp_raw isa AbstractVector ?
+                     collect(Any, filter(!isnothing, exp_raw)) : nothing)
         try
             register_sigil!(table;
                 name = nm,
@@ -1016,6 +1034,8 @@ function restore_table!(table::SigilTable, data::AbstractDict)::Int
                 applies_at = ap,
                 sigil_type = sigil_type,
                 lexicon = lexicon,
+                params = params,
+                expansion = expansion,
                 provenance = prov,
                 overwrite = true,
                 promote_at_tokenize = pat,

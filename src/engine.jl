@@ -485,6 +485,13 @@ struct Vote
     # All existing 7-arg call sites (cast_vote, cast_explicit_vote, every
     # test fixture) work unchanged via the inner constructor's default.
     payload::String
+    # GRUG v7.17+: multipart vote grouping. objective_id ties votes from
+    # the same compound question together so AIML can orchestrate them as a
+    # coherent bundle instead of independent singleton votes.
+    # bundle_role: :singleton (default), :step_n (math chain intermediate),
+    # :final (math chain answer), :companion (multipart clause vote).
+    objective_id::UInt64
+    bundle_role::Symbol
 
     Vote(node_id::AbstractString,
          action::AbstractString,
@@ -493,10 +500,23 @@ struct Vote
          user_triples::Vector{RelationalTriple},
          node_triples::Vector{RelationalTriple},
          antimatch::Bool,
-         payload::AbstractString = "") = new(
+         payload::AbstractString = "",
+         objective_id::UInt64 = UInt64(0),
+         bundle_role::Symbol = :singleton) = new(
             String(node_id), String(action), Float64(confidence),
             negatives, user_triples, node_triples, antimatch, String(payload),
+            objective_id, bundle_role,
          )
+end
+
+# GRUG v7.17+: monotonically increasing counter for objective_id.
+# Each compound input cycle gets a fresh ID; votes stamped with the same
+# objective_id belong to the same logical question.
+const _OBJECTIVE_COUNTER = Ref{UInt64}(UInt64(0))
+
+function fresh_objective_id()::UInt64
+    _OBJECTIVE_COUNTER[] += UInt64(1)
+    return _OBJECTIVE_COUNTER[]
 end
 
 const NODE_MAP  = Dict{String, Node}()
@@ -3262,45 +3282,36 @@ function _cast_math_votes(
     end
     _, negatives = select_action(node.action_packet)
 
+    # GRUG v7.17+: every vote bundle gets a shared objective_id so AIML
+    # can group math chain steps with their final answer.
+    obj_id = fresh_objective_id()
+
     # GRUG: filter to math bindings only and pass to ArithmeticEngine.
-    # has_math_bindings was already checked by SigilMediator for routing
-    # decisions, but we verify again here so this function is safe to call
-    # standalone (e.g. from tests).
     if !has_math_bindings(bindings)
         @warn "[ENGINE] _cast_math_votes called with non-math bindings on node $(node.id); emitting opener-only fallback"
-        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false)]
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, "", obj_id, :singleton)]
     end
 
     result = compute_arithmetic(bindings)
     if !isnothing(result.error)
         @warn "[ENGINE] _cast_math_votes: compute_arithmetic error on node $(node.id): $(result.error); emitting opener-only fallback"
-        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false)]
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, "", obj_id, :singleton)]
     end
 
     out = Vote[]
 
     # GRUG: per-step votes (only emitted for chained ops where len(steps) > 1).
-    # action stays the opener command name (so COMMANDS lookup works);
-    # payload carries the structured "lhs op rhs = result" string.
-    # These are SUPPORT votes -- the orchestrator may render them as backup
-    # context, but the headline vote below is what speaks first.
+    # Each step gets bundle_role = :step_n so AIML knows it's intermediate.
     if length(result.steps) > 1
         for step in result.steps
             step_payload = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
-            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, step_payload))
+            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, step_payload, obj_id, :step_n))
         end
     end
 
-    # GRUG: macros are SCAFFOLDING. They compute an outcome and hand it
-    # back as a value -- nothing more. The macro must NOT do the language
-    # work itself (no "Answer: X", no inline narration). AIML's static
-    # skeletons own the linguistic wrapping; the macro just provides the
-    # number to plug in. So payload = the bare answer string.
-    #
-    # Multi-step problems: per-step votes above carry the worked steps as
-    # SUPPORT context for AIML to weave in if it wants. The headline still
-    # carries only the final value -- AIML decides whether to show steps.
-    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, result.answer_str))
+    # GRUG: The headline answer vote. bundle_role = :final tells AIML
+    # this is the primary output of the math chain.
+    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, result.answer_str, obj_id, :final))
 
     return out
 end
@@ -3329,6 +3340,10 @@ function _cast_multipart_votes(
     end
     _, negatives = select_action(node.action_packet)
 
+    # GRUG v7.17+: every multipart vote bundle shares one objective_id.
+    # Each clause gets bundle_role = :companion so AIML can cohere them.
+    obj_id = fresh_objective_id()
+
     # GRUG: SigilBinding.raw_position is 0-based per SigilPromoter contract.
     # Convert to 1-based Julia indices for slicing.
     conj_positions = sort!([Int(b.raw_position) + 1 for b in bindings if b.name == "conj"])
@@ -3336,7 +3351,7 @@ function _cast_multipart_votes(
     if isempty(conj_positions)
         # GRUG: no clause boundaries -> single vote with full text echo.
         return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
-                         strip(original_text) |> String)]
+                         strip(original_text) |> String, obj_id, :singleton)]
     end
 
     # GRUG: split original text on word-index boundaries. raw_position is the
@@ -3347,15 +3362,13 @@ function _cast_multipart_votes(
     out = Vote[]
     start_idx = 1
     for cp in conj_positions
-        # GRUG: clause runs [start_idx, cp-1]. Skip empty clauses (consecutive
-        # conjunctions) so we don't emit blank votes.
         cp_clamped = clamp(cp, 1, n_toks + 1)
         clause_end = cp_clamped - 1
         if clause_end >= start_idx
             clause_text = strip(join(tokens[start_idx:clause_end], " "))
             if !isempty(clause_text)
                 push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
-                                String(clause_text)))
+                                String(clause_text), obj_id, :companion))
             end
         end
         start_idx = cp_clamped + 1
@@ -3365,7 +3378,7 @@ function _cast_multipart_votes(
         tail_text = strip(join(tokens[start_idx:n_toks], " "))
         if !isempty(tail_text)
             push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
-                            String(tail_text)))
+                            String(tail_text), obj_id, :companion))
         end
     end
 
@@ -3373,7 +3386,7 @@ function _cast_multipart_votes(
     # bare "and"), emit the fallback single-vote so the node still speaks.
     if isempty(out)
         push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
-                        strip(original_text) |> String))
+                        strip(original_text) |> String, obj_id, :singleton))
     end
 
     return out

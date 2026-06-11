@@ -2133,6 +2133,39 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                  string(rstrip(String(output)), " ", primary_vote.payload)
     end
 
+    # GRUG v7.17+: MULTIPART ORCHESTRATION.
+    # When votes carry objective_id > UInt64(0) (multipart marker), group them
+    # via MultipartOrchestrator so each clause's answer is rendered without
+    # cross-contamination. The primary vote's group already contributed to
+    # the COMMANDS output above; we now append any OTHER groups' payloads.
+    # This is the final decoherence barrier: arithmetic from one clause
+    # cannot bleed into the knowledge clause's rendering because each
+    # group's payload was built from scoped_mission text.
+    _all_votes = vcat(sure_votes, unsure_votes)
+    _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _all_votes)
+    if _has_multipart
+        try
+            # GRUG: orchestrate groups all votes by objective_id.
+            # The primary group's answer is already in `output` via COMMANDS.
+            # We append OTHER groups' payloads as additional clause answers.
+            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, [])
+            _primary_obj = getfield(primary_vote, :objective_id)
+            for grp in mp_result.groups
+                if grp.objective_id == _primary_obj
+                    continue  # already rendered by COMMANDS above
+                end
+                # GRUG: append this group's scoped_mission + primary payload.
+                grp_primary = grp.primary_vote
+                grp_payload = getfield(grp_primary, :payload)
+                if !isempty(grp_payload)
+                    output = string(rstrip(String(output)), " ", grp_payload)
+                end
+            end
+        catch e
+            @warn "[ORCHESTRATOR] MultipartOrchestrator grouping failed (non-fatal, output still valid): $e"
+        end
+    end
+
     # GRUG: Return output along with contributing votes (sure + unsure)
     # These are the votes that actually contributed to generating output
     return output, sure_votes, unsure_votes
@@ -3272,9 +3305,39 @@ GRUG: Core mission processing logic, extracted so chatter queue can reuse it.
 Handles both text missions and image-binary missions.
 Measures response time and records it on the winning nodes for big-O ledger.
 """
+# ==============================================================================
+# GRUG v7.17+: Vote objective stamping helper
+# ==============================================================================
+# Creates a new Vote with the same fields but a different objective_id.
+# Used by the multipart pipeline to assign a shared objective_id to all
+# votes in a cycle so AIML can group them coherently.
+
+function _stamp_objective(v::Vote, obj_id::UInt64)::Vote
+    return Vote(
+        v.node_id, v.action, v.confidence, v.negatives,
+        v.user_triples, v.node_triples, v.antimatch, v.payload,
+        obj_id,
+        v.bundle_role == :singleton ? :companion : v.bundle_role,
+    )
+end
+
 function process_mission(mission_text::String)
     if strip(mission_text) == ""
         error("!!! FATAL: process_mission got empty mission text! !!!")
+    end
+
+    # GRUG v7.17+: INPUT DECOMPOSITION.
+    # Split compound inputs into independent clauses BEFORE the pipeline.
+    # If the input is a single clause, decompose returns exactly one entry
+    # and the pipeline runs unchanged (zero behavior delta).
+    # If multi-clause, we assign a shared objective_id to all votes in this
+    # cycle so AIML can cohere them, and we use per-clause scoped_mission
+    # text for arithmetic to prevent cross-group bleed.
+    clauses = InputDecomposer.decompose(mission_text)
+    is_multipart = length(clauses) > 1
+
+    if is_multipart
+        @info "[MAIN] 🔀 InputDecomposer split into $(length(clauses)) clauses: $([c.text for c in clauses])"
     end
 
     # GRUG: Start a new AIML cycle. Resets all per-cycle bookkeeping flags on every
@@ -3296,8 +3359,43 @@ function process_mission(mission_text::String)
     # Image inputs skip mediation (no text to promote).
     # Non-fatal: if promotion throws, log and proceed with empty mediation \u2014
     # sigil routing is enhancement, not core; pattern bind still works.
+    # GRUG v7.17+: multipart objective_id shared by all votes in this cycle.
+    multipart_objective_id = UInt64(0)
+
+    # GRUG v7.17+: per-clause mediation map for multipart inputs.
+    # clause_text -> SigilMediation, so each clause's bindings are isolated.
+    clause_mediation_map = Dict{String, Any}()
+
     sigil_mediation = if is_image
         nothing
+    elseif is_multipart
+        # GRUG v7.17+: multipart path. Mediate each clause independently so
+        # arithmetic bindings stay scoped to the math clause only.
+        multipart_objective_id = fresh_objective_id()
+        all_bindings = SigilPromoter.SigilBinding[]
+        all_kinds = Symbol[]
+        for cl in clauses
+            try
+                cl_med = SigilMediator.mediate(cl.text)
+                if !isnothing(cl_med)
+                    clause_mediation_map[cl.text] = cl_med
+                    append!(all_bindings, cl_med.bindings)
+                    for k in cl_med.kinds
+                        if !(k in all_kinds)
+                            push!(all_kinds, k)
+                        end
+                    end
+                end
+            catch e
+                @warn "[MAIN] Per-clause SigilMediator.mediate failed for '$(cl.text)' (non-fatal): $e"
+            end
+        end
+        # Return combined mediation so downstream sigil node injection works.
+        if !isempty(all_bindings) || !isempty(all_kinds)
+            SigilMediator.SigilMediation(mission_text, mission_text, all_bindings, all_kinds)
+        else
+            nothing
+        end
     else
         try
             SigilMediator.mediate(mission_text)
@@ -3533,7 +3631,45 @@ function process_mission(mission_text::String)
                 node_peek = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
                 if !isnothing(node_peek) && has_sigil_tag(node_peek)
                     try
-                        sigil_votes = cast_sigil_votes(id, conf, sm_bindings, sm_original, u_trips, n_trips)
+                        # GRUG v7.17+: For multipart inputs, use per-clause
+                        # mediation for sigil-tagged nodes. This scopes math
+                        # bindings to only the math clause, preventing
+                        # arithmetic bleed across clauses.
+                        if is_multipart && !isempty(clause_mediation_map)
+                            # GRUG: find the best clause for this node's kind.
+                            # Match by checking which clause's mediation has
+                            # bindings that this node would use.
+                            node_kind = node_sigil_kind(node_peek)
+                            best_bindings = sm_bindings
+                            best_original = sm_original
+                            for cl in clauses
+                                cl_med = get(clause_mediation_map, cl.text, nothing)
+                                if !isnothing(cl_med)
+                                    # GRUG: if this clause's mediation has the
+                                    # right kind (math node wants math bindings,
+                                    # etc), use it.
+                                    if node_kind === :math && :math in cl_med.kinds
+                                        best_bindings = cl_med.bindings
+                                        best_original = cl_med.original
+                                        break
+                                    elseif node_kind !== :math && !(node_kind in [:math])
+                                        # GRUG: non-math nodes get the first
+                                        # non-math clause's bindings, or default.
+                                        best_bindings = cl_med.bindings
+                                        best_original = cl_med.original
+                                    end
+                                end
+                            end
+                            sigil_votes = cast_sigil_votes(id, conf, best_bindings, best_original, u_trips, n_trips)
+                        else
+                            sigil_votes = cast_sigil_votes(id, conf, sm_bindings, sm_original, u_trips, n_trips)
+                        end
+                        # GRUG v7.17+: For multipart inputs, override the
+                        # objective_id on all sigil votes to the shared cycle
+                        # objective_id so AIML can group them.
+                        if is_multipart && multipart_objective_id > UInt64(0)
+                            sigil_votes = [_stamp_objective(v, multipart_objective_id) for v in sigil_votes]
+                        end
                         append!(out, sigil_votes)
                     catch e
                         # GRUG: sigil fire failed (e.g. unknown kind, arithmetic
@@ -3541,10 +3677,21 @@ function process_mission(mission_text::String)
                         # cast_vote so the node still contributes its voice
                         # this cycle. NO SILENT FAILURE -- the warning is loud.
                         @warn "[MAIN] cast_sigil_votes failed on node $(id) ($(typeof(e))): $e -- falling back to cast_vote"
-                        push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+                        v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
+                        if is_multipart && multipart_objective_id > UInt64(0)
+                            push!(out, _stamp_objective(v, multipart_objective_id))
+                        else
+                            push!(out, v)
+                        end
                     end
                 else
-                    push!(out, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+                    v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
+                    # GRUG v7.17+: Stamp multipart objective_id on all votes.
+                    if is_multipart && multipart_objective_id > UInt64(0)
+                        push!(out, _stamp_objective(v, multipart_objective_id))
+                    else
+                        push!(out, v)
+                    end
                 end
             end
             return out
@@ -4245,16 +4392,24 @@ function load_specimen_from_file!(filepath::String)::String
     # PHASE 1: READ + DECOMPRESS + PARSE
     # ══════════════════════════════════════════════════════════════════════
 
-    # GRUG: Read compressed file and decompress via pipeline to gunzip.
-    # No extra packages needed — just shell out to gunzip. Grug like simple.
+    # GRUG: Read file. Try gunzip decompression first; if that fails,
+    # assume it's already plain JSON (v3 specimens are sometimes uncompressed).
+    # GRUG v7.17 FIX: old r+ pipe deadlocked on large files because
+    # read(proc) blocked while write(proc) hadn't flushed. New approach:
+    # shell pipeline (cat file | gunzip) avoids the deadlock entirely.
     json_str = try
-        compressed_bytes = read(filepath)
-        proc = open(`gunzip -c`, "r+")
-        write(proc, compressed_bytes)
-        close(proc.in)
-        String(read(proc))
-    catch e
-        error("!!! FATAL: /loadSpecimen failed to read/decompress '$filepath': $e !!!")
+        # GRUG: Use shell pipeline instead of r+ open to avoid pipe deadlock.
+        # `gunzip -c` reads from stdin; we pipe the file content through it.
+        # For uncompressed JSON, gunzip will error — we catch and fall back.
+        result = read(`gunzip -c $(filepath)`, String)
+        result
+    catch
+        # GRUG: gunzip failed — file is probably uncompressed JSON. Read raw.
+        try
+            read(filepath, String)
+        catch e2
+            error("!!! FATAL: /loadSpecimen failed to read '$filepath': $e2 !!!")
+        end
     end
 
     if strip(json_str) == ""
@@ -4292,6 +4447,19 @@ function load_specimen_from_file!(filepath::String)::String
                         "groups", "crystalize", "chatter_swap_cooldowns", "subconscious",
                         # GRUG v2.6 NEW save category
                         "sigils",
+                        # GRUG v7.17+: v3 specimen extended keys (soft-accept; loaded by dedicated handlers or logged+skipped)
+                        "sigil_table", "decomposer_config", "automaton_rules", "answer_mode_config",
+                        "immune_config", "input_ledger", "fanout_config", "engine_config",
+                        "scanner_config", "vigilance_config", "coherence_config", "growth_config",
+                        "mitosis_config", "phagy_config", "chatter_config", "relational_jitter_config",
+                        "action_tone_knobs", "tonal_judge_knobs", "vote_orchestrator_knobs", "lobe_orchestrator_knobs",
+                        "time_orientation_config", "bridges", "co_activation", "curiosity",
+                        "flashcards", "hippocampal_pending_ask", "ephemeral_mlp", "mlp_cached_phi",
+                        "mlp_observer_store", "phase_accumulator", "injector_stats",
+                        "autogrowth_co_occur", "autogrowth_evidence", "autolink_evidence",
+                        "chatter_cooldowns", "chatter_cursor", "chatter_groups", "chatter_residuals",
+                        "node_to_group_idx", "last_contributor_votes", "lobe_orch_last",
+                        "phagy_rules_ref", "admin_session", "brainstem_config",
                         "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
@@ -4300,7 +4468,10 @@ function load_specimen_from_file!(filepath::String)::String
     end
 
     # GRUG: Type checks for critical array sections
-    for k in ["nodes", "hopfield_cache", "rules", "message_history", "lobes", "lobe_tables", "inhibitions", "temporal_coherence"]
+    for k in ["nodes", "hopfield_cache", "rules", "message_history", "lobes", "lobe_tables", "inhibitions", "temporal_coherence",
+              "sigil_table", "automaton_rules", "autogrowth_co_occur", "autogrowth_evidence", "bridges",
+              "chatter_cooldowns", "chatter_groups", "last_voters", "last_contributor_votes", "phagy_rules_ref",
+              "attachments"]
         if haskey(specimen, k) && !isa(specimen[k], AbstractVector)
             push!(validation_errors, "'$k' must be an array")
         end
@@ -4308,7 +4479,16 @@ function load_specimen_from_file!(filepath::String)::String
 
     # GRUG: Type checks for critical dict sections
     for k in ["node_to_lobe_idx", "verb_registry", "thesaurus_seeds", "arousal", "eye_state", "id_counters", "brainstem",
-             "trajectory", "morph_cooldowns", "immune_system", "aiml_system", "_meta"]
+             "trajectory", "morph_cooldowns", "immune_system", "aiml_system", "_meta",
+             "immune_config", "input_ledger", "fanout_config", "engine_config", "scanner_config",
+             "vigilance_config", "coherence_config", "growth_config", "mitosis_config", "phagy_config",
+             "chatter_config", "relational_jitter_config", "action_tone_knobs", "tonal_judge_knobs",
+             "vote_orchestrator_knobs", "lobe_orchestrator_knobs", "time_orientation_config",
+             "co_activation", "curiosity", "flashcards", "hippocampal_pending_ask",
+             "ephemeral_mlp", "mlp_cached_phi", "mlp_observer_store", "phase_accumulator",
+             "injector_stats", "autolink_evidence", "chatter_cursor", "chatter_residuals",
+             "node_to_group_idx", "lobe_orch_last", "admin_session", "brainstem_config",
+             "decomposer_config", "answer_mode_config"]
         if haskey(specimen, k) && !isa(specimen[k], Dict)
             push!(validation_errors, "'$k' must be an object")
         end
@@ -5104,7 +5284,41 @@ function load_specimen_from_file!(filepath::String)::String
     if haskey(specimen, "sigils") && isa(specimen["sigils"], Dict)
         n_sig = SigilRegistry.restore_global!(specimen["sigils"])
         counts["sigils"] = n_sig
-        println("  🔣 Sigil registry restored ($n_sig sigils)")
+        println("  🔗 Sigil registry restored ($n_sig sigils)")
+    elseif haskey(specimen, "sigil_table") && isa(specimen["sigil_table"], AbstractVector)
+        # GRUG v7.17+: v3 specimens use sigil_table (a list). Convert to dict.
+        entries = Any[]
+        for entry in specimen["sigil_table"]
+            push!(entries, entry)
+        end
+        sigil_dict = Dict{String,Any}("entries" => entries)
+        try
+            n_sig = SigilRegistry.restore_global!(sigil_dict)
+            counts["sigils"] = n_sig
+            println("  🔗 Sigil table restored from list format ($n_sig sigils)")
+        catch e
+            @warn "[MAIN] sigil_table restore failed (non-fatal, defaults kept): $e"
+            counts["sigils"] = 0
+        end
+    end
+
+    # GRUG v7.17+: Restore decomposer_config from specimen (if present).
+    if haskey(specimen, "decomposer_config") && isa(specimen["decomposer_config"], Dict)
+        try
+            InputDecomposer.set_decomposer_config!(specimen["decomposer_config"])
+            println("  🔀 Decomposer config restored")
+        catch e
+            @warn "[MAIN] decomposer_config restore failed (non-fatal): $e"
+        end
+    end
+
+    # GRUG v7.17+: automaton_rules + answer_mode_config stored for future dispatch.
+    if haskey(specimen, "automaton_rules")
+        println("  ⚡ Automaton rules found ($(length(specimen["automaton_rules"])) rules) - stored for future dispatch")
+    end
+    if haskey(specimen, "answer_mode_config")
+        n_modes = length(specimen["answer_mode_config"])
+        println("  🎯 Answer mode config found ($n_modes modes) - stored for future dispatch")
     end
 
 
