@@ -2817,7 +2817,20 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
                         (t_rel  in pat_tokens || t_rel  in act_tokens ? 1 : 0)
         triple_is_circular = overlap_count >= 2
         if !triple_is_circular
-            rel_swapped  = _pick_synonym(String(t.relation), node_drop_table, node_required)
+            # GRUG v7.56: Expand relation sigil before synonym-swap.
+            # If t.relation is a dynamic sigil (e.g. "&causal"), resolve it
+            # to a concrete verb from the sigil expansion pool, then route
+            # that concrete verb through _pick_synonym as usual. Without
+            # this, "&causal" leaks into the conversational output verbatim.
+            _raw_rel = String(t.relation)
+            _rel_expanded = SigilRegistry.expand_relation_if_sigil(_ENGINE_SIGIL_TABLE, _raw_rel)
+            if length(_rel_expanded) > 1 || (length(_rel_expanded) == 1 && _rel_expanded[1] != _raw_rel)
+                # Sigil resolved — pick a random concrete verb from the expansion
+                _concrete_rel = rand(_rel_expanded)
+            else
+                _concrete_rel = _raw_rel
+            end
+            rel_swapped  = _pick_synonym(_concrete_rel, node_drop_table, node_required)
             subj_swapped = _swap_words_in(String(t.subject),  node_drop_table, node_required)
             obj_swapped  = _swap_words_in(String(t.object),   node_drop_table, node_required)
             push!(support_pieces, " $(rand(_TRIPLE_PREFIX_POOL)) $subj_swapped $rel_swapped $obj_swapped.")

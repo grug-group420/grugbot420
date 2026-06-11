@@ -29,12 +29,12 @@
       "relational_patterns": [
         {
           "subject": "number",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "result"
         },
         {
           "subject": "sum",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "number"
         }
       ],
@@ -96,7 +96,7 @@
       "relational_patterns": [
         {
           "subject": "moment",
-          "relation": "produces",
+          "relation": "&causal",
           "object": "era"
         }
       ],
@@ -256,12 +256,12 @@
       "relational_patterns": [
         {
           "subject": "number",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "equation"
         },
         {
           "subject": "formula",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "quantity"
         }
       ],
@@ -365,12 +365,12 @@
       "relational_patterns": [
         {
           "subject": "event",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "civilization"
         },
         {
           "subject": "era",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "artifact"
         }
       ],
@@ -429,7 +429,7 @@
       "relational_patterns": [
         {
           "subject": "number",
-          "relation": "contains",
+          "relation": "&spatial",
           "object": "equation"
         }
       ],
@@ -487,12 +487,12 @@
       "relational_patterns": [
         {
           "subject": "cause",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "effect"
         },
         {
           "subject": "cause",
-          "relation": "leads_to",
+          "relation": "&causal",
           "object": "effect"
         }
       ],
@@ -548,7 +548,7 @@
       "relational_patterns": [
         {
           "subject": "math",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "history"
         }
       ],
@@ -600,7 +600,7 @@
       "relational_patterns": [
         {
           "subject": "math",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "future"
         }
       ],
@@ -1295,17 +1295,17 @@
       "relational_patterns": [
         {
           "subject": "organism",
-          "relation": "is_like",
+          "relation": "&similarity",
           "object": "species"
         },
         {
           "subject": "organism",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "species"
         },
         {
           "subject": "organism",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "species"
         }
       ],
@@ -1367,17 +1367,17 @@
       "relational_patterns": [
         {
           "subject": "cat",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "fur"
         },
         {
           "subject": "cat",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "whiskers"
         },
         {
           "subject": "cat",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "lion"
         }
       ],
@@ -1438,17 +1438,17 @@
       "relational_patterns": [
         {
           "subject": "dog",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "bark"
         },
         {
           "subject": "dog",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "loyalty"
         },
         {
           "subject": "dog",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "wolf"
         }
       ],
@@ -1504,12 +1504,12 @@
       "relational_patterns": [
         {
           "subject": "nature",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "forest"
         },
         {
           "subject": "tree",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "mountain"
         }
       ],
@@ -1569,7 +1569,7 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "contains",
+          "relation": "&spatial",
           "object": "habitat"
         },
         {
@@ -1632,12 +1632,12 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "migration"
         },
         {
           "subject": "season",
-          "relation": "triggers",
+          "relation": "&causal",
           "object": "knowledge"
         }
       ],
@@ -1698,7 +1698,7 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "season"
         }
       ],
@@ -2365,12 +2365,12 @@
       "relational_patterns": [
         {
           "subject": "feeling",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "emotion"
         },
         {
           "subject": "heart",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "today"
         }
       ],
@@ -2428,7 +2428,7 @@
       "relational_patterns": [
         {
           "subject": "state",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "mood"
         }
       ],
@@ -2480,12 +2480,12 @@
       "relational_patterns": [
         {
           "subject": "sadness",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "change"
         },
         {
           "subject": "sadness",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "passing"
         }
       ],
@@ -2542,7 +2542,7 @@
       "relational_patterns": [
         {
           "subject": "happiness",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "connection"
         }
       ],
@@ -2593,12 +2593,12 @@
       "relational_patterns": [
         {
           "subject": "thing",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "weather"
         },
         {
           "subject": "entity",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "season"
         }
       ],
@@ -2659,7 +2659,7 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "past"
         }
       ],
@@ -2716,7 +2716,7 @@
       "relational_patterns": [
         {
           "subject": "feeling",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "future"
         }
       ],
@@ -3281,12 +3281,12 @@
       "relational_patterns": [
         {
           "subject": "phenomenon",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "theory"
         },
         {
           "subject": "experiment",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "properties"
         }
       ],
@@ -3347,12 +3347,12 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "contains",
+          "relation": "&spatial",
           "object": "orbit"
         },
         {
           "subject": "knowledge",
-          "relation": "around",
+          "relation": "&spatial",
           "object": "sun"
         }
       ],
@@ -3411,12 +3411,12 @@
       "relational_patterns": [
         {
           "subject": "cause",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "effect"
         },
         {
           "subject": "cause",
-          "relation": "produces",
+          "relation": "&causal",
           "object": "effect"
         }
       ],
@@ -3530,7 +3530,7 @@
       "relational_patterns": [
         {
           "subject": "answer",
-          "relation": "precedes",
+          "relation": "&temporal",
           "object": "discovery"
         }
       ],
@@ -4070,12 +4070,12 @@
       "relational_patterns": [
         {
           "subject": "thing",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "purpose"
         },
         {
           "subject": "entity",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "object"
         }
       ],
@@ -4133,7 +4133,7 @@
       "relational_patterns": [
         {
           "subject": "existence",
-          "relation": "causes",
+          "relation": "&causal",
           "object": "consciousness"
         }
       ],
@@ -4187,12 +4187,12 @@
       "relational_patterns": [
         {
           "subject": "consciousness",
-          "relation": "resembles",
+          "relation": "&similarity",
           "object": "awareness"
         },
         {
           "subject": "consciousness",
-          "relation": "has",
+          "relation": "&possessive",
           "object": "qualia"
         }
       ],
@@ -8672,12 +8672,12 @@
     },
     {
       "word": "hopeless",
-      "reason": "despair inhibitor — redirect to empathy",
+      "reason": "despair inhibitor \u2014 redirect to empathy",
       "added_at": 1781168001.449
     },
     {
       "word": "impossible",
-      "reason": "defeatist inhibitor — redirect to possibility",
+      "reason": "defeatist inhibitor \u2014 redirect to possibility",
       "added_at": 1781168001.449
     },
     {
@@ -8687,7 +8687,7 @@
     },
     {
       "word": "harmful",
-      "reason": "safety inhibitor — requires validation",
+      "reason": "safety inhibitor \u2014 requires validation",
       "added_at": 1781169801.449
     },
     {
