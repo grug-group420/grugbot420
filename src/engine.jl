@@ -3311,7 +3311,11 @@ function _cast_math_votes(
 
     # GRUG: The headline answer vote. bundle_role = :final tells AIML
     # this is the primary output of the math chain.
-    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, result.answer_str, obj_id, :final))
+    # GRUG v7.18+: DECOHERENCE FIX — use format_arithmetic_reply for the
+    # final vote payload so the user sees a natural-language answer like
+    # "2 plus 2 equals 4" instead of just the bare number "4".
+    formatted_reply = format_arithmetic_reply(result)
+    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, formatted_reply, obj_id, :final))
 
     return out
 end

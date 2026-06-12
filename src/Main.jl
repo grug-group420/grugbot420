@@ -1912,6 +1912,52 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         error("!!! FATAL: Orchestrator failed: Mission text is invisible wind! !!!")
     end
 
+    # GRUG v7.19: DETERMINISTIC MATH ANSWER GUARANTEE.
+    # Before any stochastic voting, check if the mission text contains math.
+    # If SigilMediator detects math bindings AND ArithmeticEngine computes a
+    # valid result, store the formatted answer for guaranteed injection into
+    # the output. This ensures math answers ALWAYS appear regardless of which
+    # node wins the primary election — the vote system is stochastic and
+    # math sigil nodes often have low confidence, causing the answer to be
+    # dropped even with the _math_payloads injection fix.
+    _deterministic_math_answers = String[]
+    try
+        _det_med = SigilMediator.mediate(mission)
+        if :math in _det_med.kinds && !isempty(_det_med.bindings)
+            _det_result = ArithmeticEngine.compute_arithmetic(_det_med.bindings)
+            if isnothing(_det_result.error)
+                push!(_deterministic_math_answers, ArithmeticEngine.format_arithmetic_reply(_det_result))
+            end
+        end
+    catch
+        # Non-fatal — if SigilMediator fails, just skip deterministic math
+    end
+    # GRUG v7.19: Also check per-clause for multipart inputs
+    try
+        _det_clauses = InputDecomposer.decompose(mission)
+        if length(_det_clauses) > 1
+            for _det_cl in _det_clauses
+                try
+                    _det_cl_med = SigilMediator.mediate(_det_cl.text)
+                    if :math in _det_cl_med.kinds && !isempty(_det_cl_med.bindings)
+                        _det_cl_result = ArithmeticEngine.compute_arithmetic(_det_cl_med.bindings)
+                        if isnothing(_det_cl_result.error)
+                            _det_cl_reply = ArithmeticEngine.format_arithmetic_reply(_det_cl_result)
+                            # Deduplicate against already-found answers
+                            if !(_det_cl_reply in _deterministic_math_answers)
+                                push!(_deterministic_math_answers, _det_cl_reply)
+                            end
+                        end
+                    end
+                catch
+                    # Per-clause mediation may fail, skip
+                end
+            end
+        end
+    catch
+        # Non-fatal — decomposition may fail
+    end
+
     # GRUG: Sort votes by confidence descending BEFORE bucketing.
     sorted_votes = sort(votes; by = v -> v.confidence, rev = true)
 
@@ -2098,11 +2144,45 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # confirmed support first, unlinked next, hedge last.
     unsure_votes = vcat(confirmed_support_votes, unlinked_support_votes, hedge_votes)
 
+    # GRUG v7.18+: DECOHERENCE FIX — use scoped_mission for primary group too.
+    # When the primary vote belongs to a multipart clause (objective_id > 0),
+    # find the scoped clause text and use that as the mission for COMMANDS
+    # instead of the full compound text. This prevents AIML from seeing
+    # "what is 3 times 4 and what is the sky" when it should see "what is 3 times 4".
+    _primary_scoped_mission = mission  # default: full text (non-multipart or singleton)
+    _primary_obj_id = getfield(primary_vote, :objective_id)
+    # GRUG v7.19: Only attempt scoped_mission lookup when the mission text
+    # is actually multipart (contains conjunctions). Math sigil votes always
+    # carry a non-zero objective_id (from _cast_math_votes), but for single-
+    # clause inputs the MultipartOrchestrator would group them incorrectly
+    # and set scoped_mission to the payload text ("2 plus 2 equals 4") instead
+    # of the original user input ("what is 2 plus 2").
+    _mission_is_multipart = occursin(r"\b(and|or|but|also|additionally)\b", mission) && length(InputDecomposer.decompose(mission)) > 1
+    if _primary_obj_id > UInt64(0) && _mission_is_multipart
+        # GRUG: look up the clause that matches this objective_id.
+        # We need to find which clause has this objective_id.
+        # Walk the clause_objective_ids dict if available (it's in process_mission scope).
+        # Since we're inside ephemeral_aiml_orchestrator, we don't have direct access.
+        # Instead, use MultipartOrchestrator to find the scoped text from the primary's group.
+        try
+            _pre_all = vcat(sure_votes, unsure_votes)
+            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, [])
+            for _pre_grp in _pre_result.groups
+                if _pre_grp.objective_id == _primary_obj_id
+                    _primary_scoped_mission = _pre_grp.scoped_mission
+                    break
+                end
+            end
+        catch
+            # GRUG: if MultipartOrchestrator fails here, just use full mission.
+        end
+    end
+
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
     # GRUG v7.16.0: try/finally clears band info so it never leaks across cycles.
     # If COMMANDS throws, band info still cleared -- NO SILENT FAILURES, NO GHOSTS.
     output = try
-        COMMANDS[primary_vote.action](mission, node, primary_vote, sure_votes, unsure_votes, votes)
+        COMMANDS[primary_vote.action](_primary_scoped_mission, node, primary_vote, sure_votes, unsure_votes, votes)
     finally
         lock(_CURRENT_BAND_INFO_LOCK) do
             empty!(_CURRENT_BAND_INFO)
@@ -2127,37 +2207,100 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # the node's voice (from the action_packet command) and the structured
     # answer. Empty payload (the default for normal pattern-bind votes)
     # leaves output unchanged.
-    if !isempty(primary_vote.payload)
+    # GRUG v7.19: Skip concat when the payload was already used as the CLAIM
+    # inside generate_aiml_payload (bundle_role === :final). Otherwise the
+    # math answer appears twice — once as the opening claim and once appended
+    # at the end.
+    _primary_already_in_claim = (getfield(primary_vote, :bundle_role) === :final &&
+                                  !isempty(getfield(primary_vote, :payload)))
+    if !isempty(primary_vote.payload) && !_primary_already_in_claim
         output = isempty(strip(String(output))) ?
                  primary_vote.payload :
                  string(rstrip(String(output)), " ", primary_vote.payload)
     end
 
-    # GRUG v7.17+: MULTIPART ORCHESTRATION.
-    # When votes carry objective_id > UInt64(0) (multipart marker), group them
-    # via MultipartOrchestrator so each clause's answer is rendered without
-    # cross-contamination. The primary vote's group already contributed to
-    # the COMMANDS output above; we now append any OTHER groups' payloads.
-    # This is the final decoherence barrier: arithmetic from one clause
-    # cannot bleed into the knowledge clause's rendering because each
-    # group's payload was built from scoped_mission text.
+    # GRUG v7.19+: MATH ANSWER INJECTION — DECOHERENCE FIX.
+    # Two sources of math answers:
+    #   (1) _deterministic_math_answers — computed directly from mission text
+    #       at the top of this function, guaranteed to exist for math inputs
+    #   (2) _math_payloads from :final votes — may or may not be present
+    #       depending on whether math sigil votes survived threshold/lockin
+    # Merge both, deduplicate, and INJECT prominently right after the voice
+    # label so math answers appear as the FIRST spoken content.
+    _primary_payload = getfield(primary_vote, :payload)
+    _all_math_answers = String[]
+    for ans in _deterministic_math_answers
+        if ans != _primary_payload && !(ans in _all_math_answers)
+            push!(_all_math_answers, ans)
+        end
+    end
+    for v in votes
+        role = getfield(v, :bundle_role)
+        payload = getfield(v, :payload)
+        if role === :final && !isempty(payload) && payload != _primary_payload && !(payload in _all_math_answers)
+            push!(_all_math_answers, payload)
+        end
+    end
+    if !isempty(_all_math_answers)
+        math_prefix = join(_all_math_answers, "; ") * ". "
+        out_str = String(output)
+        # GRUG: Find the voice label prefix and inject after it.
+        # Format is "[Voice label] <rest of output>"
+        m_voice = match(r"^(\[[^\]]*\]\s*)", out_str)
+        if m_voice !== nothing
+            output = string(m_voice.match, math_prefix, out_str[length(m_voice.match)+1:end])
+        else
+            # No voice label — just prepend
+            output = string(math_prefix, out_str)
+        end
+    end
+
+    # GRUG v7.18+: MULTIPART ORCHESTRATION — per-clause AIML rendering.
+    # DECOHERENCE FIX: Instead of just appending raw payloads from other groups,
+    # we now run full COMMANDS rendering for each non-primary group using the
+    # group's scoped_mission text. This means:
+    #   - Math clauses get "Thinking it through: the calculation. 4"
+    #   - Knowledge clauses get "Here is the picture: the sky is..." 
+    #   - NOT raw "4" appended to a garbled compound response
     _all_votes = vcat(sure_votes, unsure_votes)
     _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _all_votes)
     if _has_multipart
         try
-            # GRUG: orchestrate groups all votes by objective_id.
-            # The primary group's answer is already in `output` via COMMANDS.
-            # We append OTHER groups' payloads as additional clause answers.
             mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, [])
             _primary_obj = getfield(primary_vote, :objective_id)
             for grp in mp_result.groups
                 if grp.objective_id == _primary_obj
                     continue  # already rendered by COMMANDS above
                 end
-                # GRUG: append this group's scoped_mission + primary payload.
+                # GRUG v7.18+: Full AIML rendering for each non-primary group.
+                # Use the group's scoped_mission as the mission text so AIML
+                # sees only this clause, not the full compound input.
                 grp_primary = grp.primary_vote
+                grp_node = lock(() -> get(NODE_MAP, grp_primary.node_id, nothing), NODE_LOCK)
                 grp_payload = getfield(grp_primary, :payload)
-                if !isempty(grp_payload)
+                grp_scoped = grp.scoped_mission
+                # GRUG: convert Vector{Any} → Vector{Vote} for type-safe COMMANDS dispatch
+                grp_votes_typed = Vote[v for v in grp.votes]
+                # GRUG: if we have the node and COMMANDS has the action, render it.
+                if !isnothing(grp_node) && haskey(COMMANDS, grp_primary.action)
+                    try
+                        grp_output = COMMANDS[grp_primary.action](grp_scoped, grp_node, grp_primary, Vote[], grp_votes_typed, grp_votes_typed)
+                        # GRUG: also concat the group primary's payload if present.
+                        if !isempty(grp_payload)
+                            grp_output = isempty(strip(String(grp_output))) ?
+                                         grp_payload :
+                                         string(rstrip(String(grp_output)), " ", grp_payload)
+                        end
+                        output = string(rstrip(String(output)), " ", grp_output)
+                    catch e
+                        # GRUG: per-group rendering failed — fall back to raw payload.
+                        @warn "[ORCHESTRATOR] Per-group COMMANDS rendering failed for group $(grp.objective_id) (falling back to payload): $e"
+                        if !isempty(grp_payload)
+                            output = string(rstrip(String(output)), " ", grp_payload)
+                        end
+                    end
+                elseif !isempty(grp_payload)
+                    # GRUG: no COMMANDS entry — just append the payload.
                     output = string(rstrip(String(output)), " ", grp_payload)
                 end
             end
@@ -2539,7 +2682,17 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     #   trust the payload to carry the actual value. We do NOT echo the
     #   user's input -- that would turn AIML into a question-paraphraser.
     # -------------------------------------------------------------------
-    claim_raw = if winner_pattern_is_scaffolding
+    # GRUG v7.19: MATH ANSWER PROMINENCE FIX — when the primary vote carries
+    # a :final bundle_role (ArithmeticEngine answer), its payload IS the
+    # spoken claim. Use it directly instead of the generic "the calculation"
+    # handle, so the user sees "2 plus 2 equals 4" as the opening claim
+    # instead of "Thinking it through: the calculation. 2 plus 2 equals 4"
+    # where the answer is buried at the end after all directives.
+    _primary_bundle_role = getfield(primary_vote, :bundle_role)
+    _primary_payload = getfield(primary_vote, :payload)
+    claim_raw = if _primary_bundle_role === :final && !isempty(_primary_payload)
+        _primary_payload
+    elseif winner_pattern_is_scaffolding
         _claim_handle_for_action(primary_vote.action)
     elseif isempty(node_pattern)
         "the mission \"$mission\" touches unseeded territory"
@@ -3321,6 +3474,74 @@ function _stamp_objective(v::Vote, obj_id::UInt64)::Vote
     )
 end
 
+# GRUG v7.18+: DECOHERENCE FIX — determine which clause a node best belongs to.
+# Used during per-clause objective_id stamping so MultipartOrchestrator can group
+# votes by clause. For @sigil:math nodes, we check which clause has math mediation.
+# For regular pattern-bind nodes, we pick the clause whose text has the most
+# token overlap with the node's pattern. Fallback: first clause.
+function _best_clause_objective_for_node(
+    node_id::String,
+    node_peek,       # Union{Nothing, Node} — pass nothing if already locked
+    clauses,         # Vector of DecomposedClause
+    clause_objective_ids::Dict{String, UInt64},
+)::UInt64
+    # GRUG: if we have a node, check for @sigil:math tag first.
+    if !isnothing(node_peek) && has_sigil_tag(node_peek)
+        nk = node_sigil_kind(node_peek)
+        if nk === :math
+            # GRUG: find the clause whose mediation has :math kind
+            # We can't access clause_mediation_map here (out of scope),
+            # so use a heuristic: find the clause whose text contains
+            # number-like words (digits, number words).
+            best_idx = 0
+            best_score = -1
+            for (i, cl) in enumerate(clauses)
+                toks = split(lowercase(cl.text))
+                score = count(t -> occursin(r"^[0-9]+$", t) || t in ("one","two","three","four","five","six","seven","eight","nine","ten",
+                    "zero","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty",
+                    "plus","minus","times","divided","multiply","add","subtract"), toks)
+                if score > best_score
+                    best_score = score
+                    best_idx = i
+                end
+            end
+            if best_idx > 0
+                cl = clauses[best_idx]
+                return get(clause_objective_ids, cl.text, UInt64(0))
+            end
+        end
+    end
+    # GRUG: general heuristic — pick the clause with most token overlap
+    # with the node's pattern. If node_peek is nothing, look it up.
+    local node_obj
+    if isnothing(node_peek)
+        node_obj = lock(() -> get(NODE_MAP, node_id, nothing), NODE_LOCK)
+    else
+        node_obj = node_peek
+    end
+    if isnothing(node_obj)
+        # GRUG: node vanished — fallback to first clause.
+        return isempty(clauses) ? UInt64(0) : get(clause_objective_ids, first(clauses).text, UInt64(0))
+    end
+    pattern_toks = Set(split(lowercase(strip(node_obj.pattern))))
+    best_idx = 0
+    best_overlap = -1
+    for (i, cl) in enumerate(clauses)
+        clause_toks = Set(split(lowercase(strip(cl.text))))
+        overlap = length(intersect(pattern_toks, clause_toks))
+        if overlap > best_overlap
+            best_overlap = overlap
+            best_idx = i
+        end
+    end
+    if best_idx > 0
+        cl = clauses[best_idx]
+        return get(clause_objective_ids, cl.text, UInt64(0))
+    end
+    # GRUG: no overlap at all — fallback to first clause.
+    return isempty(clauses) ? UInt64(0) : get(clause_objective_ids, first(clauses).text, UInt64(0))
+end
+
 function process_mission(mission_text::String)
     if strip(mission_text) == ""
         error("!!! FATAL: process_mission got empty mission text! !!!")
@@ -3360,7 +3581,19 @@ function process_mission(mission_text::String)
     # Non-fatal: if promotion throws, log and proceed with empty mediation \u2014
     # sigil routing is enhancement, not core; pattern bind still works.
     # GRUG v7.17+: multipart objective_id shared by all votes in this cycle.
-    multipart_objective_id = UInt64(0)
+    # GRUG v7.18+: DECOHERENCE FIX — per-clause objective_ids so MultipartOrchestrator
+    # can group votes by clause and render each clause independently. A single shared
+    # objective_id meant ALL votes (math + knowledge + survival) collapsed into one
+    # group, and the primary group's AIML rendering saw the full compound text instead
+    # of the scoped clause. Per-clause IDs fix this: each clause's votes form a
+    # separate group with its own scoped_mission text.
+    multipart_objective_id = UInt64(0)   # legacy: still set for compatibility
+    clause_objective_ids = Dict{String, UInt64}()  # clause_text -> per-clause obj_id
+    if is_multipart
+        for cl in clauses
+            clause_objective_ids[cl.text] = fresh_objective_id()
+        end
+    end
 
     # GRUG v7.17+: per-clause mediation map for multipart inputs.
     # clause_text -> SigilMediation, so each clause's bindings are isolated.
@@ -3664,11 +3897,47 @@ function process_mission(mission_text::String)
                         else
                             sigil_votes = cast_sigil_votes(id, conf, sm_bindings, sm_original, u_trips, n_trips)
                         end
-                        # GRUG v7.17+: For multipart inputs, override the
-                        # objective_id on all sigil votes to the shared cycle
-                        # objective_id so AIML can group them.
-                        if is_multipart && multipart_objective_id > UInt64(0)
-                            sigil_votes = [_stamp_objective(v, multipart_objective_id) for v in sigil_votes]
+                        # GRUG v7.18+: DECOHERENCE FIX — per-clause objective_id stamping.
+                        # Instead of stamping ALL sigil votes with one shared ID, stamp
+                        # each vote with the objective_id of the clause it belongs to.
+                        # Math votes belong to the math clause; multipart companion votes
+                        # belong to the clause whose text matches their payload.
+                        if is_multipart
+                            node_kind_local = node_sigil_kind(node_peek)
+                            stamped = Vote[]
+                            for sv in sigil_votes
+                                sv_obj_id = UInt64(0)
+                                if node_kind_local === :math
+                                    # GRUG: math votes belong to the clause that has :math in its mediation.
+                                    for (cl_text, cl_med) in clause_mediation_map
+                                        if :math in getfield(cl_med, :kinds)
+                                            sv_obj_id = get(clause_objective_ids, cl_text, UInt64(0))
+                                            break
+                                        end
+                                    end
+                                elseif node_kind_local === :multipart
+                                    # GRUG: multipart companion votes carry clause text in their payload.
+                                    # Match payload against clause texts to find the right objective_id.
+                                    sv_payload = getfield(sv, :payload)
+                                    for cl in clauses
+                                        if occursin(lowercase(strip(cl.text)), lowercase(strip(sv_payload))) ||
+                                           occursin(lowercase(strip(sv_payload)), lowercase(strip(cl.text)))
+                                            sv_obj_id = get(clause_objective_ids, cl.text, UInt64(0))
+                                            break
+                                        end
+                                    end
+                                end
+                                # GRUG: if we couldn't find a clause match, use first clause's ID as fallback.
+                                if sv_obj_id == UInt64(0) && !isempty(clause_objective_ids)
+                                    sv_obj_id = first(values(clause_objective_ids))
+                                end
+                                if sv_obj_id > UInt64(0)
+                                    push!(stamped, _stamp_objective(sv, sv_obj_id))
+                                else
+                                    push!(stamped, sv)
+                                end
+                            end
+                            sigil_votes = stamped
                         end
                         append!(out, sigil_votes)
                     catch e
@@ -3678,17 +3947,30 @@ function process_mission(mission_text::String)
                         # this cycle. NO SILENT FAILURE -- the warning is loud.
                         @warn "[MAIN] cast_sigil_votes failed on node $(id) ($(typeof(e))): $e -- falling back to cast_vote"
                         v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
-                        if is_multipart && multipart_objective_id > UInt64(0)
-                            push!(out, _stamp_objective(v, multipart_objective_id))
+                        # GRUG v7.18+: per-clause objective_id stamping for fallback votes.
+                        if is_multipart
+                            # GRUG: try to match node pattern against clauses
+                            node_peek_fallback = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
+                            fallback_obj = _best_clause_objective_for_node(id, node_peek_fallback, clauses, clause_objective_ids)
+                            if fallback_obj > UInt64(0)
+                                push!(out, _stamp_objective(v, fallback_obj))
+                            else
+                                push!(out, v)
+                            end
                         else
                             push!(out, v)
                         end
                     end
                 else
                     v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
-                    # GRUG v7.17+: Stamp multipart objective_id on all votes.
-                    if is_multipart && multipart_objective_id > UInt64(0)
-                        push!(out, _stamp_objective(v, multipart_objective_id))
+                    # GRUG v7.18+: per-clause objective_id stamping for regular votes.
+                    if is_multipart
+                        regular_obj = _best_clause_objective_for_node(id, nothing, clauses, clause_objective_ids)
+                        if regular_obj > UInt64(0)
+                            push!(out, _stamp_objective(v, regular_obj))
+                        else
+                            push!(out, v)
+                        end
                     else
                         push!(out, v)
                     end
@@ -5320,6 +5602,42 @@ function load_specimen_from_file!(filepath::String)::String
         n_modes = length(specimen["answer_mode_config"])
         println("  🎯 Answer mode config found ($n_modes modes) - stored for future dispatch")
     end
+
+    # ══════════════════════════════════════════════════════════════════════════════
+    # PHASE 4.5: ENSURE SIGIL SEED NODES EXIST
+    # ══════════════════════════════════════════════════════════════════════════════
+    # Why: Specimen files contain zero @sigil:math or @sigil:multipart tagged nodes.
+    # Without these, the ArithmeticEngine never fires and multipart decomposition
+    # has no structural rail. The initial cave population creates them (lines ~5419)
+    # but /loadSpecimen wipes the cave and never recreates them. This patch ensures
+    # they exist after every specimen load, closing the decoherence gap.
+    # ══════════════════════════════════════════════════════════════════════════════
+    begin
+        local math_ids  = list_sigil_node_ids(:math)
+        local mp_ids    = list_sigil_node_ids(:multipart)
+        if isempty(math_ids)
+            math_ctx = Dict{String, Any}(
+                "system_prompt" => "Arithmetic reasoning voice",
+                "sigil_kind"    => "math",
+            )
+            create_sigil_node("&n &op &n", "calculate^4 | reason^2 | analyze^1", math_ctx, String[]; kind = :math)
+            create_sigil_node("&n &op &n &op &n", "calculate^4 | reason^2 | ponder^1", math_ctx, String[]; kind = :math)
+            println("  🔢 @sigil:math seed nodes created (specimen had none)")
+        else
+            println("  🔢 @sigil:math nodes already present ($(length(math_ids))), skipping seed")
+        end
+        if isempty(mp_ids)
+            multipart_ctx = Dict{String, Any}(
+                "system_prompt" => "Multi-clause reasoning voice",
+                "sigil_kind"    => "multipart",
+            )
+            create_sigil_node("&conj", "explain^4 | describe^2 | elaborate^1", multipart_ctx, String[]; kind = :multipart)
+            println("  🔗 @sigil:multipart seed node created (specimen had none)")
+        else
+            println("  🔗 @sigil:multipart nodes already present ($(length(mp_ids)), skipping seed")
+        end
+    end
+
 
 
     # ══════════════════════════════════════════════════════════════════════
