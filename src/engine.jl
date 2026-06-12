@@ -45,6 +45,13 @@ if !isdefined(@__MODULE__, :ActionTonePredictor)
     using .ActionTonePredictor
 end
 
+# GRUG: Bring the SelfObserver (subconscious microlog) for context-polarity observations.
+# GRUG: Guard against double-include if SelfObserver already loaded by caller.
+if !isdefined(@__MODULE__, :SelfObserver)
+    include("SelfObserver.jl")
+    using .SelfObserver
+end
+
 # GRUG: Bring the Vote Orchestrator (parallel 1000-cap fire + unique Task dispatch + threshold vote picker).
 # GRUG: Guard against double-include if VoteOrchestrator already loaded by caller.
 if !isdefined(@__MODULE__, :VoteOrchestrator)
@@ -1671,6 +1678,14 @@ end
 # _mission_has_deterministic_answer() to choose the rendering path.
 const _CURRENT_HAS_DETERMINISTIC_ANSWER = Ref{Bool}(false)
 
+# GRUG v7.32: Context polarity — the ATP prediction for the current mission cycle.
+# Set in scan_specimens (or by the caller in Main.jl) before votes fire.
+# Read by _sigil_suppressed_by_polarity() to gate sigil vote casting when
+# the input carries negation or figurative dismiss signals.
+# "don't calculate 2+2" → ACTION_NEGATE → math suppressed
+# "easy as 2+2" → figurative_dismiss=true → math suppressed
+const _CURRENT_PREDICTION = Ref{Any}(nothing)
+
 # GRUG v7.21: _mission_has_deterministic_answer() — predicate that detects
 # whether this mission cycle produced a deterministic (computable) answer.
 # When true, the rendering pipeline skips the entire SUPPORT block — the
@@ -3183,6 +3198,38 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vecto
 
     if !isnothing(prediction)
         @info "[ENGINE] 🔮 $(ActionTonePredictor.format_prediction_summary(prediction))"
+        # GRUG v7.32: Store the prediction in the thread-local ref so
+        # cast_sigil_votes can read it for the context polarity gate.
+        _CURRENT_PREDICTION[] = prediction
+        # GRUG v7.32: PRE-VOTE SELF-OBSERVATION — record the prediction's
+        # polarity signals into the subconscious store before any votes fire.
+        # This gives SelfObserver a voice at the pre-vote phase: the observation
+        # is available for future peek_exact/peek_pattern calls so downstream
+        # logic can learn from past polarity patterns.
+        # Tagged :context_polarity so it can be filtered/audited independently.
+        try
+            _fig_dismiss = try getfield(prediction, :figurative_dismiss) catch _e1; nothing; end
+            _neg_str     = try Float64(getfield(prediction, :negation_strength)) catch _e2; 0.0; end
+            _act_family  = try getfield(prediction, :action_family) catch _e3; :unknown; end
+            SelfObserver.observe!(
+                SelfObserver.default_store(),
+                "polarity_pre_vote_$(hash(input_text))",
+                :context_polarity,
+                Dict{String,Any}(
+                    "phase"             => "pre_vote",
+                    "input_hash"        => hash(input_text),
+                    "action_family"     => string(_act_family),
+                    "figurative_dismiss"=> _fig_dismiss === true,
+                    "negation_strength" => _neg_str,
+                    "input_preview"     => first(input_text, 60),
+                );
+                p_write    = 1.0,       # always write pre-vote observations
+                salience   = 7.0,       # high salience — polarity affects vote outcomes
+                provenance = :atp_pre_vote,
+            )
+        catch ex_obs
+            @warn "[ENGINE] SelfObserver pre-vote observe! failed: $ex_obs"
+        end
         # GRUG: If predictor found a dangling verb (incomplete causal chain), warn user.
         # Informational only -- scan still proceeds, but output may be less coherent.
         if prediction.incomplete_chain
@@ -3749,6 +3796,83 @@ function _select_opener(packet::String)::String
     return opener
 end
 
+# GRUG v7.32: CONTEXT POLARITY GATE
+# ─────────────────────────────────
+# Before a sigil vote fires, check whether the input's ATP prediction
+# signals that the sigil should be suppressed. Two suppression modes:
+#
+#   1. EXPLICIT NEGATION — "don't calculate 2+2", "no don't answer that"
+#      ACTION_NEGATE with negation_strength > 0.5 and figurative_dismiss=false
+#      → The user is explicitly telling us NOT to compute/act.
+#
+#   2. FIGURATIVE DISMISS — "easy as 2+2", "simple as 1+1"
+#      figurative_dismiss=true → The math construct is a metaphor, not a request.
+#      The user isn't asking for a computation; they're using it as a comparison.
+#
+# Both modes suppress :math and :doaction sigil kinds. :multipart and other
+# kinds are NOT suppressed (negation doesn't prevent clause-splitting).
+#
+# The gate reads from _CURRENT_PREDICTION (set before the scan fires).
+# If no prediction exists (e.g. image input, or ATP failed), the gate is OPEN.
+#
+# Side language rules apply: the gate is another knob on the existing
+# ActionTonePredictor + SemanticVerbs infrastructure. No new systems —
+# just another reader of the same signals everyone else uses.
+# ──────────────────────────────────────────────────────────────────────────────
+
+"""
+    _sigil_suppressed_by_polarity(kind) -> Bool
+
+Check whether the current mission's ATP prediction suppresses this sigil kind.
+Returns true when the vote should be DROPPED entirely (not just weighted down).
+Only suppresses :math and :doaction — negation doesn't prevent clause-splitting.
+"""
+function _sigil_suppressed_by_polarity(kind::Symbol)::Bool
+    # GRUG: Only :math and :doaction are polarity-gated. :multipart and
+    # :instruction have different semantics — negation doesn't prevent clause detection.
+    if kind !== :math && kind !== :doaction
+        return false
+    end
+
+    pred = _CURRENT_PREDICTION[]
+    pred === nothing && return false  # no prediction → gate is open
+
+    # GRUG: Duck-type check — if the prediction has the fields we need, use them.
+    # This avoids a hard type dependency on ActionTonePredictor.PredictionResult.
+    has_negation = try
+        getfield(pred, :action_family) === ActionTonePredictor.ACTION_NEGATE
+    catch
+        false
+    end
+
+    has_figurative = try
+        getfield(pred, :figurative_dismiss) === true
+    catch
+        false
+    end
+
+    neg_strength = try
+        Float64(getfield(pred, :negation_strength))
+    catch
+        0.0
+    end
+
+    # GRUG: Figurative dismiss always suppresses for math/doaction.
+    # "easy as 2+2" is never a real computation request.
+    if has_figurative
+        return true
+    end
+
+    # GRUG: Explicit negation suppresses when strong enough.
+    # Weak negation (score < 0.5) might be incidental ("not bad at 2+2")
+    # and shouldn't suppress. Strong negation ("don't calculate 2+2") should.
+    if has_negation && neg_strength > 0.5
+        return true
+    end
+
+    return false
+end
+
 """
     cast_sigil_votes(id, conf, bindings, original_text, u_trips, n_trips) -> Vector{Vote}
 
@@ -3761,6 +3885,36 @@ NO SILENT FAILURES: empty id, missing node, or unknown action throws.
 For known kinds, ArithmeticEngine errors propagate as SigilFireError so
 the caller can decide whether to retry or skip.
 """
+# GRUG v7.32: Helper — record a post-vote SelfObserver observation for sigil
+# votes that fired NORMALLY (not suppressed). This lets SelfObserver chime in
+# at the post-vote phase so future peek_pattern calls can learn which sigils
+# fired under which polarity conditions.
+function _observe_sigil_fired(node_id::String, kind::Symbol, votes::Vector{Vote})
+    try
+        n_votes = length(votes)
+        obj_id  = n_votes > 0 ? votes[1].objective_id : "none"
+        SelfObserver.observe!(
+            SelfObserver.default_store(),
+            "polarity_post_vote_$(node_id)_$(obj_id)",
+            :context_polarity,
+            Dict{String,Any}(
+                "phase"        => "post_vote",
+                "node_id"      => node_id,
+                "sigil_kind"   => string(kind),
+                "outcome"      => "fired",
+                "n_votes"      => n_votes,
+                "objective_id" => obj_id,
+            );
+            p_write    = 1.0,
+            salience   = 5.0,
+            provenance = :polarity_gate_fired,
+        )
+    catch ex_obs
+        @warn "[ENGINE] SelfObserver post-vote observe! (fired) failed: $ex_obs"
+    end
+    return votes   # pass-through, so caller can: return _observe_sigil_fired(...)
+end
+
 function cast_sigil_votes(
     id::String,
     conf::Float64,
@@ -3789,12 +3943,57 @@ function cast_sigil_votes(
     # v7.27: antimatch=false removed from all branches — field no longer exists.
     bump_strength!(node)
 
+    # GRUG v7.32: CONTEXT POLARITY GATE — before dispatching, check whether
+    # the input's ATP prediction suppresses this sigil kind. "don't calculate
+    # 2+2" (ACTION_NEGATE) and "easy as 2+2" (figurative_dismiss) should NOT
+    # fire math/doaction votes. The node still gets its strength bump (it was
+    # activated by the scan, and strength is independent of whether it votes),
+    # but it emits a single suppressed-acknowledgment vote instead of computing.
+    if _sigil_suppressed_by_polarity(kind)
+        @info "[ENGINE] 🔇 Sigil kind :$kind suppressed by context polarity (negation/figurative dismiss) on node $id"
+        opener = _select_opener(node.action_packet)
+        if !haskey(COMMANDS, opener)
+            opener = "observe"  # fallback: the node still speaks, just doesn't compute
+        end
+        _, negatives = select_action(node.action_packet)
+        obj_id = fresh_objective_id()
+        # GRUG: Emit a single :suppressed vote. The node's voice is heard
+        # ("I see what you did there") but no computation happens. Payload
+        # is empty — the vote is an acknowledgment, not an answer.
+        # GRUG v7.32: POST-VOTE SELF-OBSERVATION — record that this sigil was
+        # suppressed by context polarity. SelfObserver chimes in at the post-vote
+        # phase too, so future peek_pattern calls can learn from suppressed fires.
+        try
+            SelfObserver.observe!(
+                SelfObserver.default_store(),
+                "polarity_post_vote_$(id)_$(obj_id)",
+                :context_polarity,
+                Dict{String,Any}(
+                    "phase"        => "post_vote",
+                    "node_id"      => id,
+                    "sigil_kind"   => string(kind),
+                    "outcome"      => "suppressed",
+                    "opener"       => opener,
+                    "conf"         => conf * 0.3,
+                    "objective_id" => obj_id,
+                );
+                p_write    = 1.0,
+                salience   = 6.0,
+                provenance = :polarity_gate_suppressed,
+            )
+        catch ex_obs
+            @warn "[ENGINE] SelfObserver post-vote observe! (suppressed) failed: $ex_obs"
+        end
+        return Vote[Vote(node.id, opener, conf * 0.3, negatives, u_trips, n_trips,
+                         "", obj_id, :suppressed)]
+    end
+
     if kind === :math
-        return _cast_math_votes(node, conf, bindings, u_trips, n_trips)
+        return _observe_sigil_fired(id, kind, _cast_math_votes(node, conf, bindings, u_trips, n_trips))
     elseif kind === :multipart
-        return _cast_multipart_votes(node, conf, bindings, original_text, u_trips, n_trips)
+        return _observe_sigil_fired(id, kind, _cast_multipart_votes(node, conf, bindings, original_text, u_trips, n_trips))
     elseif kind === :doaction
-        return _cast_doaction_votes(node, conf, bindings, original_text, u_trips, n_trips)
+        return _observe_sigil_fired(id, kind, _cast_doaction_votes(node, conf, bindings, original_text, u_trips, n_trips))
     elseif kind === :instruction
         throw(SigilFireError(kind, id,
             "@sigil:instruction lane is reserved; not yet implemented"))

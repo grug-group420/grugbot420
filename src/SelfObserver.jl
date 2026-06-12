@@ -113,7 +113,7 @@ const TOKEN_REFILL_SECONDS     = 20.0       # one token per N seconds per node
 const GLOBAL_TOKEN_CAP         = 8          # outstanding tokens across all nodes
 
 # GRUG: valid tag namespaces — closed set, so audits are tractable.
-const VALID_TAGS = Set{Symbol}([:timing, :lexical, :mood, :relational, :meta])
+const VALID_TAGS = Set{Symbol}([:timing, :lexical, :mood, :relational, :meta, :context_polarity])
 
 # GRUG: fuzzy time buckets, in seconds, in increasing order.
 # Boundaries are jittered per query (see fuzzy_bucket_for).

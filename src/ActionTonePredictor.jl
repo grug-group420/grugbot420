@@ -92,6 +92,8 @@ struct PredictionResult
     action_distribution ::Dict{ActionFamily, Float64}  # Normalized action probabilities
     tone_distribution   ::Dict{ToneFamily, Float64}    # Normalized tone probabilities
     trajectory_damped   ::Bool   # True if Lorenz damping was applied this prediction
+    figurative_dismiss  ::Bool   # GRUG v7.32: True when figurative language detected (easy as 2+2)
+    negation_strength   ::Float64  # GRUG v7.32: Raw negation signal magnitude [0.0, ∞)
 end
 
 # ==============================================================================
@@ -234,7 +236,13 @@ const COMMAND_MARKERS = Set([
 # GRUG: Negation markers — contradiction and rejection tokens
 const NEGATE_MARKERS = Set([
     "not", "never", "no", "wrong", "incorrect", "false", "deny",
-    "negate", "contradict", "disagree", "refuse", "reject", "invalid"
+    "negate", "contradict", "disagree", "refuse", "reject", "invalid",
+    # GRUG v7.32: Contraction negations — "don't", "won't", etc.
+    # After punctuation strip (removes ,;.!?:) the apostrophe survives,
+    # so these are literal token matches.
+    "don't", "doesn't", "didn't", "won't", "wouldn't", "can't", "cannot",
+    "couldn't", "shouldn't", "isn't", "aren't", "wasn't", "weren't",
+    "haven't", "hasn't", "hadn't", "mustn't", "needn't", "shan't"
 ])
 
 # GRUG: Speculative markers — epistemic hedging tokens
@@ -270,6 +278,29 @@ const REFLECTIVE_MARKERS = Set([
 const REFLECTIVE_PHRASES = [
     "i think", "i believe", "it seems", "i wonder",
     "one might", "it appears", "it suggests"
+]
+
+# GRUG v7.32: FIGURATIVE DISMISS markers — language that uses math-like constructs
+# as metaphors or illustrative comparisons, NOT as computation requests.
+# "easy as 2+2", "simple as 1+1", "like doing basic math" — the user is
+# being figurative, not asking for a calculation. These suppress sigil firing.
+const FIGURATIVE_DISMISS_MARKERS = Set([
+    "easy", "simple", "trivial", "obvious", "basic", "plain",
+    "straightforward", "elementary", "effortless", "commonsense",
+    "no-brainer", "natural", "automatic", "instinctive"
+])
+
+# GRUG v7.32: Multi-word figurative dismiss phrases. These scan the full
+# lowercased input string. Catches "easy as 2+2", "simple as abc", etc.
+const FIGURATIVE_DISMISS_PHRASES = [
+    "easy as", "simple as", "plain as", "obvious as",
+    "trivial as", "basic as", "straightforward as",
+    "like doing", "like saying", "like asking",
+    "no more than", "nothing more than", "just like",
+    "as easy as", "as simple as", "as basic as",
+    "common sense", "goes without saying", "of course",
+    "basically just", "essentially just", "simply put",
+    "it's just", "thats just", "that's just"
 ]
 
 # ==============================================================================
@@ -898,6 +929,28 @@ function predict_action_tone(
         action_scores[ACTION_ESCALATE] += Float64(excl_count) * 0.5
     end
 
+    # GRUG v7.32: FIGURATIVE DISMISS SCORING — language that wraps math/action
+    # constructs in dismissive comparisons ("easy as 2+2", "simple as 1+1").
+    # This is NOT a computation request — it's a metaphor. We score it into
+    # ACTION_NEGATE (the user is negating the literal interpretation) with a
+    # separate figurative_dismiss flag so the pre-vote gate can distinguish
+    # "don't calculate" (explicit negation) from "easy as 2+2" (figurative dismiss).
+    figurative_score = 0.0
+    input_low = lowercase(input_text)
+    for tok in tokens_clean
+        if tok in FIGURATIVE_DISMISS_MARKERS
+            figurative_score += 1.0
+        end
+    end
+    for phrase in FIGURATIVE_DISMISS_PHRASES
+        if contains(input_low, phrase)
+            figurative_score += 1.5  # phrases are stronger signal than single words
+        end
+    end
+    if figurative_score > 0.0
+        action_scores[ACTION_NEGATE] += figurative_score * 0.7
+    end
+
     # GRUG: Per-token lexicon scoring.
     for tok in tokens_clean
         tok in QUERY_MARKERS     && (action_scores[ACTION_QUERY]     += 1.0)
@@ -1111,7 +1164,9 @@ function predict_action_tone(
         time(),
         action_dist,
         tone_dist,
-        trajectory_damped
+        trajectory_damped,
+        figurative_score > 0.0,           # GRUG v7.32: figurative_dismiss flag
+        get(action_scores, ACTION_NEGATE, 0.0)  # GRUG v7.32: raw negation signal magnitude
     )
 end
 
