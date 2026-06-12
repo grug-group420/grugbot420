@@ -5008,8 +5008,9 @@ function save_specimen_to_file!(filepath::String)::String
 
     # ── 12. ID COUNTERS ──────────────────────────────────────────────────
     specimen["id_counters"] = Dict{String, Any}(
-        "node_id_counter" => ID_COUNTER[],
-        "msg_id_counter"  => MSG_ID_COUNTER[]
+        "node_id_counter"   => ID_COUNTER[],
+        "msg_id_counter"    => MSG_ID_COUNTER[],
+        "objective_counter" => engine._OBJECTIVE_COUNTER[]  # GRUG v7.35: persist to avoid ID collision after reload
     )
     # ─── 12.5 LAST VOTER IDS ────────────────────────────────────────────────────────
     # GRUG: Save last voter IDs so /wrong works after save/load.
@@ -5185,6 +5186,16 @@ function save_specimen_to_file!(filepath::String)::String
     # Without this, all runtime-registered actions are lost on reload.
     specimen["actions"] = ActionScript.serialize_registry()
 
+    # GRUG v7.35: 29. DECOMPOSER CONFIG (InputDecomposer) ─────────────────────
+    # Without this, any runtime tweaks to compound_pairs, split_conjunctions,
+    # or question_markers are lost on reload — decomposition rules reset to defaults.
+    specimen["decomposer_config"] = InputDecomposer.serialize_config()
+
+    # GRUG v7.35: 30. RELATIONAL JITTER CONFIG (RelationalJitter) ─────────────
+    # Jitter ratio, coin_ratio, and enabled flag are runtime-tunable Refs.
+    # Without this, they reset to defaults on reload.
+    specimen["relational_jitter_config"] = RelationalJitter.serialize_config()
+
     specimen["_meta"] = Dict{String, Any}(
         "version"    => "2.7",
         "saved_at"   => time(),
@@ -5355,31 +5366,19 @@ function load_specimen_from_file!(filepath::String)::String
     validation_errors = String[]
 
     # GRUG: Allowed top-level keys
+    # GRUG v7.35: allowed_keys trimmed to only keys with active save/load paths.
+    # Dead paper keys (no runtime state, no serialization, no handler) removed.
+    # If you add a new save key, add it here AND write the serialize/restore pair.
     allowed_keys = Set(["nodes", "hopfield_cache", "rules", "message_history",
                         "lobes", "node_to_lobe_idx", "lobe_tables",
                         "verb_registry", "thesaurus_seeds", "inhibitions",
                         "arousal", "eye_state", "id_counters", "last_voters", "brainstem", "attachments",
                         "trajectory", "temporal_coherence", "morph_cooldowns", "immune_system", "aiml_system",
-                        # GRUG v2.5 NEW save categories
                         "tonal_buildup", "concept_classes", "concept_inhibitions",
                         "groups", "crystalize", "chatter_swap_cooldowns", "subconscious",
-                        # GRUG v2.6 NEW save category
                         "sigils",
-                        # GRUG v7.17+: v3 specimen extended keys (soft-accept; loaded by dedicated handlers or logged+skipped)
-                        "sigil_table", "decomposer_config", "automaton_rules", "answer_mode_config",
-                        "immune_config", "input_ledger", "fanout_config", "engine_config",
-                        "scanner_config", "vigilance_config", "coherence_config", "growth_config",
-                        "mitosis_config", "phagy_config", "chatter_config", "relational_jitter_config",
-                        "action_tone_knobs", "tonal_judge_knobs", "vote_orchestrator_knobs", "lobe_orchestrator_knobs",
-                        "time_orientation_config", "bridges", "co_activation", "curiosity",
-                        "flashcards", "hippocampal_pending_ask", "ephemeral_mlp", "mlp_cached_phi",
-                        "mlp_observer_store", "phase_accumulator", "injector_stats",
-                        "autogrowth_co_occur", "autogrowth_evidence", "autolink_evidence",
-                        "chatter_cooldowns", "chatter_cursor", "chatter_groups", "chatter_residuals",
-                        "node_to_group_idx", "last_contributor_votes", "lobe_orch_last",
-                        "phagy_rules_ref", "admin_session", "brainstem_config",
-                        # GRUG v7.28: additional save state keys from newer save cycles
-                        "decomposer_state", "macro_state", "arithmetic_state", "stepvote_state",
+                        "actions", "decomposer_config", "relational_jitter_config",
+                        "sigil_table", "automaton_rules", "answer_mode_config",
                         "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
@@ -5387,28 +5386,20 @@ function load_specimen_from_file!(filepath::String)::String
         end
     end
 
-    # GRUG: Type checks for critical array sections
+    # GRUG v7.35: Type checks for critical array sections (dead keys removed)
     for k in ["nodes", "hopfield_cache", "rules", "message_history", "lobes", "lobe_tables", "inhibitions", "temporal_coherence",
-              "sigil_table", "automaton_rules", "autogrowth_co_occur", "autogrowth_evidence", "bridges",
-              "chatter_cooldowns", "chatter_groups", "last_voters", "last_contributor_votes", "phagy_rules_ref",
-              "attachments"]
+              "sigil_table", "automaton_rules", "last_voters", "attachments", "actions"]
         if haskey(specimen, k) && !isa(specimen[k], AbstractVector)
             push!(validation_errors, "'$k' must be an array")
         end
     end
 
-    # GRUG: Type checks for critical dict sections
+    # GRUG v7.35: Type checks for critical dict sections (dead keys removed)
     for k in ["node_to_lobe_idx", "verb_registry", "thesaurus_seeds", "arousal", "eye_state", "id_counters", "brainstem",
              "trajectory", "morph_cooldowns", "immune_system", "aiml_system", "_meta",
-             "immune_config", "input_ledger", "fanout_config", "engine_config", "scanner_config",
-             "vigilance_config", "coherence_config", "growth_config", "mitosis_config", "phagy_config",
-             "chatter_config", "relational_jitter_config", "action_tone_knobs", "tonal_judge_knobs",
-             "vote_orchestrator_knobs", "lobe_orchestrator_knobs", "time_orientation_config",
-             "co_activation", "curiosity", "flashcards", "hippocampal_pending_ask",
-             "ephemeral_mlp", "mlp_cached_phi", "mlp_observer_store", "phase_accumulator",
-             "injector_stats", "autolink_evidence", "chatter_cursor", "chatter_residuals",
-             "node_to_group_idx", "lobe_orch_last", "admin_session", "brainstem_config",
-             "decomposer_config", "answer_mode_config"]
+             "groups", "crystalize", "chatter_swap_cooldowns", "subconscious", "sigils",
+             "tonal_buildup", "concept_classes",
+             "decomposer_config", "relational_jitter_config", "answer_mode_config"]
         if haskey(specimen, k) && !isa(specimen[k], Dict)
             push!(validation_errors, "'$k' must be an object")
         end
@@ -5576,7 +5567,11 @@ function load_specimen_from_file!(filepath::String)::String
         if haskey(idc, "msg_id_counter")
             MSG_ID_COUNTER[] = Int(idc["msg_id_counter"])
         end
-        println("  🔢 ID counters restored (node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[]))")
+        # GRUG v7.35: Restore objective counter to avoid ID collision.
+        if haskey(idc, "objective_counter")
+            engine._OBJECTIVE_COUNTER[] = UInt64(idc["objective_counter"])
+        end
+        println("  🔢 ID counters restored (node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[]), objective=$(engine._OBJECTIVE_COUNTER[]))")
     end
 
     # ─── 4.1.5 LAST VOTER IDS ──────────────────────────────────────────────────
@@ -6222,13 +6217,25 @@ function load_specimen_from_file!(filepath::String)::String
         end
     end
 
-    # GRUG v7.17+: Restore decomposer_config from specimen (if present).
+    # GRUG v7.35: Restore decomposer_config from specimen (now round-trips — save writes it too).
     if haskey(specimen, "decomposer_config") && isa(specimen["decomposer_config"], Dict)
         try
-            InputDecomposer.set_decomposer_config!(specimen["decomposer_config"])
-            println("  🔀 Decomposer config restored")
+            n_dc = InputDecomposer.restore_config!(specimen["decomposer_config"])
+            println("  🔄 Decomposer config restored")
         catch e
             @warn "[MAIN] decomposer_config restore failed (non-fatal): $e"
+        end
+    end
+
+    # GRUG v7.35: Restore relational jitter config from specimen.
+    if haskey(specimen, "relational_jitter_config") && isa(specimen["relational_jitter_config"], Dict)
+        try
+            n_rj = RelationalJitter.restore_config!(specimen["relational_jitter_config"])
+            ratio = RelationalJitter.get_jitter_ratio()
+            enabled = RelationalJitter.is_jitter_enabled()
+            println("  🎲 Relational jitter config restored (ratio=$ratio, enabled=$enabled)")
+        catch e
+            @warn "[MAIN] relational_jitter_config restore failed (non-fatal): $e"
         end
     end
 
@@ -6239,6 +6246,7 @@ function load_specimen_from_file!(filepath::String)::String
     if haskey(specimen, "answer_mode_config")
         n_modes = length(specimen["answer_mode_config"])
         println("  🎯 Answer mode config found ($n_modes modes) - stored for future dispatch")
+    end
 
     # GRUG v7.31: Restore action entries from specimen (the "side list").
     # Without this, all user-registered &doAction entries are lost on reload.
@@ -6252,7 +6260,6 @@ function load_specimen_from_file!(filepath::String)::String
             @warn "[MAIN] action entries restore failed (non-fatal, defaults kept): $e"
             counts["actions"] = 0
         end
-    end
     end
 
     # ══════════════════════════════════════════════════════════════════════════════

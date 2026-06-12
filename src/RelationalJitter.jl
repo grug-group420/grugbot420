@@ -44,6 +44,7 @@ export enable_jitter!, disable_jitter!, is_jitter_enabled
 export set_jitter_ratio!, get_jitter_ratio
 export set_jitter_coin_ratio!, get_jitter_coin_ratio
 export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
+export serialize_config, restore_config!
 
 # ==============================================================================
 # ERROR TYPE — GRUG hate silent failures
@@ -708,6 +709,53 @@ function jitter_score_with_override(
         return jitter_score(score)
     end
     return score
+end
+
+# ==============================================================================
+# SERIALIZATION (for specimen persistence)
+# ==============================================================================
+
+"""
+    serialize_config() -> Dict{String,Any}
+
+GRUG: Snapshot the current jitter config for specimen save.
+Returns a dict with ratio, coin_ratio, and enabled flags.
+"""
+function serialize_config()::Dict{String,Any}
+    lock(_CONFIG_LOCK) do
+        Dict{String,Any}(
+            "ratio"      => _JITTER_RATIO[],
+            "coin_ratio" => _JITTER_COIN_RATIO[],
+            "enabled"    => _JITTER_ENABLED[],
+        )
+    end
+end
+
+"""
+    restore_config!(data::AbstractDict) -> Int
+
+GRUG: Restore jitter config from a specimen snapshot.
+Returns 1 on success. Tolerant of missing keys — defaults stay.
+"""
+function restore_config!(data::AbstractDict)::Int
+    lock(_CONFIG_LOCK) do
+        if haskey(data, "ratio")
+            r = Float64(data["ratio"])
+            if 0.0 <= r <= JITTER_RATIO_MAX
+                _JITTER_RATIO[] = r
+            end
+        end
+        if haskey(data, "coin_ratio")
+            c = Float64(data["coin_ratio"])
+            if 0.0 <= c <= 1.0
+                _JITTER_COIN_RATIO[] = c
+            end
+        end
+        if haskey(data, "enabled")
+            _JITTER_ENABLED[] = Bool(data["enabled"])
+        end
+    end
+    return 1
 end
 
 end # module RelationalJitter

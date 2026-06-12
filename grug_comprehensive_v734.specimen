@@ -792,7 +792,8 @@
   "hopfield_cache": [],
   "id_counters": {
     "msg_id_counter": 8,
-    "node_id_counter": 79
+    "node_id_counter": 79,
+    "objective_counter": 0
   },
   "immune_system": {
     "hopfield": {},
@@ -8626,5 +8627,15 @@
       "template": "tell({{rest}})",
       "description": "Tell about the rest argument"
     }
-  ]
+  ],
+  "decomposer_config": {
+    "compound_pairs": {},
+    "question_markers": [],
+    "split_conjunctions": []
+  },
+  "relational_jitter_config": {
+    "ratio": 0.0,
+    "coin_ratio": 0.0,
+    "enabled": false
+  }
 }

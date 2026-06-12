@@ -21,6 +21,7 @@
 module InputDecomposer
 
 export decompose, set_decomposer_config!, get_decomposer_config, DecomposedClause
+export serialize_config, restore_config!
 
 # =============================================================================
 # DATA STRUCTURES
@@ -241,6 +242,54 @@ function decompose(input_text::String)::Vector{DecomposedClause}
     end
 
     return clauses
+end
+
+# ==============================================================================
+# SERIALIZATION (for specimen persistence)
+# ==============================================================================
+
+"""
+    serialize_config() -> Dict{String,Any}
+
+GRUG: Snapshot the current decomposer config for specimen save.
+Returns the live _CONFIG dict (compound_pairs, question_markers, split_conjunctions).
+If config is unassigned, returns defaults.
+"""
+function serialize_config()::Dict{String,Any}
+    cfg = _ensure_config()
+    # GRUG: Deep-copy so the snapshot is independent of live state.
+    # compound_pairs values are Vectors of Strings — copy them.
+    out = Dict{String,Any}()
+    cp_raw = get(cfg, "compound_pairs", Dict{String,Vector{String}}())
+    if isa(cp_raw, Dict)
+        cp_out = Dict{String,Any}()
+        for (k, v) in cp_raw
+            cp_out[k] = isa(v, AbstractVector) ? collect(String.(v)) : v
+        end
+        out["compound_pairs"] = cp_out
+    end
+    out["question_markers"] = collect(String.(get(cfg, "question_markers", String[])))
+    out["split_conjunctions"] = collect(String.(get(cfg, "split_conjunctions", String[])))
+    # GRUG: Copy any additional keys the user may have added.
+    for k in keys(cfg)
+        if !haskey(out, k)
+            v = cfg[k]
+            out[k] = isa(v, AbstractVector) ? collect(v) : isa(v, Dict) ? Dict(k2 => v2 for (k2,v2) in v) : v
+        end
+    end
+    return out
+end
+
+"""
+    restore_config!(data::AbstractDict) -> Int
+
+GRUG: Restore decomposer config from a specimen snapshot.
+Returns 1 on success (it's a single config block).
+Tolerant of missing keys — defaults fill gaps via set_decomposer_config! merge.
+"""
+function restore_config!(data::AbstractDict)::Int
+    set_decomposer_config!(Dict{String,Any}(String(k) => v for (k,v) in data))
+    return 1
 end
 
 end # module InputDecomposer
