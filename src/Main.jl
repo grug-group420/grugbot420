@@ -6288,7 +6288,7 @@ function load_specimen_from_file!(filepath::String)::String
         else
             println("  🔗 @sigil:multipart nodes already present ($(length(mp_ids)), skipping seed")
         end
-        # GRUG v7.33: Also ensure :doaction sigil seed nodes exist.
+        # GRUG v7.34: Also ensure :doaction sigil seed nodes exist.
         local da_ids = list_sigil_node_ids(:doaction)
         if isempty(da_ids)
             doaction_ctx = Dict{String, Any}(
@@ -7003,7 +7003,7 @@ elseif !isnothing(m_right)
 #                 end
 
 #                Use /saveSpecimen and manual node editing instead.
-# GRUG: /grow system DISABLED — growth feature commented out for v7.33 planning.
+# GRUG: /grow system DISABLED — growth feature commented out for v7.34 planning.
             elseif !isnothing(m_rule)
                 # GRUG: /addRule - add a stochastic orchestration rule.
                 # Optional [prob=X.XX] suffix sets fire probability (default 1.0).
@@ -7242,7 +7242,7 @@ elseif !isnothing(m_right)
 #                     end
 #                 end
 
-# GRUG: /lobeGrow system DISABLED — growth feature commented out for v7.33 planning.
+# GRUG: /lobeGrow system DISABLED — growth feature commented out for v7.34 planning.
             elseif !isnothing(m_lobes)
                 # GRUG: /lobes - uses get_lobe_status_summary() which includes O(1) reverse index count.
                 println(Lobe.get_lobe_status_summary())

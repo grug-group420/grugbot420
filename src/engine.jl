@@ -3739,6 +3739,48 @@ function cast_vote(id, conf, u_trips, n_trips)
     # GRUG NEW: Bump strength on a coinflip when a node votes (used = maybe stronger)
     bump_strength!(node)
 
+    # GRUG v7.34: UNIVERSAL POLARITY GATE for knowledge nodes.
+    # Non-sigil nodes (:none kind) now also respect the context polarity gate.
+    # The same tri-state logic that gates sigil votes applies here:
+    #   NEGATIVE  → suppress  (0.3x confidence, :suppressed bundle_role)
+    #   NEUTRAL   → attenuate (0.7x confidence, normal bundle_role)
+    #   POSITIVE  → fire normally (1.0x, normal bundle_role)
+    # This ensures "don't tell me about X" suppresses the X knowledge node,
+    # "maybe explain Y" attenuates it, and "explain Y" fires at full strength.
+    _polarity = _context_polarity_for(:none)
+
+    if _polarity === ActionTonePredictor.POLARITY_NEGATIVE
+        @info "[ENGINE] 🔇 Knowledge node $id SUPPRESSED by context polarity (negative) — firing at 0.3x"
+        # GRUG: Record suppression in SelfObserver for post-vote audit.
+        try
+            SelfObserver.observe!(
+                SelfObserver.default_store(),
+                "polarity_post_vote_$(id)_knowledge",
+                :context_polarity,
+                Dict{String,Any}(
+                    "phase"      => "post_vote",
+                    "node_id"    => id,
+                    "sigil_kind" => "none",
+                    "outcome"    => "suppressed",
+                    "polarity"   => "negative",
+                    "action"     => winning_action,
+                    "conf"       => conf * 0.3,
+                );
+                p_write    = 1.0,
+                salience   = 6.0,
+                provenance = :polarity_gate_negative_knowledge,
+            )
+        catch ex_obs
+            @warn "[ENGINE] SelfObserver post-vote observe! (negative, knowledge) failed: $ex_obs"
+        end
+        return Vote(id, winning_action, conf * 0.3, negatives, u_trips, n_trips,
+                     "", UInt64(0), :suppressed)
+    elseif _polarity === ActionTonePredictor.POLARITY_NEUTRAL
+        @info "[ENGINE] 🔈 Knowledge node $id ATTENUATED by context polarity (neutral) — firing at 0.7x"
+        return Vote(id, winning_action, conf * 0.7, negatives, u_trips, n_trips)
+    end
+
+    # POSITIVE — fire normally, no modification
     return Vote(id, winning_action, conf, negatives, u_trips, n_trips)
 end
 
@@ -3827,8 +3869,9 @@ end
 # POSITIVE  → fire normally (1.0x confidence, normal computation)
 #   - Query, command, assert, escalate — clear intent to compute/act
 #
-# Only :none (non-sigil nodes) always returns POSITIVE. All sigil kinds
-# (:math, :multipart, :doaction, :instruction) are polarity-gated.
+# ALL node kinds are polarity-gated — sigil kinds (:math, :multipart,
+# :doaction, :instruction) AND non-sigil knowledge nodes (:none) all
+# read the same ATP prediction. The gate is universal.
 #
 # The gate reads from _CURRENT_PREDICTION (set before the scan fires).
 # If no prediction exists (e.g. image input, or ATP failed), the gate is POSITIVE.
@@ -3841,21 +3884,23 @@ end
 """
     _context_polarity_for(kind) -> ContextPolarity
 
-Return the context polarity level for this sigil kind, based on the current
+Return the context polarity level for this node kind, based on the current
 mission's ATP prediction. POSITIVE = fire normally, NEUTRAL = attenuate,
-NEGATIVE = suppress. All sigil kinds (:math, :multipart, :doaction, :instruction)
-are polarity-gated. Only :none (non-sigil nodes) always returns POSITIVE.
+NEGATIVE = suppress. ALL node kinds are polarity-gated — sigil nodes
+(:math, :multipart, :doaction, :instruction) AND non-sigil knowledge nodes
+(:none) all read the same ATP prediction. "Don't tell me about photosynthesis"
+should suppress the photosynthesis knowledge node just like "don't calculate
+2+2" suppresses the math sigil. The gate is universal.
 """
 function _context_polarity_for(kind::Symbol)
-    # GRUG v7.33: ALL sigil kinds are polarity-gated. "don't calculate 2+2
-    # and 3*4" should suppress the multipart bundle just like the singleton
-    # math vote. ATP already captures the full-input polarity — every sigil
-    # kind reads the same prediction. :instruction (reserved, not yet wired)
-    # also gates — when it's implemented, "don't instruct X" should suppress.
-    # The only kind that always returns POSITIVE is :none (non-sigil nodes).
-    if kind === :none
-        return ActionTonePredictor.POLARITY_POSITIVE
-    end
+    # GRUG v7.34: UNIVERSAL POLARITY GATE. ALL node kinds — including :none
+    # (non-sigil knowledge nodes) — are polarity-gated. The ATP prediction
+    # captures the full-input polarity. "don't tell me about X" should suppress
+    # the X knowledge node. "maybe explain Y" should attenuate it. "explain Y"
+    # should fire at full strength. There is no longer a :none bypass — every
+    # node reads the same prediction and respects the same tri-state gate.
+    # Previously :none always returned POSITIVE, which meant 64+ knowledge
+    # nodes completely bypassed the polarity gate. That was the bug.
 
     pred = _CURRENT_PREDICTION[]
     pred === nothing && return ActionTonePredictor.POLARITY_POSITIVE  # no prediction → gate is open
