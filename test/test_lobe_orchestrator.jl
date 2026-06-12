@@ -1,6 +1,6 @@
 # test_lobe_orchestrator.jl
 # ==============================================================================
-# GRUG v7.15 TESTS --- LobeOrchestrator sequential + curved-average + ties
+# GRUG v7.24 TESTS --- LobeOrchestrator sequential + simple lock-in average + ties
 # ==============================================================================
 # NO SILENT FAILURES: every @test has a diagnostic message.
 # ==============================================================================
@@ -12,38 +12,40 @@ include("../src/LobeOrchestrator.jl")
 using .LobeOrchestrator
 
 println("\n" * "=" ^ 60)
-println("GRUG v7.15 LobeOrchestrator TEST SUITE")
+println("GRUG v7.24 LobeOrchestrator TEST SUITE")
 println("=" ^ 60)
 
 # ==============================================================================
-# [1] SUMMARIZE --- basic curved-average math
+# [1] SUMMARIZE --- basic simple average math (no curve)
 # ==============================================================================
-@testset "summarize_lobe_votes: basic curved average" begin
+@testset "summarize_lobe_votes: simple average of lock-in votes" begin
     votes = Dict(
-        "science"    => [0.90, 0.85, 0.60, 0.20],     # top-tier = {0.90, 0.85}
-        "philosophy" => [0.40, 0.35, 0.30],            # top-tier = {0.40, 0.35} (0.40-0.05=0.35)
-        "cooking"    => [0.10, 0.05],                  # below multi-lobe threshold
+        "science"    => [0.90, 0.85, 0.60],  # avg = 0.7833
+        "philosophy" => [0.40, 0.35],         # avg = 0.375 (fails gate)
+        "cooking"    => [0.10, 0.05],          # avg = 0.075 (fails gate)
     )
 
     summaries = summarize_lobe_votes(votes)
     @test length(summaries) == 3
 
-    # GRUG: Verify sort by curved_avg descending.
-    @test issorted([s.curved_avg for s in summaries], rev = true)
+    # GRUG v7.24: Verify sort by avg_conf descending (no curve).
+    @test issorted([s.avg_conf for s in summaries], rev = true)
 
-    # GRUG: Verify curve math for science.
+    # GRUG v7.24: Verify simple average math for science.
     sci = first(filter(s -> s.lobe_id == "science", summaries))
-    expected_base = (0.90 + 0.85 + 0.60 + 0.20) / 4
-    expected_top  = (0.90 + 0.85) / 2
-    @test isapprox(sci.base_avg,  expected_base; atol = 1e-9)
-    @test isapprox(sci.top_avg,   expected_top;  atol = 1e-9)
-    @test isapprox(sci.curved_avg, expected_base * expected_top; atol = 1e-9)
+    expected_avg = (0.90 + 0.85 + 0.60) / 3
+    @test isapprox(sci.avg_conf, expected_avg; atol = 1e-9)
+    @test sci.max_conf == 0.90
+    @test sci.vote_count == 3
 
-    # GRUG: Verify the winning_vote threshold (>= WINNING_VOTE_CONF = 0.55).
-    @test sci.winning_vote_count == 3   # 0.90, 0.85, 0.60
-
-    # GRUG: Science should pass the multi-lobe gate; cooking should not.
+    # GRUG v7.24: Science passes the multi-lobe gate (avg >= 0.50 AND count >= 2).
     @test sci.passes_multi_lobe_gate == true
+
+    # GRUG: Philosophy fails - avg too low.
+    phil = first(filter(s -> s.lobe_id == "philosophy", summaries))
+    @test phil.passes_multi_lobe_gate == false
+
+    # GRUG: Cooking fails - avg way too low.
     cook = first(filter(s -> s.lobe_id == "cooking", summaries))
     @test cook.passes_multi_lobe_gate == false
 end
@@ -87,8 +89,8 @@ end
 # ==============================================================================
 @testset "compute_orchestration_plan: multi-lobe async" begin
     votes = Dict(
-        "science"    => [0.90, 0.85, 0.75, 0.70, 0.60],   # very strong
-        "philosophy" => [0.80, 0.78, 0.70, 0.65],         # also strong
+        "science"    => [0.90, 0.85, 0.75, 0.70, 0.60],   # avg = 0.76
+        "philosophy" => [0.80, 0.78, 0.70, 0.65],         # avg = 0.7325
     )
     summaries = summarize_lobe_votes(votes)
     plan = compute_orchestration_plan(summaries)
@@ -98,24 +100,25 @@ end
     @test plan.secondary_async[1].lobe_id == "philosophy"
     @test plan.tie_resolved_by_coinflip == false
 
-    # GRUG: Secondaries must come in descending curved_avg order.
-    all_curveds = [plan.floor_winner.curved_avg;
-                   [s.curved_avg for s in plan.secondary_async]]
-    @test issorted(all_curveds, rev = true)
+    # GRUG v7.24: Secondaries must come in descending avg_conf order.
+    all_avgs = [plan.floor_winner.avg_conf;
+                [s.avg_conf for s in plan.secondary_async]]
+    @test issorted(all_avgs, rev = true)
 end
 
 # ==============================================================================
-# [5] PLAN --- exact tie resolved by 50/50 coinflip
+# [5] PLAN --- exact tie resolved by 50/50 coinflip (ORDER only, ALL fire)
 # ==============================================================================
-@testset "compute_orchestration_plan: exact-tie coinflip" begin
-    # GRUG: Two lobes with IDENTICAL confidence lists = identical curved_avg.
+@testset "compute_orchestration_plan: exact-tie coinflip decides ORDER" begin
+    # GRUG v7.24: Two lobes with IDENTICAL confidence lists = identical avg_conf.
     votes = Dict(
         "lobe_a" => [0.80, 0.75, 0.70],
         "lobe_b" => [0.80, 0.75, 0.70],
     )
     summaries = summarize_lobe_votes(votes)
 
-    # GRUG: Many trials, both lobes should win roughly half the time.
+    # GRUG v7.24: ALL tying lobes FIRE. Coinflip decides WHO GOES FIRST.
+    # The tying lobe that doesn't go first becomes a GUARANTEED secondary.
     rng = MersenneTwister(0xC0FFEE)
     a_wins = 0
     b_wins = 0
@@ -123,8 +126,17 @@ end
     for _ in 1:n_trials
         plan = compute_orchestration_plan(summaries; rng = rng)
         @test plan.tie_resolved_by_coinflip == true
-        plan.floor_winner.lobe_id == "lobe_a" && (a_wins += 1)
-        plan.floor_winner.lobe_id == "lobe_b" && (b_wins += 1)
+
+        # GRUG v7.24: CRITICAL - the tying lobe that didn't go first
+        # MUST still appear as a guaranteed secondary. BOTH lobes FIRE.
+        @test length(plan.secondary_async) >= 1
+        if plan.floor_winner.lobe_id == "lobe_a"
+            a_wins += 1
+            @test any(s -> s.lobe_id == "lobe_b", plan.secondary_async)
+        else
+            b_wins += 1
+            @test any(s -> s.lobe_id == "lobe_a", plan.secondary_async)
+        end
     end
     @test a_wins + b_wins == n_trials
     # Allow 5% slop either direction.
@@ -135,8 +147,6 @@ end
 # [6] PLAN --- floor winner fails gate, no secondaries admitted
 # ==============================================================================
 @testset "compute_orchestration_plan: floor winner fails gate, no secondaries" begin
-    # GRUG: Every lobe is weak. Someone must still speak (floor winner), but
-    # NO secondaries get in because the "multi-lobe moment" criterion is not met.
     votes = Dict(
         "weak_a" => [0.30, 0.25],
         "weak_b" => [0.25, 0.20],
@@ -162,19 +172,16 @@ end
 # [8] CROSS-TALK GATE --- 1000-cap enforced
 # ==============================================================================
 @testset "CrossTalkGate: cap enforcement" begin
-    gate = new_cross_talk_gate(5)   # small cap for test
+    gate = new_cross_talk_gate(5)
 
-    # GRUG: Claim up to the cap.
     for i in 1:5
         @test try_claim_cross_talk!(gate) == true
     end
     @test reserved_cross_talk_slots(gate) == 5
 
-    # GRUG: Sixth must reject.
     @test try_claim_cross_talk!(gate) == false
     @test reserved_cross_talk_slots(gate) == 5
 
-    # GRUG: Release one, then can claim again.
     release_cross_talk!(gate)
     @test reserved_cross_talk_slots(gate) == 4
     @test try_claim_cross_talk!(gate) == true
@@ -197,6 +204,40 @@ end
     @test gate.cap == CROSS_TALK_ACTIVE_CAP
 end
 
+# ==============================================================================
+# [11] PLAN --- three-way tie: ALL fire, coinflip decides order
+# ==============================================================================
+@testset "compute_orchestration_plan: three-way exact tie" begin
+    votes = Dict(
+        "lobe_a" => [0.70, 0.65, 0.60],
+        "lobe_b" => [0.70, 0.65, 0.60],
+        "lobe_c" => [0.70, 0.65, 0.60],
+    )
+    summaries = summarize_lobe_votes(votes)
+
+    rng = MersenneTwister(42)
+    plan = compute_orchestration_plan(summaries; rng = rng)
+
+    @test plan.tie_resolved_by_coinflip == true
+    # GRUG v7.24: ALL three tying lobes fire. Floor winner + 2 guaranteed secondaries.
+    @test length(plan.secondary_async) >= 2
+    all_firing = Set([plan.floor_winner.lobe_id;
+                      [s.lobe_id for s in plan.secondary_async]])
+    @test "lobe_a" in all_firing
+    @test "lobe_b" in all_firing
+    @test "lobe_c" in all_firing
+end
+
+# ==============================================================================
+# [12] CONSTANTS --- v7.24 values match spec
+# ==============================================================================
+@testset "Constants: v7.24 values" begin
+    @test MULTI_LOBE_THRESHOLD == 0.50
+    @test MIN_WINNING_VOTES == 2
+    @test PER_LOBE_FIRE_CAP == 1_000
+    @test CROSS_TALK_ACTIVE_CAP == 1_000
+end
+
 println("\n" * "=" ^ 60)
-println("\u2705  LobeOrchestrator tests COMPLETE")
+println("v7.24 LobeOrchestrator tests COMPLETE")
 println("=" ^ 60)

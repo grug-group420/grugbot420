@@ -93,6 +93,11 @@ using .RelationalJitter
 # so engine and Main can use summarize_lobe_votes / compute_orchestration_plan.
 include("LobeOrchestrator.jl")
 using .LobeOrchestrator
+# #############################################################################
+# ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.     ###
+# ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.       ###
+# ###  LOBES ARE NEVER MUTED. DO NOT RE-ENABLE LOBE_TOPICALITY_FLOOR.      ###
+# #############################################################################
 
 # GRUG v7.15: Group registry --- 8-16 partner random cap, chatter windowing
 # cursor, compressed JSON disk persistence. Must load BEFORE ChatterVoteSwap
@@ -299,11 +304,11 @@ export with_brainstorm_jitter, is_brainstorm_active, get_brainstorm_depth
 export strong_low_conf_override, jitter_score_with_override
 export NONJITTER_OVERRIDE_STRENGTH_FLOOR, NONJITTER_OVERRIDE_CONF_CEIL
 
-# GRUG v7.15: LobeOrchestrator exports --- sequential + curved-average floor
+# GRUG v7.24: LobeOrchestrator exports --- sequential + lock-in-average floor
 export LobeOrchestratorError, LobeVoteSummary, OrchestrationPlan, FloorWinner
 export summarize_lobe_votes, compute_orchestration_plan
-export MULTI_LOBE_THRESHOLD, MIN_WINNING_VOTES, WINNING_VOTE_CONF
-export PER_LOBE_FIRE_CAP, CROSS_TALK_ACTIVE_CAP, TOP_WINDOW
+export MULTI_LOBE_THRESHOLD, MIN_WINNING_VOTES
+export PER_LOBE_FIRE_CAP, CROSS_TALK_ACTIVE_CAP
 export CrossTalkGate, new_cross_talk_gate
 export try_claim_cross_talk!, release_cross_talk!, reserved_cross_talk_slots
 

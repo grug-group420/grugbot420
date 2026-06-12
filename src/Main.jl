@@ -109,7 +109,12 @@ if !isdefined(@__MODULE__, :PhagyMode)
     using .PhagyMode
 end
 
-# GRUG v7.15: LobeOrchestrator.
+# #############################################################################
+# ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.     ###
+# ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.       ###
+# ###  LOBES ARE NEVER MUTED. LOBE_TOPICALITY_FLOOR IS 0.0 (DISABLED).    ###
+# #############################################################################
+# GRUG v7.24: LobeOrchestrator — sequential lobe firing, no muting.
 if !isdefined(@__MODULE__, :LobeOrchestrator)
     include("LobeOrchestrator.jl")
     using .LobeOrchestrator
@@ -3989,6 +3994,11 @@ function process_mission(mission_text::String)
                 println("[IMAGE] 🔍  Routing to image node scan path...")
                 return _scan_image_specimens(img_signal)
             else
+                # #############################################################################
+                # ###  DO NOT ADD LOBE MUTING. scan_and_expand NO LONGER MUTES LOBES.   ###
+                # ###  apply_lobe_topicality_gate! IS A PASS-THROUGH. LOBE SELECTION    ###
+                # ###  IS DONE BY LobeOrchestrator.jl: SEQUENTIAL FIRING, NO MUTING.   ###
+                # #############################################################################
                 return scan_and_expand(mission_text)
             end
         end,
@@ -4275,6 +4285,106 @@ function process_mission(mission_text::String)
     end
 
     println("--> $(length(cast_votes)) valid votes passed gate... compiling JIT superposition...")
+
+    # #############################################################################
+    # ###  GRUG v7.24: LOBE ORCHESTRATION — SEQUENTIAL FIRING, NO MUTING.   ###
+    # ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.  ###
+    # ###  THE CORRECT DESIGN IS LobeOrchestrator.jl.                        ###
+    # #############################################################################
+    #
+    # GRUG v7.24: Group LOCK-IN votes by lobe, compute the orchestration plan,
+    # and reorder cast_votes so the floor winner's votes go FIRST. The AIML
+    # orchestrator will see winner-lobe votes before anyone else's, which means
+    # the winner lobe effectively "speaks first" in rows of up to 1000.
+    #
+    # Only LOCK-IN votes (those that would pass AIML_TOP_LOCKIN_FLOOR = 0.50)
+    # feed the lobe orchestrator. Weak votes don't exist in this model.
+    # No curve needed — the lock-in floor already filtered out noise.
+    # Simple average of lock-in confidences per lobe determines floor order.
+    _lobe_plan = nothing
+    try
+        # GRUG: Collect lock-in vote confidences per lobe.
+        # A vote is "lock-in" if its confidence >= AIML_TOP_LOCKIN_FLOOR.
+        votes_by_lobe = Dict{String, Vector{Float64}}()
+        for v in cast_votes
+            if v.confidence >= VoteOrchestrator.AIML_TOP_LOCKIN_FLOOR
+                lobe_id = try Lobe.find_lobe_for_node(v.node_id) catch nothing end
+                if !isnothing(lobe_id)
+                    if !haskey(votes_by_lobe, lobe_id)
+                        votes_by_lobe[lobe_id] = Float64[]
+                    end
+                    push!(votes_by_lobe[lobe_id], v.confidence)
+                end
+            end
+        end
+
+        if !isempty(votes_by_lobe)
+            summaries = LobeOrchestrator.summarize_lobe_votes(votes_by_lobe)
+            _lobe_plan = LobeOrchestrator.compute_orchestration_plan(summaries)
+
+            if !isnothing(_lobe_plan.floor_winner)
+                fw = _lobe_plan.floor_winner
+                secondaries_str = isempty(_lobe_plan.secondary_async) ? "none" :
+                    join([s.lobe_id for s in _lobe_plan.secondary_async], ", ")
+                println("[LOBE ORCHESTRATOR] 🏆 Floor winner: $(fw.lobe_id) (avg_conf=$(round(fw.avg_conf, digits=3)), votes=$(fw.vote_count)) | Secondaries: $secondaries_str | Tie coinflip: $(_lobe_plan.tie_resolved_by_coinflip)")
+
+                # GRUG v7.24: REORDER cast_votes so floor winner's votes come first,
+                # then secondary async lobes, then everyone else.
+                # This ensures the AIML orchestrator sees the winner lobe's votes
+                # before any other — the winner "speaks first" up to PER_LOBE_FIRE_CAP.
+                floor_lobe = fw.lobe_id
+                secondary_lobes = Set{String}(s.lobe_id for s in _lobe_plan.secondary_async)
+
+                winner_votes = Vote[]
+                secondary_votes = Vote[]
+                other_votes = Vote[]
+                for v in cast_votes
+                    lobe_id = try Lobe.find_lobe_for_node(v.node_id) catch nothing end
+                    if lobe_id == floor_lobe
+                        push!(winner_votes, v)
+                    elseif !isnothing(lobe_id) && lobe_id in secondary_lobes
+                        push!(secondary_votes, v)
+                    else
+                        push!(other_votes, v)
+                    end
+                end
+
+                # GRUG: Floor winner's votes sorted by confidence descending (best first),
+                # capped at PER_LOBE_FIRE_CAP. Secondaries same. Others fill remaining.
+                sort!(winner_votes; by=v -> v.confidence, rev=true)
+                sort!(secondary_votes; by=v -> v.confidence, rev=true)
+                sort!(other_votes; by=v -> v.confidence, rev=true)
+
+                # GRUG v7.24: Enforce PER_LOBE_FIRE_CAP per lobe.
+                # Winner gets at most 1000 votes. Each secondary lobe ALSO gets at
+                # most 1000 votes. We group secondary votes by lobe, sort each group
+                # by confidence descending, cap at 1000, and concatenate in the order
+                # the orchestration plan specified (highest avg_conf first).
+                # Cross-talk is handled separately by CrossTalkGate at runtime.
+                capped_winner = winner_votes[1:min(LobeOrchestrator.PER_LOBE_FIRE_CAP, length(winner_votes))]
+
+                # GRUG: Group secondary votes by lobe, in plan order.
+                capped_secondary = Vote[]
+                for sec in _lobe_plan.secondary_async
+                    sec_lobe_votes = filter(v -> begin
+                        lid = try Lobe.find_lobe_for_node(v.node_id) catch nothing end
+                        lid == sec.lobe_id
+                    end, secondary_votes)
+                    # Sort by confidence descending (best first), cap at PER_LOBE_FIRE_CAP
+                    sort!(sec_lobe_votes; by=v -> v.confidence, rev=true)
+                    cap = min(LobeOrchestrator.PER_LOBE_FIRE_CAP, length(sec_lobe_votes))
+                    append!(capped_secondary, sec_lobe_votes[1:cap])
+                end
+
+                cast_votes = vcat(capped_winner, capped_secondary, other_votes)
+                println("[LOBE ORCHESTRATOR] 📊 Vote order: winner=$(length(capped_winner)) secondary=$(length(capped_secondary)) other=$(length(other_votes)) total=$(length(cast_votes))")
+            end
+        end
+    catch e
+        # GRUG: Lobe orchestration is enhancement, not core. If it fails, proceed
+        # with the original vote order. NO SILENT FAILURES — log loudly.
+        @warn "[MAIN v7.24] LobeOrchestrator failed (non-fatal, using original vote order): $e"
+    end
 
     # GRUG: ORCHESTRATOR SUB-PROCESS DISPATCH!
     # The AIML orchestrator is itself dispatched to a unique Task with a timeout.

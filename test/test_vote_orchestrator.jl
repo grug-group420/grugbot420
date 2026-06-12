@@ -213,11 +213,13 @@ end
     @test all_ids == Set(["top1", "top2", "sub1"])
 end
 
-@testset "[11] select_aiml_votes — sub-top coinflip strength bias" begin
-    # GRUG: Repeat many times. Strong sub-top should survive more often than weak.
+@testset "[11] select_aiml_votes — sub-top deterministic (v7.23: no coinflip)" begin
+    # GRUG v7.23: REMOVED stochastic strength-biased coinflip. Confidence is
+    # the ONLY gate. All sub-top votes that pass threshold are kept. No coinflip.
+    # strength_biased_vote_coinflip() now always returns true.
     strong_kept = 0
     weak_kept   = 0
-    trials = 2000
+    trials = 100   # deterministic, fewer trials needed
     for _ in 1:trials
         cands = [
             VoteOrchestrator.VoteCandidate("top",     1.00, 10.0),
@@ -230,13 +232,10 @@ end
         "weak"   in kept_ids && (weak_kept += 1)
     end
     println("  strong kept = $strong_kept / $trials, weak kept = $weak_kept / $trials")
-    # GRUG: Strong neuron wins the bias. Expect strong kept rate noticeably above weak.
-    @test strong_kept > weak_kept
-    # GRUG: Strong should be kept ~90% (base 0.20 + bonus 0.70 * 1.0 = 0.90).
-    # Tolerance band chosen conservatively for 2000 trials.
-    @test strong_kept > 1600   # roughly >= 80% empirical rate
-    # GRUG: Weak near-floor should be kept ~23% (base 0.20 + bonus 0.70 * 0.05 = 0.235).
-    @test weak_kept < 600      # roughly <= 30% empirical rate
+    # GRUG v7.23: BOTH strong AND weak sub-top votes are ALWAYS kept (no coinflip).
+    # Confidence decides, not strength. If it passes threshold, it fires.
+    @test strong_kept == trials
+    @test weak_kept == trials
 end
 
 @testset "[12] select_aiml_votes — input validation" begin

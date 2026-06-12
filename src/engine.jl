@@ -1504,10 +1504,14 @@ in the scaffold, and strip sentences containing tokens from lobes whose
 topicality score is below LOBE_TOPICALITY_FLOOR.
 """
 function _scaffold_coherence_pass(scaffold_text::String, mission_text::String)::String
-    if isempty(strip(scaffold_text)) || isempty(strip(mission_text))
-        return scaffold_text
-    end
+    # #############################################################################
+    # ###  DO NOT ADD LOBE MUTING. THIS IS NOW A NO-OP PASS-THROUGH.        ###
+    # ###  LOBE_TOPICALITY_FLOOR IS 0.0. NO LOBES ARE EVER MUTED.           ###
+    # ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.     ###
+    # #############################################################################
+    return scaffold_text
 
+    # DEAD CODE BELOW — kept for reference only, never reached.
     try
         # GRUG: Get the set of muted lobe IDs for this mission.
         eligible, muted, _, _ = _compute_muted_lobes(mission_text)
@@ -1594,11 +1598,21 @@ end
 
 # Raw pattern-keyword overlap does NOT unmute a lobe or its nodes.
 
+# #############################################################################
+# ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.     ###
+# ###  LOBE_TOPICALITY_FLOOR BELOW IS DISABLED (= 0.0). IT MUST STAY 0.0. ###
+# ###  THE CORRECT DESIGN IS IN LobeOrchestrator.jl: SEQUENTIAL FIRING.    ###
+# ###  THIS WAS THE ORIGINAL DESIGN. IT WAS REMOVED AND REPLACED WITH      ###
+# ###  MUTING. DO NOT DO THAT AGAIN.                                       ###
+# #############################################################################
+
 # GRUG: Topicality floor — a lobe's (thesaurus-expanded subject) must share at
 # least this fraction of tokens with the mission (also thesaurus-expanded) to
 # be eligible. Tuned low enough that domain-adjacent lobes still fire, high
 # enough to mute cooking when user asks about physics.
-const LOBE_TOPICALITY_FLOOR = 0.15
+# *** DISABLED v7.24: SET TO 0.0 — NO LOBE IS EVER MUTED. ***
+# *** THE CORRECT DESIGN IS SEQUENTIAL LOBE FIRING (LobeOrchestrator.jl) ***
+const LOBE_TOPICALITY_FLOOR = 0.0
 
 # GRUG: Bridged-node confidence discount. Muted-lobe nodes that prove a
 # semantic bridge vote at half strength — their opinion is heard but it does
@@ -1676,12 +1690,18 @@ function _mission_has_deterministic_answer(primary_vote)::Bool
     return false
 end
 
-# GRUG v7.21: _support_vote_is_coherent() — replacement for the topicality gate.
-# For exploratory (non-deterministic) missions, support votes must pass BOTH:
-#   1. Same lobe family as the primary vote's node (structural check)
-#   2. Topicality >= _SUPPORT_TOPICALITY_FLOOR (semantic check, as before)
-# For deterministic missions, this function is never called — SUPPORT is skipped.
+# #############################################################################
+# ###  DO NOT ADD LOBE MUTING. _support_vote_is_coherent IS NOW ALWAYS TRUE.###
+# ###  NO LOBE IS EVER MUTED. SUPPORT VOTES FROM ANY LOBE ARE COHERENT.   ###
+# ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.       ###
+# #############################################################################
+# GRUG v7.24: _support_vote_is_coherent() now always returns true.
+# Lobe muting is wrong. Support votes from any lobe are coherent because
+# the lock-in floor already filters weak votes. Sequential lobe firing
+# handles ordering. No lobe should ever be blocked from contributing support.
 function _support_vote_is_coherent(support_vote, primary_vote, mission_text::String)::Bool
+    return true
+    # DEAD CODE BELOW — kept for reference only, never reached.
     # Find the lobe of the support vote's node
     sv_lobe = try Lobe.find_lobe_for_node(support_vote.node_id) catch nothing end
     pv_lobe = try Lobe.find_lobe_for_node(primary_vote.node_id) catch nothing end
@@ -1742,17 +1762,15 @@ end
 """
     _compute_muted_lobes(mission_text) -> (eligible, muted, eligible_node_ids, eligible_verbs)
 
-GRUG: Partition LOBE_REGISTRY into eligible (topical) and muted (off-topic)
-sets. A lobe is eligible ONLY if its (thesaurus-expanded) subject overlaps
-the (thesaurus-expanded) mission above LOBE_TOPICALITY_FLOOR.
+#############################################################################
+###  DO NOT ADD LOBE MUTING. LOBE_TOPICALITY_FLOOR IS 0.0 (DISABLED).    ###
+###  ALL LOBES ARE ALWAYS ELIGIBLE. MUTED SET IS ALWAYS EMPTY.          ###
+###  THE CORRECT DESIGN IS IN LobeOrchestrator.jl: SEQUENTIAL FIRING.   ###
+#############################################################################
 
-CRITICAL (v7.18 user directive): raw pattern-scan hits do NOT auto-unmute a
-lobe. If a cooking node's pattern happens to lexically match a physics
-mission, the cooking lobe stays muted — the node must cross a semantic
-bridge (dynamic triple, required_relation, /nodeAttach) to vote.
-
-Returns the union of node_ids inside eligible lobes and the union of
-required_relation verbs used by those nodes (needed for verb-bridge checks).
+GRUG v7.24: With LOBE_TOPICALITY_FLOOR = 0.0, this function always returns
+all lobes as eligible and muted set as empty. Kept for backward compatibility
+with _scaffold_coherence_pass. DO NOT re-enable muting.
 """
 function _compute_muted_lobes(mission_text::String)::Tuple{Set{String}, Set{String}, Set{String}, Set{String}}
     eligible = Set{String}()
@@ -1878,91 +1896,40 @@ end
 """
     apply_lobe_topicality_gate!(mission_text, expanded) -> Vector
 
-GRUG: v7.18 main entry point. Given the raw expanded vote pool, filter out
-muted-lobe nodes that have no semantic bridge, and discount bridged nodes to
-BRIDGED_NODE_CONF_WEIGHT * confidence. Populates the telemetry Refs so Main.jl
-can surface them in the scaffold debug block.
+#############################################################################
+###  DO NOT ADD LOBE MUTING. THIS FUNCTION IS NOW A PASS-THROUGH.       ###
+###  THE CORRECT DESIGN IS IN LobeOrchestrator.jl: SEQUENTIAL FIRING.   ###
+###  LOBES ARE NEVER MUTED. THEY FIRE SEQUENTIALLY. THE HIGHEST        ###
+###  CURVED_AVG GOES FIRST. TIED LOBES BOTH FIRE, COINFLIP DECIDES     ###
+###  ORDER. DO NOT RE-ENABLE THIS GATE. DO NOT ADD LOBE MUTING.         ###
+#############################################################################
+
+GRUG v7.24: This function is now a PASS-THROUGH. It returns expanded unchanged.
+Lobe muting is the WRONG design. The correct design is sequential lobe firing
+via LobeOrchestrator.jl (curved_avg ranking, floor winner goes first, cross-talk
+gated at 1000 cap). This function used to drop muted-lobe nodes and discount
+bridged nodes to 0.5× confidence. That was wrong — it silenced lobes that
+should have had a chance to compete on confidence alone.
+
+The original (correct) design was removed and replaced with muting.
+DO NOT DO THAT AGAIN.
 """
 function apply_lobe_topicality_gate!(mission_text::String,
                                      expanded::Vector)::Vector
-    # GRUG: Reset telemetry at entry so repeated calls don't accumulate.
-    _LAST_MUTED_LOBES[]   = String[]
-    _LAST_BRIDGED_NODES[] = Tuple{String,String,String}[]
+    # GRUG v7.24: PASS-THROUGH. No muting. No gating. No dropping nodes.
+    # LobeOrchestrator.jl handles lobe selection via curved_avg ranking.
+    # This function used to partition lobes into eligible/muted, drop
+    # muted-lobe nodes, and discount bridged nodes to 0.5× confidence.
+    # ALL of that was wrong. Lobes fire sequentially based on confidence.
+    # The highest curved_avg goes first. No lobe is ever silenced.
+    #
+    # #############################################################################
+    # ###  DO NOT RE-ENABLE THIS GATE. DO NOT ADD LOBE MUTING.               ###
+    # #############################################################################
+    _LAST_MUTED_LOBES[]   = String[]  # No lobes are ever muted.
+    _LAST_BRIDGED_NODES[] = Tuple{String,String,String}[]  # No bridging needed.
+    return expanded
 
-    if !(isdefined(@__MODULE__, :Lobe)) || isempty(expanded)
-        return expanded
-    end
-
-    eligible, muted, eligible_node_ids, eligible_verbs =
-        _compute_muted_lobes(mission_text)
-
-    # GRUG: Record muted lobes for telemetry regardless of outcome.
-    _LAST_MUTED_LOBES[] = sort(collect(muted))
-
-    if isempty(muted)
-        return expanded  # Nothing to gate.
-    end
-
-    # GRUG: Extract dynamic relational triples from the mission (live).
-    # Mode 3 = high-res scan — catches compound subjects/objects and chains.
-    dyn_verbs = Set{String}()
-    try
-        dyn_trips = extract_dynamic_relational_triples(mission_text, 3)
-        for t in dyn_trips
-            push!(dyn_verbs, lowercase(strip(t.relation)))
-        end
-    catch e
-        @warn "[v7.18] extract_dynamic_relational_triples failed in gate (continuing without dyn bridge): $e"
-    end
-
-    gated = eltype(expanded)[]
-    bridged_accum = Tuple{String,String,String}[]
-
-    for entry in expanded
-        nid = entry[1]
-        lobe_id = Lobe.find_lobe_for_node(nid)
-
-        # GRUG: Node with no lobe (orphan) — keep it, no gate applies.
-        if isnothing(lobe_id)
-            push!(gated, entry)
-            continue
-        end
-
-        # GRUG: Node in eligible lobe — keep at full weight.
-        if lobe_id in eligible
-            push!(gated, entry)
-            continue
-        end
-
-        # GRUG: Node in muted lobe — check for semantic bridge.
-        node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
-        if isnothing(node)
-            continue  # vanished; skip silently
-        end
-
-        bridged, reason = _node_has_semantic_bridge(
-            node, dyn_verbs, eligible_verbs, eligible_node_ids
-        )
-        if bridged
-            # GRUG: Reinstate at half weight. entry is a tuple; rebuild with
-            # reduced confidence.
-            id_, conf_, antimatch_, u_trips_, n_trips_ = entry
-            discounted = (id_, conf_ * BRIDGED_NODE_CONF_WEIGHT,
-                          antimatch_, u_trips_, n_trips_)
-            push!(gated, discounted)
-            push!(bridged_accum, (nid, lobe_id, reason))
-        end
-        # else: muted + no bridge -> drop.
-    end
-
-    _LAST_BRIDGED_NODES[] = bridged_accum
-
-    # GRUG: Loud console trace so operator sees the gate working.
-    if !isempty(muted) || !isempty(bridged_accum)
-        println("[v7.18] 🔇 Lobe topicality gate: muted=$(length(muted)) eligible=$(length(eligible)) bridged=$(length(bridged_accum)) dropped=$(length(expanded) - length(gated))")
-    end
-
-    return gated
 end
 
 """
@@ -3606,16 +3573,18 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         println("[ENGINE] 🔗  Attachment relay pass added $(length(relay_additions)) node(s) to expanded set.")
     end
 
-    # ── v7.18 FINAL PASS: Lobe Topicality Gate + Semantic-Bridge Exception ──
-    # GRUG: After all expansion passes, filter out muted-lobe nodes that have
-    # no semantic bridge, and discount bridged nodes to half weight.
-    # This is the engine-level fix for cross-domain leakage: if the user asks
-    # about physics, cooking nodes never get to vote unless they share a
-    # dynamic relational triple verb, a required_relation, or a /nodeAttach.
+    # ── v7.24 FINAL PASS: Lobe Topicality Gate (NOW A PASS-THROUGH) ──
+    # #############################################################################
+    # ###  DO NOT ADD LOBE MUTING. apply_lobe_topicality_gate! IS A          ###
+    # ###  PASS-THROUGH. IT RETURNS expanded UNCHANGED. NO LOBES ARE MUTED. ###
+    # ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.     ###
+    # #############################################################################
+    # GRUG v7.24: The gate is now a no-op. All lobes fire. LobeOrchestrator
+    # handles sequential ordering based on lock-in vote averages.
     expanded = try
         apply_lobe_topicality_gate!(input_text, expanded)
     catch e
-        @warn "[v7.18] lobe topicality gate FAILED (continuing with unfiltered pool): $e"
+        @warn "[v7.24] lobe topicality gate FAILED (continuing with unfiltered pool): $e"
         expanded
     end
 

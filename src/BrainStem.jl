@@ -1,4 +1,10 @@
 # BrainStem.jl - GRUG Winner-Take-All Dispatcher
+# #############################################################################
+# ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.     ###
+# ###  THE CORRECT DESIGN IS LobeOrchestrator.jl: SEQUENTIAL FIRING.       ###
+# ###  LOBES ARE NEVER MUTED. BRAINSTEM ROUTES BASED ON CONFIDENCE,        ###
+# ###  NOT BY SILENCING LOBES. LOBE_TOPICALITY_FLOOR IS 0.0 (DISABLED).   ###
+# #############################################################################
 # GRUG say: BrainStem is cave router. Only ONE cave talks at a time. Others shut up.
 # GRUG say: This how brain work. One thing get attention. Other things wait.
 # GRUG say: No silent failures. If dispatch break, Grug must know.
