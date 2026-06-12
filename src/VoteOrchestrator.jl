@@ -132,7 +132,13 @@ const AIML_TOP_TIER_WINDOW = 0.05
 #     length-normalization yields ~0.15–0.30 in token_conf land), so a
 #     legitimate weak match still has a chance to clear if the scan was
 #     real evidence.
-const SPARSE_ACTIVE_FIRE_FLOOR = 0.20
+# GRUG v7.23: SPARSE_ACTIVE_FIRE_FLOOR set to 0.0.
+# Confidence is the ONLY gate now. The lock-in floor (AIML_TOP_LOCKIN_FLOOR)
+# is the authoritative threshold for orchestration. This pre-scan floor was
+# culling weak matches before they even got a chance to accumulate relational
+# confidence, causing stochastic failures where nodes with good relational
+# overlap but low token_conf were sometimes kept and sometimes dropped.
+const SPARSE_ACTIVE_FIRE_FLOOR = 0.0
 
 # GRUG v7.16+: SPARSE-ACTIVE FIRE TELEMETRY.
 # Atomic counter incremented every time the floor culls a fire. Read with
@@ -144,16 +150,12 @@ const _SPARSE_ACTIVE_SKIP_COUNT = Threads.Atomic{Int}(0)
 """
     should_fire_sparse_active(confidence::Real)::Bool
 
-GRUG: Return `true` iff `confidence` clears the sparse-active fire floor.
-On `false`, the caller MUST not fire and SHOULD increment the skip counter
-via `tally_sparse_active_skip!()` for telemetry. NaN/Inf is rejected
-(returns false; caller protects itself).
+GRUG v7.23: Always returns true for finite confidence. The sparse-active floor
+is now 0.0, so the only rejection is NaN/Inf. Confidence decides everything
+at the lock-in stage, not here.
 """
 function should_fire_sparse_active(confidence::Real)::Bool
-    if !isfinite(confidence)
-        return false
-    end
-    return Float64(confidence) >= SPARSE_ACTIVE_FIRE_FLOOR
+    return isfinite(confidence)
 end
 
 """
@@ -689,15 +691,18 @@ end
 """
     strength_biased_vote_coinflip(vc::VoteCandidate)::Bool
 
-GRUG: Same formula as engine.strength_biased_scan_coinflip. Strong nodes biased
-to be kept. Weak nodes still have ~20% base chance.
-  base = 0.20
-  bonus = 0.70 * (strength / cap)
-  prob  = base + bonus (clamped to [0, 1])
+GRUG v7.23: REMOVED stochastic coinflip. Confidence is the ONLY gate for
+orchestration. If a vote's confidence crosses the lock-in floor, it's in.
+If it doesn't, it's out. No lottery. Strength still affects node growth
+(bump_strength!) but does NOT gate whether a vote survives selection.
+
+Old behavior: 20-90% survival chance based on strength in sub-top/hedge
+bands. This caused stochastic output where the same input produced different
+responses on different runs — sometimes a knowledge vote survived the
+coinflip and rendered, sometimes it didn't, even with identical confidence.
 """
 function strength_biased_vote_coinflip(vc::VoteCandidate)::Bool
-    p = AIML_SUBTOP_BASE_PROB + (vc.strength / vc.strength_cap) * AIML_SUBTOP_BONUS_PROB
-    return rand() < clamp(p, 0.0, 1.0)
+    return true  # v7.23: Confidence decides, not a coinflip.
 end
 
 """

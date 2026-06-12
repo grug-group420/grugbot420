@@ -47,11 +47,12 @@ Random.seed!(42)  # deterministic-ish
 # =============================================================================
 println("\n[Phase 1] Creating lobes...")
 const LOBE_SPECS = [
-    ("lobe_math",      "arithmetic, calculation, quantitative reasoning"),
-    ("lobe_language",  "linguistic structure, multipart questions, conjunctions"),
-    ("lobe_social",    "greetings, empathy, social cues, comfort"),
-    ("lobe_survival",  "danger, threat, flee, fight, hide"),
-    ("lobe_reasoning", "logical analysis, ponder, deduction, why"),
+    ("lobe_math",      "arithmetic calculation quantitative reasoning compute solve evaluate plus minus times divided add subtract multiply number"),
+    ("lobe_language",  "linguistic structure multipart questions conjunctions and then also but or"),
+    ("lobe_social",    "greetings empathy social cues comfort hello hi hey"),
+    ("lobe_survival",  "danger threat flee fight hide fire smoke burn"),
+    ("lobe_reasoning", "logical analysis ponder deduction why think consider reflect"),
+    ("lobe_knowledge", "sky ocean water love ecosystem fire nature describe explain what capital france"),
 ]
 for (lid, subj) in LOBE_SPECS
     GB.Lobe.create_lobe!(lid, subj)
@@ -71,7 +72,9 @@ _connect("lobe_math",      "lobe_reasoning")
 _connect("lobe_language",  "lobe_reasoning")
 _connect("lobe_language",  "lobe_social")
 _connect("lobe_math",      "lobe_language")
-println("  🔗 4 cross-lobe cascade edges wired")
+_connect("lobe_language",  "lobe_knowledge")
+_connect("lobe_reasoning", "lobe_knowledge")
+println("  🔗 6 cross-lobe cascade edges wired")
 
 # =============================================================================
 # Phase 2: pattern-reactive nodes spread across lobes
@@ -133,7 +136,22 @@ _node_in_lobe("lobe_reasoning", "because therefore thus hence",
 _node_in_lobe("lobe_reasoning", "why does happens occurs",
     "explain^4 | reason^3 | clarify^2", reason_ctx, String[])
 
-println("  ✅ 14 pattern-reactive nodes spread across 5 lobes")
+# --- Knowledge nodes in knowledge lobe (for multipart test coverage) ---
+know_ctx = Dict{String,Any}("system_prompt" => "General knowledge and factual description.")
+_node_in_lobe("lobe_knowledge", "sky cloud sun weather atmosphere",
+    "describe^4 | explain^3 | clarify^2", know_ctx, String[])
+_node_in_lobe("lobe_knowledge", "ocean sea water river lake",
+    "describe^4 | explain^3 | elaborate^2", know_ctx, String[])
+_node_in_lobe("lobe_knowledge", "water liquid drink rain",
+    "describe^4 | explain^2 | clarify^1", know_ctx, String[])
+_node_in_lobe("lobe_knowledge", "love emotion feeling heart care",
+    "describe^3 | comfort^3 | explain^2", know_ctx, String[])
+_node_in_lobe("lobe_knowledge", "ecosystem nature environment forest habitat",
+    "describe^4 | explain^3 | elaborate^1", know_ctx, String[])
+_node_in_lobe("lobe_knowledge", "fire flame burn heat warm",
+    "describe^4 | explain^3 | alert^1", know_ctx, String[])
+
+println("  ✅ 20 pattern-reactive nodes spread across 5 lobes (14 base + 6 knowledge)")
 
 # =============================================================================
 # Phase 3: node attachments (relational fire substrate)

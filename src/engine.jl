@@ -2184,14 +2184,12 @@ function fire_attachments!(target_id::String, active_count::Int, active_cap::Int
             jitter = is_nonjitter(attach_node_ref) ? 0.0 : randn() * RELAY_CONF_JITTER_SIGMA
             confidence = max(0.1, att.base_confidence + jitter)
 
-            # GRUG: SPARSE-ACTIVE FIRE GATE on the attachment relay path.
-            # The relay's own hard floor is 0.1 ("always have SOME voice")
-            # which is intentionally below SPARSE_ACTIVE_FIRE_FLOOR (0.20).
-            # That hard floor still wins for genuinely-confident attachments
-            # post-jitter, but a base_confidence that's noisy enough to land
-            # below the sparse-active threshold is just noise riding the
-            # connector \u2014 cull it here so it never enters the vote pool.
-            # AIML layer should NOT be the place that filters this.
+            # GRUG v7.23: SPARSE-ACTIVE FIRE GATE on the attachment relay path.
+            # SPARSE_ACTIVE_FIRE_FLOOR is now 0.0 (always passes). The relay's
+            # own hard floor of 0.1 ("always have SOME voice") still applies
+            # above. The real gate is AIML_TOP_LOCKIN_FLOOR (0.50) in the
+            # orchestration phase. This check is kept as a structural hook
+            # but never culls attachment relay fires.
             if !VoteOrchestrator.should_fire_sparse_active(confidence)
                 VoteOrchestrator.tally_sparse_active_skip!()
                 continue
@@ -3106,20 +3104,19 @@ end
 """
 strength_biased_scan_coinflip(node::Node)::Bool
 
-GRUG: Before scanning a node, flip a biased coin.
-Strong nodes are more likely to be scanned and activated.
-Weak nodes can still get scanned, but less often (keeps competition alive).
+GRUG v7.23: REMOVED stochastic coinflip. Every non-grave node gets scanned.
+Confidence is the ONLY gate — if a node's pattern matches strongly enough,
+it fires. If it doesn't, it doesn't. No lottery. Strength still affects
+post-scan weight (bump_strength! on fire) but does NOT gate whether a node
+even gets to TRY matching. The lock-in floor (AIML_TOP_LOCKIN_FLOOR) is
+the authoritative confidence threshold for orchestration.
 
-Probability formula: base_prob + (strength / STRENGTH_CAP) * bonus_prob
-  - Weakest node (strength=0.0): 20% chance of scan
-  - Average node (strength=5.0): 60% chance
-  - Strongest node (strength=10.0): 90% chance
+Old behavior: 20-90% scan chance based on strength. This caused stochastic
+test failures where knowledge nodes sometimes got scanned and sometimes
+didn't, even when their pattern was a perfect match for the input.
 """
 function strength_biased_scan_coinflip(node::Node)::Bool
-    base_prob  = 0.20
-    bonus_prob = 0.70
-    scan_prob  = base_prob + (node.strength / STRENGTH_CAP) * bonus_prob
-    return rand() < clamp(scan_prob, 0.0, 1.0)
+    return true  # v7.23: EVERY node scans. Confidence decides.
 end
 
 # ==============================================================================
@@ -3383,16 +3380,14 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
 
         if token_conf > 0 || rel_conf > 0
-            # GRUG: SPARSE-ACTIVE FIRE GATE (post action-tone weighting).
-            # Per user directive: "a pattern bind below a high threshold
-            # shouldn't even fire really. its sparse active. shouldn't handle
-            # that from the aiml layer." The AIML layer used to filter this
-            # downstream, which wasted a fire slot on noise. Now the engine
-            # culls sub-threshold binds at the fire site itself BEFORE
-            # claiming a slot from FireCounter \u2014 saves attention budget
-            # for genuinely confident specimens. Threshold is
-            # SPARSE_ACTIVE_FIRE_FLOOR (0.20) \u2014 well above the relay
-            # hard-floor (0.1) and well below the AIML lock-in floor (0.50).
+            # GRUG v7.23: SPARSE-ACTIVE FIRE GATE (post action-tone weighting).
+            # Per user directive: "only votes that get locked in should even
+            # happen. like anything below lock in confidence just fuck it off
+            # dont even fire." Stochastic strength-biased coinflips REMOVED.
+            # Confidence is the ONLY gate now. SPARSE_ACTIVE_FIRE_FLOOR is
+            # now 0.0 (always passes) because the REAL gate is the lock-in
+            # floor (AIML_TOP_LOCKIN_FLOOR = 0.50) in the orchestration
+            # phase. This check is kept as a structural hook but never culls.
             if !VoteOrchestrator.should_fire_sparse_active(confidence)
                 VoteOrchestrator.tally_sparse_active_skip!()
                 return nothing
