@@ -2645,6 +2645,10 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             processed = replace(processed, "{LOBE_CONTEXT}"   => _lobe_display)
             processed = replace(processed, "{VOTE_CERTAINTY}"     => vote_certainty)
             processed = replace(processed, "{TIED_ALTERNATIVES}"  => tied_alt_str)
+            # GRUG v7.30: Verb-class improv template. AIML can use {VERB_CLASSES}
+            # to know what action family the user's verbs belong to, enabling
+            # improvisation driven by the verb signal rather than just the action packet.
+            processed = replace(processed, "{VERB_CLASSES}"  => verb_classes_str)
             push!(evaluated_rules, processed)
         end
     catch e
@@ -2656,6 +2660,18 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # GRUG: Put relation verb-noun sandwiches into the prompt to provide grammar context.
     u_triples = isempty(primary_vote.user_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.user_triples], ", ")
     n_triples = isempty(primary_vote.node_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.node_triples], ", ")
+
+    # GRUG v7.30: VERB-CLASS IMPROV CONTEXT for AIML
+    # Resolve verb classes from the primary vote's user triples so AIML
+    # can improv off the verb signal. The verb class tells AIML what KIND
+    # of action the user is requesting (reason, explain, create, etc.)
+    # and the triple subject/object provide the parameters to improv with.
+    verb_classes_str = if !isempty(primary_vote.user_triples)
+        classes = unique(filter(!isnothing, [SemanticVerbs.verb_class_of(t.relation) for t in primary_vote.user_triples]))
+        isempty(classes) ? "None" : join(classes, ", ")
+    else
+        "None"
+    end
 
     # =====================================================================
     # GRUG v7.16: AIML SYNTHESIZES VOTES INTO A NATURAL-LANGUAGE REPLY.
@@ -3518,6 +3534,61 @@ for act in warning_family
 end
 
 # ==============================================================================
+# GRUG v7.31: &doAction COMMAND DISPATCH
+# ==============================================================================
+# When a vote carries a :doaction bundle_role, the action field is the trigger
+# verb and the payload carries the assembled action output (e.g. "pork " × 200).
+# This COMMANDS entry handles action trigger verbs that don't already have a
+# family above. It checks if the primary_vote has a non-empty payload (which
+# means the action was already assembled by _cast_doaction_votes) and returns
+# it directly. If no payload, falls back to AIML generation.
+# ==============================================================================
+action_trigger_family = ["say", "repeat", "count", "check", "tell", "chant", "recite"]
+for act in action_trigger_family
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            # GRUG: If the vote carries an action payload, use it directly.
+            # This is the assembled output from _cast_doaction_votes.
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            # Fallback: generate AIML payload normally
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# ==============================================================================
+# GRUG v7.31: RECENT CONTEXT HELPER (for ActionScript RESOLVE)
+# ==============================================================================
+# Called by the RESOLVE callback wired in GrugBot420.jl.
+# Returns a summary of the last few messages from the 10k buffer.
+
+function _get_recent_context()::String
+    try
+        # Grab the last 5 non-system messages
+        recent = filter(m -> m.role == "user" || m.role == "assistant",
+                        MESSAGE_HISTORY[max(1, length(MESSAGE_HISTORY)-10):end])
+        if isempty(recent)
+            return "(nothing recent)"
+        end
+        # Summarize last 3 exchanges
+        summary_parts = String[]
+        for m in recent[end:min(end+3, length(recent))]
+            role_label = m.role == "user" ? "User" : "Grug"
+            text_preview = length(m.text) > 80 ? m.text[1:80] * "..." : m.text
+            push!(summary_parts, "$role_label: $text_preview")
+        end
+        return join(summary_parts, "\n")
+    catch
+        return "(recent context unavailable)"
+    end
+end
+
+# ==============================================================================
 # IMAGE BINARY DETECTION HELPER (FOR /mission AND /grow)
 # ==============================================================================
 
@@ -3632,7 +3703,7 @@ Explicit : /explicit <cmd> [<node_id>] <input>
 Grow     : /grow <single_line_json_packet>
 Rules    : /addRule <rule text> [prob=0.0-1.0]
            Tags: {MISSION}, {PRIMARY_ACTION}, {SURE_ACTIONS}, {UNSURE_ACTIONS},
-                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}
+                 {ALL_ACTIONS}, {CONFIDENCE}, {NODE_ID}, {MEMORY}, {LOBE_CONTEXT}, {VERB_CLASSES}
 Memory   : /pin <text>
 Nodes    : /nodes                              (show node map status)
 Status   : /status                             (show chatter + system status)
@@ -5109,10 +5180,15 @@ function save_specimen_to_file!(filepath::String)::String
     # load. Documented behavior.
     specimen["sigils"] = SigilRegistry.serialize_global()
 
+    # GRUG v7.31: 28. ACTION ENTRIES (ActionScript) ────────────────────
+    # User-definable action entries (the "side list") for &doAction.
+    # Without this, all runtime-registered actions are lost on reload.
+    specimen["actions"] = ActionScript.serialize_registry()
+
     specimen["_meta"] = Dict{String, Any}(
-        "version"    => "2.6",
+        "version"    => "2.7",
         "saved_at"   => time(),
-        "format"     => "grugbot420-specimen-v2.6"
+        "format"     => "grugbot420-specimen-v2.7"
     )
 
     # ── SERIALIZE + COMPRESS ──────────────────────────────────────────────
@@ -5161,6 +5237,7 @@ function save_specimen_to_file!(filepath::String)::String
     push!(lines, "  🔮  Trajectory entries : $(length(_traj_buf))")
     push!(lines, "  🕐  Temporal coherence : $(length(tcl_list))")
     push!(lines, "  ⏳  Morph cooldowns    : $(length(cooldown_data))")
+    push!(lines, "  🎭  Action entries    : $(length(ActionScript.list_actions()))")
     # GRUG: Show AIML stats if aiml_system was saved
     # GRUG 7.12-FIX: serialize_aiml_state()["registry"] is a
     # Dict{String, Vector{Dict}} where each value IS the list of node dicts
@@ -6162,6 +6239,20 @@ function load_specimen_from_file!(filepath::String)::String
     if haskey(specimen, "answer_mode_config")
         n_modes = length(specimen["answer_mode_config"])
         println("  🎯 Answer mode config found ($n_modes modes) - stored for future dispatch")
+
+    # GRUG v7.31: Restore action entries from specimen (the "side list").
+    # Without this, all user-registered &doAction entries are lost on reload.
+    if haskey(specimen, "actions") && isa(specimen["actions"], AbstractVector)
+        try
+            ActionScript.restore_registry!(specimen["actions"])
+            n_actions = length(ActionScript.list_actions())
+            counts["actions"] = n_actions
+            println("  🎭 Action entries restored ($n_actions actions)")
+        catch e
+            @warn "[MAIN] action entries restore failed (non-fatal, defaults kept): $e"
+            counts["actions"] = 0
+        end
+    end
     end
 
     # ══════════════════════════════════════════════════════════════════════════════

@@ -386,14 +386,17 @@ function promote_input(
     # promotion, ONCE, before the per-token loop. Order is deterministic
     # by name so two runs against the same registry produce identical
     # results.
-    promote_lambdas = SigilEntry[]
-    promote_macros  = SigilEntry[]
+    promote_lambdas   = SigilEntry[]
+    promote_macros    = SigilEntry[]
+    promote_procedures = SigilEntry[]
     for e in list_sigils(table)
         if e.promote_at_tokenize
             if e.class === :lambda
                 push!(promote_lambdas, e)
             elseif e.class === :macro
                 push!(promote_macros, e)
+            elseif e.class === :procedure
+                push!(promote_procedures, e)
             end
             # GRUG: any other class with promote_at_tokenize=true was rejected
             # at registration time — we trust the registry kernel.
@@ -447,7 +450,7 @@ function promote_input(
                 # sign word) — that's the user's anchor for this concept.
                 _promote_layer2!(out_tokens, bindings, merged,
                                  merged_surface, raw_pos,
-                                 promote_lambdas, promote_macros)
+                                 promote_lambdas, promote_macros, promote_procedures)
                 i += 2
                 continue
             end
@@ -464,7 +467,7 @@ function promote_input(
         # canonicalized form) so the binding remembers what the user typed.
         _promote_layer2!(out_tokens, bindings, canonical,
                          tok, raw_pos,
-                         promote_lambdas, promote_macros)
+                         promote_lambdas, promote_macros, promote_procedures)
         i += 1
     end
 
@@ -491,6 +494,7 @@ function _promote_layer2!(
     raw_pos::Int,
     promote_lambdas::Vector{SigilEntry},
     promote_macros::Vector{SigilEntry},
+    promote_procedures::Vector{SigilEntry},
 )
     # GRUG: try each promotable lambda's shape predicate.
     for e in promote_lambdas
@@ -525,6 +529,26 @@ function _promote_layer2!(
                 String(surface), raw_pos))
             return nothing
         end
+    end
+
+    # GRUG: try each promotable procedure's action-trigger predicate.
+    # :procedure sigils (like &doAction) promote when the token matches
+    # a registered action trigger verb (say, repeat, check, etc.).
+    # The captured value is the canonical token itself — the verb that
+    # triggered the promotion. No lexicon check; predicate is authoritative.
+    for e in promote_procedures
+        if !_predicate_allows(e, canonical)
+            continue
+        end
+        # GRUG: predicate passed — this token is an action trigger verb.
+        # Capture the canonical token as the binding value so the engine
+        # knows WHICH action to fire.
+        pos = length(out_tokens)
+        push!(out_tokens, string(SIGIL_PREFIX, e.name))
+        push!(bindings, SigilBinding(
+            pos, e.name, canonical, :procedure,
+            String(surface), raw_pos))
+        return nothing
     end
 
     # GRUG: nothing matched — token passes through as a literal. No binding

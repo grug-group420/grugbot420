@@ -161,7 +161,7 @@ const SIGIL_APPLIES_AT::NTuple{9,Symbol} = (
 
 # GRUG: which classes are activated in Stage 1. Patterns referencing reserved
 # classes throw at parse time with a clear "reserved for stage N" message.
-const STAGE1_ACTIVE_CLASSES::NTuple{3,Symbol} = (:lambda, :macro, :tag)
+const STAGE1_ACTIVE_CLASSES::NTuple{4,Symbol} = (:lambda, :macro, :tag, :procedure)
 
 # GRUG: which applies_at values are activated in Stage 1.
 const STAGE1_ACTIVE_PHASES::NTuple{2,Symbol} = (:bind, :match)
@@ -420,13 +420,13 @@ function register_sigil!(
         exp_clean = Vector{Any}(expansion)
     end
 
-    # GRUG: promote_at_tokenize gating. The front-door promoter only knows how
-    # to capture values for :lambda (shape predicate) and :macro (lexicon
-    # membership). Setting the flag on a :tag (no value) or a reserved class
-    # (gated out of pattern resolution) is a programmer error.
-    if promote_at_tokenize && !(class in (:lambda, :macro))
+    # GRUG: promote_at_tokenize gating. The front-door promoter knows how
+    # to capture values for :lambda (shape predicate), :macro (lexicon
+    # membership), and :procedure (action trigger predicate). Setting the
+    # flag on a :tag (no value) or other unsupported class is a programmer error.
+    if promote_at_tokenize && !(class in (:lambda, :macro, :procedure))
         throw(SigilConfigError(
-            "promote_at_tokenize=true is only valid for :lambda and :macro classes (got class :$class for &$nm)",
+            "promote_at_tokenize=true is only valid for :lambda, :macro, or :procedure classes (got class :$class for &$nm)",
             "promote_at_tokenize"))
     end
 

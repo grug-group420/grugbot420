@@ -34,6 +34,13 @@ using .EyeSystem
 include("SemanticVerbs.jl")
 using .SemanticVerbs
 
+# GRUG v7.31: ActionScript — &doAction reserved sigil macro with user-definable
+# action entries (the "side list"). Depends on SemanticVerbs for trigger verb
+# lookup and synonym expansion. Must load BEFORE SigilRegistry (the &doAction
+# sigil registration happens in engine.jl after all submodules are loaded).
+include("ActionScript.jl")
+using .ActionScript
+
 include("ActionTonePredictor.jl")
 using .ActionTonePredictor
 
@@ -345,5 +352,74 @@ export should_use_dynamic_path, COMPLEXITY_FLOOR
 
 # GRUG v7.15: PhagyGroupOrganizer exports --- idle-time GroupRegistry cleanup
 export GroupOrganizerStats, run_group_organizer!
+
+# GRUG v7.31: ActionScript exports --- &doAction reserved sigil system
+export ActionEntry, ActionRegistry, register_action!, unregister_action!
+export lookup_action, list_actions, execute_action, resolve_reference
+export is_action_trigger, get_action_triggers, ACTION_OPS
+export action_to_dict, dict_to_action, serialize_registry, restore_registry!
+export reset_action_registry!, action_registry
+export set_recent_callback!, set_subconscious_callback!
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GRUG v7.31: DEFERRED &doAction SIGIL REGISTRATION + DEFAULT ACTIONS
+# ──────────────────────────────────────────────────────────────────────────────
+# Must happen AFTER all submodules are loaded because:
+#   1. SigilRegistry global table exists (included earlier)
+#   2. ActionScript module exists (for is_action_trigger predicate)
+#   3. SemanticVerbs module exists (for synonyms_of used by register_action!)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# GRUG: Register the 'improv' verb class with its trigger verbs FIRST.
+# These must exist before default_actions!() calls synonyms_of().
+SemanticVerbs.add_relation_class!("improv")
+for v in ["say", "repeat", "count", "chant", "recite"]
+    SemanticVerbs.add_verb!(v, "improv")
+end
+SemanticVerbs.add_synonym!("say", "repeat")
+SemanticVerbs.add_synonym!("say", "chant")
+SemanticVerbs.add_synonym!("say", "recite")
+SemanticVerbs.add_relation_class!("reference")
+for v in ["check", "tell", "lookup", "resolve"]
+    SemanticVerbs.add_verb!(v, "reference")
+end
+SemanticVerbs.add_synonym!("check", "tell")
+
+# Register &doAction as a RESERVED :procedure-class sigil in the global table.
+# promote_predicate gates promotion to only action trigger verbs.
+SigilRegistry.register_sigil_global!(;
+    name="doAction",
+    class=:procedure,
+    applies_at=:match,
+    provenance="engine-default",
+    promote_at_tokenize=true,
+    promote_predicate=ActionScript.is_action_trigger
+)
+
+# Populate default action entries (say, repeat, count, check, tell)
+ActionScript.default_actions!()
+
+# Wire RESOLVE callbacks so ActionScript can query the 10k buffer
+# and subconscious signal layer at runtime.
+# Recent callback: scan the message history for last substantive exchange.
+ActionScript.set_recent_callback!(function(query::String)
+    # GRUG: This callback is called from ActionScript.resolve_reference
+    # when the reference is "recent", "last", "what now", etc.
+    # It queries the message history (regular 10k buffer).
+    try
+        msgs = Main._get_recent_context()
+        return isempty(msgs) ? "(nothing recent)" : msgs
+    catch
+        return "(recent context unavailable)"
+    end
+end)
+
+# Subconscious callback: deep memory traces from ages ago.
+ActionScript.set_subconscious_callback!(function(query::String)
+    # GRUG: This callback queries the subconscious signal layer.
+    # Currently returns a placeholder; the subconscious layer will be
+    # wired to Hopfield/strength decay traces in a future update.
+    return "(deep memory trace: not yet wired)"
+end)
 
 end # module GrugBot420

@@ -14,7 +14,7 @@ using Base.Threads: ReentrantLock
 export add_verb!, add_relation_class!, add_synonym!, remove_synonym!,
        get_all_verbs, get_verbs_in_class, get_relation_classes,
        normalize_synonyms, get_synonym_map, verb_class_of,
-       VERB_REGISTRY_LOCK
+       synonyms_of, VERB_REGISTRY_LOCK
 
 # ==============================================================================
 # VERB REGISTRY
@@ -350,6 +350,23 @@ function normalize_synonyms(input::String)::String
     end
 
     return result
+end
+
+"""
+    synonyms_of(verb::String)::Vector{String}
+
+Return all synonym aliases that map TO the given canonical verb.
+Reverse lookup of _SYNONYM_MAP. Used by ActionScript to register
+action entries under all synonym trigger verbs.
+
+Example: if add_synonym!("causes", "triggers") was called,
+then synonyms_of("causes") returns ["triggers"].
+"""
+function synonyms_of(verb::String)::Vector{String}
+    v = strip(lowercase(verb))
+    lock(VERB_REGISTRY_LOCK) do
+        return [alias for (alias, canonical) in _SYNONYM_MAP if lowercase(canonical) == v]
+    end
 end
 
 end # module SemanticVerbs

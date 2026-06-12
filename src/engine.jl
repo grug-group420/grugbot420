@@ -3190,6 +3190,24 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vecto
         end
     end
 
+    # GRUG v7.30: VERB-CLASS IMPROV EXTRACTION
+    # Resolve verb classes from the extracted user_triples so downstream
+    # confidence weighting can boost nodes whose action_packet aligns with
+    # the verb class the user actually used. This is the engine-side of
+    # verb-driven improvisation: the verb IS the action signal, and nodes
+    # that speak the same language get a confidence lift.
+    # Non-fatal: verb_class_of returns nothing for unknown verbs; we skip those.
+    input_verb_classes = Set{String}()
+    for trip in user_triples
+        cls = SemanticVerbs.verb_class_of(trip.relation)
+        if !isnothing(cls)
+            push!(input_verb_classes, cls)
+        end
+    end
+    if !isempty(input_verb_classes)
+        @info "[ENGINE] 🎭 Verb-class improv: detected classes $(collect(input_verb_classes)) from $(length(user_triples)) triples"
+    end
+
     # GRUG: HOPFIELD FAST-PATH CHECK - DISABLED
     # ==============================================================================
     # The Hopfield cache has been DISABLED. Pattern bind phase is blazing fast even
@@ -3356,6 +3374,32 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vecto
             end
             weight = ActionTonePredictor.get_action_weight_multiplier(prediction, node_action_peek)
             confidence = confidence * weight
+        end
+
+        # GRUG v7.30: VERB-CLASS IMPROV CONFIDENCE BOOST
+        # If the input contained verbs whose class matches this node's
+        # action_packet verbs, the node gets a confidence boost — it speaks
+        # the same action language as the user's intent. This is how Grug
+        # improvises: the verb class IS the routing signal, and nodes that
+        # match the verb class get to fire louder. Cascade depth emerges
+        # naturally when boosted nodes trigger other same-class nodes.
+        if !isempty(input_verb_classes) && confidence > 0.0
+            try
+                positives, _, _ = parse_action_packet(node.action_packet)
+                for (act, _wt) in positives
+                    act_cls = SemanticVerbs.verb_class_of(act)
+                    if !isnothing(act_cls) && act_cls in input_verb_classes
+                        # GRUG: Mild boost (1.15x) per matching verb class.
+                        # Not a huge nudge — just enough to tip the scales so
+                        # verb-aligned nodes win over generic ones. Stacks with
+                        # ATP weighting. Cumulative per-class, not per-action.
+                        confidence = confidence * 1.15
+                        break  # one boost per class match is enough
+                    end
+                end
+            catch
+                # Non-fatal: if action_packet parse fails, skip verb boost.
+            end
         end
 
         if token_conf > 0 || rel_conf > 0
@@ -3749,6 +3793,8 @@ function cast_sigil_votes(
         return _cast_math_votes(node, conf, bindings, u_trips, n_trips)
     elseif kind === :multipart
         return _cast_multipart_votes(node, conf, bindings, original_text, u_trips, n_trips)
+    elseif kind === :doaction
+        return _cast_doaction_votes(node, conf, bindings, original_text, u_trips, n_trips)
     elseif kind === :instruction
         throw(SigilFireError(kind, id,
             "@sigil:instruction lane is reserved; not yet implemented"))
@@ -3756,7 +3802,7 @@ function cast_sigil_votes(
         # GRUG: unknown sigil kind on a tagged node = specimen authoring error.
         # Loud failure, no silent fallback.
         throw(SigilFireError(kind, id,
-            "unknown sigil kind :$(kind); known kinds are :math, :multipart, :instruction"))
+            "unknown sigil kind :$(kind); known kinds are :math, :multipart, :doaction, :instruction"))
     end
 end
 
@@ -3894,6 +3940,183 @@ function _cast_multipart_votes(
     end
 
     return out
+end
+
+# -----------------------------------------------------------------------------
+# :doaction handler
+# -----------------------------------------------------------------------------
+# GRUG v7.31: &doAction reserved sigil handler. When a node is tagged
+# @sigil:doaction and the sigil promoter detected an action trigger verb,
+# this handler looks up the ActionScript entry, fills template slots from
+# bindings, executes the operation chain, and emits votes carrying the
+# assembled output as payload.
+#
+# Flow: input → thesaurus normalize → &doAction promote → cast_sigil_votes
+#       → this handler → ActionScript.execute_action → vote with payload
+#
+# The payload carries the full assembled output (e.g. "pork pork pork..." × 200).
+# The action name stays as the trigger verb so COMMANDS dispatch works.
+function _cast_doaction_votes(
+    node::Node,
+    conf::Float64,
+    bindings::Vector,
+    original_text::String,
+    u_trips::Vector{RelationalTriple},
+    n_trips::Vector{RelationalTriple},
+)::Vector{Vote}
+    # GRUG: Find the &doAction binding to get the trigger verb value.
+    doaction_binding = nothing
+    for b in bindings
+        if b.name == "doAction"
+            doaction_binding = b
+            break
+        end
+    end
+
+    # GRUG: If no &doAction binding, this node isn't actually an action node.
+    # Emit a fallback opener-only vote so the node still speaks.
+    opener = _select_opener(node.action_packet)
+    if !haskey(COMMANDS, opener)
+        error("!!! FATAL: Sigil opener [$opener] not in COMMANDS dictionary !!!")
+    end
+    _, negatives = select_action(node.action_packet)
+    obj_id = fresh_objective_id()
+
+    if isnothing(doaction_binding)
+        @warn "[ENGINE] _cast_doaction_votes: no &doAction binding found on node $(node.id); emitting opener-only fallback"
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
+    end
+
+    # GRUG: The trigger verb is the binding's value (what the user typed).
+    trigger_verb = lowercase(string(doaction_binding.value))
+
+    # GRUG: Look up the action entry from ActionScript registry.
+    entry = ActionScript.lookup_action(trigger_verb)
+    if isnothing(entry)
+        @warn "[ENGINE] _cast_doaction_votes: no action entry for trigger verb '$trigger_verb'; emitting opener-only fallback"
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
+    end
+
+    # GRUG: Build slot dict from remaining bindings.
+    # Mapping: &word → {{target}}, &n → {{count}} or {{n}}, &rest → {{rest}}
+    # Also include any named slot that matches a template placeholder.
+    slots = Dict{String, Any}()
+    for b in bindings
+        if b.name == "doAction"
+            continue  # skip the trigger itself
+        elseif b.name == "word"
+            slots["target"] = b.value
+            slots["word"] = b.value
+        elseif b.name == "n"
+            val = b.value
+            # GRUG: Try to parse as integer for REPEAT count
+            n_val = tryparse(Int, string(val))
+            if !isnothing(n_val)
+                slots["count"] = n_val
+                slots["n"] = n_val
+            else
+                slots["count"] = val
+                slots["n"] = val
+            end
+        elseif b.name == "rest"
+            slots["rest"] = b.value
+        else
+            # Generic: any other binding fills its own name slot
+            slots[b.name] = b.value
+        end
+    end
+
+    # GRUG: Also extract any literal tokens from the original text that
+    # weren't captured as bindings. For "say pork 200 times", if "pork"
+    # and "200" weren't promoted (e.g. no &word/&n in the node pattern),
+    # we need a fallback. Parse from the original text using the action
+    # trigger verb as anchor.
+    if !haskey(slots, "target") || !haskey(slots, "count")
+        _extract_action_slots!(slots, original_text, trigger_verb)
+    end
+
+    # GRUG: Execute the action template with filled slots.
+    try
+        result = ActionScript.execute_action(entry, slots)
+        if isempty(result)
+            @warn "[ENGINE] _cast_doaction_votes: empty result from execute_action for '$trigger_verb'; emitting opener-only fallback"
+            return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
+        end
+        # GRUG: Emit the action output as a vote payload. The action name
+        # is the trigger verb so COMMANDS[trigger_verb] can dispatch it.
+        # bundle_role = :doaction signals this is an action execution result.
+        return Vote[Vote(node.id, trigger_verb, conf, negatives, u_trips, n_trips, result, obj_id, :doaction)]
+    catch e
+        @warn "[ENGINE] _cast_doaction_votes: execute_action failed for '$trigger_verb': $e; emitting opener-only fallback"
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
+    end
+end
+
+"""
+    _extract_action_slots!(slots, original_text, trigger_verb)
+
+Fallback slot extractor for action inputs. Parses the original text
+around the trigger verb to capture target words and numeric counts.
+
+Example: "say pork 200 times" → trigger="say", target="pork", count=200
+Example: "repeat the date 200 times" → trigger="repeat", target="the date", count=200
+"""
+function _extract_action_slots!(slots::Dict{String, Any}, original_text::String, trigger_verb::String)
+    tokens = split(lowercase(original_text))
+    trigger_idx = findfirst(t -> t == trigger_verb, tokens)
+
+    if isnothing(trigger_idx)
+        return  # can't find trigger verb, give up
+    end
+
+    # GRUG: Tokens AFTER the trigger verb, BEFORE any "times" delimiter,
+    # are the target. Last numeric token before "times" (or at end) is count.
+    after_trigger = tokens[trigger_idx+1:end]
+
+    # Find "times" delimiter if present
+    times_idx = findfirst(t -> t in Set(["times", "x", "repeat"]), after_trigger)
+
+    if !isnothing(times_idx)
+        # Target is everything between trigger and "times" (excluding the count)
+        before_times = after_trigger[1:times_idx-1]
+        # Count: last numeric token in before_times
+        count_val = nothing
+        target_tokens = String[]
+        for tok in before_times
+            n = tryparse(Int, tok)
+            if !isnothing(n)
+                count_val = n
+            else
+                push!(target_tokens, tok)
+            end
+        end
+        if !haskey(slots, "target") && !isempty(target_tokens)
+            slots["target"] = join(target_tokens, " ")
+        end
+        if !haskey(slots, "count") && !isnothing(count_val)
+            slots["count"] = count_val
+            slots["n"] = count_val
+        end
+    else
+        # No "times" delimiter — parse last numeric as count, rest as target
+        count_val = nothing
+        target_tokens = String[]
+        for tok in after_trigger
+            n = tryparse(Int, tok)
+            if !isnothing(n)
+                count_val = n
+            else
+                push!(target_tokens, tok)
+            end
+        end
+        if !haskey(slots, "target") && !isempty(target_tokens)
+            slots["target"] = join(target_tokens, " ")
+        end
+        if !haskey(slots, "count") && !isnothing(count_val)
+            slots["count"] = count_val
+            slots["n"] = count_val
+        end
+    end
 end
 
 # ==============================================================================
@@ -4103,7 +4326,8 @@ const ALLOWED_RULE_TAGS = Set([
     "{MEMORY}",
     "{LOBE_CONTEXT}",
     "{VOTE_CERTAINTY}",
-    "{TIED_ALTERNATIVES}"
+    "{TIED_ALTERNATIVES}",
+    "{VERB_CLASSES}"
 ])
 
 """
