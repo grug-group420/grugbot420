@@ -1786,6 +1786,21 @@ const SUPPORT_STITCHES = SupportStitch[
 const _CURRENT_SUPPORT_STITCHES      = Dict{String, Symbol}()
 const _CURRENT_SUPPORT_STITCHES_LOCK = ReentrantLock()
 
+# GRUG v7.20: Semantic chunk map — per-cycle mapping from clause text to
+# Vector{SemanticChunk}. Populated in process_mission after SigilMediator
+# mediation, consumed by ephemeral_aiml_orchestrator and generate_aiml_payload
+# for scoped_mission text and topicality gating. Cleared in the same finally
+# block as _CURRENT_BAND_INFO so no stale state leaks between cycles.
+# Map: clause_text (String) -> Vector{SemanticChunk}
+const _CURRENT_CLAUSE_CHUNKS      = Dict{String, Vector{Any}}()
+const _CURRENT_CLAUSE_CHUNKS_LOCK = ReentrantLock()
+
+# GRUG v7.20: Current cycle's decomposed clauses — populated in process_mission
+# so MultipartOrchestrator.orchestrate_multipart can access clause texts even
+# when called from ephemeral_aiml_orchestrator (which doesn't receive clauses).
+const _CURRENT_CLAUSES      = Any[]
+const _CURRENT_CLAUSES_LOCK = ReentrantLock()
+
 """
     _available_support_stitches(reasons, cert, p_pat, s_pat)
 
@@ -2151,22 +2166,41 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # "what is 3 times 4 and what is the sky" when it should see "what is 3 times 4".
     _primary_scoped_mission = mission  # default: full text (non-multipart or singleton)
     _primary_obj_id = getfield(primary_vote, :objective_id)
-    # GRUG v7.19: Only attempt scoped_mission lookup when the mission text
-    # is actually multipart (contains conjunctions). Math sigil votes always
-    # carry a non-zero objective_id (from _cast_math_votes), but for single-
-    # clause inputs the MultipartOrchestrator would group them incorrectly
-    # and set scoped_mission to the payload text ("2 plus 2 equals 4") instead
-    # of the original user input ("what is 2 plus 2").
     _mission_is_multipart = occursin(r"\b(and|or|but|also|additionally)\b", mission) && length(InputDecomposer.decompose(mission)) > 1
-    if _primary_obj_id > UInt64(0) && _mission_is_multipart
-        # GRUG: look up the clause that matches this objective_id.
-        # We need to find which clause has this objective_id.
-        # Walk the clause_objective_ids dict if available (it's in process_mission scope).
-        # Since we're inside ephemeral_aiml_orchestrator, we don't have direct access.
-        # Instead, use MultipartOrchestrator to find the scoped text from the primary's group.
+
+    # GRUG v7.20: FIRST, try semantic chunk map for the best scoped_mission.
+    # The semantic chunk router decomposed the input into math-semantic,
+    # knowledge, emotive chunks etc. The PRIMARY chunk (is_primary=true)
+    # is the best scoped_mission — it captures the full semantic build-up
+    # ("what is 2 plus 2", not just "2 plus 2").
+    _chunk_scoped = nothing
+    lock(_CURRENT_CLAUSE_CHUNKS_LOCK) do
+        for (cl_text, chunks) in _CURRENT_CLAUSE_CHUNKS
+            for ch in chunks
+                if getfield(ch, :is_primary)
+                    # GRUG: for multipart, match the clause that belongs to this vote's group.
+                    # For single-clause, any primary chunk works.
+                    if !_mission_is_multipart || occursin(lowercase(strip(getfield(ch, :text))), lowercase(strip(mission))) || occursin(lowercase(strip(mission)), lowercase(strip(getfield(ch, :text))))
+                        _chunk_scoped = getfield(ch, :text)
+                        break
+                    end
+                end
+            end
+            !isnothing(_chunk_scoped) && break
+        end
+    end
+
+    if !isnothing(_chunk_scoped)
+        _primary_scoped_mission = _chunk_scoped
+    elseif _primary_obj_id > UInt64(0) && _mission_is_multipart
+        # GRUG v7.19 fallback: Only attempt scoped_mission lookup when the mission text
+        # is actually multipart. Math sigil votes always carry a non-zero objective_id,
+        # but for single-clause inputs the MultipartOrchestrator would group them incorrectly
+        # and set scoped_mission to the payload text instead of the original user input.
         try
             _pre_all = vcat(sure_votes, unsure_votes)
-            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, [])
+            _pre_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
+            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, _pre_clauses)
             for _pre_grp in _pre_result.groups
                 if _pre_grp.objective_id == _primary_obj_id
                     _primary_scoped_mission = _pre_grp.scoped_mission
@@ -2197,6 +2231,14 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         # GRUG v7.16.3: Clear lock-in score telemetry on cycle exit.
         lock(_CURRENT_LOCKIN_SCORES_LOCK) do
             empty!(_CURRENT_LOCKIN_SCORES)
+        end
+        # GRUG v7.20: Clear semantic chunk map on cycle exit.
+        lock(_CURRENT_CLAUSE_CHUNKS_LOCK) do
+            empty!(_CURRENT_CLAUSE_CHUNKS)
+        end
+        # GRUG v7.20: Clear clause data on cycle exit.
+        lock(_CURRENT_CLAUSES_LOCK) do
+            empty!(_CURRENT_CLAUSES)
         end
     end
 
@@ -2266,7 +2308,8 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _all_votes)
     if _has_multipart
         try
-            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, [])
+            _mp_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
+            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, _mp_clauses)
             _primary_obj = getfield(primary_vote, :objective_id)
             for grp in mp_result.groups
                 if grp.objective_id == _primary_obj
@@ -2740,17 +2783,31 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (a) Relational triple \u2192 sub-clause. Pick up to 1 triple to keep
+    # (a) Relational triple → sub-clause. Pick up to 1 triple to keep
     # the reply tight. Prefer a triple whose relation is in required_relations.
+    # GRUG v7.20: TRIPLE TOPICALITY FILTER — only include triples that are
+    # topically relevant to the mission. Triples from off-topic lobes (like
+    # "dish &causal strength" for a math mission) are filtered out.
     if !isempty(node_triples_obj)
+        # GRUG v7.20: Filter triples by topicality to the mission.
+        topical_triples = filter(t -> _triple_is_topical(t, mission), node_triples_obj)
+        # GRUG: If ALL triples were filtered, fall back to required-relation match.
+        # A required-relation triple is ALWAYS topical by definition.
+        if isempty(topical_triples)
+            topical_triples = filter(t -> lowercase(strip(t.relation)) in node_required, node_triples_obj)
+        end
+        # GRUG: If still empty, use original set (safety — never produce empty reply).
+        if isempty(topical_triples)
+            topical_triples = node_triples_obj
+        end
         preferred = nothing
-        for t in node_triples_obj
+        for t in topical_triples
             if lowercase(strip(t.relation)) in node_required
                 preferred = t
                 break
             end
         end
-        t = preferred === nothing ? rand(node_triples_obj) : preferred
+        t = preferred === nothing ? rand(topical_triples) : preferred
         rel_swapped  = _pick_synonym(String(t.relation), node_drop_table, node_required)
         subj_swapped = _swap_words_in(String(t.subject),  node_drop_table, node_required)
         obj_swapped  = _swap_words_in(String(t.object),   node_drop_table, node_required)
@@ -2783,10 +2840,29 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # AIML_SUPPORT_RELATION_FLOOR). They have a verified link to the primary
     # via group / attachment / lobe / shared triples / concept class, so
     # their pattern is legitimate supporting content. Cap at 2 claims.
+    # GRUG v7.20: SUPPORT-VOTE TOPICALITY GATE — even confirmed support votes
+    # from off-topic lobes are suppressed. The relation gate checks link
+    # structure, not semantic content. A math-lobe node linked via shared
+    # verb "describe" to a nature-lobe node should NOT inject "what is a
+    # sunset" into a math answer. Gate checks each support vote's lobe
+    # topicality against the mission text.
     if !isempty(support_band_votes)
+        # GRUG v7.20: Filter support votes by lobe topicality.
+        topical_support = Vote[]
+        for sv in support_band_votes
+            sv_topicality = _lobe_topicality_for_vote(sv, mission)
+            if sv_topicality >= _SUPPORT_TOPICALITY_FLOOR
+                push!(topical_support, sv)
+            end
+        end
+        # GRUG: if all filtered out (rare), fall back to original set so
+        # we never produce a completely bare reply.
+        if isempty(topical_support)
+            topical_support = support_band_votes
+        end
         support_claims_added = 0
         seen_patterns = Set{String}([node_pattern])  # avoid duplicates against primary
-        for sv in support_band_votes
+        for sv in topical_support
             support_claims_added >= 2 && break
             sn = lock(() -> get(NODE_MAP, sv.node_id, nothing), NODE_LOCK)
             sn === nothing && continue
@@ -2937,7 +3013,11 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         directive_suffix = " [Directives: " * join(evaluated_rules, "; ") * "]"
     end
 
-    conversational_reply = "$voice_prefix$core_reply$pinned_citation$lobe_tag$directive_suffix"
+    # GRUG v7.20: SCAFFOLD COHERENCE PASS — post-hoc filter on the assembled
+    # scaffold. Strips sentences containing off-topic lobe content that slipped
+    # through the topicality gate and triple filter. This is the safety net.
+    conversational_reply_raw = "$voice_prefix$core_reply$pinned_citation$lobe_tag$directive_suffix"
+    conversational_reply = _scaffold_coherence_pass(conversational_reply_raw, mission)
 
     # GRUG: Wait little bit so cpu fire not burn down hut.
     sleep(0.3)
@@ -3557,6 +3637,13 @@ function process_mission(mission_text::String)
     clauses = InputDecomposer.decompose(mission_text)
     is_multipart = length(clauses) > 1
 
+    # GRUG v7.20: Store clauses in _CURRENT_CLAUSES so downstream consumers
+    # (ephemeral_aiml_orchestrator, MultipartOrchestrator) can access them.
+    lock(_CURRENT_CLAUSES_LOCK) do
+        empty!(_CURRENT_CLAUSES)
+        append!(_CURRENT_CLAUSES, Any[cl for cl in clauses])
+    end
+
     if is_multipart
         @info "[MAIN] 🔀 InputDecomposer split into $(length(clauses)) clauses: $([c.text for c in clauses])"
     end
@@ -3635,6 +3722,64 @@ function process_mission(mission_text::String)
         catch e
             @warn "[MAIN] SigilMediator.mediate failed (non-fatal, sigil routing disabled this cycle): $e"
             nothing
+        end
+    end
+
+    # GRUG v7.20: SEMANTIC CHUNK ROUTER — decompose each clause into semantic
+    # chunks (math-semantic, knowledge, emotive, procedural) so downstream
+    # topicality gating and AIML rendering use the CORRECT scoped text.
+    # Key insight: for "what is 2 plus 2", the scoped_mission should be
+    # "what is 2 plus 2" (math_semantic chunk), NOT just "2 plus 2" (math
+    # bindings alone) or the full compound input. The chunk carries the
+    # full semantic build-up that gives the mission its meaning.
+    clause_chunk_map = Dict{String, Vector{Any}}()  # clause_text -> Vector{SemanticChunk}
+    if !isnothing(sigil_mediation)
+        try
+            if is_multipart
+                # GRUG: decompose each clause using its own mediation.
+                for cl in clauses
+                    cl_med = get(clause_mediation_map, cl.text, nothing)
+                    if !isnothing(cl_med)
+                        cl_chunks = decompose_semantic_chunks(cl.text, cl_med)
+                        clause_chunk_map[cl.text] = cl_chunks
+                        if length(cl_chunks) > 1
+                            @info "[MAIN v7.20] Semantic chunk router split '$(cl.text)' into $(length(cl_chunks)) chunks: $([(c.kind, c.text) for c in cl_chunks])"
+                        end
+                    else
+                        # No mediation for this clause — single knowledge chunk.
+                        clause_chunk_map[cl.text] = Any[SemanticChunk(cl.text, :knowledge, 0, max(0, length(split(cl.text)) - 1), true)]
+                    end
+                end
+            else
+                # GRUG: single-clause input — decompose using the single mediation.
+                all_chunks = decompose_semantic_chunks(mission_text, sigil_mediation)
+                clause_chunk_map[mission_text] = all_chunks
+                if length(all_chunks) > 1
+                    @info "[MAIN v7.20] Semantic chunk router split '$(mission_text)' into $(length(all_chunks)) chunks: $([(c.kind, c.text) for c in all_chunks])"
+                end
+            end
+        catch e
+            @warn "[MAIN v7.20] decompose_semantic_chunks failed (non-fatal, falling back to full text): $e"
+            # GRUG: fallback — each clause is a single knowledge chunk.
+            for cl in clauses
+                clause_chunk_map[cl.text] = Any[SemanticChunk(cl.text, :knowledge, 0, max(0, length(split(cl.text)) - 1), true)]
+            end
+            clause_chunk_map[mission_text] = Any[SemanticChunk(mission_text, :knowledge, 0, max(0, length(split(mission_text)) - 1), true)]
+        end
+    else
+        # GRUG: no mediation — all clauses are knowledge chunks.
+        for cl in clauses
+            clause_chunk_map[cl.text] = Any[SemanticChunk(cl.text, :knowledge, 0, max(0, length(split(cl.text)) - 1), true)]
+        end
+        clause_chunk_map[mission_text] = Any[SemanticChunk(mission_text, :knowledge, 0, max(0, length(split(mission_text)) - 1), true)]
+    end
+
+    # GRUG v7.20: Publish clause_chunk_map to _CURRENT_CLAUSE_CHUNKS so
+    # ephemeral_aiml_orchestrator and generate_aiml_payload can access it.
+    lock(_CURRENT_CLAUSE_CHUNKS_LOCK) do
+        empty!(_CURRENT_CLAUSE_CHUNKS)
+        for (cl_text, chunks) in clause_chunk_map
+            _CURRENT_CLAUSE_CHUNKS[cl_text] = chunks
         end
     end
 

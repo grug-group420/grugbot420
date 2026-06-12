@@ -128,7 +128,7 @@ end
 # For math votes, we reconstruct from step payloads.
 # For singleton groups, fall back to the primary vote's node context.
 function _infer_scoped_mission(grp_votes, clauses)::String
-    # GRUG: check for companion votes — their payload is the clause text.
+    # GRUG: check for companion votes -- their payload is the clause text.
     companions = filter(v -> getfield(v, :bundle_role) == :companion, grp_votes)
     if !isempty(companions)
         # GRUG: join all companion payloads (there may be multiple for
@@ -139,23 +139,80 @@ function _infer_scoped_mission(grp_votes, clauses)::String
         end
     end
 
-    # GRUG: check for math votes — reconstruct the expression.
-    math_votes = filter(v -> getfield(v, :bundle_role) in (:step_n, :final), grp_votes)
-    if !isempty(math_votes)
-        # GRUG: the final vote's payload is the answer. Step payloads
-        # carry "lhs op rhs = result". For scoped_mission we just need
-        # the question, not the answer — but we don't have the original
-        # question text here. Fall back to first step or final payload.
-        final_v = findfirst(v -> getfield(v, :bundle_role) == :final, math_votes)
-        if !isnothing(final_v)
-            return getfield(math_votes[final_v], :payload) |> String
+    # GRUG v7.20: Try semantic chunk map from _CURRENT_CLAUSE_CHUNKS.
+    # The semantic chunk router decomposed each clause into chunks. The
+    # PRIMARY chunk (is_primary=true) captures the full semantic build-up
+    # ("what is 2 plus 2", not just "2 plus 2"). Use it as scoped_mission.
+    _chunk_scoped = nothing
+    try
+        # GRUG: _CURRENT_CLAUSE_CHUNKS is defined in Main module.
+        # Access via parent module to avoid import cycles.
+        _chunks_map = Main._CURRENT_CLAUSE_CHUNKS
+        for (_cl_text, _chunks) in _chunks_map
+            for _ch in _chunks
+                if getfield(_ch, :is_primary)
+                    # GRUG: check if any vote in this group has payload
+                    # overlapping with this chunk's text.
+                    _ch_text = lowercase(strip(getfield(_ch, :text)))
+                    for _gv in grp_votes
+                        _gv_payload = lowercase(strip(getfield(_gv, :payload)))
+                        if !isempty(_gv_payload) && (occursin(_ch_text, _gv_payload) || occursin(_gv_payload, _ch_text))
+                            _chunk_scoped = getfield(_ch, :text)
+                            break
+                        end
+                    end
+                    !isnothing(_chunk_scoped) && break
+                end
+            end
+            !isnothing(_chunk_scoped) && break
         end
-        # fallback: first step
-        return getfield(first(math_votes), :payload) |> String
+    catch
+        # GRUG: _CURRENT_CLAUSE_CHUNKS may not be accessible or empty -- non-fatal.
+    end
+    if !isnothing(_chunk_scoped)
+        return _chunk_scoped |> String
     end
 
-    # GRUG: no clause or math info — return a generic marker.
+    # GRUG: check for math votes -- reconstruct the expression.
+    math_votes = filter(v -> getfield(v, :bundle_role) in (:step_n, :final), grp_votes)
+    if !isempty(math_votes)
+        # GRUG v7.20: math vote payloads are answers like "4", not questions.
+        # Don't use them as scoped_mission. Only use if we have no chunk data.
+        # For math, the chunk map above already provides "what is 2 plus 2".
+        # If we reach here, no chunk data was found -- fall through.
+    end
+
+    # GRUG v7.20: Try matching vote node context against clause texts.
+    # Walk the votes, find any node whose action overlaps with a clause.
+    if !isempty(clauses)
+        for _gv in grp_votes
+            try
+                _gv_action = lowercase(strip(string(getfield(_gv, :action))))
+                for _cl in clauses
+                    _cl_text = getfield(_cl, :text)
+                    if !isempty(_cl_text) && (occursin(lowercase(_cl_text), _gv_action) || occursin(_gv_action, lowercase(_cl_text)))
+                        return _cl_text |> String
+                    end
+                end
+            catch
+                # GRUG: field access may fail -- skip this vote.
+            end
+        end
+    end
+
+    # GRUG: no clause or math info -- return first vote action as fallback.
+    if !isempty(grp_votes)
+        try
+            _fb_action = string(getfield(first(grp_votes), :action))
+            if !isempty(_fb_action)
+                return _fb_action |> String
+            end
+        catch
+        end
+    end
+
     return "(multipart scope)"
 end
+
 
 end # module MultipartOrchestrator

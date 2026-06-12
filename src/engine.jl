@@ -177,6 +177,331 @@ function extract_relational_triples(input::String)::Vector{RelationalTriple}
     return triples
 end
 
+# ==============================================================================
+# SEMANTIC CHUNK ROUTER — v7.20
+# ==============================================================================
+# GRUG: The decoherence problem is that wrong-lobe content (food, survival,
+# temporal) bleeds into math/knowledge responses. The lobe topicality gate
+# filters the vote pool, but once votes exist, AIML rendering pulls ANY node's
+# content for SUPPORT. The fix: chunk the input at the ROUTING level so each
+# chunk's semantic span (including build-up like "what is" before "2+2") gets
+# its own scoped_mission, and only topical lobes vote on each chunk.
+#
+# SigilBinding.raw_position tells us where math expressions live in the token
+# stream. We expand backward to capture semantic build-up tokens. Relational
+# triples from the input provide the semantic structure (subject-verb-object)
+# that identifies what the user is actually asking about.
+# ==============================================================================
+
+"""
+    SemanticChunk
+
+GRUG v7.20: One semantic chunk of the input. A chunk is a contiguous token span
+that forms a coherent semantic unit. Math chunks include their build-up (the
+"what is" before "2+2"). Non-math chunks are the remaining topical content.
+"""
+struct SemanticChunk
+    text::String              # The chunk text (e.g. "what is 2 plus 2")
+    kind::Symbol              # :math_semantic, :knowledge, :emotive, :procedural
+    token_start::Int          # 0-based start index in raw token stream
+    token_end::Int            # 0-based end index in raw token stream (inclusive)
+    is_primary::Bool          # true if this chunk contains sigil bindings (math)
+end
+
+# GRUG v7.20: Semantic build-up markers — tokens that commonly precede a math
+# expression and are part of the question, not separate content. These are
+# the "semantic build-up" the user specifically asked to include with the math.
+# E.g. "what is 2+2" → the "what is" is build-up, not a separate knowledge query.
+const MATH_BUILDUP_MARKERS = Set([
+    "what", "is", "are", "was", "were",        # question openers
+    "answer", "calculate", "compute", "solve",  # intent verbs
+    "tell", "me", "about",                       # request framing
+    "the", "result", "of",                       # noun phrases
+    "find", "determine", "evaluate",             # procedural verbs
+    "how", "much", "many",                       # quantity questions
+    "does", "do", "would", "will",               # auxiliary verbs
+    "give", "show", "get",                       # request verbs
+    "please", "can", "could",                    # politeness markers
+])
+
+# GRUG v7.20: Maximum build-up lookback. We look backward from the first math
+# binding at most this many tokens to find semantic build-up. Prevents
+# over-eating into prior unrelated content.
+const MAX_BUILDUP_LOOKBACK = 6
+
+"""
+    _extract_math_buildup_span(tokens, first_binding_raw_pos) -> (start, end)
+
+GRUG v7.20: Given the raw token list and the raw_position of the first math
+binding (&n), look backward to find where the semantic build-up begins. The
+build-up is the contiguous run of MATH_BUILDUP_MARKERS tokens leading up to
+the first math token. If the first non-marker token is found, the build-up
+starts just after it. If no build-up is found, the span starts at the first
+binding position.
+
+Returns (start_idx, end_idx) as 0-based inclusive indices into the raw token
+stream. end_idx is the raw_position of the LAST math binding (the last &n).
+"""
+function _extract_math_buildup_span(tokens::Vector{String},
+                                     first_binding_pos::Int,
+                                     last_binding_pos::Int)::Tuple{Int, Int}
+    # GRUG: Start looking backward from just before the first math token.
+    # Build the longest contiguous run of build-up markers going backward.
+    buildup_start = first_binding_pos
+
+    lookback_start = max(1, first_binding_pos - MAX_BUILDUP_LOOKBACK)
+    for i in (first_binding_pos - 1):-1:lookback_start
+        if i < 1
+            break
+        end
+        tok_lower = lowercase(strip(tokens[i]))
+        if tok_lower in MATH_BUILDUP_MARKERS
+            buildup_start = i
+        else
+            # GRUG: Hit a non-marker token — stop. Build-up must be contiguous.
+            break
+        end
+    end
+
+    return (buildup_start, last_binding_pos)
+end
+
+"""
+    decompose_semantic_chunks(input_text, mediation) -> Vector{SemanticChunk}
+
+GRUG v7.20: Split the input into semantic chunks using SigilMediator binding
+positions. For math inputs, the math expression AND its semantic build-up
+("what is 2 plus 2", not just "2 plus 2") form one chunk. The remaining
+tokens (if any) form separate chunks.
+
+For non-math inputs, the entire input is one chunk of kind :knowledge.
+
+For multipart inputs (InputDecomposer already split on conjunctions), this
+function operates WITHIN each clause — it further refines the clause into
+math-semantic vs. non-math chunks if the clause contains math bindings.
+
+Returns a Vector{SemanticChunk} in left-to-right order. At least one chunk
+is always returned (the full input if no math is detected).
+"""
+function decompose_semantic_chunks(input_text::String,
+                                    mediation)::Vector{SemanticChunk}
+    if strip(input_text) == ""
+        error("!!! FATAL: decompose_semantic_chunks got empty input! !!!")
+    end
+
+    tokens = split(input_text)
+    n_tokens = length(tokens)
+
+    # GRUG: No mediation or no bindings → single knowledge chunk.
+    if isnothing(mediation) || isempty(getfield(mediation, :bindings))
+        return SemanticChunk[
+            SemanticChunk(input_text, :knowledge, 0, max(0, n_tokens - 1), true)
+        ]
+    end
+
+    bindings = getfield(mediation, :bindings)
+    kinds = getfield(mediation, :kinds)
+
+    # GRUG: No math kind → single knowledge chunk.
+    if !(:math in kinds)
+        return SemanticChunk[
+            SemanticChunk(input_text, :knowledge, 0, max(0, n_tokens - 1), true)
+        ]
+    end
+
+    # GRUG: Math detected! Find the math binding span using raw_position.
+    # SigilBinding.raw_position is 0-based index into the raw token stream.
+    math_bindings = [b for b in bindings if b.name in ("n", "op")]
+
+    if isempty(math_bindings)
+        # GRUG: No &n or &op bindings despite :math kind — shouldn't happen,
+        # but handle gracefully.
+        return SemanticChunk[
+            SemanticChunk(input_text, :knowledge, 0, max(0, n_tokens - 1), true)
+        ]
+    end
+
+    # GRUG: raw_position is 0-based. Julia is 1-based. Convert carefully.
+    # The binding's raw_position points to the word in the ORIGINAL input
+    # (before canonicalization). We need to map these to 1-based token indices.
+    first_math_1based = minimum(b.raw_position for b in math_bindings) + 1
+    last_math_1based  = maximum(b.raw_position for b in math_bindings) + 1
+
+    # GRUG: Expand the span backward to capture semantic build-up.
+    # "what is 2 plus 2" → math bindings at positions 2,3,4 (1-based),
+    # build-up "what is" at positions 1,2 → full span = [1..4]
+    buildup_start_1based, math_end_1based = _extract_math_buildup_span(
+        String.(tokens), first_math_1based, last_math_1based
+    )
+
+    # GRUG: Build the math-semantic chunk text.
+    math_start_clamped = clamp(buildup_start_1based, 1, n_tokens)
+    math_end_clamped   = clamp(math_end_1based, 1, n_tokens)
+
+    math_chunk_text = strip(join(tokens[math_start_clamped:math_end_clamped], " "))
+
+    chunks = SemanticChunk[]
+
+    # GRUG: If there's content BEFORE the math build-up, it's a separate chunk.
+    if math_start_clamped > 1
+        pre_text = strip(join(tokens[1:math_start_clamped - 1], " "))
+        if !isempty(pre_text)
+            # GRUG: Infer the kind of the pre-math chunk from content.
+            pre_kind = _infer_chunk_kind(pre_text)
+            push!(chunks, SemanticChunk(
+                pre_text, pre_kind,
+                0,                          # token_start (0-based)
+                math_start_clamped - 2,     # token_end (0-based, inclusive)
+                false                       # not primary
+            ))
+        end
+    end
+
+    # GRUG: The math-semantic chunk — the core of the user's directive.
+    push!(chunks, SemanticChunk(
+        String(math_chunk_text), :math_semantic,
+        math_start_clamped - 1,     # token_start (0-based)
+        math_end_clamped - 1,       # token_end (0-based, inclusive)
+        true                        # IS primary
+    ))
+
+    # GRUG: If there's content AFTER the math expression, it's a separate chunk.
+    if math_end_clamped < n_tokens
+        post_text = strip(join(tokens[math_end_clamped + 1:n_tokens], " "))
+        if !isempty(post_text)
+            post_kind = _infer_chunk_kind(post_text)
+            push!(chunks, SemanticChunk(
+                post_text, post_kind,
+                math_end_clamped,          # token_start (0-based)
+                n_tokens - 1,              # token_end (0-based, inclusive)
+                false                      # not primary
+            ))
+        end
+    end
+
+    # GRUG: If somehow no chunks were built (edge case), return full input.
+    if isempty(chunks)
+        return SemanticChunk[
+            SemanticChunk(input_text, :knowledge, 0, max(0, n_tokens - 1), true)
+        ]
+    end
+
+    return chunks
+end
+
+"""
+    _infer_chunk_kind(text) -> Symbol
+
+GRUG v7.20: Heuristic kind assignment for non-math chunks. Uses keyword
+matching to classify the chunk. Falls back to :knowledge for unrecognized text.
+"""
+function _infer_chunk_kind(text::String)::Symbol
+    lower = lowercase(strip(text))
+    # GRUG: emotive markers — feelings, emotions, self-references
+    emotive_markers = ["feel", "feeling", "angry", "sad", "happy", "scared",
+                       "afraid", "worried", "anxious", "love", "hate",
+                       "frustrated", "upset", "comfort", "mood"]
+    for m in emotive_markers
+        if occursin(m, lower)
+            return :emotive
+        end
+    end
+
+    # GRUG: procedural markers — instructions, requests
+    procedural_markers = ["how", "do", "make", "build", "create", "tell",
+                          "show", "give", "explain", "teach", "help",
+                          "can you", "could you"]
+    for m in procedural_markers
+        if occursin(m, lower)
+            return :procedural
+        end
+    end
+
+    # GRUG: default — knowledge query or statement
+    return :knowledge
+end
+
+"""
+    _lobe_topicality_for_vote(vote, mission_text) -> Float64
+
+GRUG v7.20: Compute lobe topicality for an individual vote. Finds which lobe
+the vote's node belongs to, then computes the thesaurus-expanded token overlap
+between that lobe's subject and the mission text. Returns 0.0 for unassigned
+nodes or on error.
+
+This extends the lobe topicality gate from the scan level (where it filters
+the vote pool) into the AIML rendering level (where it gates support content).
+"""
+function _lobe_topicality_for_vote(vote, mission_text::String)::Float64
+    try
+        lobe_id = Lobe.find_lobe_for_node(vote.node_id)
+        if isnothing(lobe_id)
+            return 0.0
+        end
+        rec = Lobe.get_lobe(lobe_id)
+        mission_expanded = try
+            Thesaurus.thesaurus_gate_filter(mission_text)
+        catch
+            Set(lowercase.(filter(!isempty, map(strip, split(mission_text)))))
+        end
+        return _compute_lobe_topicality(rec.subject, mission_expanded)
+    catch
+        return 0.0
+    end
+end
+
+"""
+    _triple_is_topical(triple, mission_text) -> Bool
+
+GRUG v7.20: Check if a relational triple is topically relevant to the mission
+text. A triple is topical if any of its components (subject, relation, object)
+shares at least one non-stopword token with the mission text. Triples like
+(dish, &causal, strength) for a math mission have zero overlap and get filtered.
+
+Stopwords (the, a, an, is, are, was, were, what, how, why, when, it, that,
+this, of, for, in, on, at, to, with, and, or, but) are excluded from the
+overlap check so that generic tokens don't create false topicality.
+"""
+function _triple_is_topical(triple, mission_text::String)::Bool
+    STOPWORDS = Set(["the", "a", "an", "is", "are", "was", "were", "what",
+                     "how", "why", "when", "it", "that", "this", "of", "for",
+                     "in", "on", "at", "to", "with", "and", "or", "but",
+                     "do", "does", "did", "has", "have", "had", "be", "been",
+                     "am", "not", "no", "nor", "so", "if", "then", "than",
+                     "too", "very", "just", "about", "up", "out", "can",
+                     "will", "would", "could", "should", "may", "might"])
+
+    # GRUG: tokenize the triple components
+    triple_tokens = Set{String}()
+    for component in [triple.subject, triple.relation, triple.object]
+        for tok in split(lowercase(strip(String(component))))
+            tok_clean = lowercase(strip(tok))
+            if length(tok_clean) >= 3 && !(tok_clean in STOPWORDS)
+                push!(triple_tokens, tok_clean)
+            end
+        end
+    end
+
+    # GRUG: Skip sigil tokens (&causal, &spatial etc.) — they're not topical
+    triple_tokens = filter(t -> !startswith(t, "&"), triple_tokens)
+
+    if isempty(triple_tokens)
+        return false  # triple has no content tokens to match
+    end
+
+    # GRUG: tokenize the mission text (same method as relevance scoring)
+    mission_tokens = Set{String}()
+    for tok in split(lowercase(strip(mission_text)))
+        tok_clean = lowercase(strip(tok))
+        if length(tok_clean) >= 3 && !(tok_clean in STOPWORDS)
+            push!(mission_tokens, tok_clean)
+        end
+    end
+
+    # GRUG: Any overlap = topical
+    return !isempty(intersect(triple_tokens, mission_tokens))
+end
+
 """
 extract_dynamic_relational_triples(input::String, scan_mode::Int)::Vector{RelationalTriple}
 
@@ -1165,6 +1490,108 @@ const RELAY_CONF_JITTER_SIGMA = 0.05
 #      (extracted live via extract_dynamic_relational_triples).
 #   2. A required_relation verb that is also used by a node in an eligible lobe.
 #   3. A /nodeAttach attachment pointing to a node in an eligible lobe.
+"""
+    _scaffold_coherence_pass(scaffold_text, mission_text) -> String
+
+GRUG v7.20: Post-hoc filter on the assembled scaffold. Strips sub-clauses
+that contain tokens from off-topic lobe subjects when the mission has no
+topical overlap with those domains. This is the safety net — even after
+the topicality gate and triple filter, some off-topic content may slip
+through via weak support-band votes.
+
+Strategy: tokenize the mission, identify which lobe-subject tokens appear
+in the scaffold, and strip sentences containing tokens from lobes whose
+topicality score is below LOBE_TOPICALITY_FLOOR.
+"""
+function _scaffold_coherence_pass(scaffold_text::String, mission_text::String)::String
+    if isempty(strip(scaffold_text)) || isempty(strip(mission_text))
+        return scaffold_text
+    end
+
+    try
+        # GRUG: Get the set of muted lobe IDs for this mission.
+        eligible, muted, _, _ = _compute_muted_lobes(mission_text)
+
+        if isempty(muted)
+            return scaffold_text  # no off-topic lobes → nothing to strip
+        end
+
+        # GRUG: Collect subject tokens from muted lobes. These are the
+        # "off-topic markers" — if a sentence in the scaffold contains
+        # these tokens, it's likely from a muted lobe bleeding through.
+        off_topic_markers = Set{String}()
+        for lobe_id in muted
+            try
+                rec = Lobe.get_lobe(lobe_id)
+                for tok in split(lowercase(strip(rec.subject)))
+                    tok_clean = lowercase(strip(tok))
+                    if length(tok_clean) >= 3
+                        push!(off_topic_markers, tok_clean)
+                    end
+                end
+                # GRUG: Also collect sample patterns from muted lobes.
+                # Node patterns like "what should i eat" or "a predator is
+                # hunting me" are strong off-topic signals.
+                for nid in rec.node_ids[1:min(3, length(rec.node_ids))]
+                    node = lock(() -> get(NODE_MAP, nid, nothing), NODE_LOCK)
+                    if !isnothing(node)
+                        for tok in split(lowercase(strip(node.pattern)))
+                            tok_clean = lowercase(strip(tok))
+                            if length(tok_clean) >= 4
+                                push!(off_topic_markers, tok_clean)
+                            end
+                        end
+                    end
+                end
+            catch
+                continue
+            end
+        end
+
+        if isempty(off_topic_markers)
+            return scaffold_text
+        end
+
+        # GRUG: Split scaffold into sentences on period boundaries.
+        # Re-join sentences that DON'T contain off-topic markers.
+        # Preserve the original sentence structure as much as possible.
+        sentences = split(scaffold_text, r"\.\s*")
+        kept = String[]
+
+        for sent in sentences
+            sent_strip = strip(sent)
+            if isempty(sent_strip)
+                continue
+            end
+
+            # GRUG: Check if this sentence contains off-topic markers.
+            sent_lower = lowercase(sent_strip)
+            has_off_topic = false
+            for marker in off_topic_markers
+                if occursin(marker, sent_lower)
+                    has_off_topic = true
+                    break
+                end
+            end
+
+            # GRUG: Always keep the FIRST sentence (it's the CLAIM / math answer).
+            # Only filter subsequent sentences (SUPPORT content).
+            if isempty(kept) || !has_off_topic
+                push!(kept, sent_strip)
+            end
+        end
+
+        if isempty(kept)
+            return scaffold_text  # safety: don't return empty
+        end
+
+        return join(kept, ". ") * "."
+    catch
+        # GRUG: Never crash the output on a coherence pass failure.
+        return scaffold_text
+    end
+end
+
 # Raw pattern-keyword overlap does NOT unmute a lobe or its nodes.
 
 # GRUG: Topicality floor — a lobe's (thesaurus-expanded subject) must share at
@@ -1177,6 +1604,13 @@ const LOBE_TOPICALITY_FLOOR = 0.15
 # semantic bridge vote at half strength — their opinion is heard but it does
 # not win primary.
 const BRIDGED_NODE_CONF_WEIGHT = 0.5
+
+# GRUG v7.20: Support-vote topicality floor. When rendering SUPPORT content
+# in generate_aiml_payload, confirmed support votes from lobes whose topicality
+# to the mission is below this floor are suppressed. Higher than LOBE_TOPICALITY_FLOOR
+# (0.15) because support content is optional scaffolding — the primary CLAIM
+# already carries the answer. Only strongly topical support should appear.
+const _SUPPORT_TOPICALITY_FLOOR = 0.30
 
 # GRUG: Telemetry for the scaffold debug block. Populated every scan_and_expand
 # call. Read by Main.jl when it builds the AIML payload.
