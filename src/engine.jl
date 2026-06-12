@@ -2502,29 +2502,27 @@ function create_node(
     end
 
     # GRUG: NEW NODE LATCH! Find best similar strong neighbor and link up.
-    # Only for text nodes (image nodes use SDF similarity, not token overlap).
-    # GRUG: LATCH GATE — only activate latching once map is big enough.
-    # Below NODE_LATCH_THRESHOLD, token overlap similarity is not statistically
-    # meaningful (too few nodes = junk topology from forced links). Above the
-    # threshold the map has enough diversity that similarity scores are real.
-    map_size = lock(() -> length(NODE_MAP), NODE_LOCK)
-    if !is_image_node && map_size >= NODE_LATCH_THRESHOLD
-        latch_target_id = find_best_latch_target(new_node)
-        if !isnothing(latch_target_id)
-            target_node = lock(() -> get(NODE_MAP, latch_target_id, nothing), NODE_LOCK)
-            if !isnothing(target_node)
-                linked = try_link_nodes!(new_node, target_node)
-                if linked
-                    println("[ENGINE] 🌱  Node $id latched onto neighbor $latch_target_id.")
-                end
-            end
-        end
-    elseif !is_image_node && map_size < NODE_LATCH_THRESHOLD
-        # GRUG: Map too small for meaningful latching. Node plants clean with no forced links.
-        # User is responsible for explicit drop_table wiring at this scale.
-        # Latch will engage automatically once map reaches NODE_LATCH_THRESHOLD nodes.
-        @debug "[ENGINE] Latch suppressed for $id (map_size=$map_size < NODE_LATCH_THRESHOLD=$NODE_LATCH_THRESHOLD). Plant clean."
-    end
+    # GRUG v7.34: AUTO-LINKER DISABLED — neighbor latching commented out.
+    # Auto-linking needs replanning alongside auto-growth. The old latch
+    # system did an O(N) scan of NODE_MAP per node creation (find_best_latch_target)
+    # and created neighbor links based on token overlap similarity. Both growth
+    # and auto-linking need to be redesigned together for the sprout layer
+    # architecture. Until then, nodes plant clean with no forced links.
+    # Users can still use /nodeAttach for explicit attachment wiring.
+    # if !is_image_node && map_size >= NODE_LATCH_THRESHOLD
+    #     latch_target_id = find_best_latch_target(new_node)
+    #     if !isnothing(latch_target_id)
+    #         target_node = lock(() -> get(NODE_MAP, latch_target_id, nothing), NODE_LOCK)
+    #         if !isnothing(target_node)
+    #             linked = try_link_nodes!(new_node, target_node)
+    #             if linked
+    #                 println("[ENGINE] 🌱  Node $id latched onto neighbor $latch_target_id.")
+    #             end
+    #         end
+    #     end
+    # elseif !is_image_node && map_size < NODE_LATCH_THRESHOLD
+    #     @debug "[ENGINE] Latch suppressed for $id (map_size=$map_size < NODE_LATCH_THRESHOLD=$NODE_LATCH_THRESHOLD). Plant clean."
+    # end
 
     return id
 end
