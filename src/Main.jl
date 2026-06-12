@@ -4373,7 +4373,8 @@ function process_mission(mission_text::String)
                 fw = _lobe_plan.floor_winner
                 secondaries_str = isempty(_lobe_plan.secondary_async) ? "none" :
                     join([s.lobe_id for s in _lobe_plan.secondary_async], ", ")
-                println("[LOBE ORCHESTRATOR] 🏆 Floor winner: $(fw.lobe_id) (avg_conf=$(round(fw.avg_conf, digits=3)), topicality=$(round(fw.topicality, digits=3)), curved=$(round(fw.curved_avg, digits=3)), votes=$(fw.vote_count)) | Secondaries: $secondaries_str | Tie coinflip: $(_lobe_plan.tie_resolved_by_coinflip)")
+                mi_str = _lobe_plan.mutual_incompleteness ? "YES coequal=$(join(_lobe_plan.coequal_lobe_ids, ","))" : "no"
+                println("[LOBE ORCHESTRATOR] 🏆 Floor winner: $(fw.lobe_id) (avg_conf=$(round(fw.avg_conf, digits=3)), topicality=$(round(fw.topicality, digits=3)), curved=$(round(fw.curved_avg, digits=3)), votes=$(fw.vote_count)) | Secondaries: $secondaries_str | Tie coinflip: $(_lobe_plan.tie_resolved_by_coinflip) | MutualIncompleteness: $mi_str")
 
                 # GRUG v7.24: REORDER cast_votes so floor winner's votes come first,
                 # then secondary async lobes, then everyone else.
@@ -4382,12 +4383,18 @@ function process_mission(mission_text::String)
                 floor_lobe = fw.lobe_id
                 secondary_lobes = Set{String}(s.lobe_id for s in _lobe_plan.secondary_async)
 
+                # GRUG v7.28: When mutual incompleteness fires, ALL coequal lobes
+                # go into the winner bucket. No secondary demotion. curved_avg still
+                # decides speaking order (floor_winner speaks first), but all coequal
+                # lobes get equal standing — their votes are all "primary."
+                coequal_lobes = _lobe_plan.mutual_incompleteness ? _lobe_plan.coequal_lobe_ids : Set{String}([floor_lobe])
+
                 winner_votes = Vote[]
                 secondary_votes = Vote[]
                 other_votes = Vote[]
                 for v in cast_votes
                     lobe_id = try Lobe.find_lobe_for_node(v.node_id) catch nothing end
-                    if lobe_id == floor_lobe
+                    if !isnothing(lobe_id) && lobe_id in coequal_lobes
                         push!(winner_votes, v)
                     elseif !isnothing(lobe_id) && lobe_id in secondary_lobes
                         push!(secondary_votes, v)
@@ -4424,7 +4431,8 @@ function process_mission(mission_text::String)
                 end
 
                 cast_votes = vcat(capped_winner, capped_secondary, other_votes)
-                println("[LOBE ORCHESTRATOR] 📊 Vote order: winner=$(length(capped_winner)) secondary=$(length(capped_secondary)) other=$(length(other_votes)) total=$(length(cast_votes))")
+                mi_label = _lobe_plan.mutual_incompleteness ? " (coequal)" : ""
+                println("[LOBE ORCHESTRATOR] 📊 Vote order: winner=$(length(capped_winner))$mi_label secondary=$(length(capped_secondary)) other=$(length(other_votes)) total=$(length(cast_votes))")
             end
         end
     catch e

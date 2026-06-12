@@ -1,6 +1,6 @@
 # LobeOrchestrator.jl
 # ==============================================================================
-# GRUG v7.24 - SEQUENTIAL LOBE ORCHESTRATION + LOCK-IN AVERAGE + MULTI-LOBE ASYNC
+# GRUG v7.28 - SEQUENTIAL LOBE ORCHESTRATION + LOCK-IN AVERAGE + MULTI-LOBE ASYNC + MUTUAL INCOMPLETENESS
 # ==============================================================================
 # #############################################################################
 # ###  DO NOT ADD LOBE MUTING. DO NOT CHANGE LOBE SELECTION TO A GATE.     ###
@@ -163,18 +163,32 @@ end
 
 """
     OrchestrationPlan(floor_winner, secondary_async, tie_resolved_by_coinflip,
-                      all_summaries)
+                      all_summaries, mutual_incompleteness, coequal_lobe_ids)
 
 GRUG: The plan tells the pipeline who speaks first (`floor_winner`), which
 other lobes get an async turn right after (`secondary_async`, ordered by
 descending avg_conf), and whether a 50/50 coinflip was used to break an
 exact tie (diagnostic only, does not change dispatch order).
+
+v7.28: `mutual_incompleteness` = true when 2+ lobes each have multiple strong
+matches (pass the multi-lobe gate). In this case `coequal_lobe_ids` contains
+all qualifying lobe IDs — they all get equal standing in the winner bucket,
+no secondary demotion. curved_avg still decides who speaks FIRST among them,
+but none is "primary" vs "secondary." The 1k per-lobe cap is always enforced.
 """
 struct OrchestrationPlan
     floor_winner::Union{FloorWinner, Nothing}
     secondary_async::Vector{FloorWinner}
     tie_resolved_by_coinflip::Bool
     all_summaries::Vector{LobeVoteSummary}
+    # GRUG v7.28: Mutual incompleteness — when N lobes each cover different
+    # subject clusters from the input and none covers all. In this case
+    # no lobe should outrank any other; they all get equal standing.
+    # coequal_lobe_ids is the set of lobe IDs that should be treated as
+    # co-equal primary contributors (all in the "winner" bucket, no secondary
+    # demotion). Empty set when mutual incompleteness is not detected.
+    mutual_incompleteness::Bool
+    coequal_lobe_ids::Set{String}
 end
 
 # ==============================================================================
@@ -283,7 +297,23 @@ function compute_orchestration_plan(
 )::OrchestrationPlan
 
     if isempty(summaries)
-        return OrchestrationPlan(nothing, FloorWinner[], false, summaries)
+        return OrchestrationPlan(nothing, FloorWinner[], false, summaries, false, Set{String}())
+    end
+
+    # GRUG v7.28: MUTUAL INCOMPLETENESS DETECTION
+    # Rule: if 2+ lobes each have MULTIPLE strong matches, they get co-equal
+    # standing regardless of overall averages. "Strong match" = passes the
+    # multi-lobe gate (avg >= MULTI_LOBE_THRESHOLD AND count >= MIN_WINNING_VOTES).
+    # This captures the case where different lobes each cover different subject
+    # clusters from the input — none is primary, none is secondary.
+    coequal_lobe_ids = Set{String}()
+    mutual_incompleteness = false
+    qualifying = filter(s -> s.passes_multi_lobe_gate, summaries)
+    if length(qualifying) >= 2
+        mutual_incompleteness = true
+        for s in qualifying
+            push!(coequal_lobe_ids, s.lobe_id)
+        end
     end
 
     # GRUG v7.26: Find exact ties at the top using curved_avg.
@@ -346,7 +376,7 @@ function compute_orchestration_plan(
         end
     end
 
-    return OrchestrationPlan(floor, secondaries, tie_flag, summaries)
+    return OrchestrationPlan(floor, secondaries, tie_flag, summaries, mutual_incompleteness, coequal_lobe_ids)
 end
 
 # ==============================================================================
