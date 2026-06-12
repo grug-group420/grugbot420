@@ -642,13 +642,18 @@ function evaluate_relational_dialectics(
     node_triples::Vector{RelationalTriple},
     required_relations::Vector{String},
     relation_weights::Dict{String, Float64}
-)::Tuple{Float64, Bool}
+)::Float64
 
     if isempty(node_triples)
-        return (0.0, false)
+        return 0.0
     end
 
-    is_antimatch = false
+    # GRUG v7.27: is_antimatch removed. Anti-match nodes were driving decoherence —
+    # a node with reversed subject/object triples was hard-killed instead of just
+    # scoring negatively. This caused legitimate nodes to vanish from the pipeline
+    # mid-scan, leaving orphaned votes and incoherent response assembly.
+    # Now: reversed triples just contribute negative score (same as before) but
+    # the node is NOT excluded from the pipeline. Confidence gating handles the rest.
     match_score = 0.0
     orthogonal_penalty = 0.0
 
@@ -673,7 +678,7 @@ function evaluate_relational_dialectics(
             req == NONJITTER_TAG && continue
             if !(req in user_rels)
                 # GRUG FIX 2.7: Sentinel Value for hard requirement miss!
-                return (-9999.0, false) 
+                return -9999.0
             end
         end
     end
@@ -698,8 +703,12 @@ function evaluate_relational_dialectics(
             weight = jitter_w(get(relation_weights, ut.relation, 1.0))
             if ut.relation == nt.relation
                 if ut.subject == nt.object && ut.object == nt.subject
+                    # GRUG v7.27: reversed triples subtract score but NO LONGER
+                    # hard-kill the node. The old is_antimatch flag caused the
+                    # entire node to be dropped from scan_specimens, driving
+                    # decoherence. Now it just scores negatively and the node
+                    # stays in the pool for confidence gating to handle.
                     match_score -= jitter_s(2.0 * weight)
-                    is_antimatch = true
                 elseif ut.subject == nt.subject && ut.object == nt.object
                     match_score += jitter_s(2.0 * weight)
                 elseif ut.subject == nt.subject || ut.object == nt.object
@@ -723,7 +732,7 @@ function evaluate_relational_dialectics(
         final_score = match_score - orthogonal_penalty
     end
 
-    return (final_score, is_antimatch)
+    return final_score
 end
 
 # ==============================================================================
@@ -802,12 +811,14 @@ struct Vote
     negatives::Vector{String}
     user_triples::Vector{RelationalTriple}
     node_triples::Vector{RelationalTriple}
-    antimatch::Bool
+    # GRUG v7.27: antimatch::Bool field REMOVED. Anti-match nodes were driving
+    # decoherence by hard-killing nodes mid-scan. The field is gone entirely.
+    # Confidence gating handles low-score nodes now.
     # GRUG v7.16+: optional payload string for sigil-routed multi-vote nodes.
     # When non-empty, command renderers concatenate "<action_output> <payload>"
     # so `action` stays a valid COMMANDS key while structured content (e.g.
     # arithmetic answer "= 4", clause text) rides along.
-    # All existing 7-arg call sites (cast_vote, cast_explicit_vote, every
+    # All existing 6-arg call sites (cast_vote, cast_explicit_vote, every
     # test fixture) work unchanged via the inner constructor's default.
     payload::String
     # GRUG v7.17+: multipart vote grouping. objective_id ties votes from
@@ -824,12 +835,11 @@ struct Vote
          negatives::Vector{String},
          user_triples::Vector{RelationalTriple},
          node_triples::Vector{RelationalTriple},
-         antimatch::Bool,
          payload::AbstractString = "",
          objective_id::UInt64 = UInt64(0),
          bundle_role::Symbol = :singleton) = new(
             String(node_id), String(action), Float64(confidence),
-            negatives, user_triples, node_triples, antimatch, String(payload),
+            negatives, user_triples, node_triples, String(payload),
             objective_id, bundle_role,
          )
 end
@@ -3091,19 +3101,19 @@ end
 # ==============================================================================
 
 """
-scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}}
 
 GRUG: Main scan entry point. Converts input text to signal, extracts relational
 triples, runs ActionTonePredictor, checks Hopfield fast-path, then scans all
-nodes for matches. Returns vector of (id, confidence, antimatch, user_triples,
+nodes for matches. Returns vector of (id, confidence, user_triples,
 node_triples) tuples. Throws on empty input — NO SILENT FAILURES.
 """
-function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}}
     if strip(input_text) == ""
         error("!!! FATAL: Grug cannot scan empty air! Input text is blank! !!!")
     end
 
-    all_valid_specimens = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    all_valid_specimens = Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
     
     # GRUG: Convert input to number rocks!
     target_signal = words_to_signal(input_text)
@@ -3251,7 +3261,7 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
 
     # GRUG: The fire_one closure. One node = one fire attempt. Called from
     # many Tasks in parallel. Returns a tuple if node voted, nothing if skipped.
-    # Returns shape: (id, confidence, is_antimatch, user_triples, node_triples)
+    # Returns shape: (id, confidence, user_triples, node_triples)
     fire_one = function(id::String, fc::VoteOrchestrator.FireCounter)
         # GRUG: Read node under lock, then release for scan work.
         # Scan work (pattern matching, relational eval) is read-only on the node.
@@ -3321,13 +3331,15 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
         end
 
         # 2. Relational Matcher (Dialectical)
-        rel_conf, is_antimatch = evaluate_relational_dialectics(
+        rel_conf = evaluate_relational_dialectics(
             user_triples, node.relational_patterns, node.required_relations, node.relation_weights
         )
 
-        # 3. Hard Anti-Match / Missing Requirement Penalty
-        # GRUG: -9999.0 means node demanded a gear user did not have!
-        if is_antimatch || rel_conf == -9999.0
+        # 3. Missing Requirement Penalty
+        # GRUG v7.27: Anti-match flag removed. Reversed triples just subtract
+        # from match_score now — they don't hard-kill the node. Only the
+        # -9999.0 sentinel (missing hard requirement) still drops the node.
+        if rel_conf == -9999.0
             return nothing
         end
 
@@ -3364,7 +3376,7 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Bool,
             if !VoteOrchestrator.try_claim_fire_slot!(fc)
                 return nothing
             end
-            return (id, confidence, is_antimatch, user_triples, node.relational_patterns)
+            return (id, confidence, user_triples, node.relational_patterns)
         end
         return nothing
     end
@@ -3429,7 +3441,7 @@ Pass 2 — Lobe cascade expansion (cross-lobe bridge activation):
   Cascade confidence: 60% of the highest primary confidence (cross-lobe discount).
   This prevents isolated lobe silos when a query spans multiple domains.
 """
-function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}}
+function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}}
     primary_results = scan_specimens(input_text)
 
     if isempty(primary_results)
@@ -3444,7 +3456,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
     max_primary_conf = maximum(r[2] for r in primary_results)
 
     # ── PASS 1: Drop-table expansion (same lobe, 80% confidence discount) ──────
-    for (id, conf, antimatch, u_trips, n_trips) in primary_results
+    for (id, conf, u_trips, n_trips) in primary_results
         activating_node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
         isnothing(activating_node) && continue
 
@@ -3456,7 +3468,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
 
                 # GRUG: Drop-table neighbor gets discounted confidence (80% of activator)
                 drop_conf = conf * 0.8
-                push!(expanded, (drop_id, drop_conf, false, user_triples, drop_node.relational_patterns))
+                push!(expanded, (drop_id, drop_conf, user_triples, drop_node.relational_patterns))
                 push!(already_included, drop_id)
             end
         end
@@ -3471,7 +3483,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         if cascade_conf >= 0.15
             # GRUG: Collect lobes that own the primary firing nodes
             primary_lobe_names = Set{String}()
-            for (id, conf, _, _, _) in primary_results
+            for (id, conf, _, _) in primary_results
                 lobe_name = Lobe.find_lobe_for_node(id)
                 !isnothing(lobe_name) && push!(primary_lobe_names, lobe_name)
             end
@@ -3506,7 +3518,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                         isnothing(cascade_node) && continue
                         cascade_node.is_grave && continue  # GRUG: Dead nodes don't cascade!
 
-                        push!(expanded, (node_id, cascade_conf, false, user_triples, cascade_node.relational_patterns))
+                        push!(expanded, (node_id, cascade_conf, user_triples, cascade_node.relational_patterns))
                         push!(already_included, node_id)
                     end
                 end
@@ -3536,9 +3548,9 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
         shared_fc = VoteOrchestrator.FireCounter("relay_fallback#$(hash(input_text))", VoteOrchestrator.ACTIVE_FIRE_CAP)
     end
     relay_cap   = shared_fc.cap
-    relay_additions = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    relay_additions = Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
 
-    for (id, conf, antimatch, u_trips, n_trips) in expanded
+    for (id, conf, u_trips, n_trips) in expanded
         # GRUG: Stop firing attachments if global cap is already hit. Hard cap
         # applies across ALL fire paths — no bypass for attachments!
         if VoteOrchestrator.fire_cap_reached(shared_fc)
@@ -3562,7 +3574,7 @@ function scan_and_expand(input_text::String)::Vector{Tuple{String, Float64, Bool
                 #   subject=target_id, relation="relay_attached", object=connector_pattern
                 relay_triple = RelationalTriple(id, "relay_attached", connector_pattern)
                 relay_triples = vcat(fired_node.relational_patterns, [relay_triple])
-                push!(relay_additions, (fired_id, fired_conf, false, user_triples, relay_triples))
+                push!(relay_additions, (fired_id, fired_conf, user_triples, relay_triples))
                 push!(already_included, fired_id)
             end
         end
@@ -3596,13 +3608,14 @@ end
 # ==============================================================================
 
 """
-cast_vote(id, conf, antimatch, u_trips, n_trips)
+cast_vote(id, conf, u_trips, n_trips)
 
 GRUG: Cast a vote for a matched node. Selects a stochastic action from the
 node's action packet, bumps node strength on coinflip, and returns a Vote.
 Throws if node ID is empty or node vanished from NODE_MAP — NO SILENT FAILURES.
+v7.27: antimatch param removed — anti-match nodes no longer exist in the pipeline.
 """
-function cast_vote(id, conf, antimatch, u_trips, n_trips)
+function cast_vote(id, conf, u_trips, n_trips)
     if strip(id) == "" error("!!! FATAL: Need real node ID to cast vote! !!!") end
     
     node = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
@@ -3618,7 +3631,7 @@ function cast_vote(id, conf, antimatch, u_trips, n_trips)
     # GRUG NEW: Bump strength on a coinflip when a node votes (used = maybe stronger)
     bump_strength!(node)
 
-    return Vote(id, winning_action, conf, negatives, u_trips, n_trips, antimatch)
+    return Vote(id, winning_action, conf, negatives, u_trips, n_trips)
 end
 
 """
@@ -3634,7 +3647,7 @@ function cast_explicit_vote(cmd_name::String, id::String)::Vote
     isnothing(node) && error("!!! FATAL: Explicit override failed, node [$id] not found !!!")
     
     _, negatives, _ = parse_action_packet(node.action_packet)
-    return Vote(id, cmd_name, 9999.0, negatives, RelationalTriple[], node.relational_patterns, false)
+    return Vote(id, cmd_name, 9999.0, negatives, RelationalTriple[], node.relational_patterns)
 end
 
 # ==============================================================================
@@ -3723,12 +3736,13 @@ function cast_sigil_votes(
     # GRUG: untagged or unknown kind -> just delegate to cast_vote so the
     # caller can use this function uniformly without branching.
     if kind === :none
-        return Vote[cast_vote(id, conf, false, u_trips, n_trips)]
+        return Vote[cast_vote(id, conf, u_trips, n_trips)]
     end
 
     # GRUG: per-kind dispatch. Each branch builds a Vector{Vote} sharing the
-    # same conf, antimatch=false, u_trips, n_trips. bump_strength! is called
+    # same conf, u_trips, n_trips. bump_strength! is called
     # ONCE per fire (not per emitted vote) to match cast_vote's intent.
+    # v7.27: antimatch=false removed from all branches — field no longer exists.
     bump_strength!(node)
 
     if kind === :math
@@ -3775,13 +3789,13 @@ function _cast_math_votes(
     # GRUG: filter to math bindings only and pass to ArithmeticEngine.
     if !has_math_bindings(bindings)
         @warn "[ENGINE] _cast_math_votes called with non-math bindings on node $(node.id); emitting opener-only fallback"
-        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, "", obj_id, :singleton)]
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
     end
 
     result = compute_arithmetic(bindings)
     if !isnothing(result.error)
         @warn "[ENGINE] _cast_math_votes: compute_arithmetic error on node $(node.id): $(result.error); emitting opener-only fallback"
-        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, "", obj_id, :singleton)]
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
     end
 
     out = Vote[]
@@ -3791,7 +3805,7 @@ function _cast_math_votes(
     if length(result.steps) > 1
         for step in result.steps
             step_payload = "$(step.lhs) $(step.operator) $(step.rhs) = $(step.result)"
-            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, step_payload, obj_id, :step_n))
+            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, step_payload, obj_id, :step_n))
         end
     end
 
@@ -3801,7 +3815,7 @@ function _cast_math_votes(
     # final vote payload so the user sees a natural-language answer like
     # "2 plus 2 equals 4" instead of just the bare number "4".
     formatted_reply = format_arithmetic_reply(result)
-    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false, formatted_reply, obj_id, :final))
+    push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, formatted_reply, obj_id, :final))
 
     return out
 end
@@ -3840,7 +3854,7 @@ function _cast_multipart_votes(
 
     if isempty(conj_positions)
         # GRUG: no clause boundaries -> single vote with full text echo.
-        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+        return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips,
                          strip(original_text) |> String, obj_id, :singleton)]
     end
 
@@ -3857,7 +3871,7 @@ function _cast_multipart_votes(
         if clause_end >= start_idx
             clause_text = strip(join(tokens[start_idx:clause_end], " "))
             if !isempty(clause_text)
-                push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+                push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips,
                                 String(clause_text), obj_id, :companion))
             end
         end
@@ -3867,7 +3881,7 @@ function _cast_multipart_votes(
     if start_idx <= n_toks
         tail_text = strip(join(tokens[start_idx:n_toks], " "))
         if !isempty(tail_text)
-            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+            push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips,
                             String(tail_text), obj_id, :companion))
         end
     end
@@ -3875,7 +3889,7 @@ function _cast_multipart_votes(
     # GRUG: edge case -- if all clauses got dropped (e.g. text was just a
     # bare "and"), emit the fallback single-vote so the node still speaks.
     if isempty(out)
-        push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips, false,
+        push!(out, Vote(node.id, opener, conf, negatives, u_trips, n_trips,
                         strip(original_text) |> String, obj_id, :singleton))
     end
 

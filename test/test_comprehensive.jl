@@ -93,10 +93,10 @@ println("  ✓ scan_specimens on unrelated input: $(length(results_miss)) result
 println("\n[4] VOTE CASTING & SURE/UNSURE BUCKETING")
 
 # Create known votes with controlled confidences
-v_sure1 = Vote("node_a", "reason", 2.5, String[], RelationalTriple[], RelationalTriple[], false)
-v_sure2 = Vote("node_b", "analyze", 2.5, String[], RelationalTriple[], RelationalTriple[], false)
-v_sure3 = Vote("node_c", "reason", 2.495, String[], RelationalTriple[], RelationalTriple[], false)  # within 0.05
-v_unsure = Vote("node_d", "greet", 1.8, String[], RelationalTriple[], RelationalTriple[], false)
+v_sure1 = Vote("node_a", "reason", 2.5, String[], RelationalTriple[], RelationalTriple[])
+v_sure2 = Vote("node_b", "analyze", 2.5, String[], RelationalTriple[], RelationalTriple[])
+v_sure3 = Vote("node_c", "reason", 2.495, String[], RelationalTriple[], RelationalTriple[])  # within 0.05
+v_unsure = Vote("node_d", "greet", 1.8, String[], RelationalTriple[], RelationalTriple[])
 
 all_votes = [v_sure1, v_sure2, v_sure3, v_unsure]
 sorted_votes = sort(all_votes; by = v -> v.confidence, rev = true)
@@ -483,8 +483,8 @@ println("\n[21] VOTE CASTING")
 test_vote_id = ids[1]
 test_specimens = scan_specimens("fire makes grug warm")
 if !isempty(test_specimens)
-    id, conf, antimatch, u_trips, n_trips = test_specimens[1]
-    vote = cast_vote(id, conf, antimatch, u_trips, n_trips)
+    id, conf, u_trips, n_trips = test_specimens[1]
+    vote = cast_vote(id, conf, u_trips, n_trips)
     @assert isa(vote, Vote) "FAIL: cast_vote should return Vote struct!"
     @assert vote.node_id == id "FAIL: Vote node_id mismatch!"
     @assert vote.confidence == conf "FAIL: Vote confidence mismatch!"
@@ -510,7 +510,7 @@ println("  ✓ scan_and_expand returned $(length(expanded)) result(s) after 3-pa
 
 # All IDs should be unique
 seen_ids = String[]
-for (id, conf, _, _, _) in expanded
+for (id, conf, _, _) in expanded
     @assert !(id in seen_ids) "FAIL: Duplicate node $id in scan_and_expand results!"
     push!(seen_ids, id)
 end
@@ -548,10 +548,10 @@ println("  ✓ Immune state serialize → clear → deserialize: $restored_count
 println("\n[24] VOTE TIE — 4-WAY EDGE CASE")
 
 quad_votes = [
-    Vote("q1", "reason",  3.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("q2", "analyze", 3.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("q3", "greet",   3.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("q4", "flee",    3.0, String[], RelationalTriple[], RelationalTriple[], false),
+    Vote("q1", "reason",  3.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("q2", "analyze", 3.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("q3", "greet",   3.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("q4", "flee",    3.0, String[], RelationalTriple[], RelationalTriple[]),
 ]
 quad_wins = Dict("q1" => 0, "q2" => 0, "q3" => 0, "q4" => 0)
 for _ in 1:400

@@ -34,11 +34,11 @@ println("  ✓ Engine module loaded (Vote struct available)")
 # ==============================================================================
 println("\n[2] VOTE STRUCT CONSTRUCTION")
 
-v1 = Vote("node_a", "reason", 2.5, String[], RelationalTriple[], [RelationalTriple("dog", "is", "animal")], false)
-v2 = Vote("node_b", "greet",  2.5, String[], RelationalTriple[], [RelationalTriple("cat", "is", "pet")], false)
-v3 = Vote("node_c", "reason", 2.5, String[], RelationalTriple[], RelationalTriple[], false)
-v4 = Vote("node_d", "flee",   1.8, String[], RelationalTriple[], RelationalTriple[], false)
-v5 = Vote("node_e", "ponder", 1.5, String[], RelationalTriple[], RelationalTriple[], false)
+v1 = Vote("node_a", "reason", 2.5, String[], RelationalTriple[], [RelationalTriple("dog", "is", "animal")])
+v2 = Vote("node_b", "greet",  2.5, String[], RelationalTriple[], [RelationalTriple("cat", "is", "pet")])
+v3 = Vote("node_c", "reason", 2.5, String[], RelationalTriple[], RelationalTriple[])
+v4 = Vote("node_d", "flee",   1.8, String[], RelationalTriple[], RelationalTriple[])
+v5 = Vote("node_e", "ponder", 1.5, String[], RelationalTriple[], RelationalTriple[])
 
 @assert v1.confidence == 2.5 "FAIL: Vote confidence mismatch!"
 @assert v1.node_id == "node_a" "FAIL: Vote node_id mismatch!"
@@ -98,9 +98,9 @@ println("  ✓ No single node dominates (all within expected range)")
 # ==============================================================================
 println("\n[5] SINGLE WINNER (NO TIE)")
 
-v_clear_winner = Vote("node_king", "reason", 5.0, String[], RelationalTriple[], RelationalTriple[], false)
-v_runner1 = Vote("node_r1", "greet", 4.96, String[], RelationalTriple[], RelationalTriple[], false)
-v_runner2 = Vote("node_r2", "flee", 3.0, String[], RelationalTriple[], RelationalTriple[], false)
+v_clear_winner = Vote("node_king", "reason", 5.0, String[], RelationalTriple[], RelationalTriple[])
+v_runner1 = Vote("node_r1", "greet", 4.96, String[], RelationalTriple[], RelationalTriple[])
+v_runner2 = Vote("node_r2", "flee", 3.0, String[], RelationalTriple[], RelationalTriple[])
 
 sorted_clear = sort([v_clear_winner, v_runner1, v_runner2]; by = v -> v.confidence, rev = true)
 max_clear = sorted_clear[1].confidence
@@ -202,10 +202,10 @@ println("  ✓ AIML rule with {VOTE_CERTAINTY} and {TIED_ALTERNATIVES} accepted"
 println("\n[10] EDGE CASE — ALL VOTES IDENTICAL CONFIDENCE")
 
 identical_votes = [
-    Vote("id_1", "reason", 1.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("id_2", "greet",  1.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("id_3", "flee",   1.0, String[], RelationalTriple[], RelationalTriple[], false),
-    Vote("id_4", "ponder", 1.0, String[], RelationalTriple[], RelationalTriple[], false),
+    Vote("id_1", "reason", 1.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("id_2", "greet",  1.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("id_3", "flee",   1.0, String[], RelationalTriple[], RelationalTriple[]),
+    Vote("id_4", "ponder", 1.0, String[], RelationalTriple[], RelationalTriple[]),
 ]
 
 sorted_id = sort(identical_votes; by = v -> v.confidence, rev = true)

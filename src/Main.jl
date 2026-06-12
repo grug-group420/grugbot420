@@ -3254,7 +3254,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     println(payload_io, "Lobe Context: $_lobe_line")
     println(payload_io, "User Triples: $u_triples")
     println(payload_io, "Node Triples: $n_triples")
-    println(payload_io, "Anti-Match Detected: $(primary_vote.antimatch)")
+    # GRUG v7.27: Anti-Match line removed. The antimatch field no longer exists on Vote.
     if !isempty(tied_alternatives)
         println(payload_io, "Tied Alternatives (not selected):")
         for tv in tied_alternatives
@@ -3708,7 +3708,7 @@ Measures response time and records it on the winning nodes for big-O ledger.
 function _stamp_objective(v::Vote, obj_id::UInt64)::Vote
     return Vote(
         v.node_id, v.action, v.confidence, v.negatives,
-        v.user_triples, v.node_triples, v.antimatch, v.payload,
+        v.user_triples, v.node_triples, v.payload,
         obj_id,
         v.bundle_role == :singleton ? :companion : v.bundle_role,
     )
@@ -4074,7 +4074,7 @@ function process_mission(mission_text::String)
                     node = lock(() -> get(NODE_MAP, node_id, nothing), NODE_LOCK)
                     isnothing(node) && continue
                     push!(valid_specimens, (
-                        node_id, inject_conf, false,
+                        node_id, inject_conf,
                         RelationalTriple[],         # u_trips: no triples extracted for sigil routing
                         node.relational_patterns,
                     ))
@@ -4176,7 +4176,7 @@ function process_mission(mission_text::String)
             # is the user's untouched text used for clause-text echo.
             sm_bindings = isnothing(sigil_mediation) ? SigilPromoter.SigilBinding[] : sigil_mediation.bindings
             sm_original = isnothing(sigil_mediation) ? mission_text                  : sigil_mediation.original
-            for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
+            for (id, conf, u_trips, n_trips) in valid_specimens
                 # GRUG: peek the node's tag without holding the lock across
                 # the per-node fire (cast_sigil_votes takes its own lock).
                 node_peek = lock(() -> get(NODE_MAP, id, nothing), NODE_LOCK)
@@ -4264,7 +4264,7 @@ function process_mission(mission_text::String)
                         # cast_vote so the node still contributes its voice
                         # this cycle. NO SILENT FAILURE -- the warning is loud.
                         @warn "[MAIN] cast_sigil_votes failed on node $(id) ($(typeof(e))): $e -- falling back to cast_vote"
-                        v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
+                        v = cast_vote(id, conf, u_trips, n_trips)
                         # GRUG v7.18+: per-clause objective_id stamping for fallback votes.
                         if is_multipart
                             # GRUG: try to match node pattern against clauses
@@ -4280,7 +4280,7 @@ function process_mission(mission_text::String)
                         end
                     end
                 else
-                    v = cast_vote(id, conf, is_antimatch, u_trips, n_trips)
+                    v = cast_vote(id, conf, u_trips, n_trips)
                     # GRUG v7.18+: per-clause objective_id stamping for regular votes.
                     if is_multipart
                         regular_obj = _best_clause_objective_for_node(id, nothing, clauses, clause_objective_ids)
@@ -4542,7 +4542,7 @@ function _scan_image_specimens(img_signal::Vector{Float64})
         error("!!! FATAL: _scan_image_specimens got empty img_signal! !!!")
     end
 
-    results = Tuple{String, Float64, Bool, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
+    results = Tuple{String, Float64, Vector{RelationalTriple}, Vector{RelationalTriple}}[]
 
     lock(NODE_LOCK) do
         for (id, node) in NODE_MAP
@@ -4563,7 +4563,7 @@ function _scan_image_specimens(img_signal::Vector{Float64})
             try
                 target = length(img_signal) >= length(node.signal) ? img_signal : continue
                 _, conf = cheap_scan(target, node.signal; threshold=0.25)
-                push!(results, (id, conf, false, RelationalTriple[], node.relational_patterns))
+                push!(results, (id, conf, RelationalTriple[], node.relational_patterns))
             catch e
                 if e isa PatternNotFoundError
                     continue
@@ -6139,7 +6139,8 @@ try
         "reason[dont guess, dont hallucinate]^4 | analyze[dont assume]^3 | ponder^1",
         reason_ctx, String[])
 
-    # GRUG: Node that demands verb "hits". Will hard-reject "rock hits grug" via anti-match!
+    # GRUG v7.27: Anti-match removed — nodes with reversed subject/object triples
+    # no longer hard-kill. They just score negatively and confidence gating handles them.
     create_node("grug hits rock and makes fire",
         "analyze[dont panic]^5 | ponder^2",
         relational_ctx, String[])

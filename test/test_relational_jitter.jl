@@ -341,8 +341,7 @@ end
 
     # Deterministic baseline (jitter OFF).
     RelationalJitter.disable_jitter!()
-    det_score, det_antim = evaluate_relational_dialectics(user, node, req, wts)
-    @test det_antim == false
+    det_score = evaluate_relational_dialectics(user, node, req, wts)
     @test det_score == 2.0
     RelationalJitter.enable_jitter!()
 
@@ -350,8 +349,7 @@ end
     N = 3_000
     scores = Float64[]
     for _ in 1:N
-        s, a = evaluate_relational_dialectics(user, node, req, wts)
-        @test a == false   # antimatch flag never flips
+        s = evaluate_relational_dialectics(user, node, req, wts)
         @test isfinite(s)  # no NaN / Inf leak
         push!(scores, s)
     end
@@ -388,40 +386,34 @@ end
 
     # GRUG: Run many times — every single result must be EXACTLY -9999.0.
     for _ in 1:500
-        s, a = evaluate_relational_dialectics(user, node, req, wts)
+        s = evaluate_relational_dialectics(user, node, req, wts)
         @test s == -9999.0
-        @test a == false
     end
 
-    println("  ✓ sentinel -9999.0 returned exactly on every one of 500 calls")
+    println("  ✓ sentinel -9999.0 returned exactly on every one of 500 calls (v7.27: no antimatch flag)")
 end
 
 # ============================================================================
 # TEST GROUP 13 — Antimatch path still flips flag correctly under jitter
 # ============================================================================
-@testset "[13] integration: antimatch detection robust under jitter" begin
+@testset "[13] integration: reversed triple scores negative under jitter (v7.27: antimatch flag removed)" begin
     Random.seed!(31415)
 
-    # GRUG: User says "a causes b", node says "b causes a" — reversed →
-    # antimatch → match_score goes -2.0 * weight. Flag must always flip.
+    # GRUG v7.27: antimatch flag removed. Reversed triples (user "a causes b",
+    # node "b causes a") still score negatively (-2.0 * weight), they just don't
+    # hard-kill the node anymore. The node stays in the pool for confidence gating.
     user  = [RelationalTriple("a", "causes", "b")]
     node  = [RelationalTriple("b", "causes", "a")]
     req   = String[]
     wts   = Dict{String, Float64}()
 
-    flip_count = 0
     for _ in 1:1_000
-        s, a = evaluate_relational_dialectics(user, node, req, wts)
-        if a
-            flip_count += 1
-        end
+        s = evaluate_relational_dialectics(user, node, req, wts)
         @test isfinite(s)
-        @test s < 0.0   # antimatch score is negative even after jitter
+        @test s < 0.0   # reversed triple score is negative even after jitter
     end
-    # GRUG: Antimatch is deterministic on triple contents — flag always flips.
-    @test flip_count == 1_000
 
-    println("  ✓ antimatch flag deterministic; score sign preserved under jitter")
+    println("  ✓ reversed triple score sign preserved under jitter (no antimatch flag)")
 end
 
 # ============================================================================
@@ -434,11 +426,10 @@ end
     wts   = Dict{String, Float64}()
 
     RelationalJitter.disable_jitter!()
-    first_score, first_antim = evaluate_relational_dialectics(user, node, req, wts)
+    first_score = evaluate_relational_dialectics(user, node, req, wts)
     for _ in 1:200
-        s, a = evaluate_relational_dialectics(user, node, req, wts)
+        s = evaluate_relational_dialectics(user, node, req, wts)
         @test s === first_score
-        @test a === first_antim
     end
     RelationalJitter.enable_jitter!()
 

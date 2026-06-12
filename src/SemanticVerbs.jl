@@ -376,6 +376,7 @@ end # module SemanticVerbs
 # This ordering ensures the dialectical matcher never sees alias forms — it only
 # ever sees canonical verb strings. Downstream relation weight tables, required
 # relation checks, and antimatch logic all key on canonical strings.
+# GRUG v7.27: antimatch logic removed — reversed triples just subtract score now.
 #
 # 4. WORD BOUNDARY SAFETY:
 # Synonym replacement uses \b (word boundary) anchors with case-insensitive

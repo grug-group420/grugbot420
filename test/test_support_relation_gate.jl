@@ -62,7 +62,7 @@ end
 function _vote(id::String, action::String;
                confidence::Float64 = 0.5,
                triples::Vector{RelationalTriple} = RelationalTriple[])
-    return Vote(id, action, confidence, String[], RelationalTriple[], triples, false)
+    return Vote(id, action, confidence, String[], RelationalTriple[], triples)
 end
 
 

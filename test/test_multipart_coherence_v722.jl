@@ -41,9 +41,9 @@ println("="^60)
 
         # Create mock votes with these objective_ids
         # Group 1: math group
-        math_vote = GB.Vote("node_math", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "3 times 4 equals 12", obj_id_1, :final)
+        math_vote = GB.Vote("node_math", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], "3 times 4 equals 12", obj_id_1, :final)
         # Group 2: knowledge group (no companion payload — this was the bug trigger)
-        knowledge_vote = GB.Vote("node_knowledge", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "", obj_id_2, :companion)
+        knowledge_vote = GB.Vote("node_knowledge", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], "", obj_id_2, :companion)
 
         # Test: _infer_scoped_mission for the knowledge group
         # Should return "what is the sky" via the reverse lookup, NOT "describe"
@@ -86,8 +86,8 @@ println("="^60)
         math_obj_id = clause_obj_ids[clauses[1].text]
         sky_obj_id = length(clauses) >= 2 ? clause_obj_ids[clauses[2].text] : GB.fresh_objective_id()
 
-        math_vote = GB.Vote("node_math", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "3 times 4 equals 12", math_obj_id, :final)
-        sky_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "", sky_obj_id, :companion)
+        math_vote = GB.Vote("node_math", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], "3 times 4 equals 12", math_obj_id, :final)
+        sky_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], "", sky_obj_id, :companion)
 
         # Run orchestrate_multipart WITH clause_obj_ids
         result = MultipartOrchestrator.orchestrate_multipart([math_vote, sky_vote], clauses, clause_obj_ids)
@@ -126,7 +126,7 @@ println("="^60)
         clause_obj_ids = Dict{String, UInt64}(clause_text => obj_id)
 
         # Companion vote with empty payload — the exact bug trigger
-        empty_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "", obj_id, :companion)
+        empty_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], "", obj_id, :companion)
 
         clauses = InputDecomposer.decompose("what is 3 times 4 and what is the sky")
 
@@ -157,7 +157,7 @@ println("="^60)
         for (i, cl) in enumerate(clauses)
             action = i == 1 ? "calculate" : "describe"
             obj_id = clause_obj_ids[cl.text]
-            v = GB.Vote("node_$i", action, 0.8, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "", obj_id, :companion)
+            v = GB.Vote("node_$i", action, 0.8, String[], GB.RelationalTriple[], GB.RelationalTriple[], "", obj_id, :companion)
             push!(votes, v)
         end
 
@@ -184,7 +184,7 @@ println("="^60)
     @testset "5. Singleton votes pass through unchanged" begin
         # Votes with objective_id=0 (singletons) should not be grouped.
         # This is a regression guard for the multipart orchestrator.
-        singleton_vote = GB.Vote("node_solo", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "test answer", UInt64(0), :singleton)
+        singleton_vote = GB.Vote("node_solo", "reason", 0.9, String[], GB.RelationalTriple[], GB.RelationalTriple[], "test answer", UInt64(0), :singleton)
 
         clauses = InputDecomposer.decompose("what is 2 plus 2")  # single clause
         result = MultipartOrchestrator.orchestrate_multipart([singleton_vote], clauses)
@@ -201,7 +201,7 @@ println("="^60)
 
         obj_id = GB.fresh_objective_id()
         # Vote WITH a non-empty payload (companion with clause text)
-        good_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], false, "what is the sky", obj_id, :companion)
+        good_vote = GB.Vote("node_sky", "describe", 0.7, String[], GB.RelationalTriple[], GB.RelationalTriple[], "what is the sky", obj_id, :companion)
 
         clauses = InputDecomposer.decompose("what is 3 times 4 and what is the sky")
 

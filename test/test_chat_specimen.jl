@@ -161,7 +161,7 @@ function generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, 
     out *= "Context  | $system_prompt\n"
     out *= "U-Trips  | $u_triples\n"
     out *= "N-Trips  | $n_triples\n"
-    out *= "Antimatch| $(primary_vote.antimatch)\n"
+    # GRUG v7.27: antimatch field removed from Vote
     out *= "Memory   |\n$memory_str\n"
     out *= "─────────────────────────────────────────────────\n"
     out *= "🗣 JIT RESPONSE:\n$jit_response\n"
@@ -240,8 +240,8 @@ function process_mission(mission_text::String)
     end
 
     cast_votes = Vote[]
-    for (id, conf, is_antimatch, u_trips, n_trips) in valid_specimens
-        push!(cast_votes, cast_vote(id, conf, is_antimatch, u_trips, n_trips))
+    for (id, conf, u_trips, n_trips) in valid_specimens
+        push!(cast_votes, cast_vote(id, conf, u_trips, n_trips))
     end
 
     output, sure_votes, unsure_votes = ephemeral_aiml_orchestrator(mission_text, cast_votes)

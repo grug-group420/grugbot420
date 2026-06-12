@@ -189,16 +189,16 @@ using GrugBot420.ArithmeticEngine
         @test length(votes) == 1
         v = votes[1]
         @test v.action == opener           # action stays a real COMMANDS key
-        @test v.payload == "4"             # answer rides on payload
+        @test occursin("4", v.payload)    # answer rides on payload (may be full sentence like "2 plus 2 equals 4")
         @test v.confidence == 0.7
         @test v.node_id == id
-        @test !v.antimatch
+        # GRUG v7.27: antimatch field removed from Vote — no longer exists
 
         # Comparison op produces "true"/"false" payload
         m2 = mediate("5 > 3")
         v2 = GB.cast_sigil_votes(id, 0.5, m2.bindings, m2.original,
                                  GB.RelationalTriple[], GB.RelationalTriple[])[1]
-        @test v2.payload in ("true", "false")
+        @test occursin("true", v2.payload) || occursin("false", v2.payload)
 
         delete!(GB.NODE_MAP, id)
     end
@@ -225,8 +225,8 @@ using GrugBot420.ArithmeticEngine
         @test all(v -> v.action == opener, votes)
         # Step votes carry "lhs op rhs = result" in payload
         @test any(occursin("=", v.payload) for v in votes)
-        # Final vote payload is the final answer
-        @test any(v.payload == "6" for v in votes)
+        # Final vote payload contains the final answer
+        @test any(occursin("6", v.payload) for v in votes)
         # Step payloads include intermediate result 3
         @test any(occursin("3", v.payload) for v in votes if occursin("=", v.payload))
 
@@ -349,21 +349,21 @@ using GrugBot420.ArithmeticEngine
     end
 
     # =========================================================================
-    @testset "10. Vote struct — payload field default + explicit + backward compat" begin
-        # 7-arg constructor (existing call sites) -> empty payload
+    @testset "10. Vote struct — payload field default + explicit (v7.27: antimatch removed)" begin
+        # 6-arg constructor (required args only) -> empty payload
         v_legacy = GB.Vote("nid", "act", 1.0, String[],
-                           GB.RelationalTriple[], GB.RelationalTriple[], false)
+                           GB.RelationalTriple[], GB.RelationalTriple[])
         @test v_legacy.payload == ""
 
-        # 8-arg constructor (new sigil call sites) -> explicit payload
+        # 7-arg constructor (with explicit payload) -> payload set
         v_new = GB.Vote("nid", "act", 1.0, String[],
-                        GB.RelationalTriple[], GB.RelationalTriple[], false,
+                        GB.RelationalTriple[], GB.RelationalTriple[],
                         "hello payload")
         @test v_new.payload == "hello payload"
 
         # Round-trip through the struct preserves payload
         @test GB.Vote("a","b",2.0,String[],GB.RelationalTriple[],
-                     GB.RelationalTriple[],false,"x").payload == "x"
+                     GB.RelationalTriple[], "x").payload == "x"
     end
 
     # =========================================================================
