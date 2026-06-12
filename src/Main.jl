@@ -6288,6 +6288,19 @@ function load_specimen_from_file!(filepath::String)::String
         else
             println("  🔗 @sigil:multipart nodes already present ($(length(mp_ids)), skipping seed")
         end
+        # GRUG v7.33: Also ensure :doaction sigil seed nodes exist.
+        local da_ids = list_sigil_node_ids(:doaction)
+        if isempty(da_ids)
+            doaction_ctx = Dict{String, Any}(
+                "system_prompt" => "Action execution voice - verb-driven action scripting",
+                "sigil_kind"    => "doaction",
+            )
+            create_sigil_node("&doAction &word &n", "say^4 | repeat^3 | count^2 | tell^1", doaction_ctx, String[]; kind = :doaction)
+            create_sigil_node("&doAction &rest", "check^4 | tell^3 | compute^2 | resolve^1", doaction_ctx, String[]; kind = :doaction)
+            println("  ⚡ @sigil:doaction seed nodes created (specimen had none)")
+        else
+            println("  ⚡ @sigil:doaction nodes already present ($(length(da_ids)), skipping seed")
+        end
     end
 
 
@@ -6959,36 +6972,38 @@ elseif !isnothing(m_right)
                 end
                 add_message_to_history!("System", digest, false)
                 
-            elseif !isnothing(m_grow)
+#             elseif !isnothing(m_grow)
                 # GRUG: /grow - plant new nodes from JSON packet.
                 # Regex pre-screens JSON for image binary patterns before parsing.
-                json_text = String(m_grow.captures[1])
-                add_message_to_history!("System", "/grow [JSON MAP PACKET]", false)
+#                 json_text = String(m_grow.captures[1])
+#                 add_message_to_history!("System", "/grow [JSON MAP PACKET]", false)
 
                 # GRUG: IMMUNE SYSTEM GATE — scan grow input before touching anything!
                 # /grow is a CRITICAL command (modifies node population). Full immune scan.
-                immune_passed = immune_gate("/grow", json_text; is_critical=true)
+#                 immune_passed = immune_gate("/grow", json_text; is_critical=true)
 
-                if immune_passed
-                    println("--> Grug unpacking JSON node seeds...")
+#                 if immune_passed
+#                     println("--> Grug unpacking JSON node seeds...")
 
                     # GRUG: Check if the grow packet contains image binary data.
                     # If pattern field has image binary, flag it as image node automatically.
-                    is_img, img_sig = maybe_convert_image_input(json_text)
-                    if is_img
-                        println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
+#                     is_img, img_sig = maybe_convert_image_input(json_text)
+#                     if is_img
+#                         println("[GROW] 🖼  Image binary detected in /grow packet. Image node path active.")
                         # GRUG: The JSON node grower in Engine.jl handles is_image_node flag.
                         # Image binary in pattern will be stored as SDF signal.
                         # Caller must set "is_image_node": true in the JSON for this to work.
-                    end
+#                     end
 
-                    new_ids = grow_nodes_from_packet(json_text)
+#                     new_ids = grow_nodes_from_packet(json_text)
 
-                    success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes: [$(join(new_ids, ", "))]"
-                    println(success_msg)
-                    add_message_to_history!("System", success_msg, false)
-                end
+#                     success_msg = "🌱 Tribe expanded! Grug planted $(length(new_ids)) new nodes: [$(join(new_ids, ", "))]"
+#                     println(success_msg)
+#                     add_message_to_history!("System", success_msg, false)
+#                 end
 
+#                Use /saveSpecimen and manual node editing instead.
+# GRUG: /grow system DISABLED — growth feature commented out for v7.33 planning.
             elseif !isnothing(m_rule)
                 # GRUG: /addRule - add a stochastic orchestration rule.
                 # Optional [prob=X.XX] suffix sets fire probability (default 1.0).
@@ -7179,54 +7194,55 @@ elseif !isnothing(m_right)
                     println("\U0001f517 Lobes '$(lobe_a)' \u2194 '$(lobe_b)' connected.")
                 end
 
-            elseif !isnothing(m_lobegrow)
+#             elseif !isnothing(m_lobegrow)
                 # GRUG: /lobeGrow <lobe_id> <json_packet> - grow a node directly into a lobe.
                 # JSON must have: pattern, action_packet. Optional: data, drop_table.
                 # Example: /lobeGrow language {"pattern":"hello","action_packet":"{...}"}
-                target_lobe_id = String(m_lobegrow.captures[1])
-                lobe_json      = String(strip(m_lobegrow.captures[2]))
+#                 target_lobe_id = String(m_lobegrow.captures[1])
+#                 lobe_json      = String(strip(m_lobegrow.captures[2]))
 
                 # GRUG: IMMUNE SYSTEM GATE — scan lobeGrow input before touching anything!
-                lobegrow_immune_passed = immune_gate("/lobeGrow", lobe_json; is_critical=true)
+#                 lobegrow_immune_passed = immune_gate("/lobeGrow", lobe_json; is_critical=true)
 
-                if !lobegrow_immune_passed
+#                 if !lobegrow_immune_passed
                     # GRUG: Immune system said no. Skip growth.
-                elseif !haskey(Lobe.LOBE_REGISTRY, target_lobe_id)
-                    println("\u26a0  /lobeGrow: Lobe '$(target_lobe_id)' does not exist. Use /newLobe first.")
-                elseif Lobe.lobe_is_full(target_lobe_id)
-                    println("!!! LOBE FULL: Lobe '$(target_lobe_id)' has reached its node cap. Cannot grow more nodes! Use /newLobe to add a new lobe. !!!")
-                else
-                    try
-                        packet = JSON.parse(lobe_json)
-                        if !haskey(packet, "pattern") || !haskey(packet, "action_packet")
-                            println("\u26a0  /lobeGrow: JSON must have 'pattern' and 'action_packet' fields.")
-                        else
-                            json_data  = Dict{String,Any}(string(k) => v for (k,v) in get(packet, "data", Dict()))
-                            drop_table = haskey(packet, "drop_table") && packet["drop_table"] isa AbstractVector ?
-                                         String[string(x) for x in packet["drop_table"]] : String[]
-                            new_id = create_node(
-                                packet["pattern"],
-                                packet["action_packet"],
-                                json_data,
-                                drop_table
-                            )
+#                 elseif !haskey(Lobe.LOBE_REGISTRY, target_lobe_id)
+#                     println("\u26a0  /lobeGrow: Lobe '$(target_lobe_id)' does not exist. Use /newLobe first.")
+#                 elseif Lobe.lobe_is_full(target_lobe_id)
+#                     println("!!! LOBE FULL: Lobe '$(target_lobe_id)' has reached its node cap. Cannot grow more nodes! Use /newLobe to add a new lobe. !!!")
+#                 else
+#                     try
+#                         packet = JSON.parse(lobe_json)
+#                         if !haskey(packet, "pattern") || !haskey(packet, "action_packet")
+#                             println("\u26a0  /lobeGrow: JSON must have 'pattern' and 'action_packet' fields.")
+#                         else
+#                             json_data  = Dict{String,Any}(string(k) => v for (k,v) in get(packet, "data", Dict()))
+#                             drop_table = haskey(packet, "drop_table") && packet["drop_table"] isa AbstractVector ?
+#                                          String[string(x) for x in packet["drop_table"]] : String[]
+#                             new_id = create_node(
+#                                 packet["pattern"],
+#                                 packet["action_packet"],
+#                                 json_data,
+#                                 drop_table
+#                             )
                             # GRUG: Pass alive_count to exclude graves from cap check!
                             # GRUG say: dead nodes are memory, not bloat. Cap is for living.
-                            alive_in_lobe = count_alive_nodes_in_lobe(target_lobe_id)
-                            Lobe.add_node_to_lobe!(target_lobe_id, new_id; alive_count=alive_in_lobe)
+#                             alive_in_lobe = count_alive_nodes_in_lobe(target_lobe_id)
+#                             Lobe.add_node_to_lobe!(target_lobe_id, new_id; alive_count=alive_in_lobe)
                             # GRUG: Convert JSON data and drop table into lobe's hash table chunks.
                             # Flat dict and flat vector become O(1) pattern-activated storage.
-                            json_count = LobeTable.json_to_table_chunk!(target_lobe_id, new_id, json_data)
-                            drop_count = LobeTable.drop_table_to_chunk!(target_lobe_id, new_id, drop_table)
-                            println("\U0001f331 Node '$(new_id)' grown into lobe '$(target_lobe_id)'. json_fields=$json_count drop_links=$drop_count")
-                        end
-                    catch e
-                        ctx = e isa LobeTable.LobeTableError ? " [ctx: $(e.context)]" :
-                              e isa Lobe.LobeError ? " [ctx: $(e.context)]" : ""
-                        println("!!! ERROR in /lobeGrow: $e$ctx !!!")
-                    end
-                end
+#                             json_count = LobeTable.json_to_table_chunk!(target_lobe_id, new_id, json_data)
+#                             drop_count = LobeTable.drop_table_to_chunk!(target_lobe_id, new_id, drop_table)
+#                             println("\U0001f331 Node '$(new_id)' grown into lobe '$(target_lobe_id)'. json_fields=$json_count drop_links=$drop_count")
+#                         end
+#                     catch e
+#                         ctx = e isa LobeTable.LobeTableError ? " [ctx: $(e.context)]" :
+#                               e isa Lobe.LobeError ? " [ctx: $(e.context)]" : ""
+#                         println("!!! ERROR in /lobeGrow: $e$ctx !!!")
+#                     end
+#                 end
 
+# GRUG: /lobeGrow system DISABLED — growth feature commented out for v7.33 planning.
             elseif !isnothing(m_lobes)
                 # GRUG: /lobes - uses get_lobe_status_summary() which includes O(1) reverse index count.
                 println(Lobe.get_lobe_status_summary())

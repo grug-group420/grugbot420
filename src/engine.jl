@@ -4512,41 +4512,41 @@ end
 # JSON NODE GROWER (MAP EXPANSION)
 # ==============================================================================
 
-"""
-grow_nodes_from_packet(json_str::String)::Vector{String}
+# """
+# grow_nodes_from_packet(json_str::String)::Vector{String}
 
-GRUG: Parse a JSON packet and grow new nodes from it.
-Supports `is_image_node` flag in the JSON for image node creation.
-If `is_image_node` is true, `pattern` field is treated as image binary descriptor.
-"""
-function grow_nodes_from_packet(json_str::String)::Vector{String}
-    if strip(json_str) == "" error("!!! FATAL: Cannot grow from empty JSON string !!!") end
-    packet = try JSON.parse(json_str) catch e error("!!! FATAL: JSON parser dead: $e !!!") end
+# GRUG: Parse a JSON packet and grow new nodes from it.
+# Supports `is_image_node` flag in the JSON for image node creation.
+# If `is_image_node` is true, `pattern` field is treated as image binary descriptor.
+# """
+# function grow_nodes_from_packet(json_str::String)::Vector{String}
+#     if strip(json_str) == "" error("!!! FATAL: Cannot grow from empty JSON string !!!") end
+#     packet = try JSON.parse(json_str) catch e error("!!! FATAL: JSON parser dead: $e !!!") end
     
-    if !haskey(packet, "nodes")
-        error("!!! FATAL: JSON packet missing 'nodes' array! !!!")
-    end
+#     if !haskey(packet, "nodes")
+#         error("!!! FATAL: JSON packet missing 'nodes' array! !!!")
+#     end
     
-    nodes_arr = packet["nodes"]
+#     nodes_arr = packet["nodes"]
     
-    validated = Vector{Tuple{String,String,Dict{String,Any},Vector{String},Bool}}()
-    for n in nodes_arr
-        pattern      = String(n["pattern"])
-        action_packet = String(n["action_packet"])
-        json_data    = Dict{String, Any}(string(k) => v for (k, v) in n["json_data"])
-        drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ? 
-                       String[string(x) for x in n["drop_table"]] : String[]
+#     validated = Vector{Tuple{String,String,Dict{String,Any},Vector{String},Bool}}()
+#     for n in nodes_arr
+#         pattern      = String(n["pattern"])
+#         action_packet = String(n["action_packet"])
+#         json_data    = Dict{String, Any}(string(k) => v for (k, v) in n["json_data"])
+#         drop_table   = haskey(n, "drop_table") && (n["drop_table"] isa AbstractVector) ? 
+#                        String[string(x) for x in n["drop_table"]] : String[]
         # GRUG NEW: Check for is_image_node flag in JSON packet
-        is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
-        push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
-    end
+#         is_img_node  = haskey(n, "is_image_node") && n["is_image_node"] === true
+#         push!(validated, (pattern, action_packet, json_data, drop_table, is_img_node))
+#     end
 
-    new_ids = String[]
-    for (p, a, j, d, is_img) in validated
-        push!(new_ids, create_node(p, a, j, d; is_image_node=is_img))
-    end
-    return new_ids
-end
+#     new_ids = String[]
+#     for (p, a, j, d, is_img) in validated
+#         push!(new_ids, create_node(p, a, j, d; is_image_node=is_img))
+#     end
+#     return new_ids
+# end
 
 # ==============================================================================
 # NODE STATUS SUMMARY (FOR /nodes COMMAND)
