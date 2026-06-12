@@ -46,6 +46,7 @@ end
 
 """
     orchestrate_multipart(votes, clauses) → MultipartResult
+    orchestrate_multipart(votes, clauses, clause_obj_ids) → MultipartResult
 
 Group votes by objective_id and associate each group with its clause text.
 Votes with objective_id=0x0 or bundle_role=:singleton are singletons and
@@ -53,8 +54,13 @@ pass through unchanged.
 
 `clauses` is a Vector of InputDecomposer.DecomposedClause (we access
 .text and .index by duck-typing to avoid a using-cycle).
+
+`clause_obj_ids` is an optional Dict{String, UInt64} mapping clause text
+to objective_id. When provided, _infer_scoped_mission uses it directly
+for a reverse lookup instead of reading from Main._CURRENT_CLAUSE_OBJ_IDS
+(which may have been cleared by a finally block before this call).
 """
-function orchestrate_multipart(votes, clauses)::MultipartResult
+function orchestrate_multipart(votes, clauses, clause_obj_ids::Dict{String, UInt64} = Dict{String, UInt64}())::MultipartResult
     # GRUG: separate grouped votes from singletons.
     grouped = Dict{UInt64, Vector{Any}}()   # objective_id → votes
     singletons = Vector{Any}()
@@ -86,7 +92,7 @@ function orchestrate_multipart(votes, clauses)::MultipartResult
         # For multipart votes, the payload of each companion vote IS the
         # sub-subject text (InputDecomposer clause text stored in payload).
         # For math votes, scoped_mission = the full math expression.
-        scoped = _infer_scoped_mission(grp_votes, clauses)
+        scoped = _infer_scoped_mission(grp_votes, clauses, clause_obj_ids)
 
         # GRUG: detect math group (any vote with :step_n or :final role).
         is_math = any(v -> getfield(v, :bundle_role) in (:step_n, :final), grp_votes)
@@ -123,12 +129,50 @@ end
 # INTERNAL HELPERS
 # =============================================================================
 
-# GRUG: infer scoped_mission from votes + clauses.
-# For companion votes, the payload IS the clause text.
-# For math votes, we reconstruct from step payloads.
-# For singleton groups, fall back to the primary vote's node context.
-function _infer_scoped_mission(grp_votes, clauses)::String
-    # GRUG: check for companion votes -- their payload is the clause text.
+# GRUG v7.22: infer scoped_mission from votes + clauses + objective_id mapping.
+# The PRIMARY method is a reverse lookup: given the group's objective_id,
+# look up which clause text maps to it via _CURRENT_CLAUSE_OBJ_IDS.
+# This is AUTHORITATIVE — the mapping was built when the clauses were
+# decomposed in process_mission, so it's always correct. No guessing.
+# Fallback methods (companion payloads, chunk maps, vote action matching)
+# are retained for backward compatibility but should rarely be needed.
+function _infer_scoped_mission(grp_votes, clauses, clause_obj_ids::Dict{String, UInt64} = Dict{String, UInt64}())::String
+    # GRUG v7.22: PRIMARY — reverse lookup from objective_id to clause text.
+    # The group's objective_id was assigned to a specific clause in process_mission.
+    # We use the clause_obj_ids mapping (clause_text → obj_id) and reverse it
+    # to find which clause text belongs to this group. Prefer the passed-in
+    # mapping (which survives finally-block clears); fall back to global.
+    _obj_id = nothing
+    for _gv in grp_votes
+        _gv_obj = getfield(_gv, :objective_id)
+        if _gv_obj > UInt64(0)
+            _obj_id = _gv_obj
+            break
+        end
+    end
+    if !isnothing(_obj_id)
+        # GRUG v7.22: Prefer the passed-in mapping (survives finally-block clears).
+        if !isempty(clause_obj_ids)
+            for (_cl_text, _cl_obj_id) in clause_obj_ids
+                if _cl_obj_id == _obj_id && !isempty(_cl_text)
+                    return strip(_cl_text) |> String
+                end
+            end
+        end
+        # GRUG: Fallback to global mapping (may be empty if cleared by finally).
+        try
+            _obj_map = Main._CURRENT_CLAUSE_OBJ_IDS
+            for (_cl_text, _cl_obj_id) in _obj_map
+                if _cl_obj_id == _obj_id && !isempty(_cl_text)
+                    return strip(_cl_text) |> String
+                end
+            end
+        catch
+            # GRUG: _CURRENT_CLAUSE_OBJ_IDS may not be accessible -- non-fatal.
+        end
+    end
+
+    # GRUG: SECONDARY — check for companion votes -- their payload is the clause text.
     companions = filter(v -> getfield(v, :bundle_role) == :companion, grp_votes)
     if !isempty(companions)
         # GRUG: join all companion payloads (there may be multiple for

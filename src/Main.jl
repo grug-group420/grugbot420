@@ -1801,6 +1801,14 @@ const _CURRENT_CLAUSE_CHUNKS_LOCK = ReentrantLock()
 const _CURRENT_CLAUSES      = Any[]
 const _CURRENT_CLAUSES_LOCK = ReentrantLock()
 
+# GRUG v7.22: Current cycle's clause→objective_id mapping — populated in
+# process_mission alongside _CURRENT_CLAUSES. This is the AUTHORITATIVE
+# mapping from clause text to objective_id, so MultipartOrchestrator can
+# do a REVERSE lookup (objective_id → clause text) in _infer_scoped_mission()
+# instead of guessing from vote payloads or chunk maps. Keyed by clause_text.
+const _CURRENT_CLAUSE_OBJ_IDS      = Dict{String, UInt64}()
+const _CURRENT_CLAUSE_OBJ_IDS_LOCK = ReentrantLock()
+
 """
     _available_support_stitches(reasons, cert, p_pat, s_pat)
 
@@ -1936,12 +1944,14 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # math sigil nodes often have low confidence, causing the answer to be
     # dropped even with the _math_payloads injection fix.
     _deterministic_math_answers = String[]
+    _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false  # GRUG v7.21: reset per cycle
     try
         _det_med = SigilMediator.mediate(mission)
         if :math in _det_med.kinds && !isempty(_det_med.bindings)
             _det_result = ArithmeticEngine.compute_arithmetic(_det_med.bindings)
             if isnothing(_det_result.error)
                 push!(_deterministic_math_answers, ArithmeticEngine.format_arithmetic_reply(_det_result))
+                _CURRENT_HAS_DETERMINISTIC_ANSWER[] = true  # GRUG v7.21
             end
         end
     catch
@@ -1961,6 +1971,7 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                             # Deduplicate against already-found answers
                             if !(_det_cl_reply in _deterministic_math_answers)
                                 push!(_deterministic_math_answers, _det_cl_reply)
+                                _CURRENT_HAS_DETERMINISTIC_ANSWER[] = true  # GRUG v7.21
                             end
                         end
                     end
@@ -2200,7 +2211,8 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         try
             _pre_all = vcat(sure_votes, unsure_votes)
             _pre_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
-            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, _pre_clauses)
+            _pre_obj_ids = lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do; copy(_CURRENT_CLAUSE_OBJ_IDS); end
+            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, _pre_clauses, _pre_obj_ids)
             for _pre_grp in _pre_result.groups
                 if _pre_grp.objective_id == _primary_obj_id
                     _primary_scoped_mission = _pre_grp.scoped_mission
@@ -2215,6 +2227,13 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
     # GRUG v7.16.0: try/finally clears band info so it never leaks across cycles.
     # If COMMANDS throws, band info still cleared -- NO SILENT FAILURES, NO GHOSTS.
+    # GRUG v7.21: Save the deterministic flag BEFORE the finally block clears it.
+    # The multipart coherence gate below needs to know whether the primary
+    # group produced a deterministic answer, but the finally block resets
+    # _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false before we get there.
+    _was_deterministic = _CURRENT_HAS_DETERMINISTIC_ANSWER[]
+    _saved_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
+    _saved_clause_obj_ids = lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do; copy(_CURRENT_CLAUSE_OBJ_IDS); end
     output = try
         COMMANDS[primary_vote.action](_primary_scoped_mission, node, primary_vote, sure_votes, unsure_votes, votes)
     finally
@@ -2240,6 +2259,12 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         lock(_CURRENT_CLAUSES_LOCK) do
             empty!(_CURRENT_CLAUSES)
         end
+        # GRUG v7.22: Clear clause→objective_id mapping on cycle exit.
+        lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do
+            empty!(_CURRENT_CLAUSE_OBJ_IDS)
+        end
+        # GRUG v7.21: Reset deterministic-answer flag on cycle exit.
+        _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false
     end
 
     # GRUG v7.16+: SIGIL PAYLOAD CONCAT.
@@ -2295,6 +2320,25 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
             # No voice label — just prepend
             output = string(math_prefix, out_str)
         end
+        # GRUG v7.21: For deterministic missions, the math answer IS the
+        # entire response. The scaffold after it ("the explanation", "the
+        # calculation") is generic filler that adds no information. Strip
+        # everything after the math answer(s) so the output is just:
+        # "[Voice] 2 plus 2 equals 4." — clean, no noise.
+        if _was_deterministic
+            out_str2 = String(output)
+            m_voice2 = match(r"^(\[[^\]]*\]\s*)", out_str2)
+            if m_voice2 !== nothing
+                # Keep voice label + math prefix, strip the rest
+                after_voice = out_str2[length(m_voice2.match)+1:end]
+                # Find where the math prefix ends (the ". " after the last answer)
+                math_end = findfirst(r"\.\s", after_voice)
+                if math_end !== nothing
+                    trimmed = after_voice[1:first(math_end)]
+                    output = string(m_voice2.match, trimmed)
+                end
+            end
+        end
     end
 
     # GRUG v7.18+: MULTIPART ORCHESTRATION — per-clause AIML rendering.
@@ -2308,12 +2352,56 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _all_votes)
     if _has_multipart
         try
-            _mp_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
-            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, _mp_clauses)
+            _mp_clauses = _saved_clauses  # GRUG v7.21: use saved copy (cleared in finally above)
+            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, _mp_clauses, _saved_clause_obj_ids)
             _primary_obj = getfield(primary_vote, :objective_id)
             for grp in mp_result.groups
                 if grp.objective_id == _primary_obj
                     continue  # already rendered by COMMANDS above
+                end
+                # GRUG v7.21: COHERENCE GATE for multipart non-primary groups.
+                # Two kinds of noise to filter:
+                #   (a) Sigil injection artifacts: groups with scoped_mission =
+                #       just an action name ("calculate", "reason") that don't
+                #       match any user clause. These are duplicate math votes
+                #       for the same question — skip ALWAYS (not just for det).
+                #   (b) For single-clause deterministic inputs: ALL non-primary
+                #       groups are noise (the math answer is complete). Skip.
+                #   For genuine multipart inputs (2+ user clauses), non-primary
+                #       groups represent other clauses and should render.
+                grp_has_deterministic = false
+                for gv in grp.votes
+                    gv_role = try getfield(gv, :bundle_role) catch _e; :unknown; end
+                    if gv_role === :final
+                        grp_has_deterministic = true
+                        break
+                    end
+                end
+                grp_scoped = grp.scoped_mission
+                _n_user_clauses = length(_saved_clauses)
+                @info "[MAIN v7.21] Multipart coherence gate: grp_obj=$(grp.objective_id), grp_primary=$(grp.primary_vote.node_id), grp_has_det=$(grp_has_deterministic), was_det=$(_was_deterministic), scoped=$(grp_scoped), n_clauses=$(_n_user_clauses)"
+                # Gate (a): skip groups whose scoped_mission is just an action name
+                # and doesn't match any user clause — these are sigil artifacts.
+                if !isempty(_saved_clauses)
+                    _scoped_matches_clause = false
+                    for _cl in _saved_clauses
+                        _cl_text = lowercase(strip(getfield(_cl, :text)))
+                        _scoped_lc = lowercase(strip(grp_scoped))
+                        if !isempty(_cl_text) && (_scoped_lc == _cl_text || occursin(_scoped_lc, _cl_text) || occursin(_cl_text, _scoped_lc))
+                            _scoped_matches_clause = true
+                            break
+                        end
+                    end
+                    if !_scoped_matches_clause
+                        @info "[MAIN v7.21] SKIPPING non-clause group $(grp.objective_id) (scoped='$(grp_scoped)' doesn't match any user clause)"
+                        continue
+                    end
+                end
+                # Gate (b): for single-clause deterministic inputs, skip ALL
+                # remaining non-primary groups — the math answer is complete.
+                if _was_deterministic && _n_user_clauses <= 1
+                    @info "[MAIN v7.21] SKIPPING extra group $(grp.objective_id) for single-clause deterministic"
+                    continue
                 end
                 # GRUG v7.18+: Full AIML rendering for each non-primary group.
                 # Use the group's scoped_mission as the mission text so AIML
@@ -2326,6 +2414,7 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 grp_votes_typed = Vote[v for v in grp.votes]
                 # GRUG: if we have the node and COMMANDS has the action, render it.
                 if !isnothing(grp_node) && haskey(COMMANDS, grp_primary.action)
+                    @info "[MAIN v7.21] RENDERING non-primary group $(grp.objective_id): node=$(grp_primary.node_id), action=$(grp_primary.action), scoped=$(grp_scoped)"
                     try
                         grp_output = COMMANDS[grp_primary.action](grp_scoped, grp_node, grp_primary, Vote[], grp_votes_typed, grp_votes_typed)
                         # GRUG: also concat the group primary's payload if present.
@@ -2745,14 +2834,33 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     claim = _swap_words_in(String(claim_raw), node_drop_table, node_required)
 
     # -------------------------------------------------------------------
-    # GRUG v7.16: Build SUPPORT. Up to 2 sentences, drawn from:
-    #   (a) Relational triples from the winning node — "X relates to Y"
-    #   (b) Sure companion nodes' patterns — supporting claims
-    #   (c) On UNSURE certainty, an honest hedge from unsure side-features
-    # Each sentence also routes through _swap_words_in so inhibitions
-    # and per-node drop_tables apply uniformly.
+    # GRUG v7.21: MISSION-TYPE-AWARE RENDERING — the fundamental rethink.
+    # Deterministic answers (math, factual) do NOT need a SUPPORT block.
+    # The answer IS the response. Adding relational triples and support-band
+    # votes from off-topic lobes is WORSE than no support at all — it creates
+    # the decoherence the user reported. So we branch here:
+    #   DETERMINISTIC path: CLAIM only, no SUPPORT, no triples, no support votes
+    #   EXPLORATORY path: full CLAIM + SUPPORT (with stricter lobe-family gate)
     # -------------------------------------------------------------------
-    support_pieces = String[]
+    _is_deterministic = _mission_has_deterministic_answer(primary_vote)
+    @info "[MAIN v7.21] Deterministic check: flag=$(_CURRENT_HAS_DETERMINISTIC_ANSWER[]), is_det=$_is_deterministic, primary_action=$(primary_vote.action), primary_node=$(primary_vote.node_id)"
+
+    if _is_deterministic
+        # GRUG v7.21: DETERMINISTIC PATH — the answer stands alone.
+        # No relational triples (math answers don't have "X relates to Y" support)
+        # No support-band votes (they're from off-topic lobes by definition)
+        # No hedge/unlinked votes (irrelevant noise for deterministic answers)
+        # No companion alternatives (the answer is correct, no "also leans toward")
+        # The skeleton should NOT include {SUPPORT} — just the claim.
+        skeleton = replace(skeleton, "{SUPPORT}" => "")
+        # Also simplify the skeleton for deterministic answers — remove the
+        # "Thinking it through:" / "Here is the picture:" framing when the
+        # claim is already a complete sentence like "2 plus 2 equals 4".
+        skeleton = replace(skeleton, r"^(Thinking it through: |Here is the picture: |To acknowledge what matters here: |A caution: |A concern worth raising: |Hello — here is what matters: )" => "")
+        support_pieces = String[]
+    else
+        # GRUG v7.21: EXPLORATORY PATH — CLAIM + SUPPORT with lobe-family gate.
+        support_pieces = String[]
 
     # GRUG v7.16.1: Partition unsure_votes into THREE sub-bands using band_of():
     #   :support          -> loud AND linked to primary by relation_score
@@ -2840,18 +2948,18 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # AIML_SUPPORT_RELATION_FLOOR). They have a verified link to the primary
     # via group / attachment / lobe / shared triples / concept class, so
     # their pattern is legitimate supporting content. Cap at 2 claims.
-    # GRUG v7.20: SUPPORT-VOTE TOPICALITY GATE — even confirmed support votes
+    # GRUG v7.21: LOBE-FAMILY GATE — even confirmed support votes
     # from off-topic lobes are suppressed. The relation gate checks link
     # structure, not semantic content. A math-lobe node linked via shared
     # verb "describe" to a nature-lobe node should NOT inject "what is a
-    # sunset" into a math answer. Gate checks each support vote's lobe
-    # topicality against the mission text.
+    # sunset" into a math answer. The new _support_vote_is_coherent() requires BOTH:
+    #   1. Same lobe family as the primary (structural check)
+    #   2. Topicality >= floor (semantic check)
     if !isempty(support_band_votes)
-        # GRUG v7.20: Filter support votes by lobe topicality.
+        # GRUG v7.21: Filter support votes by lobe-family + topicality.
         topical_support = Vote[]
         for sv in support_band_votes
-            sv_topicality = _lobe_topicality_for_vote(sv, mission)
-            if sv_topicality >= _SUPPORT_TOPICALITY_FLOOR
+            if _support_vote_is_coherent(sv, primary_vote, mission)
                 push!(topical_support, sv)
             end
         end
@@ -2947,6 +3055,9 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
+    # GRUG v7.21: Close the else block for exploratory path
+    end  # if _is_deterministic ... else
+
     support = join(support_pieces, "")
 
     # -------------------------------------------------------------------
@@ -3008,15 +3119,25 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # (no bullets, inline) so the reply stays a single paragraph.
     # Directives only surface when they add shaping value — empty list
     # means the reply is its own sole authority.
+    # GRUG v7.21: For deterministic missions, directives are suppressed entirely.
+    # Math answers don't need voice shaping — the answer speaks for itself.
     directive_suffix = ""
-    if !isempty(evaluated_rules)
+    if !_is_deterministic && !isempty(evaluated_rules)
         directive_suffix = " [Directives: " * join(evaluated_rules, "; ") * "]"
+    end
+
+    # GRUG v7.21: For deterministic missions, also suppress lobe_tag and
+    # pinned_citation. These are noise for math answers.
+    if _is_deterministic
+        lobe_tag = ""
+        pinned_citation = ""
     end
 
     # GRUG v7.20: SCAFFOLD COHERENCE PASS — post-hoc filter on the assembled
     # scaffold. Strips sentences containing off-topic lobe content that slipped
     # through the topicality gate and triple filter. This is the safety net.
     conversational_reply_raw = "$voice_prefix$core_reply$pinned_citation$lobe_tag$directive_suffix"
+    @info "[MAIN v7.21] AIML assembly: is_det=$_is_deterministic, skeleton='$(skeleton[1:min(80,length(skeleton))])', claim='$(claim[1:min(80,length(claim))])', support_len=$(length(support)), raw_len=$(length(conversational_reply_raw)), raw='$(conversational_reply_raw[1:min(150,length(conversational_reply_raw))])'"
     conversational_reply = _scaffold_coherence_pass(conversational_reply_raw, mission)
 
     # GRUG: Wait little bit so cpu fire not burn down hut.
@@ -3679,6 +3800,14 @@ function process_mission(mission_text::String)
     if is_multipart
         for cl in clauses
             clause_objective_ids[cl.text] = fresh_objective_id()
+        end
+        # GRUG v7.22: Store clause→objective_id mapping globally so
+        # MultipartOrchestrator._infer_scoped_mission() can do a REVERSE
+        # lookup (objective_id → clause text) instead of guessing from
+        # vote payloads or chunk maps. This is the AUTHORITATIVE source.
+        lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do
+            empty!(_CURRENT_CLAUSE_OBJ_IDS)
+            merge!(_CURRENT_CLAUSE_OBJ_IDS, clause_objective_ids)
         end
     end
 

@@ -1612,6 +1612,94 @@ const BRIDGED_NODE_CONF_WEIGHT = 0.5
 # already carries the answer. Only strongly topical support should appear.
 const _SUPPORT_TOPICALITY_FLOOR = 0.30
 
+# GRUG v7.21: LOBE FAMILY CLUSTERS — structural grouping of lobes into
+# cognitive families. Lobes in the same family share CONTENT DOMAIN, not just
+# graph connectivity. A math answer should NOT cite philosophy content even
+# though lobe_math and lobe_phil are connected — they're about different things.
+# This is the key insight the topicality gate missed: CONNECTION != RELEVANCE.
+const _LOBE_FAMILIES = Dict{String, Set{String}}(
+    "logic"    => Set(["lobe_math", "lobe_science", "lobe_tech"]),
+    "life"     => Set(["lobe_biology", "lobe_nature", "lobe_food", "lobe_surv"]),
+    "mind"     => Set(["lobe_emp", "lobe_social", "lobe_phil", "lobe_crea"]),
+    "temporal" => Set(["lobe_temporal"]),
+    "general"  => Set(["default"]),
+)
+
+# GRUG v7.21: _same_lobe_family() — strict structural check.
+# Two lobes are in the same family if they appear in the same _LOBE_FAMILIES
+# entry. Returns true if they share a family, false otherwise.
+# This replaces the fuzzy topicality gate for support vote filtering because
+# thesaurus expansion creates false overlaps between unrelated lobes.
+function _same_lobe_family(lobe_a::String, lobe_b::String)::Bool
+    if lobe_a == lobe_b
+        return true
+    end
+    for (_, members) in _LOBE_FAMILIES
+        if lobe_a in members && lobe_b in members
+            return true
+        end
+    end
+    return false
+end
+
+# GRUG v7.21: Module-level flag set by the orchestrator (Main.jl) when
+# deterministic math answers are detected for this mission cycle. Read by
+# _mission_has_deterministic_answer() to choose the rendering path.
+const _CURRENT_HAS_DETERMINISTIC_ANSWER = Ref{Bool}(false)
+
+# GRUG v7.21: _mission_has_deterministic_answer() — predicate that detects
+# whether this mission cycle produced a deterministic (computable) answer.
+# When true, the rendering pipeline skips the entire SUPPORT block — the
+# answer stands alone. No relational triples, no support-band votes, no hedge
+# votes. This is the fundamental rethink: deterministic answers don't NEED
+# scaffolding, and scaffolding from off-topic lobes is WORSE than no scaffolding.
+function _mission_has_deterministic_answer(primary_vote)::Bool
+    # Check 1: The orchestrator detected deterministic math answers for this mission.
+    # This is the PRIMARY signal — it's set when SigilMediator finds math bindings
+    # and ArithmeticEngine computes a valid result, BEFORE any stochastic voting.
+    # The primary_vote may NOT be a math vote (e.g., a survival-lobe "flee" node
+    # can win the election even for a math mission), but the deterministic answer
+    # still exists and should be rendered without decoherent support.
+    if _CURRENT_HAS_DETERMINISTIC_ANSWER[]
+        return true
+    end
+    # Check 2: bundle_role === :final means ArithmeticEngine computed an answer
+    if getfield(primary_vote, :bundle_role) === :final
+        return true
+    end
+    # Check 3: primary vote's node is in lobe_math
+    node_id = primary_vote.node_id
+    lobe_id = try Lobe.find_lobe_for_node(node_id) catch nothing end
+    if lobe_id == "lobe_math"
+        return true
+    end
+    return false
+end
+
+# GRUG v7.21: _support_vote_is_coherent() — replacement for the topicality gate.
+# For exploratory (non-deterministic) missions, support votes must pass BOTH:
+#   1. Same lobe family as the primary vote's node (structural check)
+#   2. Topicality >= _SUPPORT_TOPICALITY_FLOOR (semantic check, as before)
+# For deterministic missions, this function is never called — SUPPORT is skipped.
+function _support_vote_is_coherent(support_vote, primary_vote, mission_text::String)::Bool
+    # Find the lobe of the support vote's node
+    sv_lobe = try Lobe.find_lobe_for_node(support_vote.node_id) catch nothing end
+    pv_lobe = try Lobe.find_lobe_for_node(primary_vote.node_id) catch nothing end
+
+    # If either lobe is unknown, fall back to topicality-only gate
+    if sv_lobe === nothing || pv_lobe === nothing
+        return _lobe_topicality_for_vote(support_vote, mission_text) >= _SUPPORT_TOPICALITY_FLOOR
+    end
+
+    # Structural check: must be in the same lobe family
+    if !_same_lobe_family(sv_lobe, pv_lobe)
+        return false
+    end
+
+    # Semantic check: must also pass topicality floor
+    return _lobe_topicality_for_vote(support_vote, mission_text) >= _SUPPORT_TOPICALITY_FLOOR
+end
+
 # GRUG: Telemetry for the scaffold debug block. Populated every scan_and_expand
 # call. Read by Main.jl when it builds the AIML payload.
 const _LAST_MUTED_LOBES    = Ref{Vector{String}}(String[])
