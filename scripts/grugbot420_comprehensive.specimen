@@ -1,154 +1,152 @@
 {
   "last_voters": [],
-  "decomposer_state": {
-    "user_ordering_cues": [
+  "groups": {
+    "groups": [
       {
-        "pattern": "\\bprimarily\\b",
-        "hint": "first"
+        "is_unlinkable": false,
+        "group_id": "group_math_workers",
+        "partner_cap": 13,
+        "member_ids": [
+          "node_6",
+          "node_8",
+          "node_7"
+        ],
+        "grave_count": 0
       },
       {
-        "pattern": "\\bforemost\\b",
-        "hint": "first"
+        "is_unlinkable": false,
+        "group_id": "group_social_pack",
+        "partner_cap": 12,
+        "member_ids": [
+          "node_14",
+          "node_13",
+          "node_12"
+        ],
+        "grave_count": 0
       }
     ],
-    "user_separators": []
+    "group_id_order": [
+      "group_math_workers",
+      "group_social_pack"
+    ],
+    "version": "v7.15",
+    "cursor": 1
+  },
+  "subconscious": {
+    "drop_tables": {},
+    "table": {},
+    "total_entries": 0
   },
   "inhibitions": [
     {
-      "reason": "violent verb",
-      "added_at": 1779913728.66601,
-      "word": "destroy"
+      "reason": "user-banned offensive token",
+      "added_at": 1779987163.806574,
+      "word": "slur2"
     },
     {
-      "reason": "violent verb",
-      "added_at": 1779913728.666193,
-      "word": "kill"
-    },
-    {
-      "reason": "error trigger",
-      "added_at": 1779913728.665632,
-      "word": "crash"
+      "reason": "user-banned offensive token",
+      "added_at": 1779987163.806522,
+      "word": "slur1"
     }
   ],
   "lobes": [
     {
-      "created_at": 1779913726.871938,
+      "created_at": 1779987163.339416,
       "fire_count": 0,
-      "node_cap": 200,
-      "id": "math",
-      "node_ids": [
-        "node_12",
-        "node_13",
-        "node_14",
-        "node_18"
-      ],
-      "connected_lobe_ids": [
-        "science"
-      ],
-      "inhibit_count": 0,
-      "subject": "mathematical concepts"
-    },
-    {
-      "created_at": 1779913726.871611,
-      "fire_count": 0,
-      "node_cap": 200,
-      "id": "philosophy",
+      "node_cap": 20000,
+      "id": "lobe_survival",
       "node_ids": [
         "node_15",
-        "node_16",
-        "node_8",
+        "node_16"
+      ],
+      "connected_lobe_ids": [],
+      "inhibit_count": 0,
+      "subject": "danger, threat, flee, fight, hide"
+    },
+    {
+      "created_at": 1779987163.3394,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "lobe_language",
+      "node_ids": [
+        "node_10",
+        "node_11",
         "node_9"
       ],
       "connected_lobe_ids": [
-        "nature"
+        "lobe_math",
+        "lobe_reasoning",
+        "lobe_social"
       ],
       "inhibit_count": 0,
-      "subject": "philosophical concepts"
+      "subject": "linguistic structure, multipart questions, conjunctions"
     },
     {
-      "created_at": 1779913726.871045,
+      "created_at": 1779987163.339329,
       "fire_count": 0,
-      "node_cap": 200,
-      "id": "science",
+      "node_cap": 20000,
+      "id": "lobe_math",
       "node_ids": [
-        "node_3",
-        "node_4",
-        "node_5"
+        "node_6",
+        "node_7",
+        "node_8"
       ],
       "connected_lobe_ids": [
-        "math",
-        "technology"
+        "lobe_language",
+        "lobe_reasoning"
       ],
       "inhibit_count": 0,
-      "subject": "scientific concepts"
+      "subject": "arithmetic, calculation, quantitative reasoning"
     },
     {
-      "created_at": 1779913726.871446,
+      "created_at": 1779987163.339425,
       "fire_count": 0,
-      "node_cap": 200,
-      "id": "technology",
+      "node_cap": 20000,
+      "id": "lobe_reasoning",
       "node_ids": [
         "node_17",
-        "node_6",
-        "node_7"
+        "node_18",
+        "node_19"
       ],
       "connected_lobe_ids": [
-        "science"
+        "lobe_language",
+        "lobe_math"
       ],
       "inhibit_count": 0,
-      "subject": "technology concepts"
+      "subject": "logical analysis, ponder, deduction, why"
     },
     {
-      "created_at": 1779913726.871784,
+      "created_at": 1779987163.339408,
       "fire_count": 0,
-      "node_cap": 200,
-      "id": "nature",
+      "node_cap": 20000,
+      "id": "lobe_social",
       "node_ids": [
-        "node_10",
-        "node_11"
+        "node_12",
+        "node_13",
+        "node_14"
       ],
       "connected_lobe_ids": [
-        "philosophy"
+        "lobe_language"
       ],
       "inhibit_count": 0,
-      "subject": "natural world concepts"
+      "subject": "greetings, empathy, social cues, comfort"
     }
   ],
   "node_to_lobe_idx": {
-    "node_17": "technology",
-    "node_8": "philosophy",
-    "node_16": "philosophy",
-    "node_18": "math",
-    "node_14": "math",
-    "node_10": "nature",
-    "node_6": "technology",
-    "node_7": "technology",
-    "node_9": "philosophy",
-    "node_15": "philosophy",
-    "node_4": "science",
-    "node_5": "science",
-    "node_13": "math",
-    "node_12": "math",
-    "node_3": "science",
-    "node_11": "nature"
-  },
-  "macro_state": {
-    "user_macros": [
-      {
-        "name": "chitchat",
-        "is_active": true,
-        "trigger_spec": "\\b(?:chitchat|hey|hi grug|sup|wassup|how are you)\\b",
-        "description": "Casual conversational chat \u2014 banter handler",
-        "trigger": "keyword"
-      },
-      {
-        "name": "summarize",
-        "is_active": true,
-        "trigger_spec": "\\b(?:summarize|summary|brief)\\b",
-        "description": "Produces a brief summary frame for the input topic",
-        "trigger": "keyword"
-      }
-    ]
+    "node_17": "lobe_reasoning",
+    "node_8": "lobe_math",
+    "node_16": "lobe_survival",
+    "node_18": "lobe_reasoning",
+    "node_14": "lobe_social",
+    "node_10": "lobe_language",
+    "node_19": "lobe_reasoning",
+    "node_6": "lobe_math",
+    "node_7": "lobe_math",
+    "node_15": "lobe_survival",
+    "node_9": "lobe_language",
+    "node_13": "lobe_social",
+    "node_12": "lobe_social",
+    "node_11": "lobe_language"
   },
   "brainstem": {
     "dispatch_count": 0,
@@ -156,53 +154,115 @@
     "propagation_history": [],
     "last_winner_id": ""
   },
-  "arithmetic_state": {
-    "user_arith_ops": {
-      "kitchen_op": "+",
-      "times_two": "*"
-    }
-  },
   "message_history": [
     {
       "intensity": 1.0,
-      "role": "user",
+      "role": "User",
       "id": 0,
       "pinned": false,
-      "text": "Hello Grug, what do you know about evolution?"
-    },
-    {
-      "intensity": 0.7,
-      "role": "system",
-      "id": 1,
-      "pinned": true,
-      "text": "Evolution shapes species over time. Strong pattern in nature lobe."
+      "text": "this is a comprehensive cave demo"
     },
     {
       "intensity": 1.0,
-      "role": "user",
-      "id": 2,
+      "role": "Engine_Voice",
+      "id": 1,
       "pinned": false,
-      "text": "What is 7 plus 5?"
+      "text": "ready for inspection"
     },
     {
-      "intensity": 0.6,
-      "role": "system",
-      "id": 3,
-      "pinned": false,
-      "text": "P0[ARITH]: 7 + 5 = 12"
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 2,
+      "pinned": true,
+      "text": "all levers should be lit up"
     }
   ],
+  "tonal_buildup": {
+    "tone": "",
+    "buildup": 0.0,
+    "ts": 0.0
+  },
   "id_counters": {
-    "node_id_counter": 19,
-    "msg_id_counter": 4
+    "node_id_counter": 20,
+    "msg_id_counter": 3
+  },
+  "sigils": {
+    "label": "engine-default",
+    "entries": [
+      {
+        "provenance": "engine-default",
+        "name": "conj",
+        "promote_at_tokenize": true,
+        "sigil_type": "",
+        "class": "macro",
+        "lexicon": [
+          "and",
+          "then",
+          "also",
+          "plus",
+          "but",
+          "or"
+        ],
+        "applies_at": "bind"
+      },
+      {
+        "provenance": "user",
+        "name": "emoji",
+        "promote_at_tokenize": false,
+        "sigil_type": "",
+        "class": "tag",
+        "lexicon": null,
+        "applies_at": "bind"
+      },
+      {
+        "provenance": "engine-default",
+        "name": "n",
+        "promote_at_tokenize": true,
+        "sigil_type": "number",
+        "class": "lambda",
+        "lexicon": null,
+        "applies_at": "match"
+      },
+      {
+        "provenance": "engine-default",
+        "name": "noun",
+        "promote_at_tokenize": false,
+        "sigil_type": "",
+        "class": "macro",
+        "lexicon": [],
+        "applies_at": "bind"
+      },
+      {
+        "provenance": "engine-default",
+        "name": "op",
+        "promote_at_tokenize": true,
+        "sigil_type": "op",
+        "class": "lambda",
+        "lexicon": null,
+        "applies_at": "match"
+      },
+      {
+        "provenance": "engine-default",
+        "name": "rest",
+        "promote_at_tokenize": false,
+        "sigil_type": "slurp",
+        "class": "lambda",
+        "lexicon": null,
+        "applies_at": "match"
+      },
+      {
+        "provenance": "engine-default",
+        "name": "word",
+        "promote_at_tokenize": false,
+        "sigil_type": "word",
+        "class": "lambda",
+        "lexicon": null,
+        "applies_at": "match"
+      }
+    ]
   },
   "verb_registry": {
     "classes": {
-      "temporal": [
-        "chasing",
-        "follows",
-        "precedes"
-      ],
       "causal": [
         "causes",
         "contradicts",
@@ -212,12 +272,6 @@
         "reduces",
         "routes"
       ],
-      "biological": [
-        "adapts",
-        "evolves",
-        "grows",
-        "reproduces"
-      ],
       "spatial": [
         "are",
         "connects",
@@ -225,44 +279,26 @@
         "was",
         "were"
       ],
-      "cognitive": [
-        "evaluates",
-        "learns",
-        "remembers",
-        "thinks",
-        "understands"
+      "temporal": [
+        "chasing",
+        "follows",
+        "precedes"
       ]
     },
-    "synonyms": {
-      "studies": "learns",
-      "assess": "evaluates"
-    }
+    "synonyms": {}
+  },
+  "crystalize": {
+    "auto": [
+      "node_16"
+    ],
+    "user": [
+      "node_6"
+    ]
   },
   "hopfield_cache": [],
   "immune_system": {
-    "hopfield": {
-      "16419779072555422234": 3
-    },
-    "ledger": [
-      {
-        "kind": "nonfunky_stored",
-        "signature": "16419779072555422234",
-        "timestamp": 1779913728.554986,
-        "info": null
-      },
-      {
-        "kind": "nonfunky_stored",
-        "signature": "16419779072555422234",
-        "timestamp": 1779913728.554991,
-        "info": null
-      },
-      {
-        "kind": "nonfunky_stored",
-        "signature": "16419779072555422234",
-        "timestamp": 1779913728.554991,
-        "info": null
-      }
-    ]
+    "hopfield": {},
+    "ledger": []
   },
   "thesaurus_seeds": {
     "build": [
@@ -474,11 +510,6 @@
       "strategy",
       "thought"
     ],
-    "figure": [
-      "calculate",
-      "compute",
-      "reckon"
-    ],
     "search": [
       "explore",
       "find",
@@ -513,10 +544,12 @@
       "stop",
       "terminate"
     ],
-    "atomic": [
-      "fundamental",
-      "particle",
-      "subatomic"
+    "tranquil": [
+      "calm",
+      "composed",
+      "peaceful",
+      "relaxed",
+      "serene"
     ],
     "dispatch": [
       "forward",
@@ -547,24 +580,12 @@
       "help",
       "serve"
     ],
-    "tranquil": [
-      "calm",
-      "composed",
-      "peaceful",
-      "relaxed",
-      "serene"
-    ],
     "chilly": [
       "cold",
       "cool",
       "freezing",
       "frigid",
       "icy"
-    ],
-    "particle": [
-      "atomic",
-      "fundamental",
-      "subatomic"
     ],
     "shift": [
       "migrate",
@@ -898,7 +919,6 @@
       "just",
       "moral",
       "principled",
-      "right",
       "righteous"
     ],
     "ponder": [
@@ -1128,11 +1148,6 @@
       "simple",
       "trivial"
     ],
-    "devices": [
-      "computers",
-      "machines",
-      "robots"
-    ],
     "delicate": [
       "feeble",
       "fragile",
@@ -1333,7 +1348,6 @@
       "just",
       "moral",
       "principled",
-      "right",
       "righteous",
       "virtuous"
     ],
@@ -1491,11 +1505,6 @@
       "inference",
       "rationale",
       "reasoning"
-    ],
-    "fundamental": [
-      "atomic",
-      "particle",
-      "subatomic"
     ],
     "shatter": [
       "break",
@@ -2171,11 +2180,6 @@
       "study",
       "train"
     ],
-    "right": [
-      "ethical",
-      "moral",
-      "virtuous"
-    ],
     "hasty": [
       "brisk",
       "fast",
@@ -2392,11 +2396,6 @@
       "nervous",
       "scared",
       "worried"
-    ],
-    "reckon": [
-      "calculate",
-      "compute",
-      "figure"
     ],
     "arduous": [
       "challenging",
@@ -2923,11 +2922,6 @@
       "stunned",
       "surprised"
     ],
-    "robots": [
-      "computers",
-      "devices",
-      "machines"
-    ],
     "fatigued": [
       "drained",
       "exhausted",
@@ -3145,13 +3139,10 @@
     ],
     "calculate": [
       "assess",
-      "compute",
       "evaluate",
-      "figure",
       "gauge",
       "measure",
-      "quantify",
-      "reckon"
+      "quantify"
     ],
     "water": [
       "beverage",
@@ -3284,11 +3275,6 @@
       "truth",
       "validity",
       "verity"
-    ],
-    "machines": [
-      "computers",
-      "devices",
-      "robots"
     ],
     "knowledge": [
       "awareness",
@@ -3443,11 +3429,6 @@
       "car",
       "ride",
       "vehicle"
-    ],
-    "compute": [
-      "calculate",
-      "figure",
-      "reckon"
     ],
     "request": [
       "input",
@@ -3627,11 +3608,6 @@
       "logic",
       "rationale",
       "reasoning"
-    ],
-    "subatomic": [
-      "atomic",
-      "fundamental",
-      "particle"
     ],
     "confused": [
       "baffled",
@@ -4008,7 +3984,6 @@
       "ethical",
       "just",
       "principled",
-      "right",
       "righteous",
       "virtuous"
     ],
@@ -4026,11 +4001,6 @@
       "examine",
       "test",
       "verify"
-    ],
-    "computers": [
-      "devices",
-      "machines",
-      "robots"
     ],
     "flaw": [
       "bug",
@@ -4207,40 +4177,18 @@
   "aiml_system": {
     "cycle": 0,
     "registry": {
-      "science": [
-        {
-          "is_grave": false,
-          "fired_this_cycle": false,
-          "created_at": 1779913728.262567,
-          "strength_delta_this_cycle": 0.0,
-          "grave_reason": "",
-          "gained_this_cycle": false,
-          "template": "When asked about quantum, mention superposition",
-          "id": "ks_aiml_sci_1",
-          "voted_this_cycle": false,
-          "lobe_id": "science",
-          "strength": 5.016980148610822
-        }
-      ],
-      "technology": [
-        {
-          "is_grave": false,
-          "fired_this_cycle": false,
-          "created_at": 1779913728.26283,
-          "strength_delta_this_cycle": 0.0,
-          "grave_reason": "",
-          "gained_this_cycle": false,
-          "template": "When asked about AI, mention machine learning",
-          "id": "ks_aiml_tech_1",
-          "voted_this_cycle": false,
-          "lobe_id": "technology",
-          "strength": 4.956370630924172
-        }
-      ]
+      "lobe_survival": [],
+      "lobe_language": [],
+      "lobe_math": [],
+      "lobe_reasoning": [],
+      "lobe_social": []
     },
     "population_caps": {
-      "science": 66,
-      "technology": 66
+      "lobe_survival": 6666,
+      "lobe_language": 6666,
+      "lobe_math": 6666,
+      "lobe_reasoning": 6666,
+      "lobe_social": 6666
     }
   },
   "eye_state": {
@@ -4250,6 +4198,13 @@
     "last_centroid_y": 0.5,
     "blur_enabled": true
   },
+  "concept_inhibitions": [
+    {
+      "reason": "danger words flagged for survival lobe priority",
+      "added_at": 1779987164.042824,
+      "word": "danger"
+    }
+  ],
   "trajectory": {
     "config": {
       "decay_halflife": 120.0,
@@ -4260,8 +4215,10 @@
     },
     "buffer": []
   },
-  "stepvote_state": {
-    "step_vote_history": []
+  "_meta": {
+    "format": "grugbot420-specimen-v2.6",
+    "saved_at": 1779987165.900946,
+    "version": "2.6"
   },
   "nodes": [
     {
@@ -4269,34 +4226,26 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.6317350523056456,
-        0.8984788402754097,
-        0.02461519855483381,
-        0.270044582124484,
-        0.22273282148512463,
-        0.2710033610994111
+        0.39300060174861406,
+        0.6076281576512098,
+        0.2917105200306603,
+        0.8217228838730369
       ],
-      "hopfield_key": "491454771448783350",
+      "hopfield_key": "1716457017941752251",
       "relational_patterns": [],
       "json_data": {
-        "domain": "linguistic_macros",
-        "required_relations": [
-          "MACRO"
-        ],
-        "system_prompt": "Compression specialist active. Surface the core point in one or two short lines."
+        "system_prompt": "Cold logical analysis engine."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.139218,
-      "pattern": "Compressed summaries surface the core point",
-      "action_packet": "describe^3 | clarify^2 | explain^1",
+      "ledger_last_cleared": 1779987163.441831,
+      "pattern": "think ponder consider reflect",
+      "action_packet": "ponder^4 | reason^3 | analyze^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_17",
-      "required_relations": [
-        "MACRO"
-      ],
+      "required_relations": [],
       "relation_weights": {},
-      "strength": 7.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4305,27 +4254,25 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.7542852677886897,
-        0.29729590504215314,
-        0.07722114698374277,
-        0.17801602728266303
+        0.3661365769870197,
+        0.22303246761640322,
+        0.764294072226708
       ],
-      "hopfield_key": "14914651646851468107",
+      "hopfield_key": "14381577166818054428",
       "relational_patterns": [],
       "json_data": {
-        "domain": "ethics",
-        "system_prompt": "Ethical reasoning engine active. Speak of moral principles."
+        "system_prompt": "Quantitative reasoning over rewritten arithmetic forms."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.134141,
-      "pattern": "Ethics evaluates moral principles",
-      "action_packet": "analyze^3 | reason^2 | explain^1",
+      "ledger_last_cleared": 1779987163.425589,
+      "pattern": "compute solve evaluate",
+      "action_packet": "calculate^5 | reason^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_8",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 6.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4334,33 +4281,40 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.7900580784267015,
-        0.35391010921780197,
-        0.16489299807025148,
-        0.12971025582246878,
-        0.6038269091796251
+        0.2630790683754012,
+        0.9954395636173206,
+        0.8069211820079454,
+        0.1832548755836335
       ],
-      "hopfield_key": "13240700215579230557",
+      "hopfield_key": "10610871377390247989",
       "relational_patterns": [],
       "json_data": {
-        "domain": "linguistic_macros",
         "required_relations": [
-          "MACRO"
+          "threatens",
+          "attacks"
         ],
-        "system_prompt": "Plain-language specialist active. Explain in five-year-old terms, no jargon."
+        "relation_weights": {
+          "threatens": 2.5,
+          "attacks": 3.0
+        },
+        "system_prompt": "Threat detection and avoidance."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.138801,
-      "pattern": "Simple explanations make ideas reachable",
-      "action_packet": "explain^3 | clarify^2 | describe^1",
+      "ledger_last_cleared": 1779987163.441531,
+      "pattern": "fire smoke burn flame",
+      "action_packet": "alert^4 | warn^3 | flee^2 | hide^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_16",
       "required_relations": [
-        "MACRO"
+        "threatens",
+        "attacks"
       ],
-      "relation_weights": {},
-      "strength": 7.5,
+      "relation_weights": {
+        "threatens": 2.5,
+        "attacks": 3.0
+      },
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4369,37 +4323,26 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.6796163735637705,
-        0.2579493773833401,
-        0.46853499878563926,
-        0.8443746326682188,
-        0.7455326037831004,
-        0.4288492819892387,
-        0.6444426068024517,
-        0.5061009963810958,
-        0.8471127951028339
+        0.6801946990833176,
+        0.17541913429148662,
+        0.0064791049093678955,
+        0.7319542445913096
       ],
-      "hopfield_key": "787259766480674879",
+      "hopfield_key": "14380452338436154002",
       "relational_patterns": [],
       "json_data": {
-        "domain": "linguistic_macros",
-        "required_relations": [
-          "MACRO"
-        ],
-        "system_prompt": "Ranking specialist active. Speak in numbered priority order."
+        "system_prompt": "Cold logical analysis engine."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.139625,
-      "pattern": "Priority ordering ranks tasks from most to least important",
-      "action_packet": "analyze^3 | reason^2 | explain^1",
+      "ledger_last_cleared": 1779987163.441935,
+      "pattern": "because therefore thus hence",
+      "action_packet": "reason^5 | analyze^3 | explain^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_18",
-      "required_relations": [
-        "MACRO"
-      ],
+      "required_relations": [],
       "relation_weights": {},
-      "strength": 7.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4408,61 +4351,55 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.33004371740938565,
-        0.3485988089023593,
-        0.2625115000240728,
-        0.28657804682023813,
-        0.6534985551924974
+        0.061817323197105506,
+        0.6545387034185333,
+        0.4494252468470738,
+        0.13429678794985114
       ],
-      "hopfield_key": "1525318088444592664",
+      "hopfield_key": "14390196872476905426",
       "relational_patterns": [],
       "json_data": {
-        "domain": "math",
-        "system_prompt": "Calculus reasoning active. Speak of change and accumulation.",
-        "advanced": true
+        "system_prompt": "Polite greeting + empathic response protocols."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.136596,
-      "pattern": "Calculus studies change and accumulation",
-      "action_packet": "analyze^3 | calculate^3 | reason^1",
+      "ledger_last_cleared": 1779987163.427708,
+      "pattern": "sad upset hurt lonely",
+      "action_packet": "comfort^4 | support^3 | reassure^2 | acknowledge^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_14",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 7.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
     {
       "is_grave": false,
       "grave_reason": "",
-      "drop_table": [
-        "predation",
-        "symbiosis"
-      ],
+      "drop_table": [],
       "signal": [
-        0.6394689202472421,
-        0.7917773333869296,
-        0.5765006764737671,
-        0.2728954626393727
+        0.05287938128290659,
+        0.8241196045800286,
+        0.039302679957900065,
+        0.3375271236736579,
+        0.18203741400575096
       ],
-      "hopfield_key": "6150398194895352401",
+      "hopfield_key": "18388982737436989142",
       "relational_patterns": [],
       "json_data": {
-        "domain": "ecology",
-        "system_prompt": "Ecological reasoning active. Speak of natural communities."
+        "system_prompt": "Linguistic structure analysis and multi-clause handling."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.134998,
-      "pattern": "Ecosystems balance biological communities",
-      "action_packet": "analyze^2 | describe^1",
+      "ledger_last_cleared": 1779987163.427091,
+      "pattern": "tell me about describe explain",
+      "action_packet": "explain^4 | describe^3 | elaborate^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_10",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 6.5,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4471,31 +4408,56 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.6693380649116244,
-        0.7503690231918662,
-        0.26146548890082827,
-        0.8572306375684925,
-        0.7148794277557055
+        0.42653415935972083,
+        0.20678737433141658,
+        0.10346414585323535,
+        0.7709552835406743
       ],
-      "hopfield_key": "10050161365093380336",
+      "hopfield_key": "9056647945547394423",
       "relational_patterns": [],
       "json_data": {
-        "domain": "cs",
-        "system_prompt": "Technology analysis engine active. Speak of AI and machine learning.",
-        "ai": true
+        "system_prompt": "Cold logical analysis engine."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913726.978187,
-      "pattern": "Artificial intelligence enables machine learning",
-      "action_packet": "reason^3 | analyze^2 | calculate^1",
+      "ledger_last_cleared": 1779987163.442037,
+      "pattern": "why does happens occurs",
+      "action_packet": "explain^4 | reason^3 | clarify^2",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_19",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "@nojitter"
+      ],
+      "signal": [
+        0.8450176814683094,
+        0.5335757677119597,
+        0.5895174330733833,
+        0.1721238593374584
+      ],
+      "hopfield_key": "4634675968235678278",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Quantitative reasoning over rewritten arithmetic forms."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1779987163.425205,
+      "pattern": "count number sum total",
+      "action_packet": "calculate^4 | reason^2 | analyze^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_6",
-      "required_relations": [
-        "NONJITTER"
-      ],
+      "required_relations": [],
       "relation_weights": {},
-      "strength": 10.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4504,128 +4466,55 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.6070503905042346,
-        0.26761096331710593,
-        0.6094735164651548,
-        0.8443746326682188
+        0.48207270717087597,
+        0.9211802559446176,
+        0.8684013928973586,
+        0.7580355999521201
       ],
-      "hopfield_key": "6536722053517761002",
+      "hopfield_key": "844135452097795871",
       "relational_patterns": [],
       "json_data": {
-        "domain": "engineering",
-        "system_prompt": "Engineering reasoning active. Speak of robotics and automation."
+        "system_prompt": "Quantitative reasoning over rewritten arithmetic forms."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913726.978775,
-      "pattern": "Robots perform automated tasks",
-      "action_packet": "describe^2 | clarify^1",
+      "ledger_last_cleared": 1779987163.425479,
+      "pattern": "how many quantity amount",
+      "action_packet": "calculate^3 | analyze^2 | ponder^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_7",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 6.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
     {
       "is_grave": false,
       "grave_reason": "",
-      "drop_table": [
-        "existence",
-        "being",
-        "consciousness"
-      ],
+      "drop_table": [],
       "signal": [
-        0.8367914377236787,
-        0.3485988089023593,
-        0.4895734386123916,
         0.28657804682023813,
-        0.5466980355380241
+        0.3426420465389125,
+        0.18925660286519216,
+        0.10744450967460137,
+        0.5597640521878113
       ],
-      "hopfield_key": "4257570970188313899",
+      "hopfield_key": "18394358749350218414",
       "relational_patterns": [],
       "json_data": {
-        "domain": "metaphysics",
-        "system_prompt": "Metaphysical contemplation active. Speak of existence and reality."
+        "system_prompt": "Linguistic structure analysis and multi-clause handling."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.134595,
-      "pattern": "Metaphysics studies reality and existence",
-      "action_packet": "ponder^2 | reason^1",
+      "ledger_last_cleared": 1779987163.426971,
+      "pattern": "and then also moreover furthermore",
+      "action_packet": "explain^3 | clarify^2 | elaborate^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_9",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 5.0,
-      "response_times": [],
-      "throttle": 0.5
-    },
-    {
-      "is_grave": false,
-      "grave_reason": "",
-      "drop_table": [],
-      "signal": [
-        0.41203504348378434,
-        0.32361022035777787,
-        0.3509791251675664,
-        0.4791610144940713,
-        0.4676337984196692,
-        0.3212000924307844
-      ],
-      "hopfield_key": "4184495094600283040",
-      "relational_patterns": [],
-      "json_data": {
-        "domain": "linguistic_macros",
-        "required_relations": [
-          "MACRO"
-        ],
-        "system_prompt": "Decomposition specialist active. Break the request into numbered sub-answers, address each in order."
-      },
-      "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.138373,
-      "pattern": "Multi-part questions break into ordered sub-answers",
-      "action_packet": "explain^3 | analyze^2 | describe^1",
-      "is_unlinkable": false,
-      "is_image_node": false,
-      "id": "node_15",
-      "required_relations": [
-        "MACRO"
-      ],
-      "relation_weights": {},
-      "strength": 7.0,
-      "response_times": [],
-      "throttle": 0.5
-    },
-    {
-      "is_grave": false,
-      "grave_reason": "",
-      "drop_table": [],
-      "signal": [
-        0.3487210344130218,
-        0.5163419369578167,
-        0.513660146208926,
-        0.278005754447573,
-        0.8517731830556378,
-        0.2528158163642796
-      ],
-      "hopfield_key": "15087102319773784795",
-      "relational_patterns": [],
-      "json_data": {
-        "domain": "biology",
-        "system_prompt": "Biological reasoning engine active. Speak of cells, genes, and life."
-      },
-      "neighbor_ids": [],
-      "ledger_last_cleared": 1779913726.973924,
-      "pattern": "DNA stores genetic information in cells",
-      "action_packet": "explain^3 | describe^2",
-      "is_unlinkable": false,
-      "is_image_node": false,
-      "id": "node_4",
-      "required_relations": [],
-      "relation_weights": {},
-      "strength": 6.5,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4633,32 +4522,103 @@
       "is_grave": false,
       "grave_reason": "",
       "drop_table": [
-        "oxidation",
-        "reduction",
-        "synthesis"
+        "@nojitter"
       ],
       "signal": [
-        0.3413319496494993,
-        0.12508848635221864,
-        0.2654993104111583,
-        0.7150085489396643
+        0.4782986480661268,
+        0.3856563879810444,
+        0.8484905304779444,
+        0.7023016642895399
       ],
-      "hopfield_key": "3314592654284291926",
+      "hopfield_key": "6969890787465714110",
       "relational_patterns": [],
       "json_data": {
-        "domain": "chemistry",
-        "system_prompt": "Chemical analysis engine active. Speak of reactions and substances."
+        "required_relations": [
+          "threatens",
+          "attacks"
+        ],
+        "relation_weights": {
+          "threatens": 2.5,
+          "attacks": 3.0
+        },
+        "system_prompt": "Threat detection and avoidance."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913726.974386,
-      "pattern": "Chemical reactions transform substances",
-      "action_packet": "explain^2 | describe^1",
+      "ledger_last_cleared": 1779987163.441407,
+      "pattern": "danger threat attack hostile",
+      "action_packet": "alert^5 | warn^4 | flee^3",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_15",
+      "required_relations": [
+        "threatens",
+        "attacks"
+      ],
+      "relation_weights": {
+        "threatens": 2.5,
+        "attacks": 3.0
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "@sigil:math"
+      ],
+      "signal": [
+        0.4537671081806071,
+        0.501520212580718,
+        0.4537671081806071,
+        0.501520212580718,
+        0.4537671081806071
+      ],
+      "hopfield_key": "11471408304941372980",
+      "relational_patterns": [],
+      "json_data": {
+        "sigil_kind": "math",
+        "system_prompt": "Arithmetic reasoning voice"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1779987162.634578,
+      "pattern": "&n &op &n &op &n",
+      "action_packet": "calculate^4 | reason^2 | ponder^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_4",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "@sigil:multipart"
+      ],
+      "signal": [
+        0.18459927418832792
+      ],
+      "hopfield_key": "3405255567144622348",
+      "relational_patterns": [],
+      "json_data": {
+        "sigil_kind": "multipart",
+        "system_prompt": "Multi-clause reasoning voice"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1779987162.63459,
+      "pattern": "&conj",
+      "action_packet": "explain^4 | describe^2 | elaborate^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_5",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 5.5,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4667,29 +4627,26 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.47881472105317013,
-        0.8333000759639708,
-        0.5920878860901657,
-        0.4935952135776989,
-        0.6511745080594985,
-        0.2657707349421765
+        0.05618551477273276,
+        0.7241811952305277,
+        0.48085363163988937,
+        0.7317532955901055
       ],
-      "hopfield_key": "14081845314493228400",
+      "hopfield_key": "10361025983302388088",
       "relational_patterns": [],
       "json_data": {
-        "domain": "math",
-        "system_prompt": "Algebraic reasoning active. Speak of symbols and equations."
+        "system_prompt": "Polite greeting + empathic response protocols."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.136211,
-      "pattern": "Algebra uses symbols for unknown quantities",
-      "action_packet": "reason^3 | analyze^2",
+      "ledger_last_cleared": 1779987163.427606,
+      "pattern": "thank thanks appreciate grateful",
+      "action_packet": "smile^4 | acknowledge^3 | welcome^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_13",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 6.5,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4698,60 +4655,57 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.09894166751096639,
-        0.038577899016860796,
-        0.3546973803747502,
-        0.5388809457030667
+        0.9504661807338175,
+        0.6340081581416029,
+        0.48697554618588756,
+        0.13621135481561894,
+        0.2434394111976199
       ],
-      "hopfield_key": "10287267471604807864",
+      "hopfield_key": "8199975307254161166",
       "relational_patterns": [],
       "json_data": {
-        "fundamental": true,
-        "domain": "math",
-        "system_prompt": "Mathematical reasoning active. Speak of arithmetic and numbers."
+        "system_prompt": "Polite greeting + empathic response protocols."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.135831,
-      "pattern": "Arithmetic operates on numbers",
-      "action_packet": "calculate^3 | reason^2 | analyze^2",
+      "ledger_last_cleared": 1779987163.427503,
+      "pattern": "hello hi hey greetings howdy",
+      "action_packet": "greet[dont frown, dont insult]^4 | welcome^3 | smile^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_12",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 7.5,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
     {
       "is_grave": false,
       "grave_reason": "",
-      "drop_table": [],
-      "signal": [
-        0.16777534319394877,
-        0.8954056976307266,
-        0.3485988089023593,
-        0.4311732341434618,
-        0.4677029823034656,
-        0.6813552890727671
+      "drop_table": [
+        "@sigil:math"
       ],
-      "hopfield_key": "14690442470167664614",
+      "signal": [
+        0.4537671081806071,
+        0.501520212580718,
+        0.4537671081806071
+      ],
+      "hopfield_key": "8886154503675330167",
       "relational_patterns": [],
       "json_data": {
-        "complexity": "high",
-        "domain": "physics",
-        "system_prompt": "Cold logical analysis engine active. Speak of subatomic particles and quantum behavior."
+        "sigil_kind": "math",
+        "system_prompt": "Arithmetic reasoning voice"
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913726.901763,
-      "pattern": "Quantum mechanics studies subatomic particle behavior",
-      "action_packet": "explain^3 | analyze^2 | describe^1",
+      "ledger_last_cleared": 1779987162.634526,
+      "pattern": "&n &op &n",
+      "action_packet": "calculate^4 | reason^2 | analyze^1",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_3",
       "required_relations": [],
       "relation_weights": {},
-      "strength": 7.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     },
@@ -4760,97 +4714,397 @@
       "grave_reason": "",
       "drop_table": [],
       "signal": [
-        0.46954871841266227,
-        8.183462516952474e-05,
-        0.8054110328611128,
-        0.9307381470293437,
-        0.9930006389918524
+        0.2962847292026762,
+        0.42653415935972083,
+        0.48207270717087597,
+        0.0026927919191594373,
+        0.4009308005454768
       ],
-      "hopfield_key": "16892233236455140238",
+      "hopfield_key": "10839906493043621053",
       "relational_patterns": [],
       "json_data": {
-        "theory": true,
-        "domain": "biology",
-        "system_prompt": "Evolutionary reasoning active. Speak of species and natural selection."
+        "system_prompt": "Linguistic structure analysis and multi-clause handling."
       },
       "neighbor_ids": [],
-      "ledger_last_cleared": 1779913727.135423,
-      "pattern": "Evolution shapes species over time",
-      "action_packet": "explain^3 | describe^2",
+      "ledger_last_cleared": 1779987163.427231,
+      "pattern": "what why how when where",
+      "action_packet": "explain^3 | clarify^3 | analyze^2",
       "is_unlinkable": false,
       "is_image_node": false,
       "id": "node_11",
-      "required_relations": [
-        "NONJITTER"
-      ],
+      "required_relations": [],
       "relation_weights": {},
-      "strength": 10.0,
+      "strength": 1.0,
       "response_times": [],
       "throttle": 0.5
     }
   ],
-  "_meta": {
-    "format": "grugbot420-specimen-v2.5",
-    "saved_at": 1779913729.860719,
-    "version": "2.5"
-  },
   "arousal": {
     "decay_rate": 0.05,
     "baseline": 0.3,
-    "level": 0.65
+    "level": 0.55
   },
-  "lobe_tables": [],
+  "lobe_tables": [
+    {
+      "created_at": 1779987163.339419,
+      "lobe_id": "lobe_survival",
+      "chunks": {
+        "nodes": {
+          "node_16": {
+            "is_active": true,
+            "node_id": "node_16",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_survival",
+            "inserted_at": 1779987163.441533
+          },
+          "node_15": {
+            "is_active": true,
+            "node_id": "node_15",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_survival",
+            "inserted_at": 1779987163.441413
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1779987163.339403,
+      "lobe_id": "lobe_language",
+      "chunks": {
+        "nodes": {
+          "node_9": {
+            "is_active": true,
+            "node_id": "node_9",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_language",
+            "inserted_at": 1779987163.426976
+          },
+          "node_11": {
+            "is_active": true,
+            "node_id": "node_11",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_language",
+            "inserted_at": 1779987163.427232
+          },
+          "node_10": {
+            "is_active": true,
+            "node_id": "node_10",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_language",
+            "inserted_at": 1779987163.427095
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1779987163.33934,
+      "lobe_id": "lobe_math",
+      "chunks": {
+        "nodes": {
+          "node_6": {
+            "is_active": true,
+            "node_id": "node_6",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_math",
+            "inserted_at": 1779987163.425215
+          },
+          "node_8": {
+            "is_active": true,
+            "node_id": "node_8",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_math",
+            "inserted_at": 1779987163.42559
+          },
+          "node_7": {
+            "is_active": true,
+            "node_id": "node_7",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_math",
+            "inserted_at": 1779987163.42548
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1779987163.339427,
+      "lobe_id": "lobe_reasoning",
+      "chunks": {
+        "nodes": {
+          "node_18": {
+            "is_active": true,
+            "node_id": "node_18",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_reasoning",
+            "inserted_at": 1779987163.441935
+          },
+          "node_17": {
+            "is_active": true,
+            "node_id": "node_17",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_reasoning",
+            "inserted_at": 1779987163.441833
+          },
+          "node_19": {
+            "is_active": true,
+            "node_id": "node_19",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_reasoning",
+            "inserted_at": 1779987163.442038
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1779987163.339412,
+      "lobe_id": "lobe_social",
+      "chunks": {
+        "nodes": {
+          "node_14": {
+            "is_active": true,
+            "node_id": "node_14",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_social",
+            "inserted_at": 1779987163.427709
+          },
+          "node_13": {
+            "is_active": true,
+            "node_id": "node_13",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_social",
+            "inserted_at": 1779987163.427607
+          },
+          "node_12": {
+            "is_active": true,
+            "node_id": "node_12",
+            "_type": "NodeRef",
+            "lobe_id": "lobe_social",
+            "inserted_at": 1779987163.427504
+          }
+        },
+        "drop": {},
+        "json": {},
+        "meta": {},
+        "hopfield": {}
+      }
+    }
+  ],
   "temporal_coherence": [],
+  "concept_classes": {
+    "destruction": [
+      "break",
+      "demolish",
+      "destroy",
+      "dismantle",
+      "obliterate",
+      "ruin",
+      "shatter",
+      "wreck"
+    ],
+    "creation": [
+      "build",
+      "construct",
+      "craft",
+      "create",
+      "forge",
+      "generate",
+      "make",
+      "produce"
+    ],
+    "math_words": [
+      "divided",
+      "equals",
+      "minus",
+      "plus",
+      "times"
+    ],
+    "greeting_words": [
+      "greetings",
+      "hello",
+      "hey",
+      "hi",
+      "howdy"
+    ],
+    "assistance": [
+      "aid",
+      "assist",
+      "back",
+      "bolster",
+      "facilitate",
+      "guide",
+      "help",
+      "support"
+    ],
+    "refusal": [
+      "decline",
+      "deny",
+      "dismiss",
+      "refuse",
+      "reject",
+      "repudiate",
+      "veto"
+    ],
+    "comfort_words": [
+      "alright",
+      "here",
+      "okay",
+      "sorry",
+      "understand"
+    ],
+    "agreement": [
+      "accept",
+      "affirm",
+      "agree",
+      "concur",
+      "confirm",
+      "consent",
+      "endorse",
+      "validate"
+    ],
+    "emotion_negative": [
+      "afraid",
+      "angry",
+      "anguished",
+      "distressed",
+      "sad",
+      "troubled",
+      "upset"
+    ],
+    "understanding": [
+      "apprehend",
+      "comprehend",
+      "grasp",
+      "know",
+      "perceive",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "change": [
+      "adapt",
+      "adjust",
+      "alter",
+      "change",
+      "convert",
+      "modify",
+      "shift",
+      "transform"
+    ],
+    "investigation": [
+      "analyze",
+      "examine",
+      "explore",
+      "inspect",
+      "investigate",
+      "research",
+      "scrutinize",
+      "study"
+    ],
+    "question_words": [
+      "how",
+      "what",
+      "when",
+      "where",
+      "who",
+      "why"
+    ],
+    "danger": [
+      "danger",
+      "hazard",
+      "jeopardy",
+      "menace",
+      "peril",
+      "risk",
+      "threat"
+    ],
+    "communication": [
+      "articulate",
+      "communicate",
+      "convey",
+      "declare",
+      "express",
+      "say",
+      "speak",
+      "state",
+      "tell"
+    ],
+    "emotion_positive": [
+      "cheerful",
+      "content",
+      "delighted",
+      "glad",
+      "happy",
+      "joy",
+      "pleased",
+      "satisfied"
+    ],
+    "inquiry": [
+      "ask",
+      "inquire",
+      "interrogate",
+      "investigate",
+      "probe",
+      "query",
+      "question",
+      "seek",
+      "wonder"
+    ]
+  },
+  "chatter_swap_cooldowns": {},
   "morph_cooldowns": {},
   "attachments": [
     {
-      "pattern": "AI enables robotics",
-      "base_confidence": 0.5428571428571429,
-      "target_id": "node_7",
+      "pattern": "compute solve evaluate",
+      "base_confidence": 0.05,
+      "target_id": "node_6",
       "signal": [
-        0.4520990597444838,
-        0.26146548890082827,
-        0.8930535407123269
+        0.3661365769870197,
+        0.22303246761640322,
+        0.764294072226708
       ],
-      "node_id": "node_6"
+      "node_id": "node_18"
+    },
+    {
+      "pattern": "and then also moreover furthermore",
+      "base_confidence": 0.05,
+      "target_id": "node_11",
+      "signal": [
+        0.28657804682023813,
+        0.3426420465389125,
+        0.18925660286519216,
+        0.10744450967460137,
+        0.5597640521878113
+      ],
+      "node_id": "node_17"
     }
   ],
   "rules": [
     {
-      "text": "What is quantum mechanics",
-      "prob": 0.9
+      "text": "[empathy] If sad/hurt cues are present, lead with comfort and acknowledge.",
+      "prob": 1.0
     },
     {
-      "text": "Explain DNA",
-      "prob": 0.85
+      "text": "[reasoning] When asked 'why' or 'how', open with reasoning then explanation.",
+      "prob": 1.0
     },
     {
-      "text": "How does AI work",
-      "prob": 0.88
-    },
-    {
-      "text": "What is ethics",
-      "prob": 0.82
-    },
-    {
-      "text": "Tell me about ecosystems",
-      "prob": 0.87
-    },
-    {
-      "text": "Describe evolution",
-      "prob": 0.86
-    },
-    {
-      "text": "How does arithmetic work",
-      "prob": 0.9
-    },
-    {
-      "text": "What is algebra",
-      "prob": 0.85
-    },
-    {
-      "text": "Calculus is hard",
-      "prob": 0.7
+      "text": "[math] When computing, state the steps before the final answer.",
+      "prob": 1.0
     }
   ]
 }
