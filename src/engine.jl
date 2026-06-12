@@ -3827,8 +3827,8 @@ end
 # POSITIVE  → fire normally (1.0x confidence, normal computation)
 #   - Query, command, assert, escalate — clear intent to compute/act
 #
-# Only :math and :doaction sigil kinds are polarity-gated. :multipart and other
-# kinds are NOT gated (negation doesn't prevent clause-splitting).
+# Only :none (non-sigil nodes) always returns POSITIVE. All sigil kinds
+# (:math, :multipart, :doaction, :instruction) are polarity-gated.
 #
 # The gate reads from _CURRENT_PREDICTION (set before the scan fires).
 # If no prediction exists (e.g. image input, or ATP failed), the gate is POSITIVE.
@@ -3843,13 +3843,17 @@ end
 
 Return the context polarity level for this sigil kind, based on the current
 mission's ATP prediction. POSITIVE = fire normally, NEUTRAL = attenuate,
-NEGATIVE = suppress. Non-gated kinds (:multipart, :instruction, :none) always
-return POSITIVE.
+NEGATIVE = suppress. All sigil kinds (:math, :multipart, :doaction, :instruction)
+are polarity-gated. Only :none (non-sigil nodes) always returns POSITIVE.
 """
 function _context_polarity_for(kind::Symbol)
-    # GRUG: Only :math and :doaction are polarity-gated. :multipart and
-    # :instruction have different semantics — negation doesn't prevent clause detection.
-    if kind !== :math && kind !== :doaction
+    # GRUG v7.33: ALL sigil kinds are polarity-gated. "don't calculate 2+2
+    # and 3*4" should suppress the multipart bundle just like the singleton
+    # math vote. ATP already captures the full-input polarity — every sigil
+    # kind reads the same prediction. :instruction (reserved, not yet wired)
+    # also gates — when it's implemented, "don't instruct X" should suppress.
+    # The only kind that always returns POSITIVE is :none (non-sigil nodes).
+    if kind === :none
         return ActionTonePredictor.POLARITY_POSITIVE
     end
 
@@ -4008,7 +4012,7 @@ function cast_sigil_votes(
     #   NEGATIVE  → suppress (0.3x, no computation, :suppressed bundle_role)
     #   NEUTRAL   → attenuate (0.7x, computation happens, :attenuated bundle_role)
     #   POSITIVE  → fire normally (1.0x, normal computation)
-    # Only :math and :doaction are polarity-gated; :multipart/:instruction pass through.
+    # All sigil kinds are polarity-gated; only :none passes through as POSITIVE.
     _polarity = _context_polarity_for(kind)
 
     if _polarity === ActionTonePredictor.POLARITY_NEGATIVE

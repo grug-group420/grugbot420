@@ -73,9 +73,10 @@ using GrugBot420.SemanticVerbs
         GrugBot420._CURRENT_PREDICTION[] = pred
         @test GrugBot420._context_polarity_for(:math) === POLARITY_NEGATIVE
         @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEGATIVE
-        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
-        @test GrugBot420._context_polarity_for(:instruction) === POLARITY_POSITIVE
-        @info "[TEST] ✅ Figurative dismiss → NEGATIVE for :math/:doaction, POSITIVE for :multipart/:instruction"
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:instruction) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:none) === POLARITY_POSITIVE
+        @info "[TEST] ✅ Figurative dismiss → NEGATIVE for :math/:doaction/:multipart/:instruction, POSITIVE for :none"
     end
 
     @testset "Gate: explicit negation → NEGATIVE for :math" begin
@@ -84,7 +85,8 @@ using GrugBot420.SemanticVerbs
         GrugBot420._CURRENT_PREDICTION[] = pred
         @test GrugBot420._context_polarity_for(:math) === POLARITY_NEGATIVE
         @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEGATIVE
-        @info "[TEST] ✅ Explicit negation → NEGATIVE for :math/:doaction"
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_NEGATIVE
+        @info "[TEST] ✅ Explicit negation → NEGATIVE for :math/:doaction/:multipart"
     end
 
     @testset "Gate: speculative → NEUTRAL for :math" begin
@@ -93,8 +95,8 @@ using GrugBot420.SemanticVerbs
         GrugBot420._CURRENT_PREDICTION[] = pred
         @test GrugBot420._context_polarity_for(:math) === POLARITY_NEUTRAL
         @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEUTRAL
-        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
-        @info "[TEST] ✅ Speculative → NEUTRAL for :math/:doaction, POSITIVE for :multipart"
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_NEUTRAL
+        @info "[TEST] ✅ Speculative → NEUTRAL for :math/:doaction/:multipart"
     end
 
     @testset "Gate: normal query → POSITIVE" begin
@@ -103,6 +105,7 @@ using GrugBot420.SemanticVerbs
         GrugBot420._CURRENT_PREDICTION[] = pred
         @test GrugBot420._context_polarity_for(:math) === POLARITY_POSITIVE
         @test GrugBot420._context_polarity_for(:doaction) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
         @info "[TEST] ✅ Normal query → POSITIVE"
     end
 
@@ -110,7 +113,32 @@ using GrugBot420.SemanticVerbs
         GrugBot420._CURRENT_PREDICTION[] = nothing
         @test GrugBot420._context_polarity_for(:math) === POLARITY_POSITIVE
         @test GrugBot420._context_polarity_for(:doaction) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:none) === POLARITY_POSITIVE
         @info "[TEST] ✅ No prediction → POSITIVE (gate open)"
+    end
+
+    @testset "Gate: multipart polarity matches math polarity" begin
+        # GRUG v7.33: multipart is polarity-gated just like math/doaction.
+        # "don't calculate 2+2 and 3*4" should suppress the multipart bundle.
+        GrugBot420._CURRENT_PREDICTION[] = nothing
+        pred_neg = ActionTonePredictor.predict_action_tone("don't calculate 2+2 and 3*4", SemanticVerbs.get_all_verbs())
+        GrugBot420._CURRENT_PREDICTION[] = pred_neg
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_NEGATIVE
+
+        GrugBot420._CURRENT_PREDICTION[] = nothing
+        pred_neu = ActionTonePredictor.predict_action_tone("maybe calculate 2+2 and 3*4", SemanticVerbs.get_all_verbs())
+        GrugBot420._CURRENT_PREDICTION[] = pred_neu
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_NEUTRAL
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_NEUTRAL
+
+        GrugBot420._CURRENT_PREDICTION[] = nothing
+        pred_pos = ActionTonePredictor.predict_action_tone("calculate 2+2 and 3*4", SemanticVerbs.get_all_verbs())
+        GrugBot420._CURRENT_PREDICTION[] = pred_pos
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_POSITIVE
+        @info "[TEST] ✅ Multipart polarity matches math polarity for NEGATIVE/NEUTRAL/POSITIVE"
     end
 
     # ── SelfObserver integration ──
