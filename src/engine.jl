@@ -1686,6 +1686,12 @@ const _CURRENT_HAS_DETERMINISTIC_ANSWER = Ref{Bool}(false)
 # "easy as 2+2" → figurative_dismiss=true → math suppressed
 const _CURRENT_PREDICTION = Ref{Any}(nothing)
 
+# GRUG v7.32: Task-local flag — set to true when a sigil fire is attenuated
+# (neutral polarity). Reset to false before each cast_sigil_votes call.
+# Used by _observe_sigil_fired to record the polarity in the post-vote observation
+# without threading the polarity through every internal function signature.
+const _ATTENUATED_FIRE = Ref{Bool}(false)
+
 # GRUG v7.21: _mission_has_deterministic_answer() — predicate that detects
 # whether this mission cycle produced a deterministic (computable) answer.
 # When true, the rendering pipeline skips the entire SUPPORT block — the
@@ -3211,6 +3217,16 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vecto
             _fig_dismiss = try getfield(prediction, :figurative_dismiss) catch _e1; nothing; end
             _neg_str     = try Float64(getfield(prediction, :negation_strength)) catch _e2; 0.0; end
             _act_family  = try getfield(prediction, :action_family) catch _e3; :unknown; end
+            _polarity    = try getfield(prediction, :context_polarity) catch _e4; nothing; end
+            _polarity_str = if _polarity === ActionTonePredictor.POLARITY_NEGATIVE
+                "negative"
+            elseif _polarity === ActionTonePredictor.POLARITY_NEUTRAL
+                "neutral"
+            elseif _polarity === ActionTonePredictor.POLARITY_POSITIVE
+                "positive"
+            else
+                "unknown"
+            end
             SelfObserver.observe!(
                 SelfObserver.default_store(),
                 "polarity_pre_vote_$(hash(input_text))",
@@ -3221,6 +3237,7 @@ function scan_specimens(input_text::String)::Vector{Tuple{String, Float64, Vecto
                     "action_family"     => string(_act_family),
                     "figurative_dismiss"=> _fig_dismiss === true,
                     "negation_strength" => _neg_str,
+                    "polarity"          => _polarity_str,
                     "input_preview"     => first(input_text, 60),
                 );
                 p_write    = 1.0,       # always write pre-vote observations
@@ -3796,24 +3813,25 @@ function _select_opener(packet::String)::String
     return opener
 end
 
-# GRUG v7.32: CONTEXT POLARITY GATE
-# ─────────────────────────────────
-# Before a sigil vote fires, check whether the input's ATP prediction
-# signals that the sigil should be suppressed. Two suppression modes:
+# GRUG v7.32: Context polarity gate — tri-state: NEGATIVE / NEUTRAL / POSITIVE.
+# ──────────────────────────────────────────────────────────────────────────────
+# NEGATIVE  → suppress (0.3x confidence, no computation, :suppressed vote)
+#   - Figurative dismiss: "easy as 2+2" — math is a metaphor, not a request
+#   - Strong explicit negation: "don't calculate 2+2" — direct contradiction
 #
-#   1. EXPLICIT NEGATION — "don't calculate 2+2", "no don't answer that"
-#      ACTION_NEGATE with negation_strength > 0.5 and figurative_dismiss=false
-#      → The user is explicitly telling us NOT to compute/act.
+# NEUTRAL   → attenuate (0.7x confidence, computation still happens, :attenuated vote)
+#   - Speculative: "maybe calculate 2+2" — hedged, not committed
+#   - Weak negation: "not bad at 2+2" — ambiguous, could go either way
+#   - Reflective/neutral tone without clear command/query — uncertain intent
 #
-#   2. FIGURATIVE DISMISS — "easy as 2+2", "simple as 1+1"
-#      figurative_dismiss=true → The math construct is a metaphor, not a request.
-#      The user isn't asking for a computation; they're using it as a comparison.
+# POSITIVE  → fire normally (1.0x confidence, normal computation)
+#   - Query, command, assert, escalate — clear intent to compute/act
 #
-# Both modes suppress :math and :doaction sigil kinds. :multipart and other
-# kinds are NOT suppressed (negation doesn't prevent clause-splitting).
+# Only :math and :doaction sigil kinds are polarity-gated. :multipart and other
+# kinds are NOT gated (negation doesn't prevent clause-splitting).
 #
 # The gate reads from _CURRENT_PREDICTION (set before the scan fires).
-# If no prediction exists (e.g. image input, or ATP failed), the gate is OPEN.
+# If no prediction exists (e.g. image input, or ATP failed), the gate is POSITIVE.
 #
 # Side language rules apply: the gate is another knob on the existing
 # ActionTonePredictor + SemanticVerbs infrastructure. No new systems —
@@ -3821,56 +3839,76 @@ end
 # ──────────────────────────────────────────────────────────────────────────────
 
 """
-    _sigil_suppressed_by_polarity(kind) -> Bool
+    _context_polarity_for(kind) -> ContextPolarity
 
-Check whether the current mission's ATP prediction suppresses this sigil kind.
-Returns true when the vote should be DROPPED entirely (not just weighted down).
-Only suppresses :math and :doaction — negation doesn't prevent clause-splitting.
+Return the context polarity level for this sigil kind, based on the current
+mission's ATP prediction. POSITIVE = fire normally, NEUTRAL = attenuate,
+NEGATIVE = suppress. Non-gated kinds (:multipart, :instruction, :none) always
+return POSITIVE.
 """
-function _sigil_suppressed_by_polarity(kind::Symbol)::Bool
+function _context_polarity_for(kind::Symbol)
     # GRUG: Only :math and :doaction are polarity-gated. :multipart and
     # :instruction have different semantics — negation doesn't prevent clause detection.
     if kind !== :math && kind !== :doaction
-        return false
+        return ActionTonePredictor.POLARITY_POSITIVE
     end
 
     pred = _CURRENT_PREDICTION[]
-    pred === nothing && return false  # no prediction → gate is open
+    pred === nothing && return ActionTonePredictor.POLARITY_POSITIVE  # no prediction → gate is open
 
-    # GRUG: Duck-type check — if the prediction has the fields we need, use them.
-    # This avoids a hard type dependency on ActionTonePredictor.PredictionResult.
-    has_negation = try
-        getfield(pred, :action_family) === ActionTonePredictor.ACTION_NEGATE
-    catch
-        false
+    # GRUG: Prefer the computed context_polarity field if it exists.
+    # This is the canonical path — ATP already did the tri-state resolution.
+    polarity = try
+        getfield(pred, :context_polarity)
+    catch; nothing; end
+
+    if polarity !== nothing
+        # GRUG: Duck-type — if it matches one of the three enum values, return it.
+        if polarity === ActionTonePredictor.POLARITY_NEGATIVE ||
+           polarity === ActionTonePredictor.POLARITY_NEUTRAL ||
+           polarity === ActionTonePredictor.POLARITY_POSITIVE
+            return polarity
+        end
     end
 
+    # GRUG: Fallback — if context_polarity field doesn't exist (old prediction
+    # objects, or ATP didn't compute it), derive from the raw fields.
     has_figurative = try
         getfield(pred, :figurative_dismiss) === true
-    catch
-        false
-    end
+    catch; false; end
+
+    has_negation = try
+        getfield(pred, :action_family) === ActionTonePredictor.ACTION_NEGATE
+    catch; false; end
 
     neg_strength = try
         Float64(getfield(pred, :negation_strength))
-    catch
-        0.0
-    end
+    catch; 0.0; end
 
-    # GRUG: Figurative dismiss always suppresses for math/doaction.
-    # "easy as 2+2" is never a real computation request.
+    action_fam = try
+        getfield(pred, :action_family)
+    catch; nothing; end
+
+    tone_fam = try
+        getfield(pred, :tone_family)
+    catch; nothing; end
+
+    # Derive polarity from raw signals
     if has_figurative
-        return true
+        return ActionTonePredictor.POLARITY_NEGATIVE
+    elseif has_negation && neg_strength > 0.5
+        return ActionTonePredictor.POLARITY_NEGATIVE
+    elseif action_fam === ActionTonePredictor.ACTION_SPECULATE
+        return ActionTonePredictor.POLARITY_NEUTRAL
+    elseif has_negation && neg_strength > 0.0
+        return ActionTonePredictor.POLARITY_NEUTRAL
+    elseif action_fam === ActionTonePredictor.ACTION_QUERY || action_fam === ActionTonePredictor.ACTION_COMMAND || action_fam === ActionTonePredictor.ACTION_ESCALATE
+        return ActionTonePredictor.POLARITY_POSITIVE
+    elseif action_fam === ActionTonePredictor.ACTION_ASSERT && tone_fam === ActionTonePredictor.TONE_REFLECTIVE
+        return ActionTonePredictor.POLARITY_NEUTRAL
+    else
+        return ActionTonePredictor.POLARITY_POSITIVE
     end
-
-    # GRUG: Explicit negation suppresses when strong enough.
-    # Weak negation (score < 0.5) might be incidental ("not bad at 2+2")
-    # and shouldn't suppress. Strong negation ("don't calculate 2+2") should.
-    if has_negation && neg_strength > 0.5
-        return true
-    end
-
-    return false
 end
 
 """
@@ -3893,6 +3931,19 @@ function _observe_sigil_fired(node_id::String, kind::Symbol, votes::Vector{Vote}
     try
         n_votes = length(votes)
         obj_id  = n_votes > 0 ? votes[1].objective_id : "none"
+        # GRUG v7.32: Record polarity in the post-vote observation.
+        # If _ATTENUATED_FIRE[] is true, this was a neutral-polarity fire (0.7x conf).
+        # Otherwise it's a positive-polarity fire (1.0x conf).
+        _outcome = if _ATTENUATED_FIRE[]
+            "attenuated"
+        else
+            "fired"
+        end
+        _polarity_str = if _ATTENUATED_FIRE[]
+            "neutral"
+        else
+            "positive"
+        end
         SelfObserver.observe!(
             SelfObserver.default_store(),
             "polarity_post_vote_$(node_id)_$(obj_id)",
@@ -3901,7 +3952,8 @@ function _observe_sigil_fired(node_id::String, kind::Symbol, votes::Vector{Vote}
                 "phase"        => "post_vote",
                 "node_id"      => node_id,
                 "sigil_kind"   => string(kind),
-                "outcome"      => "fired",
+                "outcome"      => _outcome,
+                "polarity"     => _polarity_str,
                 "n_votes"      => n_votes,
                 "objective_id" => obj_id,
             );
@@ -3909,8 +3961,12 @@ function _observe_sigil_fired(node_id::String, kind::Symbol, votes::Vector{Vote}
             salience   = 5.0,
             provenance = :polarity_gate_fired,
         )
+        # GRUG: Reset the attenuated flag after observation so it doesn't leak
+        # into the next sigil's observation.
+        _ATTENUATED_FIRE[] = false
     catch ex_obs
         @warn "[ENGINE] SelfObserver post-vote observe! (fired) failed: $ex_obs"
+        _ATTENUATED_FIRE[] = false  # always reset
     end
     return votes   # pass-through, so caller can: return _observe_sigil_fired(...)
 end
@@ -3943,26 +3999,30 @@ function cast_sigil_votes(
     # v7.27: antimatch=false removed from all branches — field no longer exists.
     bump_strength!(node)
 
-    # GRUG v7.32: CONTEXT POLARITY GATE — before dispatching, check whether
-    # the input's ATP prediction suppresses this sigil kind. "don't calculate
-    # 2+2" (ACTION_NEGATE) and "easy as 2+2" (figurative_dismiss) should NOT
-    # fire math/doaction votes. The node still gets its strength bump (it was
-    # activated by the scan, and strength is independent of whether it votes),
-    # but it emits a single suppressed-acknowledgment vote instead of computing.
-    if _sigil_suppressed_by_polarity(kind)
-        @info "[ENGINE] 🔇 Sigil kind :$kind suppressed by context polarity (negation/figurative dismiss) on node $id"
+    # GRUG v7.32: Reset the attenuated-fire flag at the start of each
+    # cast_sigil_votes call so it doesn't leak from a previous invocation.
+    _ATTENUATED_FIRE[] = false
+
+    # GRUG v7.32: CONTEXT POLARITY GATE — tri-state: NEGATIVE / NEUTRAL / POSITIVE.
+    # The gate reads the ATP prediction and decides how this sigil vote fires:
+    #   NEGATIVE  → suppress (0.3x, no computation, :suppressed bundle_role)
+    #   NEUTRAL   → attenuate (0.7x, computation happens, :attenuated bundle_role)
+    #   POSITIVE  → fire normally (1.0x, normal computation)
+    # Only :math and :doaction are polarity-gated; :multipart/:instruction pass through.
+    _polarity = _context_polarity_for(kind)
+
+    if _polarity === ActionTonePredictor.POLARITY_NEGATIVE
+        @info "[ENGINE] 🔇 Sigil kind :$kind SUPPRESSED by context polarity (negative) on node $id"
         opener = _select_opener(node.action_packet)
         if !haskey(COMMANDS, opener)
             opener = "observe"  # fallback: the node still speaks, just doesn't compute
         end
         _, negatives = select_action(node.action_packet)
         obj_id = fresh_objective_id()
-        # GRUG: Emit a single :suppressed vote. The node's voice is heard
-        # ("I see what you did there") but no computation happens. Payload
-        # is empty — the vote is an acknowledgment, not an answer.
+        # GRUG: Emit a single :suppressed vote. No computation happens.
+        # The node's voice is heard ("I see what you did there") at reduced confidence.
         # GRUG v7.32: POST-VOTE SELF-OBSERVATION — record that this sigil was
-        # suppressed by context polarity. SelfObserver chimes in at the post-vote
-        # phase too, so future peek_pattern calls can learn from suppressed fires.
+        # suppressed by context polarity.
         try
             SelfObserver.observe!(
                 SelfObserver.default_store(),
@@ -3973,19 +4033,36 @@ function cast_sigil_votes(
                     "node_id"      => id,
                     "sigil_kind"   => string(kind),
                     "outcome"      => "suppressed",
+                    "polarity"     => "negative",
                     "opener"       => opener,
                     "conf"         => conf * 0.3,
                     "objective_id" => obj_id,
                 );
                 p_write    = 1.0,
                 salience   = 6.0,
-                provenance = :polarity_gate_suppressed,
+                provenance = :polarity_gate_negative,
             )
         catch ex_obs
-            @warn "[ENGINE] SelfObserver post-vote observe! (suppressed) failed: $ex_obs"
+            @warn "[ENGINE] SelfObserver post-vote observe! (negative) failed: $ex_obs"
         end
         return Vote[Vote(node.id, opener, conf * 0.3, negatives, u_trips, n_trips,
                          "", obj_id, :suppressed)]
+    end
+
+    if _polarity === ActionTonePredictor.POLARITY_NEUTRAL
+        @info "[ENGINE] 🔈 Sigil kind :$kind ATTENUATED by context polarity (neutral) on node $id — firing at 0.7x"
+        # GRUG: Neutral polarity — the intent is hedged/ambiguous. The sigil still
+        # fires (computation happens), but at reduced confidence (0.7x). The votes
+        # keep their normal bundle_role (:final, :step_n, etc.) so downstream
+        # processing isn't disrupted. The reduced confidence IS the signal.
+        # The _observe_sigil_fired helper at the return will record the neutral
+        # polarity in the post-vote observation.
+        conf = conf * 0.7
+        # GRUG: Track that this fire was attenuated so _observe_sigil_fired can
+        # include it in the post-vote observation.
+        # We use a task-local flag to avoid threading the polarity through every
+        # internal function signature.
+        _ATTENUATED_FIRE[] = true
     end
 
     if kind === :math

@@ -1,86 +1,126 @@
 # test_context_polarity.jl
-# GRUG: Test the context polarity gate — SelfObserver pre/post vote observations
-# and the _sigil_suppressed_by_polarity gate.
+# GRUG v7.32: Test the context polarity gate — tri-state NEGATIVE/NEUTRAL/POSITIVE
+# with SelfObserver pre/post vote observations.
 #
-# Three test cases:
-#   1. "don't calculate 2+2"  → math suppressed (explicit negation)
-#   2. "easy as 2+2"          → math suppressed (figurative dismiss)
-#   3. "what is 2+2"          → math fires normally
+# Test cases:
+#   1. "don't calculate 2+2"  → NEGATIVE polarity (explicit negation) → suppressed
+#   2. "easy as 2+2"          → NEGATIVE polarity (figurative dismiss) → suppressed
+#   3. "maybe calculate 2+2"  → NEUTRAL polarity (speculative) → attenuated (0.7x)
+#   4. "what is 2+2"          → POSITIVE polarity (query) → fires normally (1.0x)
+#   5. "calculate 3*4"        → POSITIVE polarity (assert + neutral tone) → fires normally
 
 using Test
 
-# ── Load the module ──
 using GrugBot420
 using GrugBot420.SelfObserver
 using GrugBot420.ActionTonePredictor
 using GrugBot420.SemanticVerbs
 
-@testset "Context Polarity Gate" begin
+@testset "Context Polarity Gate — Tri-State" begin
 
-    # ── Reset state between tests ──
     GrugBot420._CURRENT_PREDICTION[] = nothing
     SelfObserver.drop_store!(SelfObserver.default_store())
 
-    @testset "ATP figurative dismiss detection" begin
+    # ── ATP polarity computation ──
+
+    @testset "ATP: figurative dismiss → NEGATIVE" begin
         pred = ActionTonePredictor.predict_action_tone("easy as 2+2", SemanticVerbs.get_all_verbs())
+        @test pred.context_polarity === POLARITY_NEGATIVE
         @test pred.figurative_dismiss === true
         @test pred.negation_strength > 0.0
-        @info "[TEST] ✅ 'easy as 2+2' → figurative_dismiss=$(pred.figurative_dismiss), neg_strength=$(pred.negation_strength)"
+        @info "[TEST] ✅ 'easy as 2+2' → POLARITY_NEGATIVE"
     end
 
-    @testset "ATP explicit negation detection" begin
+    @testset "ATP: explicit negation → NEGATIVE" begin
         pred = ActionTonePredictor.predict_action_tone("don't calculate 2+2", SemanticVerbs.get_all_verbs())
-        @test pred.action_family === ActionTonePredictor.ACTION_NEGATE
+        @test pred.context_polarity === POLARITY_NEGATIVE
+        @test pred.action_family === ACTION_NEGATE
         @test pred.negation_strength > 0.5
-        @info "[TEST] ✅ 'don't calculate 2+2' → action_family=$(pred.action_family), neg_strength=$(pred.negation_strength)"
+        @info "[TEST] ✅ 'don't calculate 2+2' → POLARITY_NEGATIVE"
     end
 
-    @testset "ATP normal query — no suppression signals" begin
+    @testset "ATP: speculative → NEUTRAL" begin
+        pred = ActionTonePredictor.predict_action_tone("maybe calculate 2+2", SemanticVerbs.get_all_verbs())
+        @test pred.context_polarity === POLARITY_NEUTRAL
+        @test pred.action_family === ACTION_SPECULATE
+        @info "[TEST] ✅ 'maybe calculate 2+2' → POLARITY_NEUTRAL"
+    end
+
+    @testset "ATP: assert + reflective tone → NEUTRAL" begin
+        pred = ActionTonePredictor.predict_action_tone("I think 2+2 equals 4", SemanticVerbs.get_all_verbs())
+        @test pred.context_polarity === POLARITY_NEUTRAL
+        @info "[TEST] ✅ 'I think 2+2 equals 4' → POLARITY_NEUTRAL"
+    end
+
+    @testset "ATP: query → POSITIVE" begin
         pred = ActionTonePredictor.predict_action_tone("what is 2+2", SemanticVerbs.get_all_verbs())
-        @test pred.figurative_dismiss === false
-        # Should NOT be a strong negation
-        gate_would_suppress = (pred.action_family === ActionTonePredictor.ACTION_NEGATE && pred.negation_strength > 0.5) || pred.figurative_dismiss
-        @test gate_would_suppress === false
-        @info "[TEST] ✅ 'what is 2+2' → figurative_dismiss=$(pred.figurative_dismiss), action_family=$(pred.action_family), neg_strength=$(pred.negation_strength)"
+        @test pred.context_polarity === POLARITY_POSITIVE
+        @test pred.action_family === ACTION_QUERY
+        @info "[TEST] ✅ 'what is 2+2' → POLARITY_POSITIVE"
     end
 
-    @testset "Gate: figurative dismiss suppresses :math" begin
+    @testset "ATP: assert + neutral tone → POSITIVE" begin
+        pred = ActionTonePredictor.predict_action_tone("calculate 3*4", SemanticVerbs.get_all_verbs())
+        @test pred.context_polarity === POLARITY_POSITIVE
+        @info "[TEST] ✅ 'calculate 3*4' → POLARITY_POSITIVE"
+    end
+
+    # ── Gate: _context_polarity_for ──
+
+    @testset "Gate: figurative dismiss → NEGATIVE for :math" begin
         GrugBot420._CURRENT_PREDICTION[] = nothing
         pred = ActionTonePredictor.predict_action_tone("easy as 2+2", SemanticVerbs.get_all_verbs())
         GrugBot420._CURRENT_PREDICTION[] = pred
-        @test GrugBot420._sigil_suppressed_by_polarity(:math) === true
-        @test GrugBot420._sigil_suppressed_by_polarity(:doaction) === true
-        @test GrugBot420._sigil_suppressed_by_polarity(:multipart) === false
-        @test GrugBot420._sigil_suppressed_by_polarity(:instruction) === false
-        @info "[TEST] ✅ Figurative dismiss suppresses :math and :doaction, not :multipart/:instruction"
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:instruction) === POLARITY_POSITIVE
+        @info "[TEST] ✅ Figurative dismiss → NEGATIVE for :math/:doaction, POSITIVE for :multipart/:instruction"
     end
 
-    @testset "Gate: explicit negation suppresses :math" begin
+    @testset "Gate: explicit negation → NEGATIVE for :math" begin
         GrugBot420._CURRENT_PREDICTION[] = nothing
         pred = ActionTonePredictor.predict_action_tone("don't calculate 2+2", SemanticVerbs.get_all_verbs())
         GrugBot420._CURRENT_PREDICTION[] = pred
-        @test GrugBot420._sigil_suppressed_by_polarity(:math) === true
-        @test GrugBot420._sigil_suppressed_by_polarity(:doaction) === true
-        @info "[TEST] ✅ Explicit negation suppresses :math and :doaction"
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_NEGATIVE
+        @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEGATIVE
+        @info "[TEST] ✅ Explicit negation → NEGATIVE for :math/:doaction"
     end
 
-    @testset "Gate: normal query does NOT suppress :math" begin
+    @testset "Gate: speculative → NEUTRAL for :math" begin
+        GrugBot420._CURRENT_PREDICTION[] = nothing
+        pred = ActionTonePredictor.predict_action_tone("maybe calculate 2+2", SemanticVerbs.get_all_verbs())
+        GrugBot420._CURRENT_PREDICTION[] = pred
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_NEUTRAL
+        @test GrugBot420._context_polarity_for(:doaction) === POLARITY_NEUTRAL
+        @test GrugBot420._context_polarity_for(:multipart) === POLARITY_POSITIVE
+        @info "[TEST] ✅ Speculative → NEUTRAL for :math/:doaction, POSITIVE for :multipart"
+    end
+
+    @testset "Gate: normal query → POSITIVE" begin
         GrugBot420._CURRENT_PREDICTION[] = nothing
         pred = ActionTonePredictor.predict_action_tone("what is 2+2", SemanticVerbs.get_all_verbs())
         GrugBot420._CURRENT_PREDICTION[] = pred
-        @test GrugBot420._sigil_suppressed_by_polarity(:math) === false
-        @test GrugBot420._sigil_suppressed_by_polarity(:doaction) === false
-        @info "[TEST] ✅ Normal query does NOT suppress :math or :doaction"
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:doaction) === POLARITY_POSITIVE
+        @info "[TEST] ✅ Normal query → POSITIVE"
     end
 
-    @testset "Gate: no prediction → gate is open" begin
+    @testset "Gate: no prediction → POSITIVE (gate open)" begin
         GrugBot420._CURRENT_PREDICTION[] = nothing
-        @test GrugBot420._sigil_suppressed_by_polarity(:math) === false
-        @test GrugBot420._sigil_suppressed_by_polarity(:doaction) === false
-        @info "[TEST] ✅ No prediction → gate is open (no suppression)"
+        @test GrugBot420._context_polarity_for(:math) === POLARITY_POSITIVE
+        @test GrugBot420._context_polarity_for(:doaction) === POLARITY_POSITIVE
+        @info "[TEST] ✅ No prediction → POSITIVE (gate open)"
     end
 
-    @testset "SelfObserver pre-vote observation" begin
+    # ── SelfObserver integration ──
+
+    @testset "SelfObserver :context_polarity tag is valid" begin
+        @test :context_polarity in SelfObserver.VALID_TAGS
+        @info "[TEST] ✅ :context_polarity is in SelfObserver.VALID_TAGS"
+    end
+
+    @testset "SelfObserver pre-vote observation with polarity" begin
         SelfObserver.drop_store!(SelfObserver.default_store())
 
         wrote = SelfObserver.observe!(
@@ -92,7 +132,8 @@ using GrugBot420.SemanticVerbs
                 "input_hash"        => hash("easy as 2+2"),
                 "action_family"     => "ACTION_NEGATE",
                 "figurative_dismiss"=> true,
-                "negation_strength" => 1.2,
+                "negation_strength" => 1.75,
+                "polarity"          => "negative",
                 "input_preview"     => "easy as 2+2",
             );
             p_write    = 1.0,
@@ -101,19 +142,18 @@ using GrugBot420.SemanticVerbs
         )
         @test wrote === true
 
-        # peek_exact takes (store, node_id, key) — node_id is typically
-        # a dash-separated entity id; for tests we use a dummy.
         fragments = SelfObserver.peek_exact(SelfObserver.default_store(), "test-node", "polarity_pre_vote_test1")
         @test fragments !== nothing
         @test length(fragments) >= 1
         f = fragments[1]
         @test f.tag === :context_polarity
         @test f.payload_strings["phase"] == "pre_vote"
+        @test f.payload_strings["polarity"] == "negative"
         @test f.payload_strings["figurative_dismiss"] == "true"
-        @info "[TEST] ✅ SelfObserver pre-vote observation written and retrieved"
+        @info "[TEST] ✅ SelfObserver pre-vote observation with polarity written and retrieved"
     end
 
-    @testset "SelfObserver post-vote observation (suppressed)" begin
+    @testset "SelfObserver post-vote: negative (suppressed)" begin
         SelfObserver.drop_store!(SelfObserver.default_store())
 
         wrote = SelfObserver.observe!(
@@ -125,24 +165,25 @@ using GrugBot420.SemanticVerbs
                 "node_id"      => "test_math_node",
                 "sigil_kind"   => "math",
                 "outcome"      => "suppressed",
+                "polarity"     => "negative",
                 "opener"       => "observe",
                 "conf"         => 0.24,
                 "objective_id" => "obj_001",
             );
             p_write    = 1.0,
             salience   = 6.0,
-            provenance = :polarity_gate_suppressed,
+            provenance = :polarity_gate_negative,
         )
         @test wrote === true
 
         fragments = SelfObserver.peek_exact(SelfObserver.default_store(), "test-node", "polarity_post_vote_test1")
         @test fragments !== nothing
-        @test length(fragments) >= 1
         @test fragments[1].payload_strings["outcome"] == "suppressed"
-        @info "[TEST] ✅ SelfObserver post-vote suppressed observation written and retrieved"
+        @test fragments[1].payload_strings["polarity"] == "negative"
+        @info "[TEST] ✅ SelfObserver post-vote negative (suppressed) observation written"
     end
 
-    @testset "SelfObserver post-vote observation (fired)" begin
+    @testset "SelfObserver post-vote: neutral (attenuated)" begin
         SelfObserver.drop_store!(SelfObserver.default_store())
 
         wrote = SelfObserver.observe!(
@@ -153,8 +194,9 @@ using GrugBot420.SemanticVerbs
                 "phase"        => "post_vote",
                 "node_id"      => "test_math_node",
                 "sigil_kind"   => "math",
-                "outcome"      => "fired",
-                "n_votes"      => 2,
+                "outcome"      => "attenuated",
+                "polarity"     => "neutral",
+                "n_votes"      => 1,
                 "objective_id" => "obj_002",
             );
             p_write    = 1.0,
@@ -165,31 +207,53 @@ using GrugBot420.SemanticVerbs
 
         fragments = SelfObserver.peek_exact(SelfObserver.default_store(), "test-node", "polarity_post_vote_test2")
         @test fragments !== nothing
-        @test length(fragments) >= 1
-        @test fragments[1].payload_strings["outcome"] == "fired"
-        @info "[TEST] ✅ SelfObserver post-vote fired observation written and retrieved"
+        @test fragments[1].payload_strings["outcome"] == "attenuated"
+        @test fragments[1].payload_strings["polarity"] == "neutral"
+        @info "[TEST] ✅ SelfObserver post-vote neutral (attenuated) observation written"
     end
 
-    @testset "SelfObserver :context_polarity tag is valid" begin
-        @test :context_polarity in SelfObserver.VALID_TAGS
-        @info "[TEST] ✅ :context_polarity is in SelfObserver.VALID_TAGS"
+    @testset "SelfObserver post-vote: positive (fired normally)" begin
+        SelfObserver.drop_store!(SelfObserver.default_store())
+
+        wrote = SelfObserver.observe!(
+            SelfObserver.default_store(),
+            "polarity_post_vote_test3",
+            :context_polarity,
+            Dict{String,Any}(
+                "phase"        => "post_vote",
+                "node_id"      => "test_math_node",
+                "sigil_kind"   => "math",
+                "outcome"      => "fired",
+                "polarity"     => "positive",
+                "n_votes"      => 2,
+                "objective_id" => "obj_003",
+            );
+            p_write    = 1.0,
+            salience   = 5.0,
+            provenance = :polarity_gate_fired,
+        )
+        @test wrote === true
+
+        fragments = SelfObserver.peek_exact(SelfObserver.default_store(), "test-node", "polarity_post_vote_test3")
+        @test fragments !== nothing
+        @test fragments[1].payload_strings["outcome"] == "fired"
+        @test fragments[1].payload_strings["polarity"] == "positive"
+        @info "[TEST] ✅ SelfObserver post-vote positive (fired) observation written"
     end
 
     @testset "SelfObserver peek_pattern for context_polarity" begin
         SelfObserver.drop_store!(SelfObserver.default_store())
 
         SelfObserver.observe!(SelfObserver.default_store(), "polarity_entry_1", :context_polarity,
-            Dict{String,Any}("phase" => "pre_vote", "figurative_dismiss" => true);
+            Dict{String,Any}("phase" => "pre_vote", "polarity" => "negative");
             p_write=1.0, salience=7.0, provenance=:test)
         SelfObserver.observe!(SelfObserver.default_store(), "polarity_entry_2", :context_polarity,
-            Dict{String,Any}("phase" => "post_vote", "outcome" => "suppressed");
+            Dict{String,Any}("phase" => "post_vote", "polarity" => "neutral");
             p_write=1.0, salience=6.0, provenance=:test)
         SelfObserver.observe!(SelfObserver.default_store(), "other_entry_1", :mood,
             Dict{String,Any}("mood" => "curious");
             p_write=1.0, salience=5.0, provenance=:test)
 
-        # peek_pattern takes (store, node_id, query_string; tag=...)
-        # Query "polarity" should match keys containing "polarity"
         results = SelfObserver.peek_pattern(SelfObserver.default_store(), "test-node", "polarity";
             tag=:context_polarity)
         @test results !== nothing
@@ -200,6 +264,7 @@ using GrugBot420.SemanticVerbs
 
     # Clean up
     GrugBot420._CURRENT_PREDICTION[] = nothing
+    GrugBot420._ATTENUATED_FIRE[] = false
 end
 
 @info "[TEST] ══════════════════════════════════════════"

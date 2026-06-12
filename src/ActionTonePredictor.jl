@@ -45,14 +45,19 @@ module ActionTonePredictor
 
 using Random
 
-export ActionFamily, ToneFamily, PredictionResult,
+export ActionFamily, ToneFamily, ContextPolarity, PredictionResult,
        predict_action_tone, apply_prediction_to_arousal!,
        get_action_weight_multiplier, format_prediction_summary,
        reset_trajectory!, get_trajectory_state, TrajectoryConfig,
        reset_tonal_buildup!, get_tonal_buildup,
        TONAL_BUILDUP_INCREMENT, TONAL_BUILDUP_HALFLIFE_S,
        TONAL_BUILDUP_AROUSAL_GAIN,
-       LORENZ_SNAPBACK_JITTER, LORENZ_SNAPBACK_PULL
+       LORENZ_SNAPBACK_JITTER, LORENZ_SNAPBACK_PULL,
+       ACTION_ASSERT, ACTION_QUERY, ACTION_COMMAND, ACTION_NEGATE,
+       ACTION_SPECULATE, ACTION_ESCALATE,
+       TONE_HOSTILE, TONE_CURIOUS, TONE_DECLARATIVE, TONE_URGENT,
+       TONE_NEUTRAL, TONE_REFLECTIVE,
+       POLARITY_POSITIVE, POLARITY_NEUTRAL, POLARITY_NEGATIVE
 
 # ==============================================================================
 # ENUM TYPES
@@ -78,6 +83,16 @@ end
     TONE_REFLECTIVE   # Hedged language: "i think", "perhaps", "it seems"
 end
 
+# GRUG v7.32: Context polarity — the pre-vote gate's decision axis.
+# POSITIVE  = fire normally (1.0x)  — query, command, clear request
+# NEUTRAL   = fire with reduced confidence (0.7x)  — hedged, speculative, ambiguous
+# NEGATIVE  = suppress (0.3x, no computation)  — negation, figurative dismiss
+@enum ContextPolarity begin
+    POLARITY_POSITIVE   # Clear intent to compute/act — "what is 2+2", "calculate 3*4"
+    POLARITY_NEUTRAL    # Hedged or ambiguous — "maybe calculate", "I think 2+2", "wonder about"
+    POLARITY_NEGATIVE   # Suppressed — "don't calculate", "easy as 2+2" (figurative)
+end
+
 # GRUG: Full prediction result. Carry this through the cave as a pre-tuning packet.
 # It is immutable — created once per input, read many times during scan.
 struct PredictionResult
@@ -94,6 +109,7 @@ struct PredictionResult
     trajectory_damped   ::Bool   # True if Lorenz damping was applied this prediction
     figurative_dismiss  ::Bool   # GRUG v7.32: True when figurative language detected (easy as 2+2)
     negation_strength   ::Float64  # GRUG v7.32: Raw negation signal magnitude [0.0, ∞)
+    context_polarity    ::ContextPolarity  # GRUG v7.32: Pre-vote gate decision axis
 end
 
 # ==============================================================================
@@ -1153,6 +1169,32 @@ function predict_action_tone(
     # GRUG: Scale weight by confidence. Low confidence = stay near 1.0 (minimal skew).
     scaled_weight = 1.0 + (base_weight - 1.0) * action_confidence
 
+    # ------------------------------------------------------------------
+    # STEP 9: Compute context polarity for pre-vote gate
+    # ------------------------------------------------------------------
+    # GRUG v7.32: The polarity is the gate's decision axis. It summarizes the
+    # full ATP signal into a single tri-state that cast_sigil_votes reads.
+    #   NEGATIVE  = suppress (figurative dismiss OR strong explicit negation)
+    #   NEUTRAL   = hedged/ambiguous (speculative, reflective, weak negation)
+    #   POSITIVE  = clear intent (query, command, assert without negation)
+    _fig_dismiss  = figurative_score > 0.0
+    _neg_strength = get(action_scores, ACTION_NEGATE, 0.0)
+    _polarity = if _fig_dismiss
+        POLARITY_NEGATIVE    # figurative dismiss always suppresses math/doaction
+    elseif predicted_action === ACTION_NEGATE && _neg_strength > 0.5
+        POLARITY_NEGATIVE    # strong explicit negation suppresses
+    elseif predicted_action === ACTION_SPECULATE
+        POLARITY_NEUTRAL     # "maybe calculate", "could be" — hedged, not suppressed
+    elseif predicted_action === ACTION_NEGATE && _neg_strength > 0.0
+        POLARITY_NEUTRAL     # weak negation ("not bad at 2+2") — ambiguous, reduce confidence
+    elseif predicted_action === ACTION_QUERY || predicted_action === ACTION_COMMAND || predicted_action === ACTION_ESCALATE
+        POLARITY_POSITIVE    # query, command, escalate — clear intent regardless of tone
+    elseif predicted_action === ACTION_ASSERT && predicted_tone === TONE_REFLECTIVE
+        POLARITY_NEUTRAL     # assert + reflective = hedged claim ("I think 2+2")
+    else
+        POLARITY_POSITIVE    # assert + non-reflective tone, or any other clear action — fire normally
+    end
+
     return PredictionResult(
         predicted_action,
         predicted_tone,
@@ -1165,8 +1207,9 @@ function predict_action_tone(
         action_dist,
         tone_dist,
         trajectory_damped,
-        figurative_score > 0.0,           # GRUG v7.32: figurative_dismiss flag
-        get(action_scores, ACTION_NEGATE, 0.0)  # GRUG v7.32: raw negation signal magnitude
+        _fig_dismiss,            # GRUG v7.32: figurative_dismiss flag
+        _neg_strength,           # GRUG v7.32: raw negation signal magnitude
+        _polarity                # GRUG v7.32: context polarity for pre-vote gate
     )
 end
 
