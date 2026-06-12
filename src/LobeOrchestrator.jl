@@ -26,12 +26,21 @@
 # place. They are guaranteed to fire. The coinflip is purely an ORDERING
 # decision, not an admission decision.
 #
-# NO CURVE NEEDED (v7.24): The lock-in floor (AIML_TOP_LOCKIN_FLOOR = 0.50)
-# already filters out weak votes. Only votes that pass 0.50 reach this
-# orchestrator. There are no mediocre votes to curve against. A simple
-# average of lock-in confidences per lobe is all that's needed. The old
-# curved_avg (base_avg * top_avg) was designed to prevent many-mediocre from
-# beating few-strong, but mediocre votes don't exist here. Simple avg wins.
+# CONTEXT TOPICALITY CURVE (v7.26): A lobe whose domain is relevant to the
+# input gets a proportional boost to its ordering score. The formula is:
+#   curved_avg = avg_conf * (1.0 + CONTEXT_TOPICALITY_CURVE_CAP * topicality)
+# topicality = fraction of thesaurus-expanded lobe subject tokens that appear
+# in the thesaurus-expanded mission tokens (already computed by
+# _compute_lobe_topicality in engine.jl). A lobe with 0 topicality (unrelated
+# domain) gets exactly its simple avg — no penalty, no change from v7.24.
+# A lobe with high topicality gets a boost up to (1 + CAP)× its avg.
+# This is NOT muting. It's NOT a gate. Every lobe still fires. It just
+# affects who speaks FIRST — which is the whole point of orchestration.
+#
+# The old curved_avg (base_avg * top_avg) was wrong because it was synthetic —
+# it penalized many-strong lobes by multiplying against the top vote's
+# confidence. This one uses a REAL signal: how relevant is this lobe's
+# subject to what the user actually asked? Common sense.
 #
 # MULTI-LOBE ASYNC GATE:
 #   - A lobe must have avg >= MULTI_LOBE_THRESHOLD, AND
@@ -56,6 +65,7 @@ export LobeVoteSummary, OrchestrationPlan, FloorWinner
 export summarize_lobe_votes, compute_orchestration_plan
 export MULTI_LOBE_THRESHOLD, MIN_WINNING_VOTES
 export PER_LOBE_FIRE_CAP, CROSS_TALK_ACTIVE_CAP
+export CONTEXT_TOPICALITY_CURVE_CAP
 export CrossTalkGate, new_cross_talk_gate, try_claim_cross_talk!, release_cross_talk!
 export reserved_cross_talk_slots
 
@@ -86,6 +96,16 @@ const PER_LOBE_FIRE_CAP  = 1_000
 # through the CrossTalkGate below.
 const CROSS_TALK_ACTIVE_CAP = 1_000
 
+# GRUG v7.26: Context topicality curve cap. Maximum multiplicative boost
+# a lobe can receive for domain relevance. Formula:
+#   curved_avg = avg_conf * (1.0 + CONTEXT_TOPICALITY_CURVE_CAP * topicality)
+# topicality is in [0.0, 1.0] from _compute_lobe_topicality (thesaurus-expanded
+# token overlap between lobe subject and mission text). At topicality=1.0 the
+# lobe gets (1 + CAP)× its avg. At topicality=0.0 no boost at all (v7.24
+# behavior). This only affects ordering — who speaks first. No muting.
+# 0.25 means a maximally relevant lobe gets a 25% boost over its raw avg.
+const CONTEXT_TOPICALITY_CURVE_CAP = 0.25
+
 # ==============================================================================
 # ERROR TYPE --- no silent failures, ever
 # ==============================================================================
@@ -105,11 +125,17 @@ _throw(msg::String, ctx::String) = throw(LobeOrchestratorError(msg, ctx))
 # ==============================================================================
 
 """
-    LobeVoteSummary(lobe_id, vote_count, avg_conf, max_conf, passes_multi_lobe_gate)
+    LobeVoteSummary(lobe_id, vote_count, avg_conf, max_conf, passes_multi_lobe_gate,
+                    topicality, curved_avg)
 
-GRUG v7.24: Per-lobe rollup of this cycle's LOCK-IN vote pool.
+GRUG v7.26: Per-lobe rollup of this cycle's LOCK-IN vote pool.
 `avg_conf` is the simple average of all lock-in confidences for this lobe.
-No curve needed — the lock-in floor already filtered out weak votes.
+`topicality` is how relevant this lobe's subject is to the mission text
+(0.0 = unrelated, 1.0 = fully matching). Computed by _compute_lobe_topicality
+in engine.jl using thesaurus-expanded token overlap.
+`curved_avg` = avg_conf * (1.0 + CONTEXT_TOPICALITY_CURVE_CAP * topicality).
+A lobe with 0 topicality gets exactly its avg_conf — no penalty.
+A lobe with high topicality gets a proportional ordering boost.
 `passes_multi_lobe_gate` pre-computes the two-factor gate so downstream
 code can't forget one of the factors.
 """
@@ -119,6 +145,8 @@ struct LobeVoteSummary
     avg_conf::Float64
     max_conf::Float64
     passes_multi_lobe_gate::Bool
+    topicality::Float64
+    curved_avg::Float64
 end
 
 # ==============================================================================
@@ -129,6 +157,8 @@ struct FloorWinner
     lobe_id::String
     avg_conf::Float64
     vote_count::Int
+    topicality::Float64
+    curved_avg::Float64
 end
 
 """
@@ -152,22 +182,26 @@ end
 # ==============================================================================
 
 """
-    summarize_lobe_votes(votes_by_lobe::Dict{String, Vector{Float64}})
+    summarize_lobe_votes(votes_by_lobe::Dict{String, Vector{Float64}};
+                         topicality_by_lobe::Dict{String, Float64} = Dict{String, Float64}())
         ::Vector{LobeVoteSummary}
 
-GRUG v7.24: Takes a mapping from lobe_id -> list of LOCK-IN confidence scores
-cast from that lobe this cycle. Returns a LobeVoteSummary per lobe, sorted by
-avg_conf descending. Empty-vote lobes are silently dropped (no vote = no
+GRUG v7.26: Takes a mapping from lobe_id -> list of LOCK-IN confidence scores
+cast from that lobe this cycle, plus optional topicality scores per lobe
+(from _compute_lobe_topicality). Returns a LobeVoteSummary per lobe, sorted by
+curved_avg descending. Empty-vote lobes are silently dropped (no vote = no
 summary = no floor claim). A lobe with a single lock-in vote is legal but
 will almost never pass the two-factor gate (needs >= MIN_WINNING_VOTES).
 
-NO CURVE: Since only lock-in votes (>= 0.50) reach this function, there are
-no mediocre votes to curve against. Simple average is all that's needed.
+CONTEXT TOPICALITY CURVE: curved_avg = avg_conf * (1.0 + CAP * topicality).
+If no topicality provided for a lobe, topicality = 0.0 (no boost, v7.24 behavior).
+Sorting uses curved_avg so domain-relevant lobes sort higher for ordering.
 
 Throws LobeOrchestratorError if any confidence is NaN/Inf.
 """
 function summarize_lobe_votes(
-    votes_by_lobe::Dict{String, Vector{Float64}}
+    votes_by_lobe::Dict{String, Vector{Float64}};
+    topicality_by_lobe::Dict{String, Float64} = Dict{String, Float64}()
 )::Vector{LobeVoteSummary}
 
     summaries = LobeVoteSummary[]
@@ -187,8 +221,15 @@ function summarize_lobe_votes(
         avg_conf = sum(confs) / length(confs)
         max_conf = maximum(confs)
 
-        # GRUG v7.24: Simple avg of lock-in votes. No curve needed.
-        # The lock-in floor already filtered out weak votes.
+        # GRUG v7.26: Context topicality curve.
+        # topicality defaults to 0.0 if not provided — no boost, no penalty.
+        topicality = get(topicality_by_lobe, lobe_id, 0.0)
+        curved_avg = avg_conf * (1.0 + CONTEXT_TOPICALITY_CURVE_CAP * topicality)
+
+        # GRUG v7.24: gate uses raw avg_conf (not curved) — the curve only
+        # affects ordering, not admission. A lobe with high topicality but
+        # low avg_conf still doesn't pass the gate. The curve is for who
+        # speaks FIRST, not who gets to speak at all.
         passes = (avg_conf >= MULTI_LOBE_THRESHOLD) &&
                  (length(confs) >= MIN_WINNING_VOTES)
 
@@ -198,12 +239,14 @@ function summarize_lobe_votes(
             avg_conf,
             max_conf,
             passes,
+            topicality,
+            curved_avg,
         ))
     end
 
-    # GRUG: Sort descending by avg_conf so downstream planning code can walk
-    # summaries in priority order.
-    sort!(summaries, by = s -> s.avg_conf, rev = true)
+    # GRUG v7.26: Sort descending by curved_avg so domain-relevant lobes
+    # get priority in the orchestration plan. This is the whole point.
+    sort!(summaries, by = s -> s.curved_avg, rev = true)
 
     return summaries
 end
@@ -217,10 +260,10 @@ end
                                rng::AbstractRNG = Random.GLOBAL_RNG)
         ::OrchestrationPlan
 
-GRUG v7.24: Build the orchestration plan from summaries (sorted by avg_conf desc).
+GRUG v7.26: Build the orchestration plan from summaries (sorted by curved_avg desc).
 
 Rules enforced here (straight from the spec):
-  - Floor winner = lobe with max avg_conf. Exact ties: ALL tying lobes FIRE.
+  - Floor winner = lobe with max curved_avg. Exact ties: ALL tying lobes FIRE.
     A 50/50 coinflip decides WHO GOES FIRST (ordering, not admission).
     Tying lobes are NEVER gated out — they tied for first place.
   - Secondary async = the remaining tying lobes (in coinflip order), THEN
@@ -243,9 +286,11 @@ function compute_orchestration_plan(
         return OrchestrationPlan(nothing, FloorWinner[], false, summaries)
     end
 
-    # GRUG: Find exact ties at the top (avg_conf equal to the very max).
-    top_val = summaries[1].avg_conf
-    tied_at_top = filter(s -> s.avg_conf == top_val, summaries)
+    # GRUG v7.26: Find exact ties at the top using curved_avg.
+    # curved_avg = avg_conf * (1.0 + CAP * topicality), so domain-relevant
+    # lobes sort higher. Ties on curved_avg are real ties for ordering.
+    top_val = summaries[1].curved_avg
+    tied_at_top = filter(s -> s.curved_avg == top_val, summaries)
 
     # #############################################################################
     # ###  DO NOT CHANGE: TIE RULE — ALL tying lobes FIRE.                    ###
@@ -269,6 +314,8 @@ function compute_orchestration_plan(
         ordered_tied[1].lobe_id,
         ordered_tied[1].avg_conf,
         ordered_tied[1].vote_count,
+        ordered_tied[1].topicality,
+        ordered_tied[1].curved_avg,
     )
 
     # GRUG v7.24: Build the fire-order list. ALL tying lobes are guaranteed to
@@ -283,6 +330,8 @@ function compute_orchestration_plan(
             ordered_tied[i].lobe_id,
             ordered_tied[i].avg_conf,
             ordered_tied[i].vote_count,
+            ordered_tied[i].topicality,
+            ordered_tied[i].curved_avg,
         ))
     end
 
@@ -293,7 +342,7 @@ function compute_orchestration_plan(
             # Skip lobes already in the tie group (they're already guaranteed)
             any(t -> t.lobe_id == s.lobe_id, ordered_tied) && continue
             s.passes_multi_lobe_gate || continue
-            push!(secondaries, FloorWinner(s.lobe_id, s.avg_conf, s.vote_count))
+            push!(secondaries, FloorWinner(s.lobe_id, s.avg_conf, s.vote_count, s.topicality, s.curved_avg))
         end
     end
 

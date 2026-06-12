@@ -4346,14 +4346,34 @@ function process_mission(mission_text::String)
         end
 
         if !isempty(votes_by_lobe)
-            summaries = LobeOrchestrator.summarize_lobe_votes(votes_by_lobe)
+            # GRUG v7.26: Compute topicality for each lobe that has lock-in votes.
+            # topicality = thesaurus-expanded token overlap between lobe subject
+            # and mission text. Passed to summarize_lobe_votes so the context
+            # relevance curve can boost domain-relevant lobes in ordering.
+            topicality_by_lobe = Dict{String, Float64}()
+            mission_expanded = try
+                Thesaurus.thesaurus_gate_filter(mission_text)
+            catch
+                Set(lowercase.(filter(!isempty, map(strip, split(mission_text)))))
+            end
+            for lobe_id in keys(votes_by_lobe)
+                try
+                    rec = Lobe.get_lobe(lobe_id)
+                    topicality_by_lobe[lobe_id] = _compute_lobe_topicality(rec.subject, mission_expanded)
+                catch
+                    topicality_by_lobe[lobe_id] = 0.0  # GRUG: no boost if lookup fails
+                end
+            end
+
+            summaries = LobeOrchestrator.summarize_lobe_votes(votes_by_lobe;
+                                                              topicality_by_lobe = topicality_by_lobe)
             _lobe_plan = LobeOrchestrator.compute_orchestration_plan(summaries)
 
             if !isnothing(_lobe_plan.floor_winner)
                 fw = _lobe_plan.floor_winner
                 secondaries_str = isempty(_lobe_plan.secondary_async) ? "none" :
                     join([s.lobe_id for s in _lobe_plan.secondary_async], ", ")
-                println("[LOBE ORCHESTRATOR] 🏆 Floor winner: $(fw.lobe_id) (avg_conf=$(round(fw.avg_conf, digits=3)), votes=$(fw.vote_count)) | Secondaries: $secondaries_str | Tie coinflip: $(_lobe_plan.tie_resolved_by_coinflip)")
+                println("[LOBE ORCHESTRATOR] 🏆 Floor winner: $(fw.lobe_id) (avg_conf=$(round(fw.avg_conf, digits=3)), topicality=$(round(fw.topicality, digits=3)), curved=$(round(fw.curved_avg, digits=3)), votes=$(fw.vote_count)) | Secondaries: $secondaries_str | Tie coinflip: $(_lobe_plan.tie_resolved_by_coinflip)")
 
                 # GRUG v7.24: REORDER cast_votes so floor winner's votes come first,
                 # then secondary async lobes, then everyone else.
