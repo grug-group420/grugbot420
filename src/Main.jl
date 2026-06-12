@@ -2209,10 +2209,13 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         # but for single-clause inputs the MultipartOrchestrator would group them incorrectly
         # and set scoped_mission to the payload text instead of the original user input.
         try
-            _pre_all = vcat(sure_votes, unsure_votes)
+            # GRUG v7.22: Only pass LOCKED-IN votes (sure_votes) to the orchestrator.
+            # Unsure votes (support + hedge) are noise for grouping — they can
+            # have stale/wrong objective_ids and pull scoped_mission off-track.
+            # They still go to COMMANDS for rendering; they just don't GROUP.
             _pre_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
             _pre_obj_ids = lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do; copy(_CURRENT_CLAUSE_OBJ_IDS); end
-            _pre_result = MultipartOrchestrator.orchestrate_multipart(_pre_all, _pre_clauses, _pre_obj_ids)
+            _pre_result = MultipartOrchestrator.orchestrate_multipart(sure_votes, _pre_clauses, _pre_obj_ids)
             for _pre_grp in _pre_result.groups
                 if _pre_grp.objective_id == _primary_obj_id
                     _primary_scoped_mission = _pre_grp.scoped_mission
@@ -2348,12 +2351,16 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     #   - Math clauses get "Thinking it through: the calculation. 4"
     #   - Knowledge clauses get "Here is the picture: the sky is..." 
     #   - NOT raw "4" appended to a garbled compound response
-    _all_votes = vcat(sure_votes, unsure_votes)
-    _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _all_votes)
+    # GRUG v7.22: Only pass LOCKED-IN votes to the multipart orchestrator.
+    # Unsure votes are rendering noise (support/hedge), not grouping signal.
+    # They still render via COMMANDS; they just don't get to influence
+    # which clause a group belongs to or what scoped_mission it gets.
+    _locked_votes = sure_votes
+    _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _locked_votes)
     if _has_multipart
         try
             _mp_clauses = _saved_clauses  # GRUG v7.21: use saved copy (cleared in finally above)
-            mp_result = MultipartOrchestrator.orchestrate_multipart(_all_votes, _mp_clauses, _saved_clause_obj_ids)
+            mp_result = MultipartOrchestrator.orchestrate_multipart(_locked_votes, _mp_clauses, _saved_clause_obj_ids)
             _primary_obj = getfield(primary_vote, :objective_id)
             for grp in mp_result.groups
                 if grp.objective_id == _primary_obj
