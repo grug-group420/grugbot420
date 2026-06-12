@@ -144,6 +144,18 @@ if !isdefined(@__MODULE__, :DynamicActionTonePredictor)
     using .DynamicActionTonePredictor
 end
 
+# GRUG v7.28: SelfObserver (needed for specimen restore).
+if !isdefined(@__MODULE__, :SelfObserver)
+    include("SelfObserver.jl")
+    using .SelfObserver
+end
+
+# GRUG v7.28: SigilRegistry (needed for specimen restore).
+if !isdefined(@__MODULE__, :SigilRegistry)
+    include("SigilRegistry.jl")
+    using .SigilRegistry
+end
+
 # GRUG v7.15: PhagyGroupOrganizer (depends on GroupRegistry).
 if !isdefined(@__MODULE__, :PhagyGroupOrganizer)
     include("PhagyGroupOrganizer.jl")
@@ -5188,6 +5200,8 @@ function load_specimen_from_file!(filepath::String)::String
                         "chatter_cooldowns", "chatter_cursor", "chatter_groups", "chatter_residuals",
                         "node_to_group_idx", "last_contributor_votes", "lobe_orch_last",
                         "phagy_rules_ref", "admin_session", "brainstem_config",
+                        # GRUG v7.28: additional save state keys from newer save cycles
+                        "decomposer_state", "macro_state", "arithmetic_state", "stepvote_state",
                         "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
