@@ -1,0 +1,7512 @@
+{
+  "last_voters": [],
+  "inhibitions": [
+    {
+      "reason": "shallow attention hook",
+      "added_at": 1.778712649590425e9,
+      "word": "clickbait"
+    },
+    {
+      "reason": "generic inbox pollution word",
+      "added_at": 1.778712649590407e9,
+      "word": "spam"
+    },
+    {
+      "reason": "manipulative one-sided framing",
+      "added_at": 1.778712649590431e9,
+      "word": "propaganda"
+    }
+  ],
+  "lobes": [
+    {
+      "created_at": 1.778712649177048e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "emotions",
+      "node_ids": [
+        "node_43",
+        "node_44",
+        "node_45",
+        "node_46",
+        "node_47",
+        "node_48",
+        "node_49",
+        "node_50"
+      ],
+      "connected_lobe_ids": [
+        "daily_life"
+      ],
+      "inhibit_count": 0,
+      "subject": "feelings moods and social bonds"
+    },
+    {
+      "created_at": 1.778712649177039e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "daily_life",
+      "node_ids": [
+        "node_35",
+        "node_36",
+        "node_37",
+        "node_38",
+        "node_39",
+        "node_40",
+        "node_41",
+        "node_42"
+      ],
+      "connected_lobe_ids": [
+        "emotions",
+        "nature"
+      ],
+      "inhibit_count": 0,
+      "subject": "food sleep work home and routine"
+    },
+    {
+      "created_at": 1.77871264917702e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "philosophy",
+      "node_ids": [
+        "node_19",
+        "node_20",
+        "node_21",
+        "node_22",
+        "node_23",
+        "node_24",
+        "node_25",
+        "node_26"
+      ],
+      "connected_lobe_ids": [
+        "nature",
+        "science"
+      ],
+      "inhibit_count": 0,
+      "subject": "meaning ethics logic and existence"
+    },
+    {
+      "created_at": 1.778712649176949e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "science",
+      "node_ids": [
+        "node_10",
+        "node_3",
+        "node_4",
+        "node_5",
+        "node_6",
+        "node_7",
+        "node_8",
+        "node_9"
+      ],
+      "connected_lobe_ids": [
+        "philosophy",
+        "technology"
+      ],
+      "inhibit_count": 0,
+      "subject": "scientific concepts and the natural laws"
+    },
+    {
+      "created_at": 1.778712649177009e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "technology",
+      "node_ids": [
+        "node_11",
+        "node_12",
+        "node_13",
+        "node_14",
+        "node_15",
+        "node_16",
+        "node_17",
+        "node_18"
+      ],
+      "connected_lobe_ids": [
+        "science"
+      ],
+      "inhibit_count": 0,
+      "subject": "computers software hardware networks and engineering"
+    },
+    {
+      "created_at": 1.77871264917703e9,
+      "fire_count": 0,
+      "node_cap": 20000,
+      "id": "nature",
+      "node_ids": [
+        "node_27",
+        "node_28",
+        "node_29",
+        "node_30",
+        "node_31",
+        "node_32",
+        "node_33",
+        "node_34"
+      ],
+      "connected_lobe_ids": [
+        "daily_life",
+        "philosophy"
+      ],
+      "inhibit_count": 0,
+      "subject": "plants animals weather and ecosystems"
+    }
+  ],
+  "node_to_lobe_idx": {
+    "node_20": "philosophy",
+    "node_24": "philosophy",
+    "node_14": "technology",
+    "node_30": "nature",
+    "node_43": "emotions",
+    "node_10": "science",
+    "node_48": "emotions",
+    "node_41": "daily_life",
+    "node_49": "emotions",
+    "node_7": "science",
+    "node_15": "technology",
+    "node_25": "philosophy",
+    "node_23": "philosophy",
+    "node_34": "nature",
+    "node_3": "science",
+    "node_11": "technology",
+    "node_50": "emotions",
+    "node_16": "technology",
+    "node_38": "daily_life",
+    "node_18": "technology",
+    "node_44": "emotions",
+    "node_39": "daily_life",
+    "node_9": "science",
+    "node_4": "science",
+    "node_46": "emotions",
+    "node_17": "technology",
+    "node_32": "nature",
+    "node_26": "philosophy",
+    "node_28": "nature",
+    "node_33": "nature",
+    "node_35": "daily_life",
+    "node_5": "science",
+    "node_13": "technology",
+    "node_8": "science",
+    "node_21": "philosophy",
+    "node_37": "daily_life",
+    "node_45": "emotions",
+    "node_42": "daily_life",
+    "node_47": "emotions",
+    "node_22": "philosophy",
+    "node_27": "nature",
+    "node_19": "philosophy",
+    "node_6": "science",
+    "node_29": "nature",
+    "node_31": "nature",
+    "node_36": "daily_life",
+    "node_12": "technology",
+    "node_40": "daily_life"
+  },
+  "brainstem": {
+    "dispatch_count": 0,
+    "last_dispatch_t": 0.0,
+    "propagation_history": [],
+    "last_winner_id": ""
+  },
+  "message_history": [
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 0,
+      "pinned": true,
+      "text": "grug believes biology cannot be guardrailed only evolved"
+    },
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 1,
+      "pinned": true,
+      "text": "transformers are one organ not the whole body of intelligence"
+    },
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 2,
+      "pinned": true,
+      "text": "stochastic resonance is the ubiquitous jitter with snap back"
+    },
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 3,
+      "pinned": true,
+      "text": "llms should be architects not oracles generating structure not answers"
+    },
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 4,
+      "pinned": true,
+      "text": "every ai camp discovered one biological mechanism and they all belong together"
+    },
+    {
+      "intensity": 1.0,
+      "role": "User_Pinned",
+      "id": 5,
+      "pinned": true,
+      "text": "simulation theory is unfalsifiable and confuses map with territory"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 6,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_4' to 'node_3' with pattern \"atoms and gravity both act across space\" (base_conf=0.127, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 7,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_6' to 'node_5' with pattern \"dna mutation drives evolution\" (base_conf=0.05, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 8,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_8' to 'node_7' with pattern \"energy and light are both electromagneti\" (base_conf=0.133, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 9,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_12' to 'node_11' with pattern \"computers run neural networks\" (base_conf=0.272, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 10,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_14' to 'node_13' with pattern \"internet carries encrypted packets\" (base_conf=0.05, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 11,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_20' to 'node_19' with pattern \"meaning shapes ethics\" (base_conf=0.15, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 12,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_24' to 'node_23' with pattern \"simulation theory fails basic logic\" (base_conf=0.272, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 13,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_28' to 'node_27' with pattern \"trees line rivers in the forest\" (base_conf=0.217, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 14,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_32' to 'node_31' with pattern \"fungi help tides of life continue\" (base_conf=0.127, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 15,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_36' to 'node_35' with pattern \"sleep and food both restore energy\" (base_conf=0.323, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 16,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_44' to 'node_43' with pattern \"joy and fear are both warnings from the \" (base_conf=0.281, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 17,
+      "pinned": false,
+      "text": "/nodeAttach: Attached 'node_48' to 'node_47' with pattern \"love grows calm between two people\" (base_conf=0.232, 1/4)"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 18,
+      "pinned": false,
+      "text": "/groupRegister core_science node_3"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 19,
+      "pinned": false,
+      "text": "/groupRegister core_science node_4"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 20,
+      "pinned": false,
+      "text": "/groupRegister core_science node_5"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 21,
+      "pinned": false,
+      "text": "/groupRegister core_science node_8"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 22,
+      "pinned": false,
+      "text": "/groupRegister core_tech node_11"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 23,
+      "pinned": false,
+      "text": "/groupRegister core_tech node_12"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 24,
+      "pinned": false,
+      "text": "/groupRegister core_tech node_13"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 25,
+      "pinned": false,
+      "text": "/groupRegister core_phil node_19"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 26,
+      "pinned": false,
+      "text": "/groupRegister core_phil node_22"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 27,
+      "pinned": false,
+      "text": "/groupRegister core_phil node_24"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 28,
+      "pinned": false,
+      "text": "/groupRegister core_phil node_25"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 29,
+      "pinned": false,
+      "text": "/groupRegister core_phil node_26"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 30,
+      "pinned": false,
+      "text": "/groupRegister core_life node_35"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 31,
+      "pinned": false,
+      "text": "/groupRegister core_life node_36"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 32,
+      "pinned": false,
+      "text": "/groupRegister core_emotion node_43"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 33,
+      "pinned": false,
+      "text": "/groupRegister core_emotion node_48"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 34,
+      "pinned": false,
+      "text": "/crystalize node_22"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 35,
+      "pinned": false,
+      "text": "/crystalize node_25"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 36,
+      "pinned": false,
+      "text": "/crystalize node_26"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 37,
+      "pinned": false,
+      "text": "/crystalize node_48"
+    },
+    {
+      "intensity": 1.0,
+      "role": "System",
+      "id": 38,
+      "pinned": false,
+      "text": "/saveSpecimen test_run/grug_seeded.specimen.gz"
+    }
+  ],
+  "id_counters": {
+    "node_id_counter": 51,
+    "msg_id_counter": 39
+  },
+  "verb_registry": {
+    "classes": {
+      "causal": [
+        "causes",
+        "contradicts",
+        "hits",
+        "increases",
+        "makes",
+        "reduces",
+        "routes"
+      ],
+      "describe": [
+        "describe",
+        "narrate",
+        "recount"
+      ],
+      "empathize": [
+        "empathize",
+        "relate",
+        "understand"
+      ],
+      "explain": [
+        "clarify",
+        "elaborate",
+        "explain"
+      ],
+      "spatial": [
+        "are",
+        "connects",
+        "is",
+        "was",
+        "were"
+      ],
+      "reflect": [
+        "consider",
+        "ponder",
+        "reflect"
+      ],
+      "temporal": [
+        "chasing",
+        "follows",
+        "precedes"
+      ]
+    },
+    "synonyms": {
+      "sympathize": "empathize",
+      "portray": "describe",
+      "contemplate": "reflect",
+      "expound": "explain"
+    }
+  },
+  "hopfield_cache": [],
+  "immune_system": {
+    "hopfield": {},
+    "ledger": []
+  },
+  "thesaurus_seeds": {
+    "build": [
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "want": [
+      "demand",
+      "desire",
+      "lack",
+      "need",
+      "require"
+    ],
+    "contemplate": [
+      "consider",
+      "ponder",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "observe": [
+      "detect",
+      "examine",
+      "inspect",
+      "look",
+      "measure",
+      "monitor",
+      "record",
+      "see",
+      "track",
+      "view",
+      "watch"
+    ],
+    "occupation": [
+      "career",
+      "employment",
+      "job",
+      "profession",
+      "work"
+    ],
+    "fearful": [
+      "afraid",
+      "anxious",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "give": [
+      "deliver",
+      "grant",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "truth": [
+      "actuality",
+      "fact",
+      "reality",
+      "validity",
+      "verity"
+    ],
+    "icy": [
+      "chilly",
+      "cold",
+      "cool",
+      "freezing",
+      "frigid"
+    ],
+    "solid": [
+      "mighty",
+      "powerful",
+      "robust",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "fast": [
+      "brisk",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "employment": [
+      "career",
+      "job",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "relaxed": [
+      "calm",
+      "composed",
+      "peaceful",
+      "serene",
+      "tranquil"
+    ],
+    "weary": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "tired"
+    ],
+    "force": [
+      "capacity",
+      "charge",
+      "energy",
+      "potential",
+      "power"
+    ],
+    "move": [
+      "migrate",
+      "relocate",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "damage": [
+      "break",
+      "crack",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "theoretical": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "notional"
+    ],
+    "walk": [
+      "march",
+      "stride",
+      "stroll",
+      "trek",
+      "wander"
+    ],
+    "say": [
+      "chat",
+      "converse",
+      "discuss",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "make": [
+      "build",
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "produce"
+    ],
+    "associate": [
+      "attach",
+      "bind",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "residence": [
+      "building",
+      "dwelling",
+      "home",
+      "house",
+      "place"
+    ],
+    "try": [
+      "attempt",
+      "endeavor",
+      "experiment",
+      "strive",
+      "test"
+    ],
+    "principled": [
+      "ethical",
+      "just",
+      "moral",
+      "righteous",
+      "virtuous"
+    ],
+    "postulate": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "supposition",
+      "theory"
+    ],
+    "plan": [
+      "approach",
+      "concept",
+      "design",
+      "idea",
+      "method",
+      "notion",
+      "proposal",
+      "scheme",
+      "strategy",
+      "thought"
+    ],
+    "search": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "scan",
+      "seek"
+    ],
+    "hypothetical": [
+      "abstract",
+      "conceptual",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "product": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "outcome",
+      "output",
+      "reply",
+      "response",
+      "result"
+    ],
+    "cease": [
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "tranquil": [
+      "calm",
+      "composed",
+      "peaceful",
+      "relaxed",
+      "serene"
+    ],
+    "dispatch": [
+      "forward",
+      "push",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "repair": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "resolve",
+      "restore"
+    ],
+    "auto": [
+      "automobile",
+      "car",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "support": [
+      "aid",
+      "assist",
+      "facilitate",
+      "help",
+      "serve"
+    ],
+    "chilly": [
+      "cold",
+      "cool",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "shift": [
+      "migrate",
+      "move",
+      "relocate",
+      "transfer",
+      "transport"
+    ],
+    "bold": [
+      "brave",
+      "courageous",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "correct": [
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "basic": [
+      "easy",
+      "effortless",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "progress": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "mutate",
+      "transform"
+    ],
+    "train": [
+      "adapt",
+      "evolve",
+      "improve",
+      "learn",
+      "study"
+    ],
+    "cuisine": [
+      "dish",
+      "food",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "align": [
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "cache": [
+      "archive",
+      "keep",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "reality": [
+      "actuality",
+      "fact",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "failure": [
+      "bug",
+      "defect",
+      "error",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "livid": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "mad",
+      "wrathful"
+    ],
+    "sorrowful": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "unhappy"
+    ],
+    "response": [
+      "answer",
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "result",
+      "solution"
+    ],
+    "nervous": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "strenuous": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "hard",
+      "tough"
+    ],
+    "faith": [
+      "belief",
+      "conviction",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "finance": [
+      "capital",
+      "cash",
+      "currency",
+      "funds",
+      "money"
+    ],
+    "conviction": [
+      "belief",
+      "faith",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "trivial": [
+      "basic",
+      "easy",
+      "effortless",
+      "simple",
+      "straightforward"
+    ],
+    "generate": [
+      "cause",
+      "create",
+      "induce",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "question": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "probe",
+      "query"
+    ],
+    "thought": [
+      "concept",
+      "idea",
+      "notion",
+      "plan",
+      "proposal"
+    ],
+    "find": [
+      "detect",
+      "discover",
+      "explore",
+      "identify",
+      "locate",
+      "look",
+      "query",
+      "scan",
+      "search",
+      "seek",
+      "uncover"
+    ],
+    "fluid": [
+      "beverage",
+      "drink",
+      "liquid",
+      "water"
+    ],
+    "proposal": [
+      "concept",
+      "idea",
+      "notion",
+      "plan",
+      "thought"
+    ],
+    "validity": [
+      "actuality",
+      "fact",
+      "reality",
+      "truth",
+      "verity"
+    ],
+    "track": [
+      "detect",
+      "measure",
+      "monitor",
+      "observe",
+      "record"
+    ],
+    "potential": [
+      "capacity",
+      "charge",
+      "energy",
+      "force",
+      "power"
+    ],
+    "subsist": [
+      "be",
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "remain"
+    ],
+    "evaluate": [
+      "analyze",
+      "assess",
+      "calculate",
+      "examine",
+      "gauge",
+      "investigate",
+      "measure",
+      "quantify",
+      "study"
+    ],
+    "excited": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "keen",
+      "thrilled"
+    ],
+    "restore": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "resolve"
+    ],
+    "job": [
+      "career",
+      "employment",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "bewildered": [
+      "baffled",
+      "confused",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "purge": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "remove",
+      "wipe"
+    ],
+    "pleased": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful"
+    ],
+    "retrieve": [
+      "acquire",
+      "fetch",
+      "gain",
+      "get",
+      "import",
+      "load",
+      "obtain",
+      "open",
+      "read",
+      "receive"
+    ],
+    "tired": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "weary"
+    ],
+    "keen": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "excited",
+      "thrilled"
+    ],
+    "freezing": [
+      "chilly",
+      "cold",
+      "cool",
+      "frigid",
+      "icy"
+    ],
+    "locate": [
+      "detect",
+      "discover",
+      "find",
+      "identify",
+      "uncover"
+    ],
+    "virtuous": [
+      "ethical",
+      "just",
+      "moral",
+      "principled",
+      "righteous"
+    ],
+    "ponder": [
+      "consider",
+      "contemplate",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "righteous": [
+      "ethical",
+      "just",
+      "moral",
+      "principled",
+      "virtuous"
+    ],
+    "get": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "obtain",
+      "pull",
+      "receive",
+      "retrieve"
+    ],
+    "be": [
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "record": [
+      "archive",
+      "cache",
+      "detect",
+      "keep",
+      "measure",
+      "monitor",
+      "observe",
+      "persist",
+      "save",
+      "store",
+      "track"
+    ],
+    "inference": [
+      "argument",
+      "deduction",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "burning": [
+      "boiling",
+      "fiery",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "message": [
+      "input",
+      "prompt",
+      "query",
+      "request",
+      "signal"
+    ],
+    "matter": [
+      "element",
+      "mass",
+      "material",
+      "stuff",
+      "substance"
+    ],
+    "probe": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "query",
+      "question"
+    ],
+    "large": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "massive",
+      "vast"
+    ],
+    "mistake": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "flaw"
+    ],
+    "melancholy": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "perplexed": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "lost",
+      "puzzled"
+    ],
+    "simple": [
+      "basic",
+      "easy",
+      "effortless",
+      "straightforward",
+      "trivial"
+    ],
+    "patch": [
+      "correct",
+      "fix",
+      "mend",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "easy": [
+      "basic",
+      "effortless",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "automobile": [
+      "auto",
+      "car",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "mindfulness": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "perception",
+      "sentience"
+    ],
+    "wipe": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "remove"
+    ],
+    "grasp": [
+      "comprehend",
+      "know",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "facilitate": [
+      "aid",
+      "assist",
+      "help",
+      "serve",
+      "support"
+    ],
+    "attempt": [
+      "endeavor",
+      "experiment",
+      "strive",
+      "test",
+      "try"
+    ],
+    "platform": [
+      "architecture",
+      "framework",
+      "structure",
+      "system"
+    ],
+    "mass": [
+      "element",
+      "material",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "dash": [
+      "jog",
+      "race",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "profession": [
+      "career",
+      "employment",
+      "job",
+      "occupation",
+      "work"
+    ],
+    "archive": [
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "work": [
+      "career",
+      "employment",
+      "job",
+      "occupation",
+      "profession"
+    ],
+    "straightforward": [
+      "basic",
+      "easy",
+      "effortless",
+      "simple",
+      "trivial"
+    ],
+    "delicate": [
+      "feeble",
+      "fragile",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "daring": [
+      "bold",
+      "brave",
+      "courageous",
+      "fearless",
+      "heroic"
+    ],
+    "send": [
+      "dispatch",
+      "forward",
+      "push",
+      "route",
+      "transmit"
+    ],
+    "end": [
+      "cease",
+      "finish",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "hypothesis": [
+      "assumption",
+      "conjecture",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "speak": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "talk",
+      "tell"
+    ],
+    "load": [
+      "fetch",
+      "import",
+      "open",
+      "read",
+      "retrieve"
+    ],
+    "initiate": [
+      "begin",
+      "commence",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "dwelling": [
+      "building",
+      "home",
+      "house",
+      "place",
+      "residence"
+    ],
+    "deduction": [
+      "argument",
+      "inference",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "inquiry": [
+      "challenge",
+      "doubt",
+      "interrogate",
+      "probe",
+      "query",
+      "question"
+    ],
+    "read": [
+      "fetch",
+      "import",
+      "load",
+      "open",
+      "retrieve"
+    ],
+    "induce": [
+      "cause",
+      "create",
+      "generate",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "understand": [
+      "comprehend",
+      "grasp",
+      "know",
+      "realize",
+      "recognize"
+    ],
+    "mutate": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "progress",
+      "transform"
+    ],
+    "boiling": [
+      "burning",
+      "fiery",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "commence": [
+      "begin",
+      "initiate",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "data": [
+      "facts",
+      "info",
+      "information",
+      "records",
+      "stats"
+    ],
+    "remain": [
+      "be",
+      "exist",
+      "live",
+      "occur",
+      "persist",
+      "subsist"
+    ],
+    "obtain": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "get",
+      "pull",
+      "receive",
+      "retrieve"
+    ],
+    "element": [
+      "mass",
+      "material",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "live": [
+      "be",
+      "exist",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "heroic": [
+      "bold",
+      "brave",
+      "courageous",
+      "daring",
+      "fearless"
+    ],
+    "conjecture": [
+      "assumption",
+      "hypothesis",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "defect": [
+      "bug",
+      "error",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "elated": [
+      "cheerful",
+      "content",
+      "delighted",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "ethical": [
+      "just",
+      "moral",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "theory": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "supposition"
+    ],
+    "content": [
+      "cheerful",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "lead": [
+      "cause",
+      "create",
+      "generate",
+      "induce",
+      "produce",
+      "trigger"
+    ],
+    "procedure": [
+      "experiment",
+      "investigation",
+      "study",
+      "test",
+      "trial"
+    ],
+    "structure": [
+      "architecture",
+      "framework",
+      "platform",
+      "system"
+    ],
+    "puzzled": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "lost",
+      "perplexed"
+    ],
+    "swift": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy"
+    ],
+    "tiny": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "small"
+    ],
+    "downcast": [
+      "dejected",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "break": [
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "frigid": [
+      "chilly",
+      "cold",
+      "cool",
+      "freezing",
+      "icy"
+    ],
+    "keep": [
+      "archive",
+      "cache",
+      "persist",
+      "record",
+      "save",
+      "store"
+    ],
+    "method": [
+      "approach",
+      "design",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "launch": [
+      "begin",
+      "commence",
+      "initiate",
+      "start",
+      "trigger"
+    ],
+    "infer": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "predict",
+      "project"
+    ],
+    "erase": [
+      "clear",
+      "delete",
+      "drop",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "cold": [
+      "chilly",
+      "cool",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "learn": [
+      "adapt",
+      "evolve",
+      "improve",
+      "study",
+      "train"
+    ],
+    "vast": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "massive"
+    ],
+    "beverage": [
+      "drink",
+      "fluid",
+      "liquid",
+      "water"
+    ],
+    "logic": [
+      "argument",
+      "deduction",
+      "inference",
+      "rationale",
+      "reasoning"
+    ],
+    "shatter": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin"
+    ],
+    "push": [
+      "dispatch",
+      "forward",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "assert": [
+      "argue",
+      "claim",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "strong": [
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "sturdy",
+      "tough"
+    ],
+    "drop": [
+      "clear",
+      "delete",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "hard": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "strenuous",
+      "tough"
+    ],
+    "run": [
+      "dash",
+      "jog",
+      "race",
+      "rush",
+      "sprint"
+    ],
+    "stunned": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "startled",
+      "surprised"
+    ],
+    "trial": [
+      "experiment",
+      "investigation",
+      "procedure",
+      "study",
+      "test"
+    ],
+    "hot": [
+      "boiling",
+      "burning",
+      "fiery",
+      "scorching",
+      "warm"
+    ],
+    "compact": [
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "eager": [
+      "animated",
+      "enthusiastic",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "examine": [
+      "analyze",
+      "assess",
+      "check",
+      "evaluate",
+      "inspect",
+      "investigate",
+      "look",
+      "observe",
+      "see",
+      "study",
+      "test",
+      "validate",
+      "verify",
+      "view",
+      "watch"
+    ],
+    "grant": [
+      "deliver",
+      "give",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "rationale": [
+      "argument",
+      "deduction",
+      "inference",
+      "logic",
+      "reasoning"
+    ],
+    "prompt": [
+      "input",
+      "message",
+      "query",
+      "request",
+      "signal"
+    ],
+    "idea": [
+      "concept",
+      "notion",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "mend": [
+      "correct",
+      "fix",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "resolve": [
+      "correct",
+      "fix",
+      "mend",
+      "patch",
+      "repair",
+      "restore"
+    ],
+    "match": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "pair"
+    ],
+    "seek": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "scan",
+      "search"
+    ],
+    "transport": [
+      "migrate",
+      "move",
+      "relocate",
+      "shift",
+      "transfer"
+    ],
+    "drained": [
+      "exhausted",
+      "fatigued",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "employ": [
+      "apply",
+      "leverage",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "brisk": [
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "powerless": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "frail",
+      "weak"
+    ],
+    "composed": [
+      "calm",
+      "peaceful",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "notion": [
+      "concept",
+      "idea",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "contend": [
+      "argue",
+      "assert",
+      "claim",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "trouble": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "obstacle",
+      "problem"
+    ],
+    "start": [
+      "begin",
+      "commence",
+      "initiate",
+      "launch",
+      "trigger"
+    ],
+    "insight": [
+      "awareness",
+      "cognition",
+      "knowledge",
+      "understanding",
+      "wisdom"
+    ],
+    "afraid": [
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "irate": [
+      "angry",
+      "enraged",
+      "furious",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "strategy": [
+      "approach",
+      "design",
+      "method",
+      "plan",
+      "scheme"
+    ],
+    "aid": [
+      "assist",
+      "facilitate",
+      "help",
+      "serve",
+      "support"
+    ],
+    "begin": [
+      "commence",
+      "initiate",
+      "launch",
+      "start",
+      "trigger"
+    ],
+    "explore": [
+      "find",
+      "look",
+      "query",
+      "scan",
+      "search",
+      "seek"
+    ],
+    "courageous": [
+      "bold",
+      "brave",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "enormous": [
+      "big",
+      "gigantic",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "surprised": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "startled",
+      "stunned"
+    ],
+    "ruin": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "fracture",
+      "shatter"
+    ],
+    "quick": [
+      "brisk",
+      "fast",
+      "hasty",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "reasoning": [
+      "argument",
+      "deduction",
+      "inference",
+      "logic",
+      "rationale"
+    ],
+    "material": [
+      "element",
+      "mass",
+      "matter",
+      "stuff",
+      "substance"
+    ],
+    "shocked": [
+      "amazed",
+      "astonished",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "comprehend": [
+      "grasp",
+      "know",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "plodding": [
+      "gradual",
+      "leisurely",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "supply": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "provide"
+    ],
+    "reason": [
+      "argue",
+      "assert",
+      "claim",
+      "consider",
+      "contemplate",
+      "contend",
+      "debate",
+      "ponder",
+      "posit",
+      "reflect",
+      "think"
+    ],
+    "framework": [
+      "architecture",
+      "platform",
+      "structure",
+      "system"
+    ],
+    "chat": [
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "records": [
+      "data",
+      "facts",
+      "info",
+      "information",
+      "stats"
+    ],
+    "unhurried": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "slow",
+      "sluggish"
+    ],
+    "utilize": [
+      "apply",
+      "employ",
+      "leverage",
+      "operate",
+      "use"
+    ],
+    "lost": [
+      "baffled",
+      "bewildered",
+      "confused",
+      "perplexed",
+      "puzzled"
+    ],
+    "leisurely": [
+      "gradual",
+      "plodding",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "furious": [
+      "angry",
+      "enraged",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "scared": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "terrified",
+      "worried"
+    ],
+    "warm": [
+      "boiling",
+      "burning",
+      "fiery",
+      "hot",
+      "scorching"
+    ],
+    "fragile": [
+      "delicate",
+      "feeble",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "stance": [
+      "belief",
+      "conviction",
+      "faith",
+      "opinion",
+      "position",
+      "view"
+    ],
+    "frail": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "powerless",
+      "weak"
+    ],
+    "project": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "infer",
+      "predict"
+    ],
+    "car": [
+      "auto",
+      "automobile",
+      "ride",
+      "truck",
+      "vehicle"
+    ],
+    "bind": [
+      "associate",
+      "attach",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "sleepy": [
+      "drained",
+      "exhausted",
+      "fatigued",
+      "tired",
+      "weary"
+    ],
+    "worried": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified"
+    ],
+    "march": [
+      "stride",
+      "stroll",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "petite": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "small",
+      "tiny"
+    ],
+    "sturdy": [
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "strong",
+      "tough"
+    ],
+    "obstacle": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "problem",
+      "trouble"
+    ],
+    "home": [
+      "building",
+      "dwelling",
+      "house",
+      "place",
+      "residence"
+    ],
+    "career": [
+      "employment",
+      "job",
+      "occupation",
+      "profession",
+      "work"
+    ],
+    "just": [
+      "ethical",
+      "moral",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "stroll": [
+      "march",
+      "stride",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "difficulty": [
+      "challenge",
+      "issue",
+      "obstacle",
+      "problem",
+      "trouble"
+    ],
+    "fetch": [
+      "acquire",
+      "gain",
+      "get",
+      "import",
+      "load",
+      "obtain",
+      "open",
+      "read",
+      "receive",
+      "retrieve"
+    ],
+    "fix": [
+      "correct",
+      "mend",
+      "patch",
+      "repair",
+      "resolve",
+      "restore"
+    ],
+    "enraged": [
+      "angry",
+      "furious",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "create": [
+      "build",
+      "cause",
+      "construct",
+      "craft",
+      "form",
+      "generate",
+      "induce",
+      "lead",
+      "make",
+      "produce",
+      "trigger"
+    ],
+    "fearless": [
+      "bold",
+      "brave",
+      "courageous",
+      "daring",
+      "heroic"
+    ],
+    "crack": [
+      "break",
+      "damage",
+      "destroy",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "answer": [
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "response",
+      "result",
+      "solution"
+    ],
+    "apply": [
+      "employ",
+      "leverage",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "need": [
+      "demand",
+      "desire",
+      "lack",
+      "require",
+      "want"
+    ],
+    "scheme": [
+      "approach",
+      "design",
+      "method",
+      "plan",
+      "strategy"
+    ],
+    "improve": [
+      "adapt",
+      "evolve",
+      "learn",
+      "study",
+      "train"
+    ],
+    "hasty": [
+      "brisk",
+      "fast",
+      "quick",
+      "rapid",
+      "speedy",
+      "swift"
+    ],
+    "intangible": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "notional",
+      "theoretical"
+    ],
+    "sad": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sorrowful",
+      "unhappy"
+    ],
+    "building": [
+      "dwelling",
+      "home",
+      "house",
+      "place",
+      "residence"
+    ],
+    "acquire": [
+      "fetch",
+      "gain",
+      "get",
+      "obtain",
+      "receive",
+      "retrieve"
+    ],
+    "provide": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "supply"
+    ],
+    "cool": [
+      "chilly",
+      "cold",
+      "freezing",
+      "frigid",
+      "icy"
+    ],
+    "ride": [
+      "auto",
+      "automobile",
+      "car",
+      "truck",
+      "vehicle"
+    ],
+    "thrilled": [
+      "animated",
+      "eager",
+      "enthusiastic",
+      "excited",
+      "keen"
+    ],
+    "gradual": [
+      "leisurely",
+      "plodding",
+      "slow",
+      "sluggish",
+      "unhurried"
+    ],
+    "evolve": [
+      "adapt",
+      "change",
+      "develop",
+      "improve",
+      "learn",
+      "mutate",
+      "progress",
+      "study",
+      "train",
+      "transform"
+    ],
+    "halt": [
+      "cease",
+      "end",
+      "finish",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "animated": [
+      "eager",
+      "enthusiastic",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "produce": [
+      "build",
+      "cause",
+      "construct",
+      "craft",
+      "create",
+      "form",
+      "generate",
+      "induce",
+      "lead",
+      "make",
+      "trigger"
+    ],
+    "attach": [
+      "associate",
+      "bind",
+      "connect",
+      "join",
+      "link",
+      "wire"
+    ],
+    "serene": [
+      "calm",
+      "composed",
+      "peaceful",
+      "relaxed",
+      "tranquil"
+    ],
+    "output": [
+      "answer",
+      "product",
+      "reply",
+      "response",
+      "result"
+    ],
+    "delighted": [
+      "cheerful",
+      "content",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "rush": [
+      "dash",
+      "jog",
+      "race",
+      "run",
+      "sprint"
+    ],
+    "brave": [
+      "bold",
+      "courageous",
+      "daring",
+      "fearless",
+      "heroic"
+    ],
+    "challenging": [
+      "arduous",
+      "difficult",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "view": [
+      "belief",
+      "conviction",
+      "examine",
+      "faith",
+      "inspect",
+      "look",
+      "observe",
+      "opinion",
+      "position",
+      "see",
+      "stance",
+      "watch"
+    ],
+    "system": [
+      "architecture",
+      "framework",
+      "platform",
+      "structure"
+    ],
+    "remove": [
+      "clear",
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "wipe"
+    ],
+    "wisdom": [
+      "awareness",
+      "cognition",
+      "insight",
+      "knowledge",
+      "understanding"
+    ],
+    "map": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "match",
+      "pair"
+    ],
+    "terrified": [
+      "afraid",
+      "anxious",
+      "fearful",
+      "nervous",
+      "scared",
+      "worried"
+    ],
+    "arduous": [
+      "challenging",
+      "difficult",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "facts": [
+      "data",
+      "info",
+      "information",
+      "records",
+      "stats"
+    ],
+    "demonstrate": [
+      "display",
+      "exhibit",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "stride": [
+      "march",
+      "stroll",
+      "trek",
+      "walk",
+      "wander"
+    ],
+    "detect": [
+      "discover",
+      "find",
+      "identify",
+      "locate",
+      "measure",
+      "monitor",
+      "observe",
+      "record",
+      "track",
+      "uncover"
+    ],
+    "endeavor": [
+      "attempt",
+      "experiment",
+      "strive",
+      "test",
+      "try"
+    ],
+    "solution": [
+      "answer",
+      "outcome",
+      "reply",
+      "response",
+      "result"
+    ],
+    "anticipate": [
+      "estimate",
+      "forecast",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "trigger": [
+      "begin",
+      "cause",
+      "commence",
+      "create",
+      "generate",
+      "induce",
+      "initiate",
+      "launch",
+      "lead",
+      "produce",
+      "start"
+    ],
+    "belief": [
+      "conviction",
+      "faith",
+      "opinion",
+      "position",
+      "stance",
+      "view"
+    ],
+    "doubt": [
+      "challenge",
+      "inquiry",
+      "interrogate",
+      "probe",
+      "query",
+      "question"
+    ],
+    "stop": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "terminate"
+    ],
+    "verify": [
+      "assess",
+      "check",
+      "examine",
+      "test",
+      "validate"
+    ],
+    "persist": [
+      "archive",
+      "be",
+      "cache",
+      "exist",
+      "keep",
+      "live",
+      "occur",
+      "record",
+      "remain",
+      "save",
+      "store",
+      "subsist"
+    ],
+    "form": [
+      "build",
+      "construct",
+      "craft",
+      "create",
+      "make",
+      "produce"
+    ],
+    "migrate": [
+      "move",
+      "relocate",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "joyful": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "pleased"
+    ],
+    "bug": [
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "join": [
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "link",
+      "wire"
+    ],
+    "problem": [
+      "challenge",
+      "difficulty",
+      "issue",
+      "obstacle",
+      "trouble"
+    ],
+    "capital": [
+      "cash",
+      "currency",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "reply": [
+      "answer",
+      "outcome",
+      "output",
+      "product",
+      "response",
+      "result",
+      "solution"
+    ],
+    "gauge": [
+      "assess",
+      "calculate",
+      "evaluate",
+      "measure",
+      "quantify"
+    ],
+    "exist": [
+      "be",
+      "live",
+      "occur",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "liquid": [
+      "beverage",
+      "drink",
+      "fluid",
+      "water"
+    ],
+    "query": [
+      "challenge",
+      "doubt",
+      "explore",
+      "find",
+      "input",
+      "inquiry",
+      "interrogate",
+      "look",
+      "message",
+      "probe",
+      "prompt",
+      "question",
+      "request",
+      "scan",
+      "search",
+      "seek",
+      "signal"
+    ],
+    "see": [
+      "examine",
+      "inspect",
+      "look",
+      "observe",
+      "view",
+      "watch"
+    ],
+    "conceptual": [
+      "abstract",
+      "hypothetical",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "gain": [
+      "acquire",
+      "fetch",
+      "get",
+      "obtain",
+      "receive",
+      "retrieve"
+    ],
+    "weak": [
+      "delicate",
+      "feeble",
+      "fragile",
+      "frail",
+      "powerless"
+    ],
+    "exhibit": [
+      "demonstrate",
+      "display",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "peaceful": [
+      "calm",
+      "composed",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "gigantic": [
+      "big",
+      "enormous",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "robust": [
+      "mighty",
+      "powerful",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "substance": [
+      "element",
+      "mass",
+      "material",
+      "matter",
+      "stuff"
+    ],
+    "food": [
+      "cuisine",
+      "dish",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "stats": [
+      "data",
+      "facts",
+      "info",
+      "information",
+      "records"
+    ],
+    "vehicle": [
+      "auto",
+      "automobile",
+      "car",
+      "ride",
+      "truck"
+    ],
+    "quantify": [
+      "assess",
+      "calculate",
+      "evaluate",
+      "gauge",
+      "measure"
+    ],
+    "think": [
+      "consider",
+      "contemplate",
+      "ponder",
+      "reason",
+      "reflect"
+    ],
+    "dejected": [
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "angry": [
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "mad",
+      "wrathful"
+    ],
+    "feeble": [
+      "delicate",
+      "fragile",
+      "frail",
+      "powerless",
+      "weak"
+    ],
+    "fracture": [
+      "break",
+      "crack",
+      "damage",
+      "destroy",
+      "ruin",
+      "shatter"
+    ],
+    "rapid": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "speedy",
+      "swift"
+    ],
+    "sustenance": [
+      "cuisine",
+      "dish",
+      "food",
+      "meal",
+      "nourishment"
+    ],
+    "reveal": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "present",
+      "show"
+    ],
+    "uncover": [
+      "detect",
+      "discover",
+      "find",
+      "identify",
+      "locate"
+    ],
+    "forward": [
+      "dispatch",
+      "push",
+      "route",
+      "send",
+      "transmit"
+    ],
+    "scan": [
+      "explore",
+      "find",
+      "look",
+      "query",
+      "search",
+      "seek"
+    ],
+    "assumption": [
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "supposition",
+      "theory"
+    ],
+    "stuff": [
+      "element",
+      "mass",
+      "material",
+      "matter",
+      "substance"
+    ],
+    "error": [
+      "bug",
+      "defect",
+      "failure",
+      "fault",
+      "flaw",
+      "mistake"
+    ],
+    "jog": [
+      "dash",
+      "race",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "trek": [
+      "march",
+      "stride",
+      "stroll",
+      "walk",
+      "wander"
+    ],
+    "cash": [
+      "capital",
+      "currency",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "construct": [
+      "build",
+      "craft",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "claim": [
+      "argue",
+      "assert",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "consciousness": [
+      "awareness",
+      "cognition",
+      "mindfulness",
+      "perception",
+      "sentience"
+    ],
+    "anxious": [
+      "afraid",
+      "fearful",
+      "nervous",
+      "scared",
+      "terrified",
+      "worried"
+    ],
+    "calm": [
+      "composed",
+      "peaceful",
+      "relaxed",
+      "serene",
+      "tranquil"
+    ],
+    "sluggish": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "slow",
+      "unhurried"
+    ],
+    "assess": [
+      "analyze",
+      "calculate",
+      "check",
+      "evaluate",
+      "examine",
+      "gauge",
+      "investigate",
+      "measure",
+      "quantify",
+      "study",
+      "test",
+      "validate",
+      "verify"
+    ],
+    "gloomy": [
+      "dejected",
+      "downcast",
+      "melancholy",
+      "sad",
+      "sorrowful",
+      "unhappy"
+    ],
+    "wire": [
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "join",
+      "link"
+    ],
+    "startled": [
+      "amazed",
+      "astonished",
+      "shocked",
+      "stunned",
+      "surprised"
+    ],
+    "fatigued": [
+      "drained",
+      "exhausted",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "measure": [
+      "assess",
+      "calculate",
+      "detect",
+      "evaluate",
+      "gauge",
+      "monitor",
+      "observe",
+      "quantify",
+      "record",
+      "track"
+    ],
+    "fault": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "flaw",
+      "mistake"
+    ],
+    "charge": [
+      "capacity",
+      "energy",
+      "force",
+      "potential",
+      "power"
+    ],
+    "dish": [
+      "cuisine",
+      "food",
+      "meal",
+      "nourishment",
+      "sustenance"
+    ],
+    "destroy": [
+      "break",
+      "crack",
+      "damage",
+      "fracture",
+      "ruin",
+      "shatter"
+    ],
+    "pair": [
+      "align",
+      "correspond",
+      "fit",
+      "link",
+      "map",
+      "match"
+    ],
+    "sprint": [
+      "dash",
+      "jog",
+      "race",
+      "run",
+      "rush"
+    ],
+    "forecast": [
+      "anticipate",
+      "estimate",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "cause": [
+      "create",
+      "generate",
+      "induce",
+      "lead",
+      "produce",
+      "trigger"
+    ],
+    "correspond": [
+      "align",
+      "fit",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "require": [
+      "demand",
+      "desire",
+      "lack",
+      "need",
+      "want"
+    ],
+    "challenge": [
+      "difficulty",
+      "doubt",
+      "inquiry",
+      "interrogate",
+      "issue",
+      "obstacle",
+      "probe",
+      "problem",
+      "query",
+      "question",
+      "trouble"
+    ],
+    "position": [
+      "belief",
+      "conviction",
+      "faith",
+      "opinion",
+      "stance",
+      "view"
+    ],
+    "receive": [
+      "accept",
+      "acquire",
+      "collect",
+      "fetch",
+      "gain",
+      "get",
+      "obtain",
+      "pull",
+      "retrieve"
+    ],
+    "drink": [
+      "beverage",
+      "fluid",
+      "liquid",
+      "water"
+    ],
+    "check": [
+      "assess",
+      "examine",
+      "test",
+      "validate",
+      "verify"
+    ],
+    "help": [
+      "aid",
+      "assist",
+      "facilitate",
+      "serve",
+      "support"
+    ],
+    "clear": [
+      "delete",
+      "drop",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "hand": [
+      "deliver",
+      "give",
+      "grant",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "test": [
+      "assess",
+      "attempt",
+      "check",
+      "endeavor",
+      "examine",
+      "experiment",
+      "investigation",
+      "procedure",
+      "strive",
+      "study",
+      "trial",
+      "try",
+      "validate",
+      "verify"
+    ],
+    "know": [
+      "comprehend",
+      "grasp",
+      "realize",
+      "recognize",
+      "understand"
+    ],
+    "house": [
+      "building",
+      "dwelling",
+      "home",
+      "place",
+      "residence"
+    ],
+    "talk": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "tell"
+    ],
+    "difficult": [
+      "arduous",
+      "challenging",
+      "hard",
+      "strenuous",
+      "tough"
+    ],
+    "delete": [
+      "clear",
+      "drop",
+      "erase",
+      "purge",
+      "remove",
+      "wipe"
+    ],
+    "calculate": [
+      "assess",
+      "evaluate",
+      "gauge",
+      "measure",
+      "quantify"
+    ],
+    "water": [
+      "beverage",
+      "drink",
+      "fluid",
+      "liquid"
+    ],
+    "issue": [
+      "challenge",
+      "difficulty",
+      "obstacle",
+      "problem",
+      "trouble"
+    ],
+    "pull": [
+      "accept",
+      "collect",
+      "get",
+      "obtain",
+      "receive"
+    ],
+    "predict": [
+      "anticipate",
+      "estimate",
+      "forecast",
+      "infer",
+      "project"
+    ],
+    "strive": [
+      "attempt",
+      "endeavor",
+      "experiment",
+      "test",
+      "try"
+    ],
+    "info": [
+      "data",
+      "facts",
+      "information",
+      "records",
+      "stats"
+    ],
+    "happy": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "joyful",
+      "pleased"
+    ],
+    "amazed": [
+      "astonished",
+      "shocked",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "relocate": [
+      "migrate",
+      "move",
+      "shift",
+      "transfer",
+      "transport"
+    ],
+    "opinion": [
+      "belief",
+      "conviction",
+      "faith",
+      "position",
+      "stance",
+      "view"
+    ],
+    "occur": [
+      "be",
+      "exist",
+      "live",
+      "persist",
+      "remain",
+      "subsist"
+    ],
+    "operate": [
+      "apply",
+      "employ",
+      "leverage",
+      "use",
+      "utilize"
+    ],
+    "fit": [
+      "align",
+      "correspond",
+      "link",
+      "map",
+      "match",
+      "pair"
+    ],
+    "connect": [
+      "associate",
+      "attach",
+      "bind",
+      "join",
+      "link",
+      "wire"
+    ],
+    "import": [
+      "fetch",
+      "load",
+      "open",
+      "read",
+      "retrieve"
+    ],
+    "minute": [
+      "compact",
+      "little",
+      "miniature",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "supposition": [
+      "assumption",
+      "conjecture",
+      "hypothesis",
+      "postulate",
+      "theory"
+    ],
+    "fact": [
+      "actuality",
+      "reality",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "knowledge": [
+      "awareness",
+      "cognition",
+      "insight",
+      "understanding",
+      "wisdom"
+    ],
+    "consequence": [
+      "effect",
+      "impact",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "mighty": [
+      "powerful",
+      "robust",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "little": [
+      "compact",
+      "miniature",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "collect": [
+      "accept",
+      "get",
+      "obtain",
+      "pull",
+      "receive"
+    ],
+    "nourishment": [
+      "cuisine",
+      "dish",
+      "food",
+      "meal",
+      "sustenance"
+    ],
+    "argue": [
+      "assert",
+      "claim",
+      "contend",
+      "debate",
+      "posit",
+      "reason"
+    ],
+    "realize": [
+      "comprehend",
+      "grasp",
+      "know",
+      "recognize",
+      "understand"
+    ],
+    "signal": [
+      "input",
+      "message",
+      "prompt",
+      "query",
+      "request"
+    ],
+    "wander": [
+      "march",
+      "stride",
+      "stroll",
+      "trek",
+      "walk"
+    ],
+    "input": [
+      "message",
+      "prompt",
+      "query",
+      "request",
+      "signal"
+    ],
+    "debate": [
+      "argue",
+      "assert",
+      "claim",
+      "contend",
+      "posit",
+      "reason"
+    ],
+    "approach": [
+      "design",
+      "method",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "use": [
+      "apply",
+      "employ",
+      "leverage",
+      "operate",
+      "utilize"
+    ],
+    "converse": [
+      "chat",
+      "discuss",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "effect": [
+      "consequence",
+      "impact",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "store": [
+      "archive",
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "save"
+    ],
+    "discover": [
+      "detect",
+      "find",
+      "identify",
+      "locate",
+      "uncover"
+    ],
+    "effortless": [
+      "basic",
+      "easy",
+      "simple",
+      "straightforward",
+      "trivial"
+    ],
+    "deliver": [
+      "give",
+      "grant",
+      "hand",
+      "offer",
+      "provide",
+      "supply"
+    ],
+    "truck": [
+      "auto",
+      "automobile",
+      "car",
+      "ride",
+      "vehicle"
+    ],
+    "request": [
+      "input",
+      "message",
+      "prompt",
+      "query",
+      "signal"
+    ],
+    "estimate": [
+      "anticipate",
+      "forecast",
+      "infer",
+      "predict",
+      "project"
+    ],
+    "powerful": [
+      "mighty",
+      "robust",
+      "solid",
+      "strong",
+      "sturdy",
+      "tough"
+    ],
+    "adapt": [
+      "change",
+      "develop",
+      "evolve",
+      "improve",
+      "learn",
+      "mutate",
+      "progress",
+      "study",
+      "train",
+      "transform"
+    ],
+    "terminate": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "quit",
+      "stop"
+    ],
+    "link": [
+      "align",
+      "associate",
+      "attach",
+      "bind",
+      "connect",
+      "correspond",
+      "fit",
+      "join",
+      "map",
+      "match",
+      "pair",
+      "wire"
+    ],
+    "offer": [
+      "deliver",
+      "give",
+      "grant",
+      "hand",
+      "provide",
+      "supply"
+    ],
+    "consider": [
+      "contemplate",
+      "ponder",
+      "reason",
+      "reflect",
+      "think"
+    ],
+    "display": [
+      "demonstrate",
+      "exhibit",
+      "present",
+      "reveal",
+      "show"
+    ],
+    "architecture": [
+      "framework",
+      "platform",
+      "structure",
+      "system"
+    ],
+    "posit": [
+      "argue",
+      "assert",
+      "claim",
+      "contend",
+      "debate",
+      "reason"
+    ],
+    "lack": [
+      "demand",
+      "desire",
+      "need",
+      "require",
+      "want"
+    ],
+    "study": [
+      "adapt",
+      "analyze",
+      "assess",
+      "evaluate",
+      "evolve",
+      "examine",
+      "experiment",
+      "improve",
+      "investigate",
+      "investigation",
+      "learn",
+      "procedure",
+      "test",
+      "train",
+      "trial"
+    ],
+    "desire": [
+      "demand",
+      "lack",
+      "need",
+      "require",
+      "want"
+    ],
+    "route": [
+      "dispatch",
+      "forward",
+      "push",
+      "send",
+      "transmit"
+    ],
+    "baffled": [
+      "bewildered",
+      "confused",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "demand": [
+      "desire",
+      "lack",
+      "need",
+      "require",
+      "want"
+    ],
+    "outcome": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "product",
+      "reply",
+      "response",
+      "result",
+      "solution"
+    ],
+    "save": [
+      "archive",
+      "cache",
+      "keep",
+      "persist",
+      "record",
+      "store"
+    ],
+    "cheerful": [
+      "content",
+      "delighted",
+      "elated",
+      "glad",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "argument": [
+      "deduction",
+      "inference",
+      "logic",
+      "rationale",
+      "reasoning"
+    ],
+    "confused": [
+      "baffled",
+      "bewildered",
+      "lost",
+      "perplexed",
+      "puzzled"
+    ],
+    "astonished": [
+      "amazed",
+      "shocked",
+      "startled",
+      "stunned",
+      "surprised"
+    ],
+    "huge": [
+      "big",
+      "enormous",
+      "gigantic",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "watch": [
+      "examine",
+      "inspect",
+      "look",
+      "observe",
+      "see",
+      "view"
+    ],
+    "transfer": [
+      "migrate",
+      "move",
+      "relocate",
+      "shift",
+      "transport"
+    ],
+    "transmit": [
+      "dispatch",
+      "forward",
+      "push",
+      "route",
+      "send"
+    ],
+    "fiery": [
+      "boiling",
+      "burning",
+      "hot",
+      "scorching",
+      "warm"
+    ],
+    "open": [
+      "fetch",
+      "import",
+      "load",
+      "read",
+      "retrieve"
+    ],
+    "investigation": [
+      "experiment",
+      "procedure",
+      "study",
+      "test",
+      "trial"
+    ],
+    "serve": [
+      "aid",
+      "assist",
+      "facilitate",
+      "help",
+      "support"
+    ],
+    "change": [
+      "adapt",
+      "develop",
+      "evolve",
+      "mutate",
+      "progress",
+      "transform"
+    ],
+    "leverage": [
+      "apply",
+      "employ",
+      "operate",
+      "use",
+      "utilize"
+    ],
+    "inspect": [
+      "examine",
+      "look",
+      "observe",
+      "see",
+      "view",
+      "watch"
+    ],
+    "impact": [
+      "consequence",
+      "effect",
+      "outcome",
+      "product",
+      "result"
+    ],
+    "abstract": [
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "notional",
+      "theoretical"
+    ],
+    "craft": [
+      "build",
+      "construct",
+      "create",
+      "form",
+      "make",
+      "produce"
+    ],
+    "enthusiastic": [
+      "animated",
+      "eager",
+      "excited",
+      "keen",
+      "thrilled"
+    ],
+    "capacity": [
+      "charge",
+      "energy",
+      "force",
+      "potential",
+      "power"
+    ],
+    "design": [
+      "approach",
+      "method",
+      "plan",
+      "scheme",
+      "strategy"
+    ],
+    "present": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "reveal",
+      "show"
+    ],
+    "recognize": [
+      "comprehend",
+      "grasp",
+      "know",
+      "realize",
+      "understand"
+    ],
+    "glad": [
+      "cheerful",
+      "content",
+      "delighted",
+      "elated",
+      "happy",
+      "joyful",
+      "pleased"
+    ],
+    "monitor": [
+      "detect",
+      "measure",
+      "observe",
+      "record",
+      "track"
+    ],
+    "perception": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "mindfulness",
+      "sentience"
+    ],
+    "awareness": [
+      "cognition",
+      "consciousness",
+      "insight",
+      "knowledge",
+      "mindfulness",
+      "perception",
+      "sentience",
+      "understanding",
+      "wisdom"
+    ],
+    "analyze": [
+      "assess",
+      "evaluate",
+      "examine",
+      "investigate",
+      "study"
+    ],
+    "investigate": [
+      "analyze",
+      "assess",
+      "evaluate",
+      "examine",
+      "study"
+    ],
+    "result": [
+      "answer",
+      "consequence",
+      "effect",
+      "impact",
+      "outcome",
+      "output",
+      "product",
+      "reply",
+      "response",
+      "solution"
+    ],
+    "unhappy": [
+      "dejected",
+      "downcast",
+      "gloomy",
+      "melancholy",
+      "sad",
+      "sorrowful"
+    ],
+    "notional": [
+      "abstract",
+      "conceptual",
+      "hypothetical",
+      "intangible",
+      "theoretical"
+    ],
+    "mad": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "wrathful"
+    ],
+    "interrogate": [
+      "challenge",
+      "doubt",
+      "inquiry",
+      "probe",
+      "query",
+      "question"
+    ],
+    "concept": [
+      "idea",
+      "notion",
+      "plan",
+      "proposal",
+      "thought"
+    ],
+    "information": [
+      "data",
+      "facts",
+      "info",
+      "records",
+      "stats"
+    ],
+    "tough": [
+      "arduous",
+      "challenging",
+      "difficult",
+      "hard",
+      "mighty",
+      "powerful",
+      "robust",
+      "solid",
+      "strenuous",
+      "strong",
+      "sturdy"
+    ],
+    "understanding": [
+      "awareness",
+      "cognition",
+      "insight",
+      "knowledge",
+      "wisdom"
+    ],
+    "show": [
+      "demonstrate",
+      "display",
+      "exhibit",
+      "present",
+      "reveal"
+    ],
+    "race": [
+      "dash",
+      "jog",
+      "run",
+      "rush",
+      "sprint"
+    ],
+    "sentience": [
+      "awareness",
+      "cognition",
+      "consciousness",
+      "mindfulness",
+      "perception"
+    ],
+    "identify": [
+      "detect",
+      "discover",
+      "find",
+      "locate",
+      "uncover"
+    ],
+    "place": [
+      "building",
+      "dwelling",
+      "home",
+      "house",
+      "residence"
+    ],
+    "develop": [
+      "adapt",
+      "change",
+      "evolve",
+      "mutate",
+      "progress",
+      "transform"
+    ],
+    "assist": [
+      "aid",
+      "facilitate",
+      "help",
+      "serve",
+      "support"
+    ],
+    "scorching": [
+      "boiling",
+      "burning",
+      "fiery",
+      "hot",
+      "warm"
+    ],
+    "small": [
+      "compact",
+      "little",
+      "miniature",
+      "minute",
+      "petite",
+      "tiny"
+    ],
+    "energy": [
+      "capacity",
+      "charge",
+      "force",
+      "potential",
+      "power"
+    ],
+    "big": [
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "massive",
+      "vast"
+    ],
+    "slow": [
+      "gradual",
+      "leisurely",
+      "plodding",
+      "sluggish",
+      "unhurried"
+    ],
+    "currency": [
+      "capital",
+      "cash",
+      "finance",
+      "funds",
+      "money"
+    ],
+    "moral": [
+      "ethical",
+      "just",
+      "principled",
+      "righteous",
+      "virtuous"
+    ],
+    "quit": [
+      "cease",
+      "end",
+      "finish",
+      "halt",
+      "stop",
+      "terminate"
+    ],
+    "validate": [
+      "assess",
+      "check",
+      "examine",
+      "test",
+      "verify"
+    ],
+    "flaw": [
+      "bug",
+      "defect",
+      "error",
+      "failure",
+      "fault",
+      "mistake"
+    ],
+    "reflect": [
+      "consider",
+      "contemplate",
+      "ponder",
+      "reason",
+      "think"
+    ],
+    "massive": [
+      "big",
+      "enormous",
+      "gigantic",
+      "huge",
+      "large",
+      "vast"
+    ],
+    "look": [
+      "examine",
+      "explore",
+      "find",
+      "inspect",
+      "observe",
+      "query",
+      "scan",
+      "search",
+      "see",
+      "seek",
+      "view",
+      "watch"
+    ],
+    "actuality": [
+      "fact",
+      "reality",
+      "truth",
+      "validity",
+      "verity"
+    ],
+    "finish": [
+      "cease",
+      "end",
+      "halt",
+      "quit",
+      "stop",
+      "terminate"
+    ],
+    "exhausted": [
+      "drained",
+      "fatigued",
+      "sleepy",
+      "tired",
+      "weary"
+    ],
+    "discuss": [
+      "chat",
+      "converse",
+      "say",
+      "speak",
+      "talk",
+      "tell"
+    ],
+    "meal": [
+      "cuisine",
+      "dish",
+      "food",
+      "nourishment",
+      "sustenance"
+    ],
+    "experiment": [
+      "attempt",
+      "endeavor",
+      "investigation",
+      "procedure",
+      "strive",
+      "study",
+      "test",
+      "trial",
+      "try"
+    ],
+    "speedy": [
+      "brisk",
+      "fast",
+      "hasty",
+      "quick",
+      "rapid",
+      "swift"
+    ],
+    "power": [
+      "capacity",
+      "charge",
+      "energy",
+      "force",
+      "potential"
+    ],
+    "money": [
+      "capital",
+      "cash",
+      "currency",
+      "finance",
+      "funds"
+    ],
+    "accept": [
+      "collect",
+      "get",
+      "obtain",
+      "pull",
+      "receive"
+    ],
+    "tell": [
+      "chat",
+      "converse",
+      "discuss",
+      "say",
+      "speak",
+      "talk"
+    ],
+    "wrathful": [
+      "angry",
+      "enraged",
+      "furious",
+      "irate",
+      "livid",
+      "mad"
+    ],
+    "miniature": [
+      "compact",
+      "little",
+      "minute",
+      "petite",
+      "small",
+      "tiny"
+    ],
+    "cognition": [
+      "awareness",
+      "consciousness",
+      "insight",
+      "knowledge",
+      "mindfulness",
+      "perception",
+      "sentience",
+      "understanding",
+      "wisdom"
+    ],
+    "verity": [
+      "actuality",
+      "fact",
+      "reality",
+      "truth",
+      "validity"
+    ],
+    "funds": [
+      "capital",
+      "cash",
+      "currency",
+      "finance",
+      "money"
+    ],
+    "transform": [
+      "adapt",
+      "change",
+      "develop",
+      "evolve",
+      "mutate",
+      "progress"
+    ]
+  },
+  "aiml_system": {
+    "cycle": 0,
+    "registry": {
+      "emotions": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.7787126495948e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Emotion lobe feels {MISSION}. Tone {PRIMARY_ACTION}. Vote certainty {VOTE_CERTAINTY}.",
+          "id": "emo_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "emotions",
+          "strength": 5.017443326249563
+        }
+      ],
+      "daily_life": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.778712649594793e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Daily life lobe on {MISSION}: {PRIMARY_ACTION}. All actions {ALL_ACTIONS}.",
+          "id": "life_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "daily_life",
+          "strength": 4.886868082633478
+        }
+      ],
+      "philosophy": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.778712649594766e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "Philosophy lobe heard {MISSION}. I {PRIMARY_ACTION} drawing on {LOBE_CONTEXT}.",
+          "id": "phil_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "philosophy",
+          "strength": 5.115254964984653
+        }
+      ],
+      "science": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.778712649594747e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "HELLO you asked about {MISSION} in science lobe. My primary action is {PRIMARY_ACTION} with confidence {CONFIDENCE}.",
+          "id": "sci_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "science",
+          "strength": 4.9766005534055155
+        }
+      ],
+      "technology": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.778712649594759e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "In the tech lobe {MISSION} triggers {PRIMARY_ACTION}. Tied alternatives {TIED_ALTERNATIVES}.",
+          "id": "tech_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "technology",
+          "strength": 5.090719332933522
+        }
+      ],
+      "nature": [
+        {
+          "is_grave": false,
+          "fired_this_cycle": false,
+          "created_at": 1.778712649594785e9,
+          "strength_delta_this_cycle": 0.0,
+          "grave_reason": "",
+          "gained_this_cycle": false,
+          "template": "In nature {MISSION} is answered by {PRIMARY_ACTION}. Memory says {MEMORY}.",
+          "id": "nat_greeter",
+          "voted_this_cycle": false,
+          "lobe_id": "nature",
+          "strength": 4.958006618287497
+        }
+      ]
+    },
+    "population_caps": {
+      "emotions": 6666,
+      "daily_life": 6666,
+      "philosophy": 6666,
+      "science": 6666,
+      "technology": 6666,
+      "nature": 6666
+    }
+  },
+  "eye_state": {
+    "last_centroid_x": 0.5,
+    "last_arousal": 0.3,
+    "attention_enabled": true,
+    "last_centroid_y": 0.5,
+    "blur_enabled": true
+  },
+  "trajectory": {
+    "config": {
+      "decay_halflife": 120.0,
+      "gini_threshold": 0.72,
+      "damping_strength": 0.25,
+      "buffer_size": 16,
+      "softmax_temperature": 1.5
+    },
+    "buffer": []
+  },
+  "_meta": {
+    "format": "grugbot420-specimen-v2.4",
+    "saved_at": 1.778712649595647e9,
+    "version": "2.4"
+  },
+  "nodes": [
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "ethics",
+        "moral",
+        "right",
+        "wrong",
+        "virtue"
+      ],
+      "signal": [
+        0.7542852677886897,
+        0.25624103392211617,
+        0.2962847292026762,
+        0.42492177769570566,
+        0.02933592069820026,
+        0.33369889207670245,
+        0.9168221983618001,
+        0.345066415676415
+      ],
+      "hopfield_key": "16950903443668983906",
+      "relational_patterns": [
+        {
+          "relation": "are",
+          "object": "right",
+          "subject": "actions"
+        }
+      ],
+      "json_data": {
+        "branch": "ethics",
+        "system_prompt": "Lobe seed node about ethics asks what actions are right or wrong."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241736e9,
+      "pattern": "ethics asks what actions are right or wrong",
+      "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_20",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "simulation",
+        "map",
+        "territory",
+        "proof",
+        "unfalsifiable"
+      ],
+      "signal": [
+        0.7455625096231238,
+        0.4337544410832905,
+        0.5039457751164873,
+        0.8503523139307934,
+        0.5569664651592138,
+        0.6976716946287507
+      ],
+      "hopfield_key": "7344534444148304446",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about simulation theory confuses map with territory.",
+        "stance": "skeptical"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241865e9,
+      "pattern": "simulation theory confuses map with territory",
+      "action_packet": "ponder[dont ignore]^3 | analyze[dont ignore]^2 | caution[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_24",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "code",
+        "language",
+        "program",
+        "compile",
+        "syntax"
+      ],
+      "signal": [
+        0.41919263643088533,
+        0.7738499263164506,
+        0.9838304375387795,
+        0.8517731830556378,
+        0.6529422441148396,
+        0.16657500057386576,
+        0.4935952135776989,
+        0.6723706310449684
+      ],
+      "hopfield_key": "13880784494442647197",
+      "relational_patterns": [
+        {
+          "relation": "is",
+          "object": "written",
+          "subject": "code"
+        }
+      ],
+      "json_data": {
+        "domain": "software",
+        "system_prompt": "Lobe seed node about code is written in programming languages for machines."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241549e9,
+      "pattern": "code is written in programming languages for machines",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_14",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "weather",
+        "season",
+        "rain",
+        "wind",
+        "climate"
+      ],
+      "signal": [
+        0.9369211433366481,
+        0.834304450282325,
+        0.5526582320671137,
+        0.5569664651592138,
+        0.270044582124484,
+        0.09185771421067324
+      ],
+      "hopfield_key": "8948214652394138451",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "atmosphere",
+        "system_prompt": "Lobe seed node about weather patterns shift with the seasons."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242042e9,
+      "pattern": "weather patterns shift with the seasons",
+      "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_30",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.39300060174861406,
+        0.6076281576512098,
+        0.9854313687825454,
+        0.10854154474261539
+      ],
+      "hopfield_key": "3363597340069351038",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Cold logical analysis engine active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712630855828e9,
+      "pattern": "think ponder reason calculate",
+      "action_packet": "reason[dont guess, dont hallucinate]^4 | analyze[dont assume]^3 | ponder^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_1",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "joy",
+        "happy",
+        "friend",
+        "smile",
+        "celebrate"
+      ],
+      "signal": [
+        0.9960757216670808,
+        0.14628935852091018,
+        0.0026927919191594373,
+        0.573219221695672,
+        0.5441777623014303,
+        0.9142943990071256,
+        0.6444426068024517,
+        0.8097977392516214
+      ],
+      "hopfield_key": "6710902472150199060",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "positive",
+        "system_prompt": "Lobe seed node about joy rises when good things happen to friends."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242428e9,
+      "pattern": "joy rises when good things happen to friends",
+      "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_43",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "light",
+        "wave",
+        "electromagnetic",
+        "photon",
+        "speed"
+      ],
+      "signal": [
+        0.5432522198515971,
+        0.39149754888240634,
+        0.697050745238376,
+        0.05424886698898847,
+        0.3162730362932837,
+        0.40246159596402586,
+        0.02203495026895601,
+        0.13499427639024522
+      ],
+      "hopfield_key": "15385694114560426097",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "optics",
+        "domain": "physics",
+        "system_prompt": "Lobe seed node about light travels as electromagnetic waves at fixed speed."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241395e9,
+      "pattern": "light travels as electromagnetic waves at fixed speed",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_10",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "love",
+        "bond",
+        "family",
+        "friend",
+        "distance"
+      ],
+      "signal": [
+        0.7928258396169835,
+        0.8910774285370892,
+        0.7970726435295704,
+        0.14651443506900078,
+        0.5015845669090044,
+        0.28657804682023813,
+        0.37773280822987887
+      ],
+      "hopfield_key": "10420536947339580351",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "positive",
+        "system_prompt": "Lobe seed node about love binds people across years and distance."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242577e9,
+      "pattern": "love binds people across years and distance",
+      "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_48",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "read",
+        "book",
+        "mind",
+        "grow",
+        "slow"
+      ],
+      "signal": [
+        0.5509065731524532,
+        0.5549414795702651,
+        0.7056663960818687,
+        0.270044582124484,
+        0.99385029438459,
+        0.2359752783579288
+      ],
+      "hopfield_key": "17433912626762199928",
+      "relational_patterns": [],
+      "json_data": {
+        "activity": "reading",
+        "system_prompt": "Lobe seed node about reading books grows the mind slowly."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242366e9,
+      "pattern": "reading books grows the mind slowly",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_41",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "calm",
+        "breath",
+        "attention",
+        "peace",
+        "slow"
+      ],
+      "signal": [
+        0.12927617564245633,
+        0.5146520658597008,
+        0.7455326037831004,
+        0.5183827621323156,
+        0.28657804682023813,
+        0.5227568374207073,
+        0.25760811166294595
+      ],
+      "hopfield_key": "17586297638014995786",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "neutral",
+        "system_prompt": "Lobe seed node about calm comes from breath and slow attention."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242606e9,
+      "pattern": "calm comes from breath and slow attention",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_49",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "star",
+        "fusion",
+        "hydrogen",
+        "helium",
+        "light"
+      ],
+      "signal": [
+        0.6443945235414456,
+        0.09220622824768444,
+        0.06226648262032441,
+        0.4791610144940713,
+        0.4746339813686136,
+        0.28657804682023813,
+        0.16639256431456362,
+        0.5432522198515971
+      ],
+      "hopfield_key": "18200422701434673665",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "astronomy",
+        "object": "star",
+        "system_prompt": "Lobe seed node about stars fuse hydrogen into helium and shine light."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241302e9,
+      "pattern": "stars fuse hydrogen into helium and shine light",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_7",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "encrypt",
+        "key",
+        "cipher",
+        "hash",
+        "security"
+      ],
+      "signal": [
+        0.9603871092016442,
+        0.7058407560448022,
+        0.3204193523181182,
+        0.0091863427118116,
+        0.06370016110899605,
+        0.7130405012549333
+      ],
+      "hopfield_key": "3500521875627737274",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "security",
+        "system_prompt": "Lobe seed node about encryption scrambles data using mathematical keys."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241581e9,
+      "pattern": "encryption scrambles data using mathematical keys",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_15",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "biology",
+        "guardrail",
+        "evolution",
+        "imperfection",
+        "adaptation"
+      ],
+      "signal": [
+        0.9825277859851581,
+        0.4182716633412022,
+        0.061420299866471635,
+        0.9260581578878265,
+        0.5133597104844105,
+        0.016715026343470267
+      ],
+      "hopfield_key": "8952887556721587507",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about biology cannot be guardrailed only evolved.",
+        "stance": "anti-metric"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241895e9,
+      "pattern": "biology cannot be guardrailed only evolved",
+      "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_25",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "logic",
+        "premise",
+        "conclusion",
+        "valid",
+        "sound"
+      ],
+      "signal": [
+        0.47859125633761124,
+        0.6592137850018015,
+        0.14937794397231052,
+        0.4791610144940713,
+        0.1415041071075184,
+        0.80157706216661
+      ],
+      "hopfield_key": "896324858066049286",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "logic",
+        "system_prompt": "Lobe seed node about logic chains premises into valid conclusions."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241834e9,
+      "pattern": "logic chains premises into valid conclusions",
+      "action_packet": "ponder[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_23",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "wolf",
+        "pack",
+        "hunt",
+        "family",
+        "predator"
+      ],
+      "signal": [
+        0.42232737814808513,
+        0.9093062139807693,
+        0.8517731830556378,
+        0.6806075622661851,
+        0.21693790800365712,
+        0.9117428343371625
+      ],
+      "hopfield_key": "13348407101697334547",
+      "relational_patterns": [],
+      "json_data": {
+        "class": "mammalia",
+        "system_prompt": "Lobe seed node about wolves hunt in coordinated family packs.",
+        "kingdom": "animalia"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242154e9,
+      "pattern": "wolves hunt in coordinated family packs",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_34",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "mass",
+        "force",
+        "attraction",
+        "newton",
+        "einstein"
+      ],
+      "signal": [
+        0.4415170038115362,
+        0.042481503350911914,
+        0.9220448254409747,
+        0.6116122968042325,
+        0.3354899766649665,
+        0.901906196488709,
+        0.5676143763622843,
+        0.901906196488709
+      ],
+      "hopfield_key": "16861512395552356138",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "mechanics",
+        "domain": "physics",
+        "system_prompt": "Lobe seed node about gravity pulls objects toward earth mass attracts mass."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649223006e9,
+      "pattern": "gravity pulls objects toward earth mass attracts mass",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_3",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "computer",
+        "binary",
+        "logic",
+        "gate",
+        "cpu"
+      ],
+      "signal": [
+        0.9338995524288007,
+        0.601659277156742,
+        0.278005754447573,
+        0.0091863427118116,
+        0.7319730535819885,
+        0.47859125633761124,
+        0.10546146070277522
+      ],
+      "hopfield_key": "13457440187130083398",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "hardware",
+        "system_prompt": "Lobe seed node about computers process information using binary logic gates."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241432e9,
+      "pattern": "computers process information using binary logic gates",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_11",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "trust",
+        "slow",
+        "break",
+        "faith",
+        "betray"
+      ],
+      "signal": [
+        0.7414566786645165,
+        0.7056663960818687,
+        0.5227568374207073,
+        0.28657804682023813,
+        0.41481582160122527,
+        0.5454176293614696
+      ],
+      "hopfield_key": "18365919169464618131",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "positive",
+        "system_prompt": "Lobe seed node about trust grows slow and breaks fast."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242631e9,
+      "pattern": "trust grows slow and breaks fast",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_50",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "database",
+        "query",
+        "row",
+        "table",
+        "sql"
+      ],
+      "signal": [
+        0.7812975860621273,
+        0.350036978801697,
+        0.19708734088315022,
+        0.7566967850785662,
+        0.02814897713460073,
+        0.23419569309484933,
+        0.3204193523181182
+      ],
+      "hopfield_key": "5026208012783483826",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "data",
+        "system_prompt": "Lobe seed node about databases store queryable rows of structured data."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241614e9,
+      "pattern": "databases store queryable rows of structured data",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_16",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "walk",
+        "outside",
+        "exercise",
+        "fresh",
+        "clear"
+      ],
+      "signal": [
+        0.978045944426503,
+        0.37343694114608006,
+        0.7753717816042578,
+        0.270044582124484,
+        0.06236249982375194,
+        0.28657804682023813,
+        0.5796306706053942,
+        0.573219221695672
+      ],
+      "hopfield_key": "16316133734882795563",
+      "relational_patterns": [],
+      "json_data": {
+        "activity": "walking",
+        "system_prompt": "Lobe seed node about walking outside clears the head and feels good."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242275e9,
+      "pattern": "walking outside clears the head and feels good",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_38",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "gpu",
+        "render",
+        "pixel",
+        "parallel",
+        "shader"
+      ],
+      "signal": [
+        0.016906118438465404,
+        0.37877369670232064,
+        0.8031311625690519,
+        0.4532429781220414,
+        0.0091863427118116,
+        0.3279206628565134,
+        0.8480031419761326
+      ],
+      "hopfield_key": "3974764845182996101",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "graphics",
+        "system_prompt": "Lobe seed node about graphics cards render pixels using parallel math."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241673e9,
+      "pattern": "graphics cards render pixels using parallel math",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_18",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "fear",
+        "danger",
+        "alarm",
+        "flee",
+        "freeze"
+      ],
+      "signal": [
+        0.503695017140873,
+        0.21529439231698122,
+        0.270044582124484,
+        0.763442536141416,
+        0.02814897713460073,
+        0.4782986480661268,
+        0.13554137021621895
+      ],
+      "hopfield_key": "7395625027800029264",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "negative",
+        "system_prompt": "Lobe seed node about fear warns the body of danger nearby."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242458e9,
+      "pattern": "fear warns the body of danger nearby",
+      "action_packet": "describe[dont ignore]^2 | warn[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_44",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "work",
+        "job",
+        "hours",
+        "career",
+        "task"
+      ],
+      "signal": [
+        0.959010976172708,
+        0.7738499263164506,
+        0.4009308005454768,
+        0.4288492819892387,
+        0.10872691478268827,
+        0.02814897713460073,
+        0.270044582124484,
+        0.43925634135666247,
+        0.07580874977194127
+      ],
+      "hopfield_key": "10259178703700405895",
+      "relational_patterns": [
+        {
+          "relation": "is",
+          "object": "where",
+          "subject": "work"
+        }
+      ],
+      "json_data": {
+        "domain": "work",
+        "system_prompt": "Lobe seed node about work is where most hours of the week go."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242309e9,
+      "pattern": "work is where most hours of the week go",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_39",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "energy",
+        "conservation",
+        "thermodynamics",
+        "heat",
+        "work"
+      ],
+      "signal": [
+        0.7423494596971212,
+        0.4182716633412022,
+        0.061420299866471635,
+        0.21707722638874227,
+        0.9168221983618001,
+        0.0925544915569456,
+        0.5133597104844105,
+        0.7070711823593859
+      ],
+      "hopfield_key": "12336699712580572601",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "thermodynamics",
+        "domain": "physics",
+        "system_prompt": "Lobe seed node about energy cannot be created or destroyed only transformed."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241364e9,
+      "pattern": "energy cannot be created or destroyed only transformed",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_9",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "atom",
+        "molecule",
+        "bond",
+        "electron",
+        "proton"
+      ],
+      "signal": [
+        0.18612080742588524,
+        0.2801048963805231,
+        0.4791610144940713,
+        0.8712060211718421,
+        0.62023112920958,
+        0.3413319496494993,
+        0.3397707497482092
+      ],
+      "hopfield_key": "318279064986055163",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "chemistry",
+        "system_prompt": "Lobe seed node about atoms combine into molecules through chemical bonds.",
+        "scale": "atomic"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241158e9,
+      "pattern": "atoms combine into molecules through chemical bonds",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_4",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "sad",
+        "grief",
+        "loss",
+        "quiet",
+        "slow"
+      ],
+      "signal": [
+        0.23731157904474592,
+        0.25624103392211617,
+        0.270044582124484,
+        0.7861169666694787,
+        0.6444426068024517,
+        0.5227568374207073,
+        0.28657804682023813,
+        0.5560008235290811
+      ],
+      "hopfield_key": "9340443991645499186",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "negative",
+        "system_prompt": "Lobe seed node about sadness asks the heart to slow and rest."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242517e9,
+      "pattern": "sadness asks the heart to slow and rest",
+      "action_packet": "describe[dont ignore]^2 | comfort[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_46",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "robot",
+        "sensor",
+        "motor",
+        "actuator",
+        "control"
+      ],
+      "signal": [
+        0.6070503905042346,
+        0.6961837004145071,
+        0.2444028516676595,
+        0.28657804682023813,
+        0.4855080135611746,
+        0.6444426068024517,
+        0.7586534960612966,
+        0.8517731830556378,
+        0.270044582124484,
+        0.5945674778496809
+      ],
+      "hopfield_key": "11269159103058041466",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "robotics",
+        "system_prompt": "Lobe seed node about robots use sensors and motors to act in the world."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241645e9,
+      "pattern": "robots use sensors and motors to act in the world",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_17",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "ocean",
+        "tide",
+        "moon",
+        "gravity",
+        "wave"
+      ],
+      "signal": [
+        0.6859530198569176,
+        0.05751793923640744,
+        0.9796348423942379,
+        0.28657804682023813,
+        0.4512769426691538,
+        0.2532623448211229,
+        0.5838759467585235,
+        0.7166567408708039
+      ],
+      "hopfield_key": "10129952462534507406",
+      "relational_patterns": [],
+      "json_data": {
+        "feature": "ocean",
+        "system_prompt": "Lobe seed node about ocean tides rise and fall by lunar pull."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242102e9,
+      "pattern": "ocean tides rise and fall by lunar pull",
+      "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_32",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "paradigm",
+        "mechanism",
+        "unified",
+        "bio-analog",
+        "coexist"
+      ],
+      "signal": [
+        0.600891582602074,
+        0.4520990597444838,
+        0.13130881349001522,
+        0.8794516510086691,
+        0.5288304352303629,
+        0.5765006764737671,
+        0.23374090717084706
+      ],
+      "hopfield_key": "15016718872330421531",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about every AI paradigm describes one biological mechanism.",
+        "stance": "unified"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241927e9,
+      "pattern": "every AI paradigm describes one biological mechanism",
+      "action_packet": "ponder[dont ignore]^2 | reason[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_26",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "river",
+        "mountain",
+        "sea",
+        "flow",
+        "watershed"
+      ],
+      "signal": [
+        0.5036136273372048,
+        0.31609750402231956,
+        0.7455326037831004,
+        0.18282358711852484,
+        0.04286514833488107,
+        0.6444426068024517,
+        0.270044582124484,
+        0.8284194575490763
+      ],
+      "hopfield_key": "10885764679830355151",
+      "relational_patterns": [],
+      "json_data": {
+        "feature": "water",
+        "system_prompt": "Lobe seed node about rivers flow from mountains down to the sea."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241988e9,
+      "pattern": "rivers flow from mountains down to the sea",
+      "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_28",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "bee",
+        "flower",
+        "pollen",
+        "honey",
+        "hive"
+      ],
+      "signal": [
+        0.8887398788884775,
+        0.1583932490377559,
+        0.46790435964780686,
+        0.28657804682023813,
+        0.16489299807025148,
+        0.2468821680470147
+      ],
+      "hopfield_key": "10000827824944704001",
+      "relational_patterns": [],
+      "json_data": {
+        "order": "hymenoptera",
+        "system_prompt": "Lobe seed node about bees pollinate flowers and make honey.",
+        "kingdom": "animalia"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242128e9,
+      "pattern": "bees pollinate flowers and make honey",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_33",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "sleep",
+        "rest",
+        "night",
+        "dream",
+        "recovery"
+      ],
+      "signal": [
+        0.11210469767673871,
+        0.2508977716361915,
+        0.99385029438459,
+        0.28657804682023813,
+        0.763442536141416,
+        0.600891582602074,
+        0.6181220816952852
+      ],
+      "hopfield_key": "9862542131803455412",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "health",
+        "system_prompt": "Lobe seed node about sleep restores mind and body every night."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242185e9,
+      "pattern": "sleep restores mind and body every night",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_35",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.9504661807338175,
+        0.6340081581416029,
+        0.6573056681613353,
+        0.054126128344148546
+      ],
+      "hopfield_key": "3424827947143480936",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Highly polite greeting protocols active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712630855785e9,
+      "pattern": "hello hi greeting mornin",
+      "action_packet": "greet[dont frown, dont insult]^3 | welcome[dont be rude]^2 | smile^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_0",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "dna",
+        "gene",
+        "cell",
+        "code",
+        "life"
+      ],
+      "signal": [
+        0.3487210344130218,
+        0.5163419369578167,
+        0.513660146208926,
+        0.41919263643088533,
+        0.03713391105644038,
+        0.600891582602074,
+        0.8585081935875736,
+        0.8263268709906488
+      ],
+      "hopfield_key": "5276029969018226330",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "biology",
+        "system_prompt": "Lobe seed node about dna stores genetic code inside every living cell.",
+        "scale": "molecular"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241224e9,
+      "pattern": "dna stores genetic code inside every living cell",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_5",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "internet",
+        "network",
+        "protocol",
+        "packet",
+        "router"
+      ],
+      "signal": [
+        0.270044582124484,
+        0.9134144272057766,
+        0.23119339706594105,
+        0.9338995524288007,
+        0.14651443506900078,
+        0.270044582124484,
+        0.26964799592701916,
+        0.5945674778496809
+      ],
+      "hopfield_key": "13084639623033789232",
+      "relational_patterns": [
+        {
+          "relation": "connects",
+          "object": "computers",
+          "subject": "internet"
+        }
+      ],
+      "json_data": {
+        "domain": "networking",
+        "system_prompt": "Lobe seed node about the internet connects computers across the whole world."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241493e9,
+      "pattern": "the internet connects computers across the whole world",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_13",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [],
+      "signal": [
+        0.3194648975276139,
+        0.8878016608890751,
+        0.1108933932798855,
+        0.28657804682023813,
+        0.9265236970110724,
+        0.2630790683754012
+      ],
+      "hopfield_key": "13406871354912520156",
+      "relational_patterns": [
+        {
+          "relation": "hits",
+          "object": "rock",
+          "subject": "grug"
+        },
+        {
+          "relation": "makes",
+          "object": "fire",
+          "subject": "and"
+        }
+      ],
+      "json_data": {
+        "required_relations": [
+          "hits"
+        ],
+        "relation_weights": {
+          "hits": 2.5
+        },
+        "system_prompt": "Causal relational analysis active."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712630858633e9,
+      "pattern": "grug hits rock and makes fire",
+      "action_packet": "analyze[dont panic]^5 | ponder^2",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_2",
+      "required_relations": [
+        "hits"
+      ],
+      "relation_weights": {
+        "hits": 2.5
+      },
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "evolution",
+        "selection",
+        "species",
+        "darwin",
+        "fitness"
+      ],
+      "signal": [
+        0.46954871841266227,
+        0.4009555510920794,
+        0.542877338916626,
+        0.6045493491646236,
+        0.8663028958045069,
+        0.28657804682023813,
+        0.8320568039527259
+      ],
+      "hopfield_key": "279417852718934812",
+      "relational_patterns": [],
+      "json_data": {
+        "theory": "evolution",
+        "domain": "biology",
+        "system_prompt": "Lobe seed node about evolution selects traits that survive and reproduce."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241331e9,
+      "pattern": "evolution selects traits that survive and reproduce",
+      "action_packet": "explain[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_8",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "knowledge",
+        "belief",
+        "truth",
+        "justify",
+        "evidence"
+      ],
+      "signal": [
+        0.518450597619607,
+        0.09506285696092744,
+        0.2823361809522296,
+        0.3791250141176723,
+        0.20878465728752885
+      ],
+      "hopfield_key": "8769164873614767482",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "epistemology",
+        "system_prompt": "Lobe seed node about knowledge requires justified true belief."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241763e9,
+      "pattern": "knowledge requires justified true belief",
+      "action_packet": "ponder[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_21",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "coffee",
+        "caffeine",
+        "morning",
+        "wake",
+        "brew"
+      ],
+      "signal": [
+        0.9463651168361795,
+        0.8133166958838289,
+        0.270044582124484,
+        0.9491381714165857,
+        0.5569664651592138,
+        0.7275681622309538,
+        0.8517731830556378,
+        0.270044582124484,
+        0.5818184243232297
+      ],
+      "hopfield_key": "7625807797160906501",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about coffee wakes the brain with caffeine in the morning.",
+        "drink": "coffee"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242242e9,
+      "pattern": "coffee wakes the brain with caffeine in the morning",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_37",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "anger",
+        "rage",
+        "boundary",
+        "injustice",
+        "fire"
+      ],
+      "signal": [
+        0.7265732542813718,
+        0.6452585403280384,
+        0.0026927919191594373,
+        0.42649126708070373,
+        0.02933592069820026,
+        0.02128645339142075
+      ],
+      "hopfield_key": "370833242660935628",
+      "relational_patterns": [
+        {
+          "relation": "are",
+          "object": "crossed",
+          "subject": "boundaries"
+        }
+      ],
+      "json_data": {
+        "valence": "negative",
+        "system_prompt": "Lobe seed node about anger burns when boundaries are crossed."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242486e9,
+      "pattern": "anger burns when boundaries are crossed",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_45",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "music",
+        "song",
+        "rhythm",
+        "mood",
+        "flow"
+      ],
+      "signal": [
+        0.590446987219321,
+        0.9265236970110724,
+        0.8443746326682188,
+        0.7118012043524522,
+        0.7696729851287356,
+        0.28657804682023813,
+        0.9930006389918524,
+        0.45561136137370684
+      ],
+      "hopfield_key": "13412175869445677783",
+      "relational_patterns": [
+        {
+          "relation": "makes",
+          "object": "tasks",
+          "subject": "music"
+        }
+      ],
+      "json_data": {
+        "activity": "music",
+        "system_prompt": "Lobe seed node about music makes tasks feel lighter and time fly."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242393e9,
+      "pattern": "music makes tasks feel lighter and time fly",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_42",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "curious",
+        "new",
+        "explore",
+        "question",
+        "wonder"
+      ],
+      "signal": [
+        0.32846421831810296,
+        0.042481503350911914,
+        0.270044582124484,
+        0.99385029438459,
+        0.6116122968042325,
+        0.7529113180138063,
+        0.5441777623014303
+      ],
+      "hopfield_key": "3063260699198234315",
+      "relational_patterns": [],
+      "json_data": {
+        "valence": "positive",
+        "system_prompt": "Lobe seed node about curiosity pulls the mind toward new things."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242545e9,
+      "pattern": "curiosity pulls the mind toward new things",
+      "action_packet": "describe[dont ignore]^2 | support[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_47",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "consciousness",
+        "mind",
+        "qualia",
+        "experience",
+        "awareness"
+      ],
+      "signal": [
+        0.4428184289366991,
+        0.3390736336235846,
+        0.061420299866471635,
+        0.7735190962026199,
+        0.4258478925455631,
+        0.28489440234897717
+      ],
+      "hopfield_key": "88681478614634250",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "mind",
+        "system_prompt": "Lobe seed node about consciousness may be fundamental not derived."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241804e9,
+      "pattern": "consciousness may be fundamental not derived",
+      "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_22",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "tree",
+        "forest",
+        "carbon",
+        "oxygen",
+        "photosynthesis"
+      ],
+      "signal": [
+        0.6293084052618958,
+        0.20854674905904402,
+        0.8858681476535465,
+        0.28657804682023813,
+        0.11026771116562382,
+        0.3811133793935152,
+        0.8517731830556378,
+        0.5474968281248072
+      ],
+      "hopfield_key": "17803650117220309718",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about trees breathe carbon and grow tall in forests.",
+        "kingdom": "plantae"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241959e9,
+      "pattern": "trees breathe carbon and grow tall in forests",
+      "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_27",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "meaning",
+        "choice",
+        "action",
+        "purpose",
+        "freedom"
+      ],
+      "signal": [
+        0.8500420405293939,
+        0.5146520658597008,
+        0.7455326037831004,
+        0.2962847292026762,
+        0.4066345643282334,
+        0.5772247623632539,
+        0.28657804682023813,
+        0.2962847292026762,
+        0.4066345643282334,
+        0.8920343470949266
+      ],
+      "hopfield_key": "1741419260959466754",
+      "relational_patterns": [],
+      "json_data": {
+        "school": "existentialism",
+        "system_prompt": "Lobe seed node about meaning comes from what we choose and what we do."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241706e9,
+      "pattern": "meaning comes from what we choose and what we do",
+      "action_packet": "ponder[dont ignore]^2 | describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_19",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "quantum",
+        "wave",
+        "particle",
+        "superposition",
+        "uncertainty"
+      ],
+      "signal": [
+        0.16777534319394877,
+        0.6216506385262885,
+        0.02455673960779625,
+        0.697050745238376,
+        0.9455887688031671,
+        0.11659770494045417,
+        0.28657804682023813,
+        0.4677029823034656
+      ],
+      "hopfield_key": "6704620706044316974",
+      "relational_patterns": [],
+      "json_data": {
+        "branch": "quantum",
+        "domain": "physics",
+        "system_prompt": "Lobe seed node about quantum particles behave as both wave and particle."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241266e9,
+      "pattern": "quantum particles behave as both wave and particle",
+      "action_packet": "explain[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_6",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "bird",
+        "nest",
+        "song",
+        "feather",
+        "flight"
+      ],
+      "signal": [
+        0.6792026000011044,
+        0.24236983745093615,
+        0.13635052413761573,
+        0.28657804682023813,
+        0.748118333617534,
+        0.40246159596402586,
+        0.22674848969860043
+      ],
+      "hopfield_key": "597462385075269437",
+      "relational_patterns": [],
+      "json_data": {
+        "class": "aves",
+        "system_prompt": "Lobe seed node about birds build nests and sing at sunrise.",
+        "kingdom": "animalia"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242016e9,
+      "pattern": "birds build nests and sing at sunrise",
+      "action_packet": "describe[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_29",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "mushroom",
+        "fungus",
+        "mycelium",
+        "network",
+        "symbiosis"
+      ],
+      "signal": [
+        0.7898169096750687,
+        0.6189459099838182,
+        0.5474968281248072,
+        0.62023112920958,
+        0.43874972505418675,
+        0.8573804201039459
+      ],
+      "hopfield_key": "6779868189154807428",
+      "relational_patterns": [],
+      "json_data": {
+        "system_prompt": "Lobe seed node about mushrooms connect forests through fungal networks.",
+        "kingdom": "fungi"
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242073e9,
+      "pattern": "mushrooms connect forests through fungal networks",
+      "action_packet": "describe[dont ignore]^2 | explain[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_31",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "food",
+        "meal",
+        "energy",
+        "taste",
+        "fresh"
+      ],
+      "signal": [
+        0.3507316118051471,
+        0.7389694154990567,
+        0.7423494596971212,
+        0.28657804682023813,
+        0.8764051116488627,
+        0.573219221695672,
+        0.0026927919191594373,
+        0.7196853746339475
+      ],
+      "hopfield_key": "7258336363926925986",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "nutrition",
+        "system_prompt": "Lobe seed node about food gives energy and tastes good when fresh."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242214e9,
+      "pattern": "food gives energy and tastes good when fresh",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_36",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "cook",
+        "home",
+        "cheap",
+        "healthy",
+        "kitchen"
+      ],
+      "signal": [
+        0.8483215897982435,
+        0.40246159596402586,
+        0.009871586079801792,
+        0.7738499263164506,
+        0.7011874209560811,
+        0.28657804682023813,
+        0.06449820366236249,
+        0.456407428543895
+      ],
+      "hopfield_key": "7049388234451656833",
+      "relational_patterns": [
+        {
+          "relation": "is",
+          "object": "cheaper",
+          "subject": "home"
+        }
+      ],
+      "json_data": {
+        "activity": "cooking",
+        "system_prompt": "Lobe seed node about cooking at home is cheaper and often healthier."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649242339e9,
+      "pattern": "cooking at home is cheaper and often healthier",
+      "action_packet": "describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_40",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    },
+    {
+      "is_grave": false,
+      "grave_reason": "",
+      "drop_table": [
+        "neural",
+        "network",
+        "learn",
+        "training",
+        "pattern"
+      ],
+      "signal": [
+        0.8558758088130866,
+        0.8573804201039459,
+        0.551697180691617,
+        0.834304450282325,
+        0.7455326037831004,
+        0.4992166694832978,
+        0.3204193523181182
+      ],
+      "hopfield_key": "8220857035167124336",
+      "relational_patterns": [],
+      "json_data": {
+        "domain": "ai",
+        "system_prompt": "Lobe seed node about neural networks learn patterns from training data."
+      },
+      "neighbor_ids": [],
+      "ledger_last_cleared": 1.778712649241466e9,
+      "pattern": "neural networks learn patterns from training data",
+      "action_packet": "explain[dont ignore]^3 | describe[dont ignore]^2 | analyze[dont ignore]^1",
+      "is_unlinkable": false,
+      "is_image_node": false,
+      "id": "node_12",
+      "required_relations": [],
+      "relation_weights": {},
+      "strength": 1.0,
+      "response_times": [],
+      "throttle": 0.5
+    }
+  ],
+  "arousal": {
+    "decay_rate": 0.05,
+    "baseline": 0.3,
+    "level": 0.3
+  },
+  "lobe_tables": [
+    {
+      "created_at": 1.778712649177055e9,
+      "lobe_id": "emotions",
+      "chunks": {
+        "nodes": {
+          "node_45": {
+            "is_active": true,
+            "node_id": "node_45",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.77871264924249e9
+          },
+          "node_50": {
+            "is_active": true,
+            "node_id": "node_50",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242632e9
+          },
+          "node_44": {
+            "is_active": true,
+            "node_id": "node_44",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.77871264924246e9
+          },
+          "node_47": {
+            "is_active": true,
+            "node_id": "node_47",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242546e9
+          },
+          "node_49": {
+            "is_active": true,
+            "node_id": "node_49",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242608e9
+          },
+          "node_43": {
+            "is_active": true,
+            "node_id": "node_43",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242429e9
+          },
+          "node_46": {
+            "is_active": true,
+            "node_id": "node_46",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242518e9
+          },
+          "node_48": {
+            "is_active": true,
+            "node_id": "node_48",
+            "_type": "NodeRef",
+            "lobe_id": "emotions",
+            "inserted_at": 1.778712649242578e9
+          }
+        },
+        "drop": {
+          "node_48:distance": true,
+          "node_46:slow": true,
+          "node_50:trust": true,
+          "node_43:smile": true,
+          "node_46:loss": true,
+          "node_46:quiet": true,
+          "node_46:sad": true,
+          "node_45:injustice": true,
+          "node_45:rage": true,
+          "node_49:attention": true,
+          "node_47:curious": true,
+          "node_49:slow": true,
+          "node_50:break": true,
+          "node_45:fire": true,
+          "node_44:danger": true,
+          "node_46:grief": true,
+          "node_49:peace": true,
+          "node_47:question": true,
+          "node_45:anger": true,
+          "node_43:friend": true,
+          "node_48:friend": true,
+          "node_50:faith": true,
+          "node_44:alarm": true,
+          "node_44:flee": true,
+          "node_48:love": true,
+          "node_49:calm": true,
+          "node_44:fear": true,
+          "node_49:breath": true,
+          "node_50:betray": true,
+          "node_43:joy": true,
+          "node_43:happy": true,
+          "node_43:celebrate": true,
+          "node_44:freeze": true,
+          "node_45:boundary": true,
+          "node_47:wonder": true,
+          "node_48:family": true,
+          "node_47:new": true,
+          "node_48:bond": true,
+          "node_50:slow": true,
+          "node_47:explore": true
+        },
+        "json": {
+          "node_47:system_prompt": "Lobe seed node about curiosity pulls the mind toward new things.",
+          "node_48:valence": "positive",
+          "node_44:system_prompt": "Lobe seed node about fear warns the body of danger nearby.",
+          "node_43:valence": "positive",
+          "node_48:system_prompt": "Lobe seed node about love binds people across years and distance.",
+          "node_50:valence": "positive",
+          "node_49:system_prompt": "Lobe seed node about calm comes from breath and slow attention.",
+          "node_50:system_prompt": "Lobe seed node about trust grows slow and breaks fast.",
+          "node_47:valence": "positive",
+          "node_45:system_prompt": "Lobe seed node about anger burns when boundaries are crossed.",
+          "node_49:valence": "neutral",
+          "node_43:system_prompt": "Lobe seed node about joy rises when good things happen to friends.",
+          "node_44:valence": "negative",
+          "node_45:valence": "negative",
+          "node_46:system_prompt": "Lobe seed node about sadness asks the heart to slow and rest.",
+          "node_46:valence": "negative"
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.77871264917704e9,
+      "lobe_id": "daily_life",
+      "chunks": {
+        "nodes": {
+          "node_42": {
+            "is_active": true,
+            "node_id": "node_42",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.7787126492424e9
+          },
+          "node_41": {
+            "is_active": true,
+            "node_id": "node_41",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242368e9
+          },
+          "node_36": {
+            "is_active": true,
+            "node_id": "node_36",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242215e9
+          },
+          "node_39": {
+            "is_active": true,
+            "node_id": "node_39",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.77871264924231e9
+          },
+          "node_35": {
+            "is_active": true,
+            "node_id": "node_35",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242186e9
+          },
+          "node_40": {
+            "is_active": true,
+            "node_id": "node_40",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242341e9
+          },
+          "node_37": {
+            "is_active": true,
+            "node_id": "node_37",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242243e9
+          },
+          "node_38": {
+            "is_active": true,
+            "node_id": "node_38",
+            "_type": "NodeRef",
+            "lobe_id": "daily_life",
+            "inserted_at": 1.778712649242276e9
+          }
+        },
+        "drop": {
+          "node_41:book": true,
+          "node_42:music": true,
+          "node_37:morning": true,
+          "node_42:flow": true,
+          "node_39:job": true,
+          "node_40:cheap": true,
+          "node_37:coffee": true,
+          "node_36:meal": true,
+          "node_38:clear": true,
+          "node_36:taste": true,
+          "node_39:hours": true,
+          "node_39:career": true,
+          "node_35:recovery": true,
+          "node_40:kitchen": true,
+          "node_42:song": true,
+          "node_35:rest": true,
+          "node_41:read": true,
+          "node_37:caffeine": true,
+          "node_37:wake": true,
+          "node_36:energy": true,
+          "node_41:mind": true,
+          "node_35:sleep": true,
+          "node_38:fresh": true,
+          "node_40:cook": true,
+          "node_35:dream": true,
+          "node_41:slow": true,
+          "node_36:food": true,
+          "node_38:walk": true,
+          "node_40:healthy": true,
+          "node_37:brew": true,
+          "node_38:exercise": true,
+          "node_36:fresh": true,
+          "node_35:night": true,
+          "node_38:outside": true,
+          "node_40:home": true,
+          "node_41:grow": true,
+          "node_42:rhythm": true,
+          "node_39:work": true,
+          "node_39:task": true,
+          "node_42:mood": true
+        },
+        "json": {
+          "node_36:domain": "nutrition",
+          "node_38:system_prompt": "Lobe seed node about walking outside clears the head and feels good.",
+          "node_37:drink": "coffee",
+          "node_39:domain": "work",
+          "node_42:activity": "music",
+          "node_40:activity": "cooking",
+          "node_42:system_prompt": "Lobe seed node about music makes tasks feel lighter and time fly.",
+          "node_40:system_prompt": "Lobe seed node about cooking at home is cheaper and often healthier.",
+          "node_36:system_prompt": "Lobe seed node about food gives energy and tastes good when fresh.",
+          "node_35:system_prompt": "Lobe seed node about sleep restores mind and body every night.",
+          "node_41:activity": "reading",
+          "node_39:system_prompt": "Lobe seed node about work is where most hours of the week go.",
+          "node_37:system_prompt": "Lobe seed node about coffee wakes the brain with caffeine in the morning.",
+          "node_35:domain": "health",
+          "node_41:system_prompt": "Lobe seed node about reading books grows the mind slowly.",
+          "node_38:activity": "walking"
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.778712649177021e9,
+      "lobe_id": "philosophy",
+      "chunks": {
+        "nodes": {
+          "node_24": {
+            "is_active": true,
+            "node_id": "node_24",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241867e9
+          },
+          "node_20": {
+            "is_active": true,
+            "node_id": "node_20",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241737e9
+          },
+          "node_25": {
+            "is_active": true,
+            "node_id": "node_25",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241897e9
+          },
+          "node_23": {
+            "is_active": true,
+            "node_id": "node_23",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241836e9
+          },
+          "node_19": {
+            "is_active": true,
+            "node_id": "node_19",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241707e9
+          },
+          "node_22": {
+            "is_active": true,
+            "node_id": "node_22",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241806e9
+          },
+          "node_21": {
+            "is_active": true,
+            "node_id": "node_21",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241764e9
+          },
+          "node_26": {
+            "is_active": true,
+            "node_id": "node_26",
+            "_type": "NodeRef",
+            "lobe_id": "philosophy",
+            "inserted_at": 1.778712649241928e9
+          }
+        },
+        "drop": {
+          "node_24:unfalsifiable": true,
+          "node_25:guardrail": true,
+          "node_20:virtue": true,
+          "node_22:mind": true,
+          "node_20:moral": true,
+          "node_21:evidence": true,
+          "node_23:logic": true,
+          "node_24:proof": true,
+          "node_25:imperfection": true,
+          "node_24:territory": true,
+          "node_25:evolution": true,
+          "node_26:unified": true,
+          "node_24:map": true,
+          "node_25:adaptation": true,
+          "node_25:biology": true,
+          "node_19:choice": true,
+          "node_19:purpose": true,
+          "node_20:right": true,
+          "node_26:paradigm": true,
+          "node_26:mechanism": true,
+          "node_21:knowledge": true,
+          "node_21:justify": true,
+          "node_23:conclusion": true,
+          "node_24:simulation": true,
+          "node_26:coexist": true,
+          "node_23:premise": true,
+          "node_22:qualia": true,
+          "node_19:meaning": true,
+          "node_22:awareness": true,
+          "node_21:belief": true,
+          "node_20:ethics": true,
+          "node_22:consciousness": true,
+          "node_23:sound": true,
+          "node_19:freedom": true,
+          "node_20:wrong": true,
+          "node_21:truth": true,
+          "node_22:experience": true,
+          "node_23:valid": true,
+          "node_19:action": true,
+          "node_26:bio-analog": true
+        },
+        "json": {
+          "node_25:system_prompt": "Lobe seed node about biology cannot be guardrailed only evolved.",
+          "node_20:system_prompt": "Lobe seed node about ethics asks what actions are right or wrong.",
+          "node_21:branch": "epistemology",
+          "node_22:system_prompt": "Lobe seed node about consciousness may be fundamental not derived.",
+          "node_20:branch": "ethics",
+          "node_19:school": "existentialism",
+          "node_25:stance": "anti-metric",
+          "node_24:stance": "skeptical",
+          "node_23:system_prompt": "Lobe seed node about logic chains premises into valid conclusions.",
+          "node_22:branch": "mind",
+          "node_23:branch": "logic",
+          "node_19:system_prompt": "Lobe seed node about meaning comes from what we choose and what we do.",
+          "node_21:system_prompt": "Lobe seed node about knowledge requires justified true belief.",
+          "node_24:system_prompt": "Lobe seed node about simulation theory confuses map with territory.",
+          "node_26:stance": "unified",
+          "node_26:system_prompt": "Lobe seed node about every AI paradigm describes one biological mechanism."
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.778712649176962e9,
+      "lobe_id": "science",
+      "chunks": {
+        "nodes": {
+          "node_7": {
+            "is_active": true,
+            "node_id": "node_7",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241304e9
+          },
+          "node_8": {
+            "is_active": true,
+            "node_id": "node_8",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241333e9
+          },
+          "node_4": {
+            "is_active": true,
+            "node_id": "node_4",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.77871264924117e9
+          },
+          "node_5": {
+            "is_active": true,
+            "node_id": "node_5",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241226e9
+          },
+          "node_6": {
+            "is_active": true,
+            "node_id": "node_6",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241267e9
+          },
+          "node_3": {
+            "is_active": true,
+            "node_id": "node_3",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649223018e9
+          },
+          "node_10": {
+            "is_active": true,
+            "node_id": "node_10",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241399e9
+          },
+          "node_9": {
+            "is_active": true,
+            "node_id": "node_9",
+            "_type": "NodeRef",
+            "lobe_id": "science",
+            "inserted_at": 1.778712649241366e9
+          }
+        },
+        "drop": {
+          "node_4:electron": true,
+          "node_7:star": true,
+          "node_8:fitness": true,
+          "node_9:conservation": true,
+          "node_5:dna": true,
+          "node_5:life": true,
+          "node_9:heat": true,
+          "node_8:evolution": true,
+          "node_3:attraction": true,
+          "node_8:selection": true,
+          "node_3:mass": true,
+          "node_4:molecule": true,
+          "node_10:photon": true,
+          "node_5:cell": true,
+          "node_7:fusion": true,
+          "node_8:darwin": true,
+          "node_4:bond": true,
+          "node_10:light": true,
+          "node_10:speed": true,
+          "node_3:force": true,
+          "node_6:quantum": true,
+          "node_6:uncertainty": true,
+          "node_9:energy": true,
+          "node_6:superposition": true,
+          "node_7:helium": true,
+          "node_8:species": true,
+          "node_3:newton": true,
+          "node_5:gene": true,
+          "node_6:particle": true,
+          "node_4:proton": true,
+          "node_10:electromagnetic": true,
+          "node_5:code": true,
+          "node_4:atom": true,
+          "node_9:thermodynamics": true,
+          "node_7:light": true,
+          "node_9:work": true,
+          "node_10:wave": true,
+          "node_3:einstein": true,
+          "node_7:hydrogen": true,
+          "node_6:wave": true
+        },
+        "json": {
+          "node_7:domain": "astronomy",
+          "node_7:object": "star",
+          "node_5:scale": "molecular",
+          "node_6:system_prompt": "Lobe seed node about quantum particles behave as both wave and particle.",
+          "node_9:domain": "physics",
+          "node_3:domain": "physics",
+          "node_5:domain": "biology",
+          "node_10:domain": "physics",
+          "node_4:domain": "chemistry",
+          "node_4:scale": "atomic",
+          "node_7:system_prompt": "Lobe seed node about stars fuse hydrogen into helium and shine light.",
+          "node_6:domain": "physics",
+          "node_9:system_prompt": "Lobe seed node about energy cannot be created or destroyed only transformed.",
+          "node_10:branch": "optics",
+          "node_10:system_prompt": "Lobe seed node about light travels as electromagnetic waves at fixed speed.",
+          "node_3:system_prompt": "Lobe seed node about gravity pulls objects toward earth mass attracts mass.",
+          "node_8:system_prompt": "Lobe seed node about evolution selects traits that survive and reproduce.",
+          "node_3:branch": "mechanics",
+          "node_4:system_prompt": "Lobe seed node about atoms combine into molecules through chemical bonds.",
+          "node_8:theory": "evolution",
+          "node_8:domain": "biology",
+          "node_6:branch": "quantum",
+          "node_9:branch": "thermodynamics",
+          "node_5:system_prompt": "Lobe seed node about dna stores genetic code inside every living cell."
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.778712649177012e9,
+      "lobe_id": "technology",
+      "chunks": {
+        "nodes": {
+          "node_15": {
+            "is_active": true,
+            "node_id": "node_15",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241582e9
+          },
+          "node_18": {
+            "is_active": true,
+            "node_id": "node_18",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241674e9
+          },
+          "node_14": {
+            "is_active": true,
+            "node_id": "node_14",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241551e9
+          },
+          "node_17": {
+            "is_active": true,
+            "node_id": "node_17",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241646e9
+          },
+          "node_13": {
+            "is_active": true,
+            "node_id": "node_13",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241497e9
+          },
+          "node_12": {
+            "is_active": true,
+            "node_id": "node_12",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241467e9
+          },
+          "node_16": {
+            "is_active": true,
+            "node_id": "node_16",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241615e9
+          },
+          "node_11": {
+            "is_active": true,
+            "node_id": "node_11",
+            "_type": "NodeRef",
+            "lobe_id": "technology",
+            "inserted_at": 1.778712649241433e9
+          }
+        },
+        "drop": {
+          "node_12:network": true,
+          "node_14:syntax": true,
+          "node_11:binary": true,
+          "node_14:code": true,
+          "node_16:database": true,
+          "node_11:logic": true,
+          "node_16:table": true,
+          "node_17:sensor": true,
+          "node_17:actuator": true,
+          "node_13:protocol": true,
+          "node_18:parallel": true,
+          "node_15:cipher": true,
+          "node_13:internet": true,
+          "node_15:hash": true,
+          "node_15:key": true,
+          "node_17:robot": true,
+          "node_18:gpu": true,
+          "node_13:router": true,
+          "node_13:packet": true,
+          "node_11:cpu": true,
+          "node_14:language": true,
+          "node_16:sql": true,
+          "node_12:training": true,
+          "node_15:encrypt": true,
+          "node_13:network": true,
+          "node_14:program": true,
+          "node_14:compile": true,
+          "node_18:render": true,
+          "node_11:computer": true,
+          "node_12:pattern": true,
+          "node_12:neural": true,
+          "node_16:row": true,
+          "node_11:gate": true,
+          "node_17:control": true,
+          "node_15:security": true,
+          "node_18:pixel": true,
+          "node_12:learn": true,
+          "node_16:query": true,
+          "node_18:shader": true,
+          "node_17:motor": true
+        },
+        "json": {
+          "node_17:system_prompt": "Lobe seed node about robots use sensors and motors to act in the world.",
+          "node_12:domain": "ai",
+          "node_18:system_prompt": "Lobe seed node about graphics cards render pixels using parallel math.",
+          "node_17:domain": "robotics",
+          "node_16:domain": "data",
+          "node_15:domain": "security",
+          "node_14:domain": "software",
+          "node_13:system_prompt": "Lobe seed node about the internet connects computers across the whole world.",
+          "node_12:system_prompt": "Lobe seed node about neural networks learn patterns from training data.",
+          "node_15:system_prompt": "Lobe seed node about encryption scrambles data using mathematical keys.",
+          "node_11:domain": "hardware",
+          "node_18:domain": "graphics",
+          "node_14:system_prompt": "Lobe seed node about code is written in programming languages for machines.",
+          "node_11:system_prompt": "Lobe seed node about computers process information using binary logic gates.",
+          "node_13:domain": "networking",
+          "node_16:system_prompt": "Lobe seed node about databases store queryable rows of structured data."
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    },
+    {
+      "created_at": 1.778712649177032e9,
+      "lobe_id": "nature",
+      "chunks": {
+        "nodes": {
+          "node_33": {
+            "is_active": true,
+            "node_id": "node_33",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242129e9
+          },
+          "node_27": {
+            "is_active": true,
+            "node_id": "node_27",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.77871264924196e9
+          },
+          "node_34": {
+            "is_active": true,
+            "node_id": "node_34",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242155e9
+          },
+          "node_29": {
+            "is_active": true,
+            "node_id": "node_29",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242017e9
+          },
+          "node_31": {
+            "is_active": true,
+            "node_id": "node_31",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242074e9
+          },
+          "node_30": {
+            "is_active": true,
+            "node_id": "node_30",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242043e9
+          },
+          "node_32": {
+            "is_active": true,
+            "node_id": "node_32",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649242103e9
+          },
+          "node_28": {
+            "is_active": true,
+            "node_id": "node_28",
+            "_type": "NodeRef",
+            "lobe_id": "nature",
+            "inserted_at": 1.778712649241989e9
+          }
+        },
+        "drop": {
+          "node_29:nest": true,
+          "node_29:feather": true,
+          "node_29:song": true,
+          "node_31:fungus": true,
+          "node_33:honey": true,
+          "node_32:ocean": true,
+          "node_34:pack": true,
+          "node_28:river": true,
+          "node_32:gravity": true,
+          "node_27:carbon": true,
+          "node_34:predator": true,
+          "node_30:wind": true,
+          "node_34:wolf": true,
+          "node_34:family": true,
+          "node_33:flower": true,
+          "node_28:sea": true,
+          "node_32:moon": true,
+          "node_30:weather": true,
+          "node_32:wave": true,
+          "node_33:pollen": true,
+          "node_29:bird": true,
+          "node_29:flight": true,
+          "node_27:forest": true,
+          "node_33:hive": true,
+          "node_34:hunt": true,
+          "node_27:oxygen": true,
+          "node_31:mushroom": true,
+          "node_27:photosynthesis": true,
+          "node_30:climate": true,
+          "node_32:tide": true,
+          "node_30:season": true,
+          "node_28:watershed": true,
+          "node_31:mycelium": true,
+          "node_30:rain": true,
+          "node_31:network": true,
+          "node_28:mountain": true,
+          "node_33:bee": true,
+          "node_28:flow": true,
+          "node_27:tree": true,
+          "node_31:symbiosis": true
+        },
+        "json": {
+          "node_32:feature": "ocean",
+          "node_30:domain": "atmosphere",
+          "node_33:order": "hymenoptera",
+          "node_34:system_prompt": "Lobe seed node about wolves hunt in coordinated family packs.",
+          "node_27:kingdom": "plantae",
+          "node_28:feature": "water",
+          "node_29:kingdom": "animalia",
+          "node_28:system_prompt": "Lobe seed node about rivers flow from mountains down to the sea.",
+          "node_31:system_prompt": "Lobe seed node about mushrooms connect forests through fungal networks.",
+          "node_30:system_prompt": "Lobe seed node about weather patterns shift with the seasons.",
+          "node_33:kingdom": "animalia",
+          "node_34:kingdom": "animalia",
+          "node_27:system_prompt": "Lobe seed node about trees breathe carbon and grow tall in forests.",
+          "node_31:kingdom": "fungi",
+          "node_29:system_prompt": "Lobe seed node about birds build nests and sing at sunrise.",
+          "node_33:system_prompt": "Lobe seed node about bees pollinate flowers and make honey.",
+          "node_32:system_prompt": "Lobe seed node about ocean tides rise and fall by lunar pull.",
+          "node_34:class": "mammalia",
+          "node_29:class": "aves"
+        },
+        "meta": {},
+        "hopfield": {}
+      }
+    }
+  ],
+  "temporal_coherence": [],
+  "morph_cooldowns": {},
+  "attachments": [
+    {
+      "pattern": "love grows calm between two people",
+      "base_confidence": 0.2318181818181818,
+      "target_id": "node_47",
+      "signal": [
+        0.7928258396169835,
+        0.7056663960818687,
+        0.12927617564245633,
+        0.42746696154173136,
+        0.5827853889466348,
+        0.7970726435295704
+      ],
+      "node_id": "node_48"
+    },
+    {
+      "pattern": "joy and fear are both warnings from the body",
+      "base_confidence": 0.28076923076923077,
+      "target_id": "node_43",
+      "signal": [
+        0.9960757216670808,
+        0.28657804682023813,
+        0.503695017140873,
+        0.02933592069820026,
+        0.9455887688031671,
+        0.551360974621966,
+        0.7455326037831004,
+        0.270044582124484,
+        0.763442536141416
+      ],
+      "node_id": "node_44"
+    },
+    {
+      "pattern": "trees line rivers in the forest",
+      "base_confidence": 0.21666666666666667,
+      "target_id": "node_27",
+      "signal": [
+        0.6293084052618958,
+        0.21353260261513649,
+        0.5036136273372048,
+        0.8517731830556378,
+        0.270044582124484,
+        0.6226670025642956
+      ],
+      "node_id": "node_28"
+    },
+    {
+      "pattern": "meaning shapes ethics",
+      "base_confidence": 0.15000000000000002,
+      "target_id": "node_19",
+      "signal": [
+        0.8500420405293939,
+        8.183462516952474e-5,
+        0.7542852677886897
+      ],
+      "node_id": "node_20"
+    },
+    {
+      "pattern": "sleep and food both restore energy",
+      "base_confidence": 0.3227272727272727,
+      "target_id": "node_35",
+      "signal": [
+        0.11210469767673871,
+        0.28657804682023813,
+        0.3507316118051471,
+        0.9455887688031671,
+        0.9240515280937879,
+        0.7423494596971212
+      ],
+      "node_id": "node_36"
+    },
+    {
+      "pattern": "energy and light are both electromagnetic",
+      "base_confidence": 0.13333333333333333,
+      "target_id": "node_7",
+      "signal": [
+        0.7423494596971212,
+        0.28657804682023813,
+        0.5432522198515971,
+        0.02933592069820026,
+        0.9455887688031671,
+        0.05424886698898847
+      ],
+      "node_id": "node_8"
+    },
+    {
+      "pattern": "simulation theory fails basic logic",
+      "base_confidence": 0.2722222222222222,
+      "target_id": "node_23",
+      "signal": [
+        0.7455625096231238,
+        0.4337544410832905,
+        0.8088768040936225,
+        0.5525353277532792,
+        0.47859125633761124
+      ],
+      "node_id": "node_24"
+    },
+    {
+      "pattern": "dna mutation drives evolution",
+      "base_confidence": 0.05,
+      "target_id": "node_5",
+      "signal": [
+        0.3487210344130218,
+        0.7768702878188903,
+        0.013944200216961026,
+        0.46954871841266227
+      ],
+      "node_id": "node_6"
+    },
+    {
+      "pattern": "fungi help tides of life continue",
+      "base_confidence": 0.12692307692307692,
+      "target_id": "node_31",
+      "signal": [
+        0.8065726192853696,
+        0.06923951997599607,
+        0.05751793923640744,
+        0.02814897713460073,
+        0.6598521642357316,
+        0.44404345533312695
+      ],
+      "node_id": "node_32"
+    },
+    {
+      "pattern": "internet carries encrypted packets",
+      "base_confidence": 0.05,
+      "target_id": "node_13",
+      "signal": [
+        0.9134144272057766,
+        0.8172455838112832,
+        0.45568465256387564,
+        0.8623910520182217
+      ],
+      "node_id": "node_14"
+    },
+    {
+      "pattern": "atoms and gravity both act across space",
+      "base_confidence": 0.12692307692307692,
+      "target_id": "node_3",
+      "signal": [
+        0.18612080742588524,
+        0.28657804682023813,
+        0.4415170038115362,
+        0.9455887688031671,
+        0.7586534960612966,
+        0.14651443506900078,
+        0.5025812828772028
+      ],
+      "node_id": "node_4"
+    },
+    {
+      "pattern": "computers run neural networks",
+      "base_confidence": 0.2722222222222222,
+      "target_id": "node_11",
+      "signal": [
+        0.9338995524288007,
+        0.6898738871328447,
+        0.8558758088130866,
+        0.8573804201039459
+      ],
+      "node_id": "node_12"
+    }
+  ],
+  "rules": [
+    {
+      "text": "When {MISSION} activates, favor {PRIMARY_ACTION} but keep {SURE_ACTIONS} ready.",
+      "prob": 1.0
+    },
+    {
+      "text": "Confidence level {CONFIDENCE} shapes the tone of {PRIMARY_ACTION}.",
+      "prob": 0.9
+    },
+    {
+      "text": "If {VOTE_CERTAINTY} is UNSURE, mention {TIED_ALTERNATIVES} as options.",
+      "prob": 0.85
+    },
+    {
+      "text": "Anchor answer in {LOBE_CONTEXT} when lobes fire together.",
+      "prob": 0.8
+    },
+    {
+      "text": "Pull from {MEMORY} only when mission asks about past.",
+      "prob": 0.7
+    },
+    {
+      "text": "Node {NODE_ID} is the primary voice; let {ALL_ACTIONS} support it.",
+      "prob": 0.6
+    },
+    {
+      "text": "Unsure votes go into {UNSURE_ACTIONS} for soft hedging.",
+      "prob": 0.5
+    }
+  ]
+}
