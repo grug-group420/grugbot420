@@ -170,11 +170,12 @@ other lobes get an async turn right after (`secondary_async`, ordered by
 descending avg_conf), and whether a 50/50 coinflip was used to break an
 exact tie (diagnostic only, does not change dispatch order).
 
-v7.28: `mutual_incompleteness` = true when 2+ lobes each have multiple strong
-matches (pass the multi-lobe gate). In this case `coequal_lobe_ids` contains
-all qualifying lobe IDs — they all get equal standing in the winner bucket,
-no secondary demotion. curved_avg still decides who speaks FIRST among them,
-but none is "primary" vs "secondary." The 1k per-lobe cap is always enforced.
+v7.28: `mutual_incompleteness` = true when 2+ lobes each have at least one
+lock-in vote. In this case `coequal_lobe_ids` contains all qualifying lobe IDs —
+they all get equal standing in the winner bucket, no secondary demotion. A single
+lock-in is a real signal this lobe covers part of the input. curved_avg still
+decides who speaks FIRST among them, but none is "primary" vs "secondary."
+The 1k per-lobe cap is always enforced.
 """
 struct OrchestrationPlan
     floor_winner::Union{FloorWinner, Nothing}
@@ -301,14 +302,16 @@ function compute_orchestration_plan(
     end
 
     # GRUG v7.28: MUTUAL INCOMPLETENESS DETECTION
-    # Rule: if 2+ lobes each have MULTIPLE strong matches, they get co-equal
-    # standing regardless of overall averages. "Strong match" = passes the
-    # multi-lobe gate (avg >= MULTI_LOBE_THRESHOLD AND count >= MIN_WINNING_VOTES).
-    # This captures the case where different lobes each cover different subject
-    # clusters from the input — none is primary, none is secondary.
+    # Rule: if 2+ lobes each have at least one lock-in vote, they get co-equal
+    # standing regardless of overall averages. A single lock-in (conf >= 0.50)
+    # is a real signal that this lobe covers part of the input. Requiring
+    # "multiple" was artificial — one hit is enough to say "this lobe has
+    # something relevant." The multi-lobe gate (avg >= 0.50 AND count >= 2)
+    # is a separate, higher bar for secondary async admission, not for
+    # mutual incompleteness co-equality.
     coequal_lobe_ids = Set{String}()
     mutual_incompleteness = false
-    qualifying = filter(s -> s.passes_multi_lobe_gate, summaries)
+    qualifying = filter(s -> s.vote_count >= 1, summaries)
     if length(qualifying) >= 2
         mutual_incompleteness = true
         for s in qualifying
