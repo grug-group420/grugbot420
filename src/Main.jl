@@ -2245,47 +2245,15 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     end
 
     # GRUG: Pass EVERYTHING to the command block so the Generative Engine can see Grug's whole mind!
-    # GRUG v7.16.0: try/finally clears band info so it never leaks across cycles.
-    # If COMMANDS throws, band info still cleared -- NO SILENT FAILURES, NO GHOSTS.
-    # GRUG v7.21: Save the deterministic flag BEFORE the finally block clears it.
-    # The multipart coherence gate below needs to know whether the primary
-    # group produced a deterministic answer, but the finally block resets
-    # _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false before we get there.
+    # GRUG v7.29: DEFERRED CLEARING — the finally block now wraps the ENTIRE
+    # rendering section (primary + math injection + multipart). Previously it
+    # only wrapped the primary COMMANDS call, which CLEARED shared state before
+    # non-primary groups could use it. Now shared state survives until ALL
+    # per-lobe rendering is done, then gets cleared once at the end.
+    # NO SILENT FAILURES, NO GHOSTS — finally still guarantees cleanup.
     _was_deterministic = _CURRENT_HAS_DETERMINISTIC_ANSWER[]
-    _saved_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
-    _saved_clause_obj_ids = lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do; copy(_CURRENT_CLAUSE_OBJ_IDS); end
-    output = try
-        COMMANDS[primary_vote.action](_primary_scoped_mission, node, primary_vote, sure_votes, unsure_votes, votes)
-    finally
-        lock(_CURRENT_BAND_INFO_LOCK) do
-            empty!(_CURRENT_BAND_INFO)
-        end
-        lock(_CURRENT_RELATION_SCORES_LOCK) do
-            empty!(_CURRENT_RELATION_SCORES)
-        end
-        # GRUG v7.16.2: Clear stitch telemetry too -- NO SILENT LEAKS.
-        lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
-            empty!(_CURRENT_SUPPORT_STITCHES)
-        end
-        # GRUG v7.16.3: Clear lock-in score telemetry on cycle exit.
-        lock(_CURRENT_LOCKIN_SCORES_LOCK) do
-            empty!(_CURRENT_LOCKIN_SCORES)
-        end
-        # GRUG v7.20: Clear semantic chunk map on cycle exit.
-        lock(_CURRENT_CLAUSE_CHUNKS_LOCK) do
-            empty!(_CURRENT_CLAUSE_CHUNKS)
-        end
-        # GRUG v7.20: Clear clause data on cycle exit.
-        lock(_CURRENT_CLAUSES_LOCK) do
-            empty!(_CURRENT_CLAUSES)
-        end
-        # GRUG v7.22: Clear clause→objective_id mapping on cycle exit.
-        lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do
-            empty!(_CURRENT_CLAUSE_OBJ_IDS)
-        end
-        # GRUG v7.21: Reset deterministic-answer flag on cycle exit.
-        _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false
-    end
+    _output_result = try
+        output = COMMANDS[primary_vote.action](_primary_scoped_mission, node, primary_vote, sure_votes, unsure_votes, votes)
 
     # GRUG v7.16+: SIGIL PAYLOAD CONCAT.
     # When the winning vote is sigil-routed (math answer, multipart clause,
@@ -2372,12 +2340,18 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
     # Unsure votes are rendering noise (support/hedge), not grouping signal.
     # They still render via COMMANDS; they just don't get to influence
     # which clause a group belongs to or what scoped_mission it gets.
+    # GRUG v7.29: Shared state now survives until ALL groups render
+    # (deferred clearing). Each non-primary group gets its own band
+    # re-write so band_of() returns correct assignments for its votes.
     _locked_votes = sure_votes
     _has_multipart = any(v -> getfield(v, :objective_id) != UInt64(0), _locked_votes)
     if _has_multipart
         try
-            _mp_clauses = _saved_clauses  # GRUG v7.21: use saved copy (cleared in finally above)
-            mp_result = MultipartOrchestrator.orchestrate_multipart(_locked_votes, _mp_clauses, _saved_clause_obj_ids)
+            # GRUG v7.29: Read _CURRENT_CLAUSES directly — no saved copy needed
+            # because deferred clearing keeps them alive through multipart rendering.
+            _mp_clauses = lock(_CURRENT_CLAUSES_LOCK) do; collect(_CURRENT_CLAUSES); end
+            _mp_clause_obj_ids = lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do; copy(_CURRENT_CLAUSE_OBJ_IDS); end
+            mp_result = MultipartOrchestrator.orchestrate_multipart(_locked_votes, _mp_clauses, _mp_clause_obj_ids)
             _primary_obj = getfield(primary_vote, :objective_id)
             for grp in mp_result.groups
                 if grp.objective_id == _primary_obj
@@ -2402,13 +2376,13 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                     end
                 end
                 grp_scoped = grp.scoped_mission
-                _n_user_clauses = length(_saved_clauses)
-                @info "[MAIN v7.21] Multipart coherence gate: grp_obj=$(grp.objective_id), grp_primary=$(grp.primary_vote.node_id), grp_has_det=$(grp_has_deterministic), was_det=$(_was_deterministic), scoped=$(grp_scoped), n_clauses=$(_n_user_clauses)"
+                _n_user_clauses = length(_mp_clauses)
+                @info "[MAIN v7.29] Multipart coherence gate: grp_obj=$(grp.objective_id), grp_primary=$(grp.primary_vote.node_id), grp_has_det=$(grp_has_deterministic), was_det=$(_was_deterministic), scoped=$(grp_scoped), n_clauses=$(_n_user_clauses)"
                 # Gate (a): skip groups whose scoped_mission is just an action name
                 # and doesn't match any user clause — these are sigil artifacts.
-                if !isempty(_saved_clauses)
+                if !isempty(_mp_clauses)
                     _scoped_matches_clause = false
-                    for _cl in _saved_clauses
+                    for _cl in _mp_clauses
                         _cl_text = lowercase(strip(getfield(_cl, :text)))
                         _scoped_lc = lowercase(strip(grp_scoped))
                         if !isempty(_cl_text) && (_scoped_lc == _cl_text || occursin(_scoped_lc, _cl_text) || occursin(_cl_text, _scoped_lc))
@@ -2417,14 +2391,14 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                         end
                     end
                     if !_scoped_matches_clause
-                        @info "[MAIN v7.21] SKIPPING non-clause group $(grp.objective_id) (scoped='$(grp_scoped)' doesn't match any user clause)"
+                        @info "[MAIN v7.29] SKIPPING non-clause group $(grp.objective_id) (scoped='$(grp_scoped)' doesn't match any user clause)"
                         continue
                     end
                 end
                 # Gate (b): for single-clause deterministic inputs, skip ALL
                 # remaining non-primary groups — the math answer is complete.
                 if _was_deterministic && _n_user_clauses <= 1
-                    @info "[MAIN v7.21] SKIPPING extra group $(grp.objective_id) for single-clause deterministic"
+                    @info "[MAIN v7.29] SKIPPING extra group $(grp.objective_id) for single-clause deterministic"
                     continue
                 end
                 # GRUG v7.18+: Full AIML rendering for each non-primary group.
@@ -2436,11 +2410,110 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
                 grp_scoped = grp.scoped_mission
                 # GRUG: convert Vector{Any} → Vector{Vote} for type-safe COMMANDS dispatch
                 grp_votes_typed = Vote[v for v in grp.votes]
+
+                # ==============================================================
+                # GRUG v7.29: PER-GROUP BAND RE-WRITE.
+                # Before firing COMMANDS for this non-primary group, re-compute
+                # band assignments (top/support/hedge) and relation scores for
+                # THIS group's votes. This ensures band_of() returns the right
+                # band for each vote inside generate_aiml_payload, instead of
+                # returning :unknown (old bug: finally cleared the primary's
+                # band info before non-primary groups could use it) or returning
+                # the PRIMARY group's band assignments (wrong group's data).
+                #
+                # The shared temp list is one list — we just write the right
+                # data into it before each group's rendering pass. Synchronous,
+                # no isolation needed beyond write-before-read ordering.
+                # ==============================================================
+                _grp_sure = Vote[]
+                _grp_unsure = Vote[]
+                if !isempty(grp_votes_typed) && length(grp_votes_typed) > 1
+                    # Sort by confidence descending
+                    _grp_sorted = sort(grp_votes_typed; by = v -> v.confidence, rev = true)
+                    # Build VoteCandidates for banded selection
+                    _grp_candidates = VoteOrchestrator.VoteCandidate[]
+                    for v in _grp_sorted
+                        _gn = lock(() -> get(NODE_MAP, v.node_id, nothing), NODE_LOCK)
+                        if !isnothing(_gn)
+                            push!(_grp_candidates, VoteOrchestrator.VoteCandidate(v.node_id, v.confidence, _gn.strength; strength_cap = STRENGTH_CAP))
+                        end
+                    end
+                    if !isempty(_grp_candidates)
+                        _grp_bands = VoteOrchestrator.select_aiml_votes_banded(_grp_candidates)
+                        _grp_top_cands = _grp_bands.top
+                        _grp_sup_cands = _grp_bands.support
+                        _grp_hedge_cands = _grp_bands.hedge
+                        # Map candidates back to Votes
+                        _grp_cand_to_vote = Dict{String, Vote}()
+                        for v in _grp_sorted
+                            _grp_cand_to_vote[v.node_id] = v
+                        end
+                        _grp_top_votes = Vote[_grp_cand_to_vote[vc.node_id] for vc in _grp_top_cands if haskey(_grp_cand_to_vote, vc.node_id)]
+                        _grp_sup_votes = Vote[_grp_cand_to_vote[vc.node_id] for vc in _grp_sup_cands if haskey(_grp_cand_to_vote, vc.node_id)]
+                        _grp_hedge_votes = Vote[_grp_cand_to_vote[vc.node_id] for vc in _grp_hedge_cands if haskey(_grp_cand_to_vote, vc.node_id)]
+                        # Lockin promotion pass for this group
+                        _grp_promo = _apply_lockin_promotion(_grp_top_votes, _grp_sup_votes, _grp_hedge_votes)
+                        _grp_sure = _grp_promo.top
+                        _grp_promoted_support = _grp_promo.support
+                        # Relation gate on this group's support candidates
+                        _grp_confirmed_support = Vote[]
+                        _grp_unlinked_support = Vote[]
+                        _grp_score_map = Dict{String, Tuple{Int, Vector{String}}}()
+                        if !isnothing(grp_node)
+                            for sv in _grp_promoted_support
+                                _sv_node = lock(() -> get(NODE_MAP, sv.node_id, nothing), NODE_LOCK)
+                                if _sv_node === nothing
+                                    push!(_grp_unlinked_support, sv)
+                                    _grp_score_map[sv.node_id] = (0, String["node-vanished"])
+                                    continue
+                                end
+                                _rs = relation_score(grp_primary, grp_node, sv, _sv_node)
+                                _grp_score_map[sv.node_id] = (_rs.score, _rs.reasons)
+                                if _rs.score >= VoteOrchestrator.AIML_SUPPORT_RELATION_FLOOR
+                                    push!(_grp_confirmed_support, sv)
+                                else
+                                    push!(_grp_unlinked_support, sv)
+                                end
+                            end
+                        else
+                            # No primary node — treat all support as unlinked
+                            _grp_unlinked_support = _grp_promoted_support
+                        end
+                        _grp_unsure = vcat(_grp_confirmed_support, _grp_unlinked_support, _grp_hedge_votes)
+                        # WRITE band info for this group into the shared temp list
+                        lock(_CURRENT_BAND_INFO_LOCK) do
+                            for v in _grp_sure;              _CURRENT_BAND_INFO[v.node_id] = :top              end
+                            for v in _grp_confirmed_support; _CURRENT_BAND_INFO[v.node_id] = :support          end
+                            for v in _grp_unlinked_support;  _CURRENT_BAND_INFO[v.node_id] = :support_unlinked end
+                            for v in _grp_hedge_votes;       _CURRENT_BAND_INFO[v.node_id] = :hedge            end
+                        end
+                        # WRITE relation scores for this group
+                        lock(_CURRENT_RELATION_SCORES_LOCK) do
+                            empty!(_CURRENT_RELATION_SCORES)
+                            merge!(_CURRENT_RELATION_SCORES, _grp_score_map)
+                        end
+                        # WRITE lock-in scores for this group
+                        lock(_CURRENT_LOCKIN_SCORES_LOCK) do
+                            empty!(_CURRENT_LOCKIN_SCORES)
+                            merge!(_CURRENT_LOCKIN_SCORES, _grp_promo.lockin_scores)
+                        end
+                        # Clear support stitches so _pick_support_stitch picks fresh for this group
+                        lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+                            empty!(_CURRENT_SUPPORT_STITCHES)
+                        end
+                    end
+                end
+                # If the group has only 1 vote (or band re-write failed), the primary is sure, rest is unsure
+                if isempty(_grp_sure) && !isempty(grp_votes_typed)
+                    _grp_sure = Vote[grp_primary]
+                    _grp_unsure = filter(v -> v.node_id != grp_primary.node_id, grp_votes_typed)
+                end
+
                 # GRUG: if we have the node and COMMANDS has the action, render it.
                 if !isnothing(grp_node) && haskey(COMMANDS, grp_primary.action)
-                    @info "[MAIN v7.21] RENDERING non-primary group $(grp.objective_id): node=$(grp_primary.node_id), action=$(grp_primary.action), scoped=$(grp_scoped)"
+                    @info "[MAIN v7.29] RENDERING non-primary group $(grp.objective_id): node=$(grp_primary.node_id), action=$(grp_primary.action), scoped=$(grp_scoped), sure=$(length(_grp_sure)), unsure=$(length(_grp_unsure))"
                     try
-                        grp_output = COMMANDS[grp_primary.action](grp_scoped, grp_node, grp_primary, Vote[], grp_votes_typed, grp_votes_typed)
+                        grp_output = COMMANDS[grp_primary.action](grp_scoped, grp_node, grp_primary, _grp_sure, _grp_unsure, grp_votes_typed)
                         # GRUG: also concat the group primary's payload if present.
                         if !isempty(grp_payload)
                             grp_output = isempty(strip(String(grp_output))) ?
@@ -2465,9 +2538,37 @@ function ephemeral_aiml_orchestrator(mission::String, votes::Vector{Vote})::Tupl
         end
     end
 
-    # GRUG: Return output along with contributing votes (sure + unsure)
+    # GRUG v7.29: Return output along with contributing votes (sure + unsure)
     # These are the votes that actually contributed to generating output
-    return output, sure_votes, unsure_votes
+        (output, sure_votes, unsure_votes)
+    finally
+        # GRUG v7.29: DEFERRED CLEARING — all shared state cleared ONCE after
+        # ALL per-lobe rendering is complete. Primary + multipart groups all
+        # had access to the shared temp list. Now we wipe it. NO SILENT LEAKS.
+        lock(_CURRENT_BAND_INFO_LOCK) do
+            empty!(_CURRENT_BAND_INFO)
+        end
+        lock(_CURRENT_RELATION_SCORES_LOCK) do
+            empty!(_CURRENT_RELATION_SCORES)
+        end
+        lock(_CURRENT_SUPPORT_STITCHES_LOCK) do
+            empty!(_CURRENT_SUPPORT_STITCHES)
+        end
+        lock(_CURRENT_LOCKIN_SCORES_LOCK) do
+            empty!(_CURRENT_LOCKIN_SCORES)
+        end
+        lock(_CURRENT_CLAUSE_CHUNKS_LOCK) do
+            empty!(_CURRENT_CLAUSE_CHUNKS)
+        end
+        lock(_CURRENT_CLAUSES_LOCK) do
+            empty!(_CURRENT_CLAUSES)
+        end
+        lock(_CURRENT_CLAUSE_OBJ_IDS_LOCK) do
+            empty!(_CURRENT_CLAUSE_OBJ_IDS)
+        end
+        _CURRENT_HAS_DETERMINISTIC_ANSWER[] = false
+    end
+    return _output_result
 end
 
 # ==============================================================================
