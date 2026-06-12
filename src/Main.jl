@@ -2870,9 +2870,16 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         # claim is already a complete sentence like "2 plus 2 equals 4".
         skeleton = replace(skeleton, r"^(Thinking it through: |Here is the picture: |To acknowledge what matters here: |A caution: |A concern worth raising: |Hello — here is what matters: )" => "")
         support_pieces = String[]
+        hedge_pieces = String[]  # GRUG v7.25: empty for deterministic — no sub-lockin section
     else
         # GRUG v7.21: EXPLORATORY PATH — CLAIM + SUPPORT with lobe-family gate.
         support_pieces = String[]
+
+    # GRUG v7.25: SUB-LOCKIN HEDGE PIECES — votes below lock-in threshold that
+    # entered the same pool but didn't make the primary response. These render
+    # in a separate "This might also be true" section AFTER the primary response,
+    # NOT inline within it. Same list, same orchestration, just separated in output.
+    hedge_pieces = String[]
 
     # GRUG v7.16.1: Partition unsure_votes into THREE sub-bands using band_of():
     #   :support          -> loud AND linked to primary by relation_score
@@ -2955,12 +2962,12 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
     end
 
-    # (c) CONFIRMED SUPPORT BAND \u2192 "Grug also sure of ..." supporting claims.
-    # These are LOUD votes that ALSO passed the relation gate (score >=
-    # AIML_SUPPORT_RELATION_FLOOR). They have a verified link to the primary
-    # via group / attachment / lobe / shared triples / concept class, so
-    # their pattern is legitimate supporting content. Cap at 2 claims.
-    # GRUG v7.21: LOBE-FAMILY GATE — even confirmed support votes
+    # (c) CONFIRMED SUPPORT BAND \u2192 sub-lockin hedge section.
+    # GRUG v7.25: These votes are LOUD and passed the relation gate, but they
+    # are BELOW lock-in threshold (combined < 0.50). They still entered the same
+    # pool — they just didn't make the primary response. Render them in the
+    # separate "This might also be true" section, NOT inline.
+    # GRUG v7.21: LOBE-FAMILY GATE still applies — even confirmed support votes
     # from off-topic lobes are suppressed. The relation gate checks link
     # structure, not semantic content. A math-lobe node linked via shared
     # verb "describe" to a nature-lobe node should NOT inject "what is a
@@ -2976,7 +2983,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
             end
         end
         # GRUG: if all filtered out (rare), fall back to original set so
-        # we never produce a completely bare reply.
+        # we never produce a completely bare hedge section.
         if isempty(topical_support)
             topical_support = support_band_votes
         end
@@ -3015,20 +3022,19 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
                 vote_certainty,
                 sv.node_id,
             )
-            push!(support_pieces, stitched)
+            push!(hedge_pieces, stitched)
 
             push!(seen_patterns, sn.pattern)
             support_claims_added += 1
         end
     end
 
-    # (d) UNLINKED SUPPORT BAND -> RELIABILITY-FLAGGED support.
-    # GRUG v7.16.1: These votes came in LOUD (past AIML_SUPPORT_FLOOR) but
+    # (d) UNLINKED SUPPORT BAND -> sub-lockin hedge section.
+    # GRUG v7.25: These votes came in LOUD (past AIML_SUPPORT_FLOOR) but
     # FAILED the relation gate -- they may be off-topic despite high
-    # confidence. We still surface them (biology rule: a loud voice should
-    # be heard), but with an EXPLICIT warning to the user so they know
-    # these claims haven't passed the topical-link check. Cap at 2 to
-    # keep the reply tight.
+    # confidence. They still entered the pool but didn't lock in. Render
+    # in the separate "This might also be true" section with an explicit
+    # reliability warning. Cap at 2 actions.
     #
     # GRUG v2.6+: render via action verbs, NOT raw patterns. Patterns can
     # contain interrogatives ("what why how") and reading them back makes
@@ -3048,22 +3054,24 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         end
         if !isempty(unlinked_actions)
             prose = _prose_join(unlinked_actions)
-            push!(support_pieces, " Grug heard $prose strongly too but is less certain those fit here.")
+            push!(hedge_pieces, " Grug heard $prose strongly too but is less certain those fit here.")
         end
     end
 
-    # (e) HEDGE BAND \u2192 reliability-flagged quiet voices. These are votes
-    # that cleared AIML_CONFIDENCE_THRESHOLD but fell below AIML_SUPPORT_FLOOR
-    # -- Grug heard them but not loud enough to claim independently.
-    # GRUG v7.16.1: Reworded so user clearly knows these are less reliable.
-    # Only renders on UNSURE certainty (top had ties). Dedupe actions first.
-    if !isempty(hedge_band_votes) && vote_certainty == "UNSURE"
+    # (e) HEDGE BAND \u2192 sub-lockin hedge section (quiet voices).
+    # GRUG v7.25: These votes cleared AIML_CONFIDENCE_THRESHOLD but fell below
+    # AIML_SUPPORT_FLOOR — Grug heard them but not loud enough to claim
+    # independently. They entered the pool but didn't lock in. Render in
+    # the separate "This might also be true" section. No longer restricted
+    # to UNSURE certainty only — ALL sub-lockin votes get the hedge section.
+    # Dedupe actions first.
+    if !isempty(hedge_band_votes)
         hedge_actions = [_pick_synonym(String(v.action), node_drop_table, node_required)
                           for v in hedge_band_votes]
         unique!(hedge_actions)
         hedge_prose = _prose_join(hedge_actions)
         if !isempty(hedge_prose)
-            push!(support_pieces, " Less certain \u2014 Grug also picked up $hedge_prose but these may not hold up.")
+            push!(hedge_pieces, " Less certain \u2014 Grug also picked up $hedge_prose but these may not hold up.")
         end
     end
 
@@ -3294,6 +3302,25 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
         println(payload_io, "Muted Lobes: <telemetry error: $e>")
     end
     print(payload_io, "=========================================")
+
+    # =====================================================================
+    # GRUG v7.25: SUB-LOCKIN HEDGE SECTION — "This might also be true"
+    # =====================================================================
+    # Votes below lock-in threshold (>= 0.20, < 0.50 combined) still entered
+    # the same pool and ran through the same orchestration pipeline. They
+    # just didn't make the primary response. They render here in a separate
+    # section AFTER the certain response, so the user can see what else
+    # Grug picked up without confusing it with the confident answer.
+    # Same list, same orchestration, just separated in output rendering.
+    # =====================================================================
+    if !isempty(hedge_pieces)
+        hedge_text = join(hedge_pieces, "")
+        println(payload_io)
+        println(payload_io, "This might also be true:")
+        print(payload_io, strip(hedge_text))
+        println(payload_io)
+    end
+
     return String(take!(payload_io))
 end
 

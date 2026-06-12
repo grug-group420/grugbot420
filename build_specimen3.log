@@ -1,0 +1,253 @@
+WARNING: redefinition of constant GrugBot420.CAUSAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.SPATIAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.TEMPORAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.MATH_BUILDUP_MARKERS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._OBJECTIVE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.COMMANDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ID_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_HIT_COUNTS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_FIRE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LOBE_FAMILIES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._CURRENT_HAS_DETERMINISTIC_ANSWER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_MUTED_LOBES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_BRIDGED_NODES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.AIML_DROP_TABLE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ALLOWED_RULE_TAGS. This may fail, cause incorrect answers, or produce other errors.
+┌ Warning: Replacing docs for `GrugBot420.words_to_signal :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.rewrite_passive_mission :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_relational_triples :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.SemanticChunk :: Union{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._extract_math_buildup_span :: Tuple{Vector{String}, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.decompose_semantic_chunks :: Tuple{String, Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._infer_chunk_kind :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._lobe_topicality_for_vote :: Tuple{Any, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._triple_is_topical :: Tuple{Any, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.extract_dynamic_relational_triples :: Tuple{String, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.evaluate_relational_dialectics :: Tuple{Vector{GrugBot420.RelationalTriple}, Vector{GrugBot420.RelationalTriple}, Vector{String}, Dict{String, Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_input_hash :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_lookup :: Tuple{UInt64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.hopfield_record! :: Tuple{UInt64, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_nonjitter :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.set_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.clear_nonjitter! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_nonjitter_ids :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.is_solidified :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.check_solidify_threshold! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.bump_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.penalize_strength! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sync_grave_to_group_registry :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_grave! :: Tuple{GrugBot420.Node, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.mark_node_contributor! :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.try_link_nodes! :: Tuple{GrugBot420.Node, GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.find_best_latch_target :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._token_overlap_similarity :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._scaffold_coherence_pass :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._compute_lobe_topicality :: Tuple{String, Set{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._compute_muted_lobes :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._node_has_semantic_bridge :: Tuple{Any, Set{String}, Set{String}, Set{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_lobe_topicality_gate! :: Tuple{String, Vector}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_node! :: Tuple{String, String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.detach_node! :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.fire_attachments! :: Tuple{String, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachment_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_attachments_for_target :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._sdf_signal_similarity :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.attach_image_node! :: Tuple{String, String, Vector{UInt8}, Int64, Int64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.reset_throttle! :: Tuple{GrugBot420.Node, Float64}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.create_node :: Tuple{String, String, Dict, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.node_sigil_kind :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.has_sigil_tag :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.pattern_is_macro_scaffolding :: Tuple{AbstractString}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.create_sigil_node :: Tuple{String, String, Dict, Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.list_sigil_node_ids :: Union{Tuple{}, Tuple{Symbol}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.parse_action_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.select_action :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.screen_input_complexity :: Tuple{Vector{Float64}, Vector{GrugBot420.RelationalTriple}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._effective_scan_mode :: Tuple{Int64, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._bidirectional_cheap_scan :: Tuple{Vector{Float64}, Vector{Float64}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.collect_drop_table_neighbors :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.strength_biased_scan_coinflip :: Tuple{GrugBot420.Node}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_specimens :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.scan_and_expand :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_vote :: NTuple{5, Any}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_explicit_vote :: Tuple{String, String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.SigilFireError :: Union{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420._select_opener :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.cast_sigil_votes :: Tuple{String, Float64, Vector, String, Vector{GrugBot420.RelationalTriple}, Vector{GrugBot420.RelationalTriple}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.apply_right_feedback! :: Tuple{Vector{String}}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.grow_nodes_from_packet :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.get_node_status_summary :: Tuple{}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.add_orchestration_rule! :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `GrugBot420.count_alive_nodes_in_lobe :: Tuple{String}` in module `GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...
+==============================================================================
+GRUG v2.6 -- BUILDING COMPREHENSIVE SPECIMEN
+Target file: /workspace/grugbot420/v722_test.specimen.gz
+==============================================================================
+
+[Phase 1] Creating lobes...
+  ✅ lobe_math (arithmetic, calculation, quantitative reasoning)
+  ✅ lobe_language (linguistic structure, multipart questions, conjunctions)
+  ✅ lobe_social (greetings, empathy, social cues, comfort)
+  ✅ lobe_survival (danger, threat, flee, fight, hide)
+  ✅ lobe_reasoning (logical analysis, ponder, deduction, why)
+  ✅ lobe_knowledge (sky, ocean, water, love, ecosystem, fire, nature, describe, explain, what)
+  🔗 6 cross-lobe cascade edges wired
+
+[Phase 2] Creating pattern-reactive nodes per lobe...
+  ✅ 20 pattern-reactive nodes spread across 5 lobes (14 base + 6 knowledge)
+
+[Phase 3] Wiring node attachments (relational fire)...
+[ENGINE] 🔗  Node 'node_18' attached to target 'node_6' with pattern "compute solve evaluate" (base_conf=0.05, 1/4 slots used).
+  🔗 attachment: node_6 -> node_18
+[ENGINE] 🔗  Node 'node_17' attached to target 'node_11' with pattern "and then also moreover furthermore" (base_conf=0.05, 1/4 slots used).
+  🔗 attachment: node_11 -> node_17
+
+[Phase 4] Adding AIML orchestration rules...
+  ✅ 3 orchestration rules registered
+
+[Phase 5] Concept classes + inhibitions...
+  ✅ 4 user-added concept classes (on top of seeded baseline)
+  🚫 2 word-level inhibitions
+  🚫 1 concept-level inhibition
+
+[Phase 6] Group registry...
+  ✅ 2 groups registered (2 total)
+
+[Phase 7] Crystalize tags...
+  💎 user-crystalized node_6
+  💎 auto-crystalized node_16
+
+[Phase 8] Subconscious microlog...
+  ✅ subconscious primed (some observations may have landed via stochastic write)
+
+[Phase 9] Custom sigil registration...
+  ✅ &emoji registered (7 sigils total in registry)
+
+[Phase 10] AIML node tribes per lobe...
+    ⚠️  aiml_node lobe_math: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_math", "Considering arithmetic, calculation, quantitative reasoning, the situation suggests a measured response."), 0x0000000000008325)
+    ⚠️  aiml_node lobe_language: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_language", "Considering linguistic structure, multipart questions, conjunctions, the situation suggests a measured response."), 0x0000000000008325)
+    ⚠️  aiml_node lobe_social: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_social", "Considering greetings, empathy, social cues, comfort, the situation suggests a measured response."), 0x0000000000008325)
+    ⚠️  aiml_node lobe_survival: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_survival", "Considering danger, threat, flee, fight, hide, the situation suggests a measured response."), 0x0000000000008325)
+    ⚠️  aiml_node lobe_reasoning: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_reasoning", "Considering logical analysis, ponder, deduction, why, the situation suggests a measured response."), 0x0000000000008325)
+    ⚠️  aiml_node lobe_knowledge: MethodError(Core.kwcall, ((strength = 1.5,), GrugBot420.AIMLNodeSystem.add_aiml_node!, "lobe_knowledge", "Considering sky, ocean, water, love, ecosystem, fire, nature, describe, explain, what, the situation suggests a measured response."), 0x0000000000008325)
+  ✅ AIML tribes registered for 6 lobes
+
+[Phase 11] Priming message history + arousal...
+  💬 3 messages seeded (1 pinned)
+  👁  arousal pre-set to 0.55
+
+[Phase 12] Priming tonal build-up...
+  🌡  tonal build-up snapshot: tone=nothing buildup=0.0
+
+[Phase 13] Saving specimen to disk...
+==============================================================================
+╔══════════════════════════════════════════════════════════════╗
+║            🧊 SPECIMEN SAVED SUCCESSFULLY                    ║
+╠══════════════════════════════════════════════════════════════╣
+  📁  File             : /workspace/grugbot420/v722_test.specimen.gz
+  📦  JSON size        : 98353 bytes
+  🗜️   Compressed size  : 14670 bytes (85.1% smaller)
+  ⏱️   Time             : 0.41s
+  ─────────────────────────────────────────────
+  🌱  Nodes            : 26
+  🧠  Lobes            : 6
+  📋  Lobe tables      : 6
+  ⚡  Hopfield entries  : 0
+  ⚙️   Rules            : 3
+  💬  Messages         : 3
+  🔧  Verb classes     : 3
+  🔤  Thesaurus words  : 499
+  🚫  Inhibitions      : 2
+  🔗  Attachments      : 2
+  🔮  Trajectory entries : 0
+  🕐  Temporal coherence : 0
+  ⏳  Morph cooldowns    : 0
+  🤖  AIML nodes       : 0
+  🌡️   Tonal build-up   : tone= buildup=0.0
+  🔠  Concept classes  : 17
+  🚫  Concept bans     : 1
+  👥  Groups           : 2
+  💎  Crystalized      : user=1 auto=1
+  🔁  Swap cooldowns   : 0
+  💭  Subconscious keys: 0
+  🔣  Sigils           : 7
+  👁   Arousal          : 0.55
+╚══════════════════════════════════════════════════════════════╝
+
+✅ Saved /workspace/grugbot420/v722_test.specimen.gz (14.3 KB)
+==============================================================================
+GRUG SPEC BUILD COMPLETE
+==============================================================================
