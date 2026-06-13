@@ -1,0 +1,1107 @@
+WARNING: redefinition of constant GrugBot420.CAUSAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.SPATIAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.TEMPORAL_VERBS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.MATH_BUILDUP_MARKERS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._OBJECTIVE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.COMMANDS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.NODE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ID_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_CACHE_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.HOPFIELD_HIT_COUNTS. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_MAP. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ATTACHMENT_LOCK. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_FIRE_COUNTER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LOBE_FAMILIES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._CURRENT_HAS_DETERMINISTIC_ANSWER. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._CURRENT_PREDICTION. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._ATTENUATED_FIRE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_MUTED_LOBES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420._LAST_BRIDGED_NODES. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.AIML_DROP_TABLE. This may fail, cause incorrect answers, or produce other errors.
+WARNING: redefinition of constant GrugBot420.ALLOWED_RULE_TAGS. This may fail, cause incorrect answers, or produce other errors.
+
+gzip: grug_comprehensive_v736.specimen: not in gzip format
+Growing initial map seeds with Stochastic Emotion Packets & Relational Gating...
+Loading specimen...
+ERROR loading specimen: ErrorException("!!! FATAL: /loadSpecimen expects a JSON object at top level, got JSON.Object{String, Any}! !!!")
+
+RUNNING 35 TEST MISSIONS
+
+=== MISSION 1 ===
+INPUT: "hello there"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 2 ===
+INPUT: "who are you"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+[ENGINE] 🐢  Node node_5 marked [GRAVED-SLOW] (avg: 12.91s > 5.0s).
+
+🤖 AIML Output Scaffold:
+[Multi-clause reasoning voice] Here is the picture: the explanation.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'who are you'
+Primary Action: describe  (conf=1.19, certainty=SURE)
+Sure Actions: [describe]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  - LOCKIN node_5 conf=1.191 link=0.0 combined=1.191
+Constraints: [None]
+Winning Node: node_5
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: (who, are, you)
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.0 eligible=2] (Recent): [User]: who are you (intensity=1.3)
+Muted Lobes: None
+Bridged Nodes: None
+========================================= who are you
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.6412149610880247), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 1.3036900943290706), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 1.0)]
+
+=== MISSION 3 ===
+INPUT: "say rock 3 times"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 4 ===
+INPUT: "repeat hello 2 times"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: reflect reason argue calculate.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'repeat hello 2 times'
+Primary Action: reason  (conf=0.19, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.195 link=0.0 combined=0.195
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.0 eligible=5] (Recent): [User]: hello there (intensity=0.58) | [User]: who are you (intensity=0.85)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.5780191687473853), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.8464507638014458), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.6500055458088213), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.7983482583787749), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 1.3060682958594023), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 1.0)]
+
+=== MISSION 5 ===
+INPUT: "count from 1 to 5"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'count from 1 to 5'
+Primary Action: greet  (conf=0.42, certainty=SURE)
+Sure Actions: [greet]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_0 conf=0.417 link=0.0 combined=0.417
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.0 eligible=7] (Recent): No recent sounds
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.36491716666405205), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.5434664444137018), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.41591011734487215), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.5325615341575738), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.8560971558657697), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.6445939079759742), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 1.309238716490115), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 1.0)]
+
+=== MISSION 6 ===
+INPUT: "check the date"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] Thinking it through: the calculation.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'check the date'
+Primary Action: calculate  (conf=0.6, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  - LOCKIN node_3 conf=0.602 link=0.0 combined=0.602
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.0 eligible=9] (Recent): [User]: hello there (intensity=0.24) | [User]: count from 1 to 5 (intensity=0.84) | [System]: Mission "count from 1 to 5" → primary=greet conf=0.42 node=node_0 (intensity=0.64)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.24056137771903904), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.3471477123043445), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.2629875958639761), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.3565352716116574), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.554813118003592), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.41174488448399926), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.8445704138680982), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.6364731125955895), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 1.2798079683462364), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 1.0)]
+
+=== MISSION 7 ===
+INPUT: "tell the time"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 8 ===
+INPUT: "remind me about the weather"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 9 ===
+INPUT: "announce news"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 10 ===
+INPUT: "recall ages ago"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] Thinking it through: the calculation.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'recall ages ago'
+Primary Action: calculate  (conf=0.6, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  - LOCKIN node_3 conf=0.599 link=0.0 combined=0.599
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [User]: check the date (intensity=0.83) | [User]: recall ages ago (intensity=1.31)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.15431960054697463), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.22953832670989252), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.17405102520806298), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.2325122866961673), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.3541199303991553), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.27330463894360657), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.5598774699732423), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.4186275714959779), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.8331713834577373), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.6322197844709669), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.6667649347935997), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.635937521849961), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.6525320286064725), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 1.3115745870535054), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 1.0)]
+
+=== MISSION 11 ===
+INPUT: "confirm the time"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 12 ===
+INPUT: "compare 10"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 13 ===
+INPUT: "compare 2"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 14 ===
+INPUT: "verify yes"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 15 ===
+INPUT: "verify no"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 16 ===
+INPUT: "search recent and today"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 17 ===
+INPUT: "say hello 3 times"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: think ponder ponder calculate.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'say hello 3 times'
+Primary Action: ponder  (conf=0.23, certainty=SURE)
+Sure Actions: [ponder]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.234 link=0.0 combined=0.234
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.56 eligible=9] (Recent): [System]: Mission "recall ages ago" → primary=calculate conf=0.6 node=node_3 (intensity=0.66) | [User]: compare 10 (intensity=0.65) | [User]: verify yes (intensity=0.65) | [User]: say hello 3 times (intensity=1.24)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.2650829065289177), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.1534981216940003), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.11586281959999832), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.4788163252222985), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.5533121285948173), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.3306556679612649), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.3597169613607695), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.2784452016682983), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.5289899013791508), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.4125790345680938), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.4280688140172929), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.4089836464183623), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.41171977447830427), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.8311828405242745), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.6605562535778206), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.6470816187198424), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.6541425112235696), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.6408244100599316), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.648691491813627), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.6686871192957125), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.6336735930883753), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 1.2421220520308651), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 1.0)]
+
+=== MISSION 18 ===
+INPUT: "maybe say hello 3 times"
+--> Scanning specimens & looking for dialectical relations...
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: ponder contemplate contemplate calculate.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'maybe say hello 3 times'
+Primary Action: reason  (conf=0.3, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [calculate]
+Relation Scores (floor=2):
+  - HEDGE     node_4:calculate score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.302 link=0.0 combined=0.302
+  -        node_4 conf=0.229 link=0.0 combined=0.229
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: (maybe, say, hello)
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=calculate | conf=0.23 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.56 eligible=5] (Recent): [System]: Mission "say hello 3 times" → primary=ponder conf=0.23 node=node_1 (intensity=0.88) | [User]: maybe say hello 3 times (intensity=1.72)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+This might also be true:
+Less certain — Grug also picked up calculate but these may not hold up.
+
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.30519267274956147), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.10153309279808825), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.07306595207112357), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.5643936038706041), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.6171854951576091), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.35043741829116637), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.23579945431714114), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.18530277326318723), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.3528046510701982), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.27259435297630086), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.27726551262510624), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.2683354476415305), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.2663932242139443), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.5324614131241215), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.42485080252880686), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.4300767173066967), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.4195584230052724), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.4289840645446036), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.4257020514766489), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.44042603929037294), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.4239406786543146), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 1.2994052079500698), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.8776987732782223), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 1.7208504174704928), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 1.0)]
+
+=== MISSION 19 ===
+INPUT: "don't say hello 3 times"
+--> Scanning specimens & looking for dialectical relations...
+--> 2 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: contemplate contemplate debate gauge.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'don't say hello 3 times'
+Primary Action: reason  (conf=0.13, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.128 link=0.0 combined=0.128
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: (don't, say, hello)
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.75 eligible=5] (Recent): [User]: say hello 3 times (intensity=1.28) | [User]: don't say hello 3 times (intensity=1.7)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.32413714750128503), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.06482176974297339), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.04629177104329636), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.6271451844949599), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.6536105981850474), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.37584812932790007), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.1574545576214432), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.11740388849904465), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.2291540652807447), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.18141150067520864), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.18240409650249423), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.1736056496142914), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.17826105195352876), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.35631728180725014), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.28367481824912666), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.27732547250099415), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.26868772965299514), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.2735355862355754), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.27481766827223597), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.2845424583134136), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.27829413635023725), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 1.282437626632083), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.8150087852089742), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 1.4933693102692425), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.8401824341816274), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 1.6998977659726302), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 1.0)]
+
+=== MISSION 20 ===
+INPUT: "explain fire and describe water"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: ponder reflect think evaluate.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'explain fire and describe water'
+Primary Action: reason  (conf=0.21, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.208 link=0.0 combined=0.208
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=9] (Recent): [User]: say hello 3 times (intensity=0.85) | [User]: maybe say hello 3 times (intensity=0.95) | [User]: don't say hello 3 times (intensity=1.12) | [System]: Mission "don't say hello 3 times" → primary=reason conf=0.13 node=node_1 (intensity=0.63)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.2139143932586823), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.042859852830492116), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.030331870227997562), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.4004666696859685), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.4203503210833335), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.24782625151933324), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.09991964918960539), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.07439132376850625), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.14563211210408133), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.11566107213878415), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.11624885072443085), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.11413444613238931), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.1165182090746391), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.23196580235393488), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.17906997683374762), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.17891610715020723), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.17842583020884936), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.18084932769221532), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.18081343017847104), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.1870781657357061), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.26683145426611155), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.850899598058497), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.5291852701770616), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.9513906162783019), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.5481499540134224), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 1.1226635483067153), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.6310723380893725), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 1.2679822678345811), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 1.0)]
+
+=== MISSION 21 ===
+INPUT: "say hello 3 times and count from 1 to 3"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] 3 times 1 equals 3.
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.23527686357275535), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.027439395488182444), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.02000760020303092), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.4384304341595067), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.45005141435881657), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.28100497314360073), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.2755388302030196), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.17768426054643827), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.09629023221960785), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.07461021570397544), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.07513601051335835), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.07476260968938486), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.07388712679473397), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.15267734569553645), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.11564803717791432), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.11943687466442567), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.1164161791095553), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.11572495511080748), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.12077506766183968), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.11918977231890295), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.24636378078212845), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.854670919860672), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.5335020959179861), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.8832085487045921), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.5257055154368429), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.9878220347728675), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.5710026074925223), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.8713615670769641), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.6929779558903874), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 1.2892607138766297), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 1.0)]
+
+=== MISSION 22 ===
+INPUT: "tell the time and check the date"
+--> Scanning specimens & looking for dialectical relations...
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] Thinking it through: the reasoning.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'tell the time'
+Primary Action: reason  (conf=0.61, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [calculate, analyze]
+Relation Scores (floor=2):
+  - HEDGE     node_4:calculate score=0
+  - HEDGE     node_1:analyze score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  - LOCKIN node_3 conf=0.611 link=0.0 combined=0.611
+  -        node_4 conf=0.332 link=0.0 combined=0.332
+  -        node_1 conf=0.224 link=0.0 combined=0.224
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: (and, check, the)
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=calculate | conf=0.33 | relations=None
+  🔸 node_1 | action=analyze | conf=0.22 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [System]: Mission "say hello 3 times and count from 1 to 3" → primary=welcome conf=0.43 node=node_0 (intensity=0.69)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+This might also be true:
+Less certain — Grug also picked up measure and inspect but these may not hold up.
+
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.15615553208355387), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.018344011297944624), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.012939289658038184), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.27880154537170904), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.2999957098550635), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.18272933873752067), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.17597843060196228), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.11260818509962355), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.3703510823344725), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.24415028621899781), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.361159782238799), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.1183750116992252), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.047952559602574725), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.10100534196188359), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.07539918977706411), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.2601566710829549), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.07524343530530767), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.07573730798608296), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.07743139957193332), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.07875294552062165), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.2343741707562332), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.5652869446480122), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.34307183462356483), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.5724539433520752), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.3395104588344886), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.6566367059257261), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.3694585474138657), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.6459727566092119), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.48692659896626983), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.8782822490371706), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.6935214433151813), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 1.2422768732063163), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 1.0)]
+
+=== MISSION 23 ===
+INPUT: "calculate 5 plus 3"
+--> Scanning specimens & looking for dialectical relations...
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] 5 plus 3 equals 8.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'calculate 5 plus 3'
+Primary Action: calculate  (conf=0.4, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [calculate, welcome]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Relation Scores (floor=2):
+  - UNLINKED  node_4:calculate score=0
+  - UNLINKED  node_0:welcome score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_4 conf=0.4 link=0.0 combined=0.4
+  -        node_3 conf=0.4 link=0.0 combined=0.4
+  -        node_0 conf=0.361 link=0.0 combined=0.361
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=calculate | conf=0.4 | relations=None
+  🔸 node_0 | action=welcome | conf=0.36 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=8] (Recent): [User]: don't say hello 3 times (intensity=0.43) | [User]: explain fire and describe water (intensity=0.42) | [User]: calculate 5 plus 3 (intensity=1.29)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.10318493333442358), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.012195014547435266), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.00824857874989663), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.17926539650398807), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.1930642394123257), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.12023870025441125), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.11234733036404711), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.07249789089543048), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.2392182901644312), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.15742160668038951), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.2298861934330533), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.07507435618833305), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.030396935575672267), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.066219436748291), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.04985978632191674), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.1691504273316611), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.04867853476120171), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.049093643834416105), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.05177309654979258), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.05138475850938054), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.14911406459730367), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.3760223866731235), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.22381134366829797), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.36907110665053716), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.21837261690987425), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.4316935794575574), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.23621039475443573), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.42372872213623214), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.32146962898508724), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.5833078804807209), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.4608006382739428), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.8290801249533416), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.6489594064039833), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 1.2885956152916405), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 1.0)]
+
+=== MISSION 24 ===
+INPUT: "maybe calculate 7 minus 2"
+--> Scanning specimens & looking for dialectical relations...
+--> 4 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] 7 minus 2 equals 5.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'maybe calculate 7 minus 2'
+Primary Action: calculate  (conf=0.28, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [calculate]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Relation Scores (floor=2):
+  - UNLINKED  node_4:calculate score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_4 conf=0.28 link=0.0 combined=0.28
+  -        node_3 conf=0.28 link=0.0 combined=0.28
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=calculate | conf=0.28 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=6] (Recent): [User]: tell the time and check the date (intensity=0.55) | [User]: calculate 5 plus 3 (intensity=1.0)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.06816343937989833), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.00799150682722994), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.005424984314444421), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.11692208877126456), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.12199022429673195), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.07689747760224708), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.07502251688711828), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.04649347052866074), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.15871057590418333), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.10018708116941355), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.15121046534526852), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.04735702970540408), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.02026348005820062), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.04184052881892601), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.03210780943792319), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.11304885364016871), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.03188635833690052), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.0313852935475753), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.032867075027915464), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.03432093567762367), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.09886070430444072), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.24089220651253795), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.1437459305524419), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.3403031912786108), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.20073780990017304), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.2864290642827779), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.15496703732501435), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.2696013209531113), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.20417053849468464), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.38854274012440626), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.29973675623987345), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.5546291861380248), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.43004339428000166), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 1.003433693532042), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.7119606047164464), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 1.315512338301578), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 1.0)]
+
+=== MISSION 25 ===
+INPUT: "don't calculate 10 times 4"
+--> Scanning specimens & looking for dialectical relations...
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] 10 times 4 equals 40.
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.04476769635340512), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.005313775578887825), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.0035714633656312557), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.19768546443664767), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.20296076546096642), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.1212313091175539), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.04742423398345499), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.02966926427418968), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.10372932472542815), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.06684843018268463), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.10057122722178381), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.03125826815708134), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.012904873113912892), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.026465058837133286), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.021084712227437408), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.07320935049091895), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.020945568567127128), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.01998657602443269), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.021217616597637472), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.022570458573031433), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.06241118019570755), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.2796942799175117), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.1644459846208201), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.33206115872386827), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.19553836156763452), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.4303493678070368), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.24503589740014445), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.1733869986263135), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.12925514912145297), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.3334096300230135), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.24008701371979954), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.3623018744114649), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.2766207561974371), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.8065838024512987), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.5316407608503316), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.9794063092814549), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.7124211097425407), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 1.2701087615086308), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 1.0)]
+
+=== MISSION 26 ===
+INPUT: "what is the chemical reaction"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 27 ===
+INPUT: "perhaps explain the chemical bonds"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Cold logical analysis engine active] Thinking it through: consider think posit calculate.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'perhaps explain the chemical bonds'
+Primary Action: reason  (conf=0.24, certainty=SURE)
+Sure Actions: [reason]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_1 conf=0.236 link=0.0 combined=0.236
+Constraints: [dont guess, dont hallucinate, dont assume]
+Winning Node: node_1
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: don't calculate 10 times 4 (intensity=0.81)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.02906765904644569), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.003401436351500872), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.0022861259682519235), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.12915919691304073), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.1328535930280704), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.07954454962004838), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.03153778061082939), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.019467049593236356), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.15784844997234396), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.10013096316169057), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.15609878811824643), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.10121853559895233), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.008514642344795265), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.017066771824085815), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.013764581842173444), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.13398320887736404), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.013666125691338495), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.01265111943405194), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.013772147967422805), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.014339981239630562), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.03953909118500715), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.18484254544782977), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.10553851607163847), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.21781671083306572), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.12768100469404253), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.28028584712788523), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.16152907451535495), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.1845757667615192), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.1330091958672299), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.21328103634249973), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.1546922103084382), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.3060538065973715), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.22386525543831792), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.5398715422497088), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.3538598768407227), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.6531657379365065), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.46315787637809036), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.8061821673625776), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.6622571493177962), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.8198181407353066), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 1.2438624679600299), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 1.0)]
+
+=== MISSION 28 ===
+INPUT: "i feel very sad today"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'i feel very sad today'
+Primary Action: greet  (conf=0.23, certainty=SURE)
+Sure Actions: [greet]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_0 conf=0.235 link=0.0 combined=0.235
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [User]: don't calculate 10 times 4 (intensity=0.54) | [User]: i feel very sad today (intensity=1.28)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.018413690561710022), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.00216801942778048), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.0015208396494427068), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.0814862109936663), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.08675246049073841), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.052347668014958555), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.020867003561711124), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.012793884086001853), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.10553225601543173), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.06695294694936324), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.10385162015200852), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.06582997240629329), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.0054008155313800795), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.01116123361556494), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.008721507334961066), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.08477556955397261), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.009087001101380714), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.008236757383549244), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.009042125174660937), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.009490786488102696), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.11716472710950393), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.12198623150676484), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.07061473232103244), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.1442031037173489), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.08366680247583935), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.17690186564817795), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.10635226977432315), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.12163880226984838), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.08495857013004517), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.1424392772911765), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.09923302707776085), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.2033458639472766), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.14386384649461867), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.3483232570997744), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.22375193409766103), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.4127769515511942), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.30541378676713504), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.5374303562860209), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.42622776109085475), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.5371659509170568), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.8098049306561506), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.6666808354595196), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 1.2802381739079431), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 1.0)]
+
+=== MISSION 29 ===
+INPUT: "maybe i feel a bit worried"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'maybe i feel a bit worried'
+Primary Action: greet  (conf=0.22, certainty=SURE)
+Sure Actions: [greet]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_0 conf=0.22 link=0.0 combined=0.22
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=5] (Recent): No recent sounds
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.011815074542296345), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.0013981726633960662), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.0009623091781503722), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.05143219208994059), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.05489297857373136), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.03440136458966942), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.013260969619958637), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.008458611085413955), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.06802768234862595), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.04466083814106591), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.06825694178917874), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.04229247526805835), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.0034450415155217414), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.007457059048299514), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.005700318936392587), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.05634697714176904), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.005834008873184333), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.005457290102935223), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.006018024463200091), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.006199351146812885), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.07681054259509781), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.0808801890393792), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.04700716242375421), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.1851015330907903), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.11210617656593613), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.11776500733566243), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.07044290061825836), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.07827336730374793), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.055232075162170303), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.09126387508260655), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.06392800982316611), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.12831288936592963), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.09547832180943114), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.22377553856282775), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.1468707347179985), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.3636635760389804), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.2601317806441873), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.3474553908623797), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.26888860860729824), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.3514601783567147), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.5338200078577586), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.4255330849092633), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 0.9491789800693691), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 0.7222229195138267), Main.GrugBot420.ChatMessage(44, "User", "maybe i feel a bit worried", false, 1.252732833337879), Main.GrugBot420.ChatMessage(45, "System", "Mission \"maybe i feel a bit worried\" → primary=greet conf=0.22 node=node_0", false, 1.0)]
+
+=== MISSION 30 ===
+INPUT: "don't worry about my feelings"
+--> Scanning specimens & looking for dialectical relations...
+--> 2 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'don't worry about my feelings'
+Primary Action: welcome  (conf=0.06, certainty=SURE)
+Sure Actions: [welcome]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_0 conf=0.065 link=0.0 combined=0.065
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=5] (Recent): No recent sounds
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.007603162038270821), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.0008868823529491027), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.000620752441633416), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.033458299270899765), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.034979428614381296), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.02245683564024685), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.008540252038302734), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.005474839542489478), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.043209070705124995), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.02968191146833398), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.04515824905644186), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.11882581939196343), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.0022775899317666794), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.0048889785465707535), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.0037004993584827707), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.03637116531303729), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.0038684047210019797), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.0035152209366464517), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.003960942079547949), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.003955661322789294), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.04945144828039774), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.053095289215558186), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.030732043106027822), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.1237842658454745), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.07155029879498932), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.16334607795214384), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.1018719634862798), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.05179062498374422), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.03530426276412649), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.05915954713273268), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.04205484166358773), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.08325191744557114), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.06085612242686716), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.14203346890158494), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.09744639016734734), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.22976095549216488), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.16861562938608857), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.3209947311957184), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.23793588505577745), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.22341388207413598), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.35381649040292984), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.28175639528408547), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 0.6125167602208293), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 0.4643149931130074), Main.GrugBot420.ChatMessage(44, "User", "maybe i feel a bit worried", false, 0.8375107353543336), Main.GrugBot420.ChatMessage(45, "System", "Mission \"maybe i feel a bit worried\" → primary=greet conf=0.22 node=node_0", false, 0.6420296765394861), Main.GrugBot420.ChatMessage(46, "User", "don't worry about my feelings", false, 1.2853051680230863), Main.GrugBot420.ChatMessage(47, "System", "Mission \"don't worry about my feelings\" → primary=welcome conf=0.06 node=node_0", false, 1.0)]
+
+=== MISSION 31 ===
+INPUT: "calculate 3 times 4"
+--> Scanning specimens & looking for dialectical relations...
+--> 3 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] 3 times 4 equals 12.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'calculate 3 times 4'
+Primary Action: calculate  (conf=0.4, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [reason]
+Hedge Actions (quiet voices, reliability-flagged): [smile]
+Relation Scores (floor=2):
+  - UNLINKED  node_4:reason score=0
+  - HEDGE     node_0:smile score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_4 conf=0.4 link=0.0 combined=0.4
+  -        node_3 conf=0.4 link=0.0 combined=0.4
+  -        node_0 conf=0.227 link=0.0 combined=0.227
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=reason | conf=0.4 | relations=None
+  🔸 node_0 | action=smile | conf=0.23 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=7] (Recent): [System]: Mission "maybe i feel a bit worried" → primary=greet conf=0.22 node=node_0 (intensity=0.42) | [User]: don't worry about my feelings (intensity=0.83) | [User]: calculate 3 times 4 (intensity=1.25)
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.004858714366913545), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.000574353451860016), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.0004037866916496408), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.17396835379749692), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.17556166162760123), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.09426129290348441), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.005541155723968115), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.003465653855703423), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.027540356855544516), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.019311449482444457), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.028764815286664656), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.076030326659638), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.001461696454430834), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.003262516048221279), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.002399922606980105), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.023014195595235896), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.00254101109738924), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.002325440897729952), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.002594344575030938), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.0025640029664185603), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.03128696303026061), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.1944953819609609), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.09722775387999029), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.21036327849485253), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.11420051349279979), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.23207284901666964), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.13706415222398155), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.0342301692727512), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.022659491196377998), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.1312982542659966), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.08567083551149286), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.053986067765241154), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.03929465821005193), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.30263095853163724), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.157929372986569), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.3140061886279268), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.1860968971469335), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.6268985822550008), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.3417816676729632), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.14678221266246308), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.22310956596799608), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.1855879422289065), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 0.39574554368279724), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 0.30244036665240154), Main.GrugBot420.ChatMessage(44, "User", "maybe i feel a bit worried", false, 0.5415063966883438), Main.GrugBot420.ChatMessage(45, "System", "Mission \"maybe i feel a bit worried\" → primary=greet conf=0.22 node=node_0", false, 0.42404892220014806), Main.GrugBot420.ChatMessage(46, "User", "don't worry about my feelings", false, 0.8284371690688508), Main.GrugBot420.ChatMessage(47, "System", "Mission \"don't worry about my feelings\" → primary=welcome conf=0.06 node=node_0", false, 0.6480659591211543), Main.GrugBot420.ChatMessage(48, "User", "calculate 3 times 4", false, 1.2451044085186052), Main.GrugBot420.ChatMessage(49, "System", "Mission \"calculate 3 times 4\" → primary=calculate conf=0.4 node=node_3", false, 1.0)]
+
+=== MISSION 32 ===
+INPUT: "compute 8 divided by 2"
+--> Scanning specimens & looking for dialectical relations...
+--> 2 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Arithmetic reasoning voice] 8 divided by 2 equals 4.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'compute 8 divided by 2'
+Primary Action: calculate  (conf=0.4, certainty=SURE)
+Sure Actions: [calculate]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [calculate]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Relation Scores (floor=2):
+  - UNLINKED  node_4:calculate score=0
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_4 conf=0.4 link=0.0 combined=0.4
+  -        node_3 conf=0.4 link=0.0 combined=0.4
+Constraints: [None]
+Winning Node: node_3
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+Other Possibilities (strong but not winners):
+  🔸 node_4 | action=calculate | conf=0.4 | relations=None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=6] (Recent): No recent sounds
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.003081513095435443), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.0003698975682556121), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.00026142912278720616), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.11345273627052968), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.11645232987290302), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.06173312658764747), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.0035821665678697646), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.0022506135752471393), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.01762122219605069), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.012317575584128685), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.01846701429954532), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.04812380160904297), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.000943072142018415), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.0020910578156817655), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.0015915112502704366), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.014859944622355695), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.0016880305723245687), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.0014825103656476968), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.0017297000525587085), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.0016669439111906218), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.0208372485706364), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.12757592952556718), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.06360732344658), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.13982511916627177), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.07581567863525239), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.15525744214968024), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.0889383426168908), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.02180847950138991), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.014292745319671367), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.08453752797857207), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.054844731010657094), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.035864238106189196), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.025387804435940468), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.20024306614922177), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.10275814623931344), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.20530912316490924), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.12141268092714927), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.40573818285535124), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.2212955416721016), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.09512565550707495), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.14701608462617236), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.12354100840178385), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 0.25868921987631044), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 0.20204404660934058), Main.GrugBot420.ChatMessage(44, "User", "maybe i feel a bit worried", false, 0.3592618708560049), Main.GrugBot420.ChatMessage(45, "System", "Mission \"maybe i feel a bit worried\" → primary=greet conf=0.22 node=node_0", false, 0.28309724608959924), Main.GrugBot420.ChatMessage(46, "User", "don't worry about my feelings", false, 0.5476766778717334), Main.GrugBot420.ChatMessage(47, "System", "Mission \"don't worry about my feelings\" → primary=welcome conf=0.06 node=node_0", false, 0.42344266355162563), Main.GrugBot420.ChatMessage(48, "User", "calculate 3 times 4", false, 0.8224083268290782), Main.GrugBot420.ChatMessage(49, "System", "Mission \"calculate 3 times 4\" → primary=calculate conf=0.4 node=node_3", false, 0.6667249394916863), Main.GrugBot420.ChatMessage(50, "User", "compute 8 divided by 2", false, 1.2620635938387688), Main.GrugBot420.ChatMessage(51, "System", "Mission \"compute 8 divided by 2\" → primary=calculate conf=0.4 node=node_3", false, 1.0)]
+
+=== MISSION 33 ===
+INPUT: "tell me about recent"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+┌ Warning: Replacing docs for `Main.GrugBot420.words_to_signal :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.rewrite_passive_mission :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.extract_relational_triples :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.SemanticChunk :: Union{}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._extract_math_buildup_span :: Tuple{Vector{String}, Int64, Int64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.decompose_semantic_chunks :: Tuple{String, Any}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._infer_chunk_kind :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._lobe_topicality_for_vote :: Tuple{Any, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._triple_is_topical :: Tuple{Any, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.extract_dynamic_relational_triples :: Tuple{String, Int64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.evaluate_relational_dialectics :: Tuple{Vector{Main.GrugBot420.RelationalTriple}, Vector{Main.GrugBot420.RelationalTriple}, Vector{String}, Dict{String, Float64}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.hopfield_input_hash :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.hopfield_lookup :: Tuple{UInt64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.hopfield_record! :: Tuple{UInt64, Vector{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.is_nonjitter :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.set_nonjitter! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.clear_nonjitter! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.collect_nonjitter_ids :: Tuple{}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.is_solidified :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.check_solidify_threshold! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.bump_strength! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.penalize_strength! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._sync_grave_to_group_registry :: Tuple{String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.mark_node_grave! :: Tuple{Main.GrugBot420.Node, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.mark_node_contributor! :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.try_link_nodes! :: Tuple{Main.GrugBot420.Node, Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.find_best_latch_target :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._token_overlap_similarity :: Tuple{String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._scaffold_coherence_pass :: Tuple{String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._compute_lobe_topicality :: Tuple{String, Set{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._compute_muted_lobes :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._node_has_semantic_bridge :: Tuple{Any, Set{String}, Set{String}, Set{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.apply_lobe_topicality_gate! :: Tuple{String, Vector}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.attach_node! :: Tuple{String, String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.detach_node! :: Tuple{String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.fire_attachments! :: Tuple{String, Int64, Int64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.get_attachment_summary :: Tuple{}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.get_attachments_for_target :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._sdf_signal_similarity :: Tuple{Vector{Float64}, Vector{Float64}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.attach_image_node! :: Tuple{String, String, Vector{UInt8}, Int64, Int64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.reset_throttle! :: Tuple{Main.GrugBot420.Node, Float64}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.create_node :: Tuple{String, String, Dict, Vector{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.node_sigil_kind :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.has_sigil_tag :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.pattern_is_macro_scaffolding :: Tuple{AbstractString}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.create_sigil_node :: Tuple{String, String, Dict, Vector{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.list_sigil_node_ids :: Union{Tuple{}, Tuple{Symbol}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.parse_action_packet :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.select_action :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.screen_input_complexity :: Tuple{Vector{Float64}, Vector{Main.GrugBot420.RelationalTriple}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._effective_scan_mode :: Tuple{Int64, Vector{Float64}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._bidirectional_cheap_scan :: Tuple{Vector{Float64}, Vector{Float64}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.collect_drop_table_neighbors :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.strength_biased_scan_coinflip :: Tuple{Main.GrugBot420.Node}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.scan_specimens :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.scan_and_expand :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.cast_vote :: NTuple{4, Any}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.cast_explicit_vote :: Tuple{String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.SigilFireError :: Union{}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._select_opener :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._context_polarity_for :: Tuple{Symbol}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420._extract_action_slots! :: Tuple{Dict{String, Any}, String, String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.apply_right_feedback! :: Tuple{Vector{String}}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.get_node_status_summary :: Tuple{}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.add_orchestration_rule! :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+┌ Warning: Replacing docs for `Main.GrugBot420.count_alive_nodes_in_lobe :: Tuple{String}` in module `Main.GrugBot420`
+└ @ Base.Docs docs/Docs.jl:243
+[ Info: [SEMANTIC] ✅  New relation class added: 'improv'
+[ Info: [SEMANTIC] ✅  Verb 'say' added to class 'improv'
+[ Info: [SEMANTIC] ✅  Verb 'repeat' added to class 'improv'
+[ Info: [SEMANTIC] ✅  Verb 'count' added to class 'improv'
+[ Info: [SEMANTIC] ✅  Verb 'chant' added to class 'improv'
+[ Info: [SEMANTIC] ✅  Verb 'recite' added to class 'improv'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'repeat' -> 'say'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'chant' -> 'say'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'recite' -> 'say'
+[ Info: [SEMANTIC] ✅  New relation class added: 'reference'
+[ Info: [SEMANTIC] ✅  Verb 'check' added to class 'reference'
+[ Info: [SEMANTIC] ✅  Verb 'tell' added to class 'reference'
+[ Info: [SEMANTIC] ✅  Verb 'lookup' added to class 'reference'
+[ Info: [SEMANTIC] ✅  Verb 'resolve' added to class 'reference'
+[ Info: [SEMANTIC] ✅  Synonym registered: 'tell' -> 'check'
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.33 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["spatial"] from 1 triples
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=describe, primary_node=node_5
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Here is the picture: {CLAIM}.{SUPPORT}', claim='the explanation', support_len=0, raw_len=68, raw='[Multi-clause reasoning voice] Here is the picture: the explanation.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.12
+┌ Warning: [ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=0.2. Falling back to highest-confidence vote.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2054
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='reflect reason argue calculate', support_len=0, raw_len=90, raw='[Cold logical analysis engine active] Thinking it through: reflect reason argue calculate.'
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=greet, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Hello — here is what matters: {CLAIM}.{SUPPOR', claim='hello hi greeting mornin', support_len=0, raw_len=97, raw='[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting morni'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 3 tokens → 6 (+3 synonyms: assess, examine, test)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+┌ Warning: [ENGINE] _cast_math_votes called with non-math bindings on node node_3; emitting opener-only fallback
+└ @ Main.GrugBot420 /workspace/grugbot420/src/engine.jl:4205
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='the calculation', support_len=0, raw_len=66, raw='[Arithmetic reasoning voice] Thinking it through: the calculation.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 3 tokens → 6 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.31 | ArousalNudge=0.0 | Weight=1.19
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.33 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.12
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.33 | ArousalNudge=0.0 | Weight=1.13
+┌ Warning: [ENGINE] _cast_math_votes called with non-math bindings on node node_3; emitting opener-only fallback
+└ @ Main.GrugBot420 /workspace/grugbot420/src/engine.jl:4205
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='the calculation', support_len=0, raw_len=66, raw='[Arithmetic reasoning voice] Thinking it through: the calculation.'
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.3 | ArousalNudge=0.0 | Weight=1.12
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.3 | ArousalNudge=0.0 | Weight=1.12
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 2 tokens → 5 (+3 synonyms: assess, check, examine)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.33 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 2 tokens → 5 (+3 synonyms: assess, check, examine)
+[ Info: [ENGINE] 🔮 Action=ACTION_NEGATE | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.09
+[ Info: [MAIN] 🔀 InputDecomposer split into 2 clauses: ["search recent", "today"]
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: explore, find, look)
+[ Info: [ENGINE] 🔮 Action=ACTION_COMMAND | Tone=TONE_NEUTRAL | Conf=0.65 | ArousalNudge=0.0 | Weight=1.32
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.33 | ArousalNudge=0.0 | Weight=1.13
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=ponder, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='think ponder ponder calculate', support_len=0, raw_len=89, raw='[Cold logical analysis engine active] Thinking it through: think ponder ponder calculate.'
+[ Info: [PREDICTOR] 👁  Arousal nudged 0.3 → 0.146 (TONE_REFLECTIVE)
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_REFLECTIVE | Conf=0.32 | ArousalNudge=-0.17 | Weight=1.06
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["improv"] from 1 triples
+[ Info: [ENGINE] 🔵 Sigil kind :math ATTENUATED by context polarity (neutral) on node node_4 — firing at 0.7x
+┌ Warning: [ENGINE] _cast_math_votes called with non-math bindings on node node_4; emitting opener-only fallback
+└ @ Main.GrugBot420 /workspace/grugbot420/src/engine.jl:4205
+[ Info: [ENGINE] 🔵 Knowledge node node_0 ATTENUATED by context polarity (neutral) — firing at 0.7x
+[ Info: [ENGINE] 🔵 Knowledge node node_1 ATTENUATED by context polarity (neutral) — firing at 0.7x
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='ponder contemplate contemplate calculate', support_len=0, raw_len=100, raw='[Cold logical analysis engine active] Thinking it through: ponder contemplate contemplate calculate.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_NEGATE | Tone=TONE_NEUTRAL | Conf=0.33 | ArousalNudge=0.0 | Weight=1.1
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["improv"] from 1 triples
+[ Info: [ENGINE] 🔴 Sigil kind :math SUPPRESSED by context polarity (negative) on node node_4 — firing at 0.3x
+[ Info: [ENGINE] 🔴 Knowledge node node_1 SUPPRESSED by context polarity (negative) — firing at 0.3x
+┌ Warning: [ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=0.2. Falling back to highest-confidence vote.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2054
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='contemplate contemplate debate gauge', support_len=0, raw_len=96, raw='[Cold logical analysis engine active] Thinking it through: contemplate contemplate debate gauge.'
+[ Info: [MAIN] 🔀 InputDecomposer split into 2 clauses: ["explain fire", "describe water"]
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: beverage, drink, fluid)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.74 | ArousalNudge=0.0 | Weight=1.45
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='ponder reflect think evaluate', support_len=0, raw_len=89, raw='[Cold logical analysis engine active] Thinking it through: ponder reflect think evaluate.'
+[ Info: [MAIN] 🔀 InputDecomposer split into 2 clauses: ["say hello 3 times", "count from 1 to 3"]
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 9 tokens → 12 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["improv"] from 1 triples
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=welcome, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='hello hi greeting mornin', support_len=0, raw_len=67, raw='[Highly polite greeting protocols active] hello hi greeting mornin.'
+[ Info: [MAIN] 🔀 InputDecomposer split into 2 clauses: ["tell the time", "check the date"]
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 6 tokens → 12 (+6 synonyms: assess, chat, converse, discuss, examine, test)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.31 | ArousalNudge=0.0 | Weight=1.19
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["reference"] from 1 triples
+┌ Warning: [ENGINE] _cast_math_votes called with non-math bindings on node node_4; emitting opener-only fallback
+└ @ Main.GrugBot420 /workspace/grugbot420/src/engine.jl:4205
+┌ Warning: [ENGINE] _cast_math_votes called with non-math bindings on node node_3; emitting opener-only fallback
+└ @ Main.GrugBot420 /workspace/grugbot420/src/engine.jl:4205
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='the reasoning', support_len=0, raw_len=64, raw='[Arithmetic reasoning voice] Thinking it through: the reasoning.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: assess, evaluate, gauge)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.13
+[ Info: [MAIN] 🔣 Sigil router injected 2 node(s) for kinds=[:math] (inject_conf=0.4)
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_3' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='5 plus 3 equals 8', support_len=0, raw_len=47, raw='[Arithmetic reasoning voice] 5 plus 3 equals 8.'
+┌ Warning: [MAIN v7.20] decompose_semantic_chunks failed (non-fatal, falling back to full text): MethodError(Main.GrugBot420._infer_chunk_kind, ("maybe",), 0x00000000000083a5)
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:4114
+[ Info: [PREDICTOR] 👁  Arousal nudged 0.146 → 0.0 (TONE_REFLECTIVE)
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: assess, evaluate, gauge)
+[ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_REFLECTIVE | Conf=0.31 | ArousalNudge=-0.17 | Weight=1.06
+[ Info: [MAIN] 🔣 Sigil router injected 2 node(s) for kinds=[:math] (inject_conf=0.4)
+[ Info: [ENGINE] 🔵 Knowledge node node_1 ATTENUATED by context polarity (neutral) — firing at 0.7x
+[ Info: [ENGINE] 🔵 Knowledge node node_0 ATTENUATED by context polarity (neutral) — firing at 0.7x
+[ Info: [ENGINE] 🔵 Sigil kind :math ATTENUATED by context polarity (neutral) on node node_3 — firing at 0.7x
+[ Info: [ENGINE] 🔵 Sigil kind :math ATTENUATED by context polarity (neutral) on node node_4 — firing at 0.7x
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_3' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='7 minus 2 equals 5', support_len=0, raw_len=48, raw='[Arithmetic reasoning voice] 7 minus 2 equals 5.'
+┌ Warning: [MAIN v7.20] decompose_semantic_chunks failed (non-fatal, falling back to full text): MethodError(Main.GrugBot420._infer_chunk_kind, ("don't",), 0x00000000000083a5)
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:4114
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: assess, evaluate, gauge)
+[ Info: [ENGINE] 🔮 Action=ACTION_NEGATE | Tone=TONE_NEUTRAL | Conf=0.32 | ArousalNudge=0.0 | Weight=1.1
+[ Info: [ENGINE] 🔴 Knowledge node node_1 SUPPRESSED by context polarity (negative) — firing at 0.3x
+[ Info: [ENGINE] 🔴 Sigil kind :math SUPPRESSED by context polarity (negative) on node node_4 — firing at 0.3x
+[ Info: [ENGINE] 🔴 Sigil kind :math SUPPRESSED by context polarity (negative) on node node_3 — firing at 0.3x
+┌ Warning: [ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=0.2. Falling back to highest-confidence vote.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2054
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_3' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='the calculation', support_len=0, raw_len=45, raw='[Arithmetic reasoning voice] the calculation.'
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.33 | ArousalNudge=0.0 | Weight=1.2
+[ Info: [ENGINE] 🎭 Verb-class improv: detected classes ["spatial"] from 1 triples
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.12 | ArousalNudge=0.0 | Weight=1.08
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_1' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=reason, primary_node=node_1
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Thinking it through: {CLAIM}.{SUPPORT}', claim='consider think posit calculate', support_len=0, raw_len=90, raw='[Cold logical analysis engine active] Thinking it through: consider think posit calculate.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 5 tokens → 8 (+3 synonyms: dejected, downcast, gloomy)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.12
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=greet, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Hello — here is what matters: {CLAIM}.{SUPPOR', claim='hello hi greeting mornin', support_len=0, raw_len=97, raw='[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting morni'
+[ Info: [PREDICTOR] 👁  Arousal nudged 0.0 → 0.0 (TONE_REFLECTIVE)
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 6 tokens → 9 (+3 synonyms: afraid, anxious, fearful)
+[ Info: [ENGINE] 🔮 Action=ACTION_SPECULATE | Tone=TONE_REFLECTIVE | Conf=0.33 | ArousalNudge=-0.17 | Weight=1.07
+[ Info: [ENGINE] 🔵 Knowledge node node_0 ATTENUATED by context polarity (neutral) — firing at 0.7x
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=greet, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Hello — here is what matters: {CLAIM}.{SUPPOR', claim='hello hi greeting mornin', support_len=0, raw_len=97, raw='[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting morni'
+[ Info: [ENGINE] 🔮 Action=ACTION_NEGATE | Tone=TONE_NEUTRAL | Conf=0.34 | ArousalNudge=0.0 | Weight=1.1
+[ Info: [ENGINE] 🔴 Knowledge node node_1 SUPPRESSED by context polarity (negative) — firing at 0.3x
+[ Info: [ENGINE] 🔴 Knowledge node node_0 SUPPRESSED by context polarity (negative) — firing at 0.3x
+┌ Warning: [ORCHESTRATOR] ⚠ No votes passed AIML_CONFIDENCE_THRESHOLD=0.2. Falling back to highest-confidence vote.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2054
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=welcome, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Hello — here is what matters: {CLAIM}.{SUPPOR', claim='hello hi greeting mornin', support_len=0, raw_len=97, raw='[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting morni'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: assess, evaluate, gauge)
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.12
+[ Info: [MAIN] 🔣 Sigil router injected 2 node(s) for kinds=[:math] (inject_conf=0.4)
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_3' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='3 times 4 equals 12', support_len=0, raw_len=49, raw='[Arithmetic reasoning voice] 3 times 4 equals 12.'
+[ Info: [ENGINE] 🔮 Action=ACTION_ASSERT | Tone=TONE_NEUTRAL | Conf=0.31 | ArousalNudge=0.0 | Weight=1.12
+[ Info: [MAIN] 🔣 Sigil router injected 2 node(s) for kinds=[:math] (inject_conf=0.4)
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_3' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=true, is_det=true, primary_action=calculate, primary_node=node_3
+[ Info: [MAIN v7.21] AIML assembly: is_det=true, skeleton='{CLAIM}.', claim='8 divided by 2 equals 4', support_len=0, raw_len=53, raw='[Arithmetic reasoning voice] 8 divided by 2 equals 4.'
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.33 | ArousalNudge=0.0 | Weight=1.2
+
+=== MISSION 34 ===
+INPUT: "tell me about today"
+--> Scanning specimens & looking for dialectical relations...
+--> No valid specimens found for this input. Cave is silent.
+STATUS: SILENT
+
+=== MISSION 35 ===
+INPUT: "search recent + today"
+--> Scanning specimens & looking for dialectical relations...
+--> 1 valid votes passed gate... compiling JIT superposition...
+
+🤖 AIML Output Scaffold:
+[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting mornin.
+--- DEBUG TELEMETRY (orchestration internals, not for speech) ---
+Mission: 'search recent + today'
+Primary Action: greet  (conf=0.21, certainty=SURE)
+Sure Actions: [greet]
+Support Actions (relation-linked, composed INLINE with primary): [None]
+Unlinked Support (loud but off-topic, reliability-flagged): [None]
+Hedge Actions (quiet voices, reliability-flagged): [None]
+Lock-In Scores (floor=0.5, w_sem=0.15):
+  -        node_0 conf=0.21 link=0.0 combined=0.21
+Constraints: [dont frown, dont insult, dont be rude]
+Winning Node: node_0
+Lobe Context: [Unassigned nodes - no lobe context]
+User Triples: None
+Node Triples: None
+AIML Memory Bank:
+Deep Memory (Pinned): No pinned rocks
+Fresh Memory [threshold=0.38 eligible=8] (Recent): No recent sounds
+Muted Lobes: None
+Bridged Nodes: None
+=========================================
+STATUS: FIRED
+OUTPUT:
+Main.GrugBot420.ChatMessage[Main.GrugBot420.ChatMessage(0, "User", "hello there", false, 0.002003568986440253), Main.GrugBot420.ChatMessage(1, "User", "who are you", false, 0.00023454517400032195), Main.GrugBot420.ChatMessage(2, "System", "Mission \"who are you\" → primary=describe conf=1.19 node=node_5", false, 0.00017337916596696495), Main.GrugBot420.ChatMessage(3, "User", "say rock 3 times", false, 0.07294612628578002), Main.GrugBot420.ChatMessage(4, "User", "repeat hello 2 times", false, 0.0771343184932458), Main.GrugBot420.ChatMessage(5, "System", "Mission \"repeat hello 2 times\" → primary=reason conf=0.19 node=node_1", false, 0.04093002700776524), Main.GrugBot420.ChatMessage(6, "User", "count from 1 to 5", false, 0.002395687135839221), Main.GrugBot420.ChatMessage(7, "System", "Mission \"count from 1 to 5\" → primary=greet conf=0.42 node=node_0", false, 0.0014907886726272567), Main.GrugBot420.ChatMessage(8, "User", "check the date", false, 0.011163755848438818), Main.GrugBot420.ChatMessage(9, "System", "Mission \"check the date\" → primary=calculate conf=0.6 node=node_3", false, 0.008121397219320129), Main.GrugBot420.ChatMessage(10, "User", "tell the time", false, 0.012003646131997451), Main.GrugBot420.ChatMessage(11, "User", "remind me about the weather", false, 0.03141507626601977), Main.GrugBot420.ChatMessage(12, "User", "announce news", false, 0.0006219762605667233), Main.GrugBot420.ChatMessage(13, "User", "recall ages ago", false, 0.0013588797859105876), Main.GrugBot420.ChatMessage(14, "System", "Mission \"recall ages ago\" → primary=calculate conf=0.6 node=node_3", false, 0.001052472729877165), Main.GrugBot420.ChatMessage(15, "User", "confirm the time", false, 0.009594769334081807), Main.GrugBot420.ChatMessage(16, "User", "compare 10", false, 0.0011102392951746409), Main.GrugBot420.ChatMessage(17, "User", "compare 2", false, 0.000987297104287007), Main.GrugBot420.ChatMessage(18, "User", "verify yes", false, 0.0011551626888901803), Main.GrugBot420.ChatMessage(19, "User", "verify no", false, 0.0011142610371575414), Main.GrugBot420.ChatMessage(20, "User", "search recent and today", false, 0.4766492093905005), Main.GrugBot420.ChatMessage(21, "User", "say hello 3 times", false, 0.08375744010519744), Main.GrugBot420.ChatMessage(22, "System", "Mission \"say hello 3 times\" → primary=ponder conf=0.23 node=node_1", false, 0.04214630968021578), Main.GrugBot420.ChatMessage(23, "User", "maybe say hello 3 times", false, 0.08847547037814747), Main.GrugBot420.ChatMessage(24, "System", "Mission \"maybe say hello 3 times\" → primary=reason conf=0.3 node=node_1", false, 0.04887034439360333), Main.GrugBot420.ChatMessage(25, "User", "don't say hello 3 times", false, 0.098576564203357), Main.GrugBot420.ChatMessage(26, "System", "Mission \"don't say hello 3 times\" → primary=reason conf=0.13 node=node_1", false, 0.056976321219755474), Main.GrugBot420.ChatMessage(27, "User", "explain fire and describe water", false, 0.01378885200102304), Main.GrugBot420.ChatMessage(28, "System", "Mission \"explain fire and describe water\" → primary=reason conf=0.21 node=node_1", false, 0.009032801255054403), Main.GrugBot420.ChatMessage(29, "User", "say hello 3 times and count from 1 to 3", false, 0.056167485859447086), Main.GrugBot420.ChatMessage(30, "System", "Mission \"say hello 3 times and count from 1 to 3\" → primary=welcome conf=0.43 node=node_0", false, 0.03502514601166511), Main.GrugBot420.ChatMessage(31, "User", "tell the time and check the date", false, 0.023592964939576286), Main.GrugBot420.ChatMessage(32, "System", "Mission \"tell the time and check the date\" → primary=reason conf=0.61 node=node_3", false, 0.016958439717317024), Main.GrugBot420.ChatMessage(33, "User", "calculate 5 plus 3", false, 0.1313988229426283), Main.GrugBot420.ChatMessage(34, "System", "Mission \"calculate 5 plus 3\" → primary=calculate conf=0.4 node=node_3", false, 0.06678138745706608), Main.GrugBot420.ChatMessage(35, "User", "maybe calculate 7 minus 2", false, 0.13153629576643397), Main.GrugBot420.ChatMessage(36, "System", "Mission \"maybe calculate 7 minus 2\" → primary=calculate conf=0.28 node=node_3", false, 0.07680399150868898), Main.GrugBot420.ChatMessage(37, "User", "don't calculate 10 times 4", false, 0.26153379379398534), Main.GrugBot420.ChatMessage(38, "System", "Mission \"don't calculate 10 times 4\" → primary=calculate conf=0.18 node=node_3", false, 0.14182097699437765), Main.GrugBot420.ChatMessage(39, "User", "what is the chemical reaction", false, 0.0629417958471278), Main.GrugBot420.ChatMessage(40, "User", "perhaps explain the chemical bonds", false, 0.09434674176448862), Main.GrugBot420.ChatMessage(41, "System", "Mission \"perhaps explain the chemical bonds\" → primary=reason conf=0.24 node=node_1", false, 0.07920930742885311), Main.GrugBot420.ChatMessage(42, "User", "i feel very sad today", false, 0.2803100138223537), Main.GrugBot420.ChatMessage(43, "System", "Mission \"i feel very sad today\" → primary=greet conf=0.23 node=node_0", false, 0.18904007787720278), Main.GrugBot420.ChatMessage(44, "User", "maybe i feel a bit worried", false, 0.23251803095195667), Main.GrugBot420.ChatMessage(45, "System", "Mission \"maybe i feel a bit worried\" → primary=greet conf=0.22 node=node_0", false, 0.18403781481663445), Main.GrugBot420.ChatMessage(46, "User", "don't worry about my feelings", false, 0.3538843426537916), Main.GrugBot420.ChatMessage(47, "System", "Mission \"don't worry about my feelings\" → primary=welcome conf=0.06 node=node_0", false, 0.2681922197331583), Main.GrugBot420.ChatMessage(48, "User", "calculate 3 times 4", false, 0.5244507749112962), Main.GrugBot420.ChatMessage(49, "System", "Mission \"calculate 3 times 4\" → primary=calculate conf=0.4 node=node_3", false, 0.4278223851053058), Main.GrugBot420.ChatMessage(50, "User", "compute 8 divided by 2", false, 0.839966166091099), Main.GrugBot420.ChatMessage(51, "System", "Mission \"compute 8 divided by 2\" → primary=calculate conf=0.4 node=node_3", false, 0.6680217114042262), Main.GrugBot420.ChatMessage(52, "User", "tell me about recent", false, 0.794287778816717), Main.GrugBot420.ChatMessage(53, "User", "tell me about today", false, 0.7883402650815334), Main.GrugBot420.ChatMessage(54, "User", "search recent + today", false, 1.2939899530771366), Main.GrugBot420.ChatMessage(55, "System", "Mission \"search recent + today\" → primary=greet conf=0.21 node=node_0", false, 1.0)]
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: chat, converse, discuss)
+[ Info: [ENGINE] 🔮 Action=ACTION_QUERY | Tone=TONE_CURIOUS | Conf=0.32 | ArousalNudge=0.0 | Weight=1.19
+[ Info: [MAIN] 🔤 Thesaurus gate expanded 4 tokens → 7 (+3 synonyms: explore, find, look)
+[ Info: [ENGINE] 🔮 Action=ACTION_COMMAND | Tone=TONE_NEUTRAL | Conf=0.66 | ArousalNudge=0.0 | Weight=1.33
+┌ Warning: [ORCHESTRATOR v7.16.3] No vote cleared AIML_TOP_LOCKIN_FLOOR=0.5. Emergency fallback: promoted highest-combined vote 'node_0' to keep cave talking.
+└ @ Main.GrugBot420 /workspace/grugbot420/src/Main.jl:2091
+[ Info: [MAIN v7.21] Deterministic check: flag=false, is_det=false, primary_action=greet, primary_node=node_0
+[ Info: [MAIN v7.21] AIML assembly: is_det=false, skeleton='Hello — here is what matters: {CLAIM}.{SUPPOR', claim='hello hi greeting mornin', support_len=0, raw_len=97, raw='[Highly polite greeting protocols active] Hello — here is what matters: hello hi greeting morni'
+
+ALL MISSIONS COMPLETE
+Results saved to v736_parsed_results.txt

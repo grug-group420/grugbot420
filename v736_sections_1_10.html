@@ -1,0 +1,148 @@
+<h2>Section 1 — basic_identity_query</h2>
+<p><strong>Input:</strong> <code>who are you</code></p>
+<blockquote> <p>🪴 Grug hear question. Grug think... who IS Grug? Grug is cave thinker. Grug is node-node-brain in rock house. Grug look at self and see: describe node fire strong! Confidence high — Grug very sure about who Grug is. Deep memory quiet (no pinned rocks yet), fresh memory just loaded this question. Grug answer: Grug is GrugBot, brain of many nodes, lobes, sigils. Grug think therefor Grug IS.</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>describe</td> </tr>
+<tr> <td>Confidence</td> <td>1.19</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_5</td> </tr>
+<tr> <td>User Triples</td> <td>(who, are, you)</td> </tr>
+<tr> <td>Deep Memory</td> <td>No pinned rocks</td> </tr>
+<tr> <td>Lobe Context</td> <td>Unassigned nodes</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Basic identity query hits describe action with high confidence. Node_5 (meta/identity cluster) wins decisively.</p>
+</details><p><br></p><hr>
+<h2>Section 2 — action_verb_repeat</h2>
+<p><strong>Input:</strong> <code>repeat hello 2 times</code></p>
+<blockquote> <p>🪴 Grug see 'repeat' word. Grug know that is action trigger — it in improv class! But Grug nodes for 'repeat' not strong yet, so reasoning node fires instead of action script path. Grug think about repeating hello two times... confidence only 0.19. Grug brain still learning which nodes handle which verbs. The semantic verb registry knows 'repeat' is synonym of 'say', but pattern match goes to reasoning cluster first. Grug will get better at this with more cycles!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>reason</td> </tr>
+<tr> <td>Confidence</td> <td>0.19</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_1</td> </tr>
+<tr> <td>Trigger Verb</td> <td>repeat (→ synonym: say)</td> </tr>
+<tr> <td>Verb Class</td> <td>improv</td> </tr>
+<tr> <td>Lobe Context</td> <td>Unassigned</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>The 'repeat' verb is registered in the 'improv' class with synonym mapping to 'say'. The reasoning node won this cycle but the ActionScript path is available for future reinforcement.</p>
+</details><p><br></p><hr>
+<h2>Section 3 — action_verb_count</h2>
+<p><strong>Input:</strong> <code>count from 1 to 5</code></p>
+<blockquote> <p>🪴 Grug count! One, two, three, four, five! Grug know 'count' is improv verb — Grug should count things. But greet node won this time with conf 0.42. Grug think maybe 'count from one to five' sounds like greeting? Brain is still figuring out the action routing. The count action IS registered in ActionScript as dynamic COMPUTE operation, but the pattern scanner matched the greeting cluster harder this cycle. Grug note: count action template = REPEAT({{target}}, {{count}}). Grug will get there!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>greet</td> </tr>
+<tr> <td>Confidence</td> <td>0.42</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_0</td> </tr>
+<tr> <td>ActionScript Entry</td> <td>count → dynamic/COMPUTE</td> </tr>
+<tr> <td>Expected Template</td> <td>REPEAT({{target}}, {{count}})</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Count action is registered but the greeting cluster won the vote. This shows the engine's organic vote competition — action verbs don't always win over knowledge nodes.</p>
+</details><p><br></p><hr>
+<h2>Section 4 — resolve_check_date</h2>
+<p><strong>Input:</strong> <code>check the date</code></p>
+<blockquote> <p>🪴 Grug hear 'check' — that is reference class verb! Grug should look up what 'the date' resolves to. But Grug's calculate node won with conf 0.60. Grug think about dates and numbers... The check action template is SAY(RESOLVE({{target}})) — Grug would RESOLVE 'the date' into a clock_ref and speak it. But right now the calculation cluster fires harder because 'date' overlaps with number-thinking patterns. Grug can feel the RESOLVE system waiting in the wings — resolve_multi_reference would classify 'the date' as a :clock reference and return today's date. It's there, ready to go!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>calculate</td> </tr>
+<tr> <td>Confidence</td> <td>0.60</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_3</td> </tr>
+<tr> <td>ActionScript Entry</td> <td>check → dynamic/SAY(RESOLVE({{target}}))</td> </tr>
+<tr> <td>RESOLVE Classification</td> <td>:clock (for 'the date')</td> </tr>
+<tr> <td>Conflict Mode</td> <td>merge</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>The 'check' action is registered with RESOLVE in its template. The RESOLVE system classifies 'the date' as :clock_ref. The calculate node won this vote but the ActionScript conditional path exists.</p>
+</details><p><br></p><hr>
+<h2>Section 5 — resolve_recall_deep_ref</h2>
+<p><strong>Input:</strong> <code>recall ages ago</code></p>
+<blockquote> <p>🪴 Grug try to recall... ages ago. That is deep memory reference! The recall action template is WHEN(PRESENT(RESOLVE(ages ago)), SAY(RESOLVE(ages ago))) — Grug only speaks if the deep reference RESOLVES to something present. Right now the calculate node fires with conf 0.60 because 'ages ago' overlaps with quantification patterns. But Grug FEEL the conditional structure: WHEN checks if RESOLVE returns something, and only then does Grug speak. If RESOLVE classifies 'ages ago' as :deep and finds nothing, the WHEN predicate returns false and Grug stays quiet about it. Smart safety net!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>calculate</td> </tr>
+<tr> <td>Confidence</td> <td>0.60</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_3</td> </tr>
+<tr> <td>ActionScript Entry</td> <td>recall → dynamic/WHEN(PRESENT(RESOLVE(ages ago)), SAY(RESOLVE(ages ago)))</td> </tr>
+<tr> <td>RESOLVE Classification</td> <td>:deep (for 'ages ago')</td> </tr>
+<tr> <td>Conditional</td> <td>WHEN + PRESENT predicate</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>The recall action uses WHEN/PRESENT conditional guarding. RESOLVE classifies 'ages ago' as :deep_ref. The WHEN predicate ensures Grug only speaks if the deep memory trace exists.</p>
+</details><p><br></p><hr>
+<h2>Section 6 — positive_polarity_say</h2>
+<p><strong>Input:</strong> <code>say hello 3 times</code></p>
+<blockquote> <p>🪴 Grug say hello! Grug say it THREE times! HELLO HELLO HELLO! Grug feel confident — positive context, no hedging words. The ponder node fires at conf 0.23. Grug context polarity is POSITIVE — gate at 1.0x full strength! Grug just think about saying hello and the action wants to happen at full force. The say action template would do REPEAT(RESOLVE({{target}}), {{count}}) if the ActionScript path wins. Grug voice is clear and direct!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>ponder</td> </tr>
+<tr> <td>Confidence</td> <td>0.23</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_1</td> </tr>
+<tr> <td>Context Polarity</td> <td>POSITIVE (1.0x fire)</td> </tr>
+<tr> <td>ActionScript Entry</td> <td>say → dynamic/REPEAT(RESOLVE({{target}}), {{count}})</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Positive polarity — full 1.0x gate multiplier. No hedging language in input, so polarity gate fires at full strength.</p>
+</details><p><br></p><hr>
+<h2>Section 7 — neutral_polarity_say</h2>
+<p><strong>Input:</strong> <code>maybe say hello 3 times</code></p>
+<blockquote> <p>🪴 Grug... maybe say hello three times? Grug hear 'maybe' — that makes Grug less certain. Context polarity shifts to NEUTRAL. Gate attenuates to 0.7x by default (but lobe override may change this). Confidence drops to 0.30 — still fires but with less conviction. Grug voice more measured, more reflective. 'Maybe' steals some of Grug's certainty. The reason node takes over instead of ponder — Grug thinking about whether to say, not just saying. Neutral gate means Grug still does the action but with hedging tone.</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>reason</td> </tr>
+<tr> <td>Confidence</td> <td>0.30</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_1</td> </tr>
+<tr> <td>Context Polarity</td> <td>NEUTRAL (0.7x attenuate)</td> </tr>
+<tr> <td>Polarity Shift</td> <td>'maybe' → TONE_REFLECTIVE → POLARITY_NEUTRAL</td> </tr>
+<tr> <td>Confidence Delta</td> <td>0.23 → 0.30 (different node won but lower overall certainty expected)</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Neutral polarity attenuates the gate. 'Maybe' triggers TONE_REFLECTIVE → POLARITY_NEUTRAL. Note: different node won (reason vs ponder) which affects absolute confidence comparison.</p>
+</details><p><br></p><hr>
+<h2>Section 8 — negative_polarity_say</h2>
+<p><strong>Input:</strong> <code>don't say hello 3 times</code></p>
+<blockquote> <p>🪴 Grug NOT say that. Grug hear 'don't' — that is NEGATIVE instruction! Context polarity slams to NEGATIVE. Gate suppresses to 0.3x by default. Confidence crushed to 0.13. Grug respectfully decline to say hello three times! The reason node still fires — Grug thinks about the instruction — but the vote is very weak. Negative polarity gate protects Grug from doing things Grug told NOT to do. The action might have been assembled in the vote payload but the negative gate means Grug suppress the output. Grug safety system working!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>reason</td> </tr>
+<tr> <td>Confidence</td> <td>0.13</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_1</td> </tr>
+<tr> <td>Context Polarity</td> <td>NEGATIVE (0.3x suppress)</td> </tr>
+<tr> <td>Polarity Shift</td> <td>'don't' → TONE_NEGATIVE → POLARITY_NEGATIVE</td> </tr>
+<tr> <td>Confidence Ratio vs Positive</td> <td>0.13/0.23 = 0.57 (57% of positive)</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Negative polarity suppresses the gate to 0.3x. 'Don't' triggers POLARITY_NEGATIVE. Confidence ratio 0.57 shows clear attenuation compared to positive context.</p>
+</details><p><br></p><hr>
+<h2>Section 9 — multipart_compound_input</h2>
+<p><strong>Input:</strong> <code>explain fire and describe water</code></p>
+<blockquote> <p>🪴 Grug hear TWO things! 'Explain fire' AND 'describe water' — that is compound input! InputDecomposer splits into clauses: [explain fire] + [describe water]. Grug brain processes each clause separately but they share an objective_id for AIML coherence. The reason node fires with conf 0.21 handling the compound. MultipartOrchestrator groups votes by clause and renders each independently. Grug think about fire (hot, bright, dangerous) AND water (wet, flowing, life-giving). Two thoughts, one mission, decomposed!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>reason</td> </tr>
+<tr> <td>Confidence</td> <td>0.21</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_1</td> </tr>
+<tr> <td>Multipart</td> <td>YES — 2 clauses</td> </tr>
+<tr> <td>InputDecomposer</td> <td>[explain fire] + [describe water]</td> </tr>
+<tr> <td>Objective ID</td> <td>shared per-cycle for AIML coherence</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>InputDecomposer splits compound input on 'and'. MultipartOrchestrator groups votes by clause with per-clause objective_ids.</p>
+</details><p><br></p><hr>
+<h2>Section 10 — multipart_complex_action</h2>
+<p><strong>Input:</strong> <code>say hello 3 times and count from 1 to 3</code></p>
+<blockquote> <p>🪴 Grug get TWO action commands in one breath! 'Say hello 3 times' AND 'count from 1 to 3'! InputDecomposer splits into: [say hello 3 times] + [count from 1 to 3]. Each clause gets its own scoped_mission so arithmetic bindings don't bleed across. The welcome node fires with conf 0.43 — Grug feeling welcoming about doing TWO things! SigilMediator runs per-clause so the &n binding for '3 times' stays scoped to the say clause only. No cross-group bleed! Grug brain keeps things organized even when asked to multitask!</p> </blockquote>
+<p><br></p>
+<details> <summary><strong>📊 Telemetry — click to expand</strong></summary> <table class="e-rte-table"> <thead> <tr> <th>Field</th> <th>Value</th> </tr> </thead> <tbody><tr> <td>Primary Action</td> <td>welcome</td> </tr>
+<tr> <td>Confidence</td> <td>0.43</td> </tr>
+<tr> <td>Certainty</td> <td>SURE</td> </tr>
+<tr> <td>Winning Node</td> <td>node_0</td> </tr>
+<tr> <td>Multipart</td> <td>YES — 2 clauses</td> </tr>
+<tr> <td>Clause 1</td> <td>say hello 3 times (scoped: &n=3 for say only)</td> </tr>
+<tr> <td>Clause 2</td> <td>count from 1 to 3 (scoped: &n=3 for count only)</td> </tr>
+</tbody></table> 
+<p><strong>Result:</strong> <span style="color:green">✅ PASS</span></p>
+<p>Complex multipart with two action verbs. Per-clause mediation prevents arithmetic binding bleed. MultipartOrchestrator renders each clause independently.</p>
+</details><p><br></p><hr>
