@@ -1326,9 +1326,15 @@ function record_response_time!(node::Node, elapsed_seconds::Float64)
         push!(node.response_times, elapsed_seconds)
 
         # GRUG: Check average response time. If too slow, node gets yeeted!
+        # GRUG v7.36.2: EXEMPT sigil nodes from GRAVED-SLOW. Sigil nodes carry
+        # macro scaffolding patterns (&doAction &word &n) that always look "slow"
+        # because their vote path includes action template execution overhead.
+        # They are injected by the sigil router with guaranteed confidence, so
+        # response time is not a meaningful quality signal for them.
         if !isempty(node.response_times)
             avg_time = sum(node.response_times) / length(node.response_times)
-            if avg_time > SLOW_NODE_THRESHOLD_SECONDS && !node.is_grave
+            _is_sigil = has_sigil_tag(node)
+            if avg_time > SLOW_NODE_THRESHOLD_SECONDS && !node.is_grave && !_is_sigil
                 node.is_grave     = true
                 node.grave_reason = "GRAVED-SLOW"
                 println("[ENGINE] 🐢  Node $(node.id) marked [GRAVED-SLOW] (avg: $(round(avg_time, digits=2))s > $(SLOW_NODE_THRESHOLD_SECONDS)s).")
@@ -1718,6 +1724,13 @@ function _mission_has_deterministic_answer(primary_vote)::Bool
     end
     # Check 2: bundle_role === :final means ArithmeticEngine computed an answer
     if getfield(primary_vote, :bundle_role) === :final
+        return true
+    end
+    # GRUG v7.36.2: bundle_role === :doaction means an action verb EXECUTED and
+    # its payload is the answer (e.g. "HELLO HELLO HELLO" for "say hello 3 times",
+    # "2025-06-13" for "check the date"). Action results are deterministic —
+    # the answer stands alone without SUPPORT scaffolding.
+    if getfield(primary_vote, :bundle_role) === :doaction
         return true
     end
     # Check 3: primary vote's node is in lobe_math
@@ -4357,6 +4370,28 @@ function _cast_doaction_votes(
 
     # GRUG: The trigger verb is the binding's value (what the user typed).
     trigger_verb = lowercase(string(doaction_binding.value))
+
+    # GRUG v7.36.3: PATTERN-BINDING COMPATIBILITY GATE.
+    # Each doaction node has a specific sigil pattern (e.g. "&doAction &word &n"
+    # vs "&doAction &rest"). The bindings vector may contain slots that match
+    # one pattern but not another. If this node's pattern requires sigils that
+    # are NOT in the bindings, this node should NOT execute the action — it
+    # should fall back to opener-only. Without this gate, both node_75
+    # (&doAction &word &n) and node_76 (&doAction &rest) receive the SAME
+    # bindings and both execute, doubling the output (6 hellos instead of 3).
+    binding_names = Set(b.name for b in bindings)
+    for tok in split(lowercase(strip(node.pattern)))
+        if startswith(tok, "&")
+            sigil_name = tok[2:end]  # strip & prefix
+            if sigil_name == "doAction"
+                continue  # doAction is always present (checked above)
+            end
+            if !(sigil_name in binding_names)
+                # This node needs a sigil that isn't in the bindings — skip it.
+                return Vote[Vote(node.id, opener, conf, negatives, u_trips, n_trips, "", obj_id, :singleton)]
+            end
+        end
+    end
 
     # GRUG: Look up the action entry from ActionScript registry.
     entry = ActionScript.lookup_action(trigger_verb)

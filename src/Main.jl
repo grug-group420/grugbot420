@@ -2610,6 +2610,15 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     tied_alt_str = isempty(tied_alternatives) ? "None" :
         join(["$(v.node_id)($(v.action),conf=$(round(v.confidence, digits=2)))" for v in tied_alternatives], ", ")
 
+    # GRUG v7.30: VERB-CLASS IMPROV CONTEXT for AIML (MOVED from after rule-swap loop)
+    # Must be defined before {VERB_CLASSES} substitution in the rule loop below.
+    verb_classes_str = if !isempty(primary_vote.user_triples)
+        classes = unique(filter(!isnothing, [SemanticVerbs.verb_class_of(t.relation) for t in primary_vote.user_triples]))
+        isempty(classes) ? "None" : join(classes, ", ")
+    else
+        "None"
+    end
+
     # GRUG: Read rule board. Swap shape-shifter words for real context chunks.
     # NOW STOCHASTIC: each rule fires based on its fire_probability.
     # This is where Grug JIT-compiles math into human language with natural variation!
@@ -2661,17 +2670,7 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     u_triples = isempty(primary_vote.user_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.user_triples], ", ")
     n_triples = isempty(primary_vote.node_triples) ? "None" : join(["($(t.subject), $(t.relation), $(t.object))" for t in primary_vote.node_triples], ", ")
 
-    # GRUG v7.30: VERB-CLASS IMPROV CONTEXT for AIML
-    # Resolve verb classes from the primary vote's user triples so AIML
-    # can improv off the verb signal. The verb class tells AIML what KIND
-    # of action the user is requesting (reason, explain, create, etc.)
-    # and the triple subject/object provide the parameters to improv with.
-    verb_classes_str = if !isempty(primary_vote.user_triples)
-        classes = unique(filter(!isnothing, [SemanticVerbs.verb_class_of(t.relation) for t in primary_vote.user_triples]))
-        isempty(classes) ? "None" : join(classes, ", ")
-    else
-        "None"
-    end
+    # (verb_classes_str already defined above, before the rule-swap loop)
 
     # =====================================================================
     # GRUG v7.16: AIML SYNTHESIZES VOTES INTO A NATURAL-LANGUAGE REPLY.
@@ -2963,7 +2962,10 @@ function generate_aiml_payload(mission::String, primary_vote::Vote, sure_votes::
     # where the answer is buried at the end after all directives.
     _primary_bundle_role = getfield(primary_vote, :bundle_role)
     _primary_payload = getfield(primary_vote, :payload)
-    claim_raw = if _primary_bundle_role === :final && !isempty(_primary_payload)
+    claim_raw = if (_primary_bundle_role === :final || _primary_bundle_role === :doaction) && !isempty(_primary_payload)
+        # GRUG v7.36.2: :doaction votes carry the executed action result as payload
+        # (e.g. "HELLO HELLO HELLO" for "say hello 3 times", "2025-06-13" for "check the date").
+        # The payload IS the spoken claim — same as :final math answers.
         _primary_payload
     elseif winner_pattern_is_scaffolding
         _claim_handle_for_action(primary_vote.action)
@@ -3562,6 +3564,106 @@ for act in action_trigger_family
 end
 
 # ==============================================================================
+# GRUG v7.36.1: EXTENDED ACTION FAMILIES
+# ==============================================================================
+# These action verbs were missing from COMMANDS, causing "Grug rolled unknown
+# action [X]! Not in COMMANDS dictionary" errors. Each follows the same pattern
+# as action_trigger_family: check for action payload first, fall back to AIML.
+# ==============================================================================
+
+# Reference actions: resolve lookups (date, time, recent, etc.)
+reference_family = ["resolve", "lookup", "remind", "confirm", "verify", "compare", "search"]
+for act in reference_family
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# Memory/context actions
+memory_family = ["announce", "recall"]
+for act in memory_family
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# Inquiry actions (synonyms of analyze/reason that thesaurus can produce)
+inquiry_family = ["investigate", "calibrate", "compute"]
+for act in inquiry_family
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# Observation/monitoring actions (thesaurus synonyms + common verbs)
+observe_family = ["observe", "monitor", "watch", "notice", "detect", "perceive", "sense", "feel", "experience", "review", "assess", "evaluate", "appraise", "judge"]
+for act in observe_family
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# Catch-all: any action verb that reaches COMMANDS but wasn't registered
+# gets a default handler that returns payload if available, else AIML-generated.
+# This prevents KeyError crashes from thesaurus expansion or unexpected verbs.
+for act in ["wonder", "imagine", "dream", "speculate", "hypothesize", "theorize",
+            "predict", "forecast", "estimate", "guess", "suppose", "assume",
+            "believe", "doubt", "question", "challenge", "criticize", "praise",
+            "celebrate", "mourn", "regret", "wish", "hope", "fear",
+            "describe", "narrate", "report", "document", "log", "record",
+            "translate", "interpret", "decode", "encode", "transform",
+            "organize", "sort", "filter", "select", "choose", "pick",
+            "combine", "merge", "split", "divide", "separate", "isolate",
+            "summarize", "outline", "sketch", "draft", "plan", "design",
+            "build", "create", "make", "generate", "produce", "construct",
+            "improve", "refine", "optimize", "enhance", "upgrade", "fix",
+            "test", "validate", "check", "inspect", "examine", "audit"]
+    if !haskey(COMMANDS, act)
+        COMMANDS[act] = (mission, node, primary_vote, sure_votes, unsure_votes, all_votes) -> begin
+            if !isempty(primary_vote.payload)
+                reset_throttle!(node, 0.3)
+                return primary_vote.payload
+            end
+            generated_text = generate_aiml_payload(mission, primary_vote, sure_votes, unsure_votes, all_votes, node.json_data)
+            reset_throttle!(node, 0.3)
+            return generated_text
+        end
+    end
+end
+
+# ==============================================================================
 # GRUG v7.31: RECENT CONTEXT HELPER (for ActionScript RESOLVE)
 # ==============================================================================
 # Called by the RESOLVE callback wired in GrugBot420.jl.
@@ -4070,7 +4172,8 @@ function process_mission(mission_text::String)
         end
     else
         try
-            SigilMediator.mediate(mission_text)
+            _med_result = SigilMediator.mediate(mission_text)
+            _med_result
         catch e
             @warn "[MAIN] SigilMediator.mediate failed (non-fatal, sigil routing disabled this cycle): $e"
             nothing
@@ -4250,7 +4353,7 @@ function process_mission(mission_text::String)
             already_in = Set(s[1] for s in valid_specimens)
             max_conf = isempty(valid_specimens) ? 0.0 :
                        maximum(s[2] for s in valid_specimens)
-            inject_conf = max(0.4, max_conf * 0.5)
+            inject_conf = max(0.55, max_conf * 0.5)
             injected = 0
             for kind in sigil_mediation.kinds
                 for node_id in list_sigil_node_ids(kind)
@@ -4703,7 +4806,19 @@ function process_mission(mission_text::String)
     digest = try
         if !isempty(contributing_votes)
             win = contributing_votes[1]
-            "Mission \"$(mission_text)\" → primary=$(win.action) conf=$(round(win.confidence, digits=2)) node=$(win.node_id)"
+            # GRUG v7.36.3: For :doaction votes, include the action RESULT in
+            # the digest so context knows what the action actually produced.
+            # "say hello 3 times" → digest should contain "hello hello hello",
+            # not just "primary=say conf=0.55 node=node_75". The result is the
+            # whole point — action verbs EXECUTE, they don't just talk ABOUT
+            # executing.
+            win_role = getfield(win, :bundle_role)
+            win_payload = getfield(win, :payload)
+            if win_role === :doaction && !isempty(win_payload)
+                "Mission \"$(mission_text)\" → $(win_payload)"
+            else
+                "Mission \"$(mission_text)\" → primary=$(win.action) conf=$(round(win.confidence, digits=2)) node=$(win.node_id)"
+            end
         else
             # GRUG: Should never happen (we guarded on isempty(valid_specimens)
             # well upstream) but be defensive. NO SILENT FAILURES — the
@@ -5012,7 +5127,7 @@ function save_specimen_to_file!(filepath::String)::String
     specimen["id_counters"] = Dict{String, Any}(
         "node_id_counter"   => ID_COUNTER[],
         "msg_id_counter"    => MSG_ID_COUNTER[],
-        "objective_counter" => engine._OBJECTIVE_COUNTER[]  # GRUG v7.35: persist to avoid ID collision after reload
+        "objective_counter" => _OBJECTIVE_COUNTER[]  # GRUG v7.35: persist to avoid ID collision after reload
     )
     # ─── 12.5 LAST VOTER IDS ────────────────────────────────────────────────────────
     # GRUG: Save last voter IDs so /wrong works after save/load.
@@ -5358,6 +5473,31 @@ function load_specimen_from_file!(filepath::String)::String
         error("!!! FATAL: /loadSpecimen JSON parse failed after decompression: $e !!!")
     end
 
+    # GRUG v7.36.1 FIX: JSON.parse returns JSON.Object{String,Any}, not Dict.
+    # JSON.Array also differs from Array. The validation phase and restore phase
+    # use isa(x, Dict) and isa(x, AbstractVector) checks that fail on these types.
+    # Solution: Deep-convert the entire specimen tree from JSON.* types to
+    # native Julia Dict/Array types. This is a one-time cost at load time.
+    function _deep_convert_json(val)
+        if isa(val, AbstractDict) && !isa(val, Dict)
+            # JSON.Object → Dict (recurse into values)
+            return Dict{String, Any}(k => _deep_convert_json(v) for (k, v) in val)
+        elseif isa(val, AbstractVector) && !isa(val, Array)
+            # JSON.Array → Array (recurse into elements)
+            return Any[_deep_convert_json(v) for v in val]
+        elseif isa(val, AbstractDict)
+            # Already a Dict — recurse into values only
+            return Dict{String, Any}(k => _deep_convert_json(v) for (k, v) in val)
+        elseif isa(val, AbstractVector)
+            # Already an Array — recurse into elements only
+            return Any[_deep_convert_json(v) for v in val]
+        else
+            # Scalar value (String, Number, Bool, nothing) — pass through
+            return val
+        end
+    end
+    specimen = _deep_convert_json(specimen)
+
     if !isa(specimen, Dict)
         error("!!! FATAL: /loadSpecimen expects a JSON object at top level, got $(typeof(specimen))! !!!")
     end
@@ -5386,6 +5526,7 @@ function load_specimen_from_file!(filepath::String)::String
                         "sigils",
                         "actions", "decomposer_config", "relational_jitter_config",
                         "sigil_table", "automaton_rules", "answer_mode_config",
+                        "resolve_conflict_mode",
                         "_meta"])
     for key in keys(specimen)
         if !(key in allowed_keys)
@@ -5394,8 +5535,9 @@ function load_specimen_from_file!(filepath::String)::String
     end
 
     # GRUG v7.35: Type checks for critical array sections (dead keys removed)
+    # GRUG v7.36.1 FIX: concept_inhibitions is serialized as array, not dict
     for k in ["nodes", "hopfield_cache", "rules", "message_history", "lobes", "lobe_tables", "inhibitions", "temporal_coherence",
-              "sigil_table", "automaton_rules", "last_voters", "attachments", "actions"]
+              "sigil_table", "automaton_rules", "last_voters", "attachments", "actions", "concept_inhibitions"]
         if haskey(specimen, k) && !isa(specimen[k], AbstractVector)
             push!(validation_errors, "'$k' must be an array")
         end
@@ -5576,9 +5718,9 @@ function load_specimen_from_file!(filepath::String)::String
         end
         # GRUG v7.35: Restore objective counter to avoid ID collision.
         if haskey(idc, "objective_counter")
-            engine._OBJECTIVE_COUNTER[] = UInt64(idc["objective_counter"])
+            _OBJECTIVE_COUNTER[] = UInt64(idc["objective_counter"])
         end
-        println("  🔢 ID counters restored (node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[]), objective=$(engine._OBJECTIVE_COUNTER[]))")
+        println("  🔢 ID counters restored (node=$(ID_COUNTER[]), msg=$(MSG_ID_COUNTER[]), objective=$(_OBJECTIVE_COUNTER[]))")
     end
 
     # ─── 4.1.5 LAST VOTER IDS ──────────────────────────────────────────────────
@@ -6226,6 +6368,25 @@ function load_specimen_from_file!(filepath::String)::String
         catch e
             @warn "[MAIN] sigil_table restore failed (non-fatal, defaults kept): $e"
             counts["sigils"] = 0
+        end
+    end
+
+    # GRUG v7.36.2: Re-attach promote_predicate for &doAction after specimen restore.
+    # Functions (promote_predicate) cannot be serialized to JSON, so after restoring
+    # a specimen the &doAction entry has promote_predicate=nothing, which means
+    # _predicate_allows() returns true for ALL tokens — every word gets promoted
+    # to &doAction (BUG 4). The merge_registry!(:keep) inside restore_table! skips
+    # the default entry because the restored one already exists. Fix: rebuild the
+    # entry with the predicate attached and overwrite in the global table.
+    begin
+        _tbl = SigilRegistry.default_table()
+        _old = get(_tbl.entries, "doAction", nothing)
+        if !isnothing(_old)
+            _patched = SigilRegistry.SigilEntry(
+                _old.name, _old.class, _old.applies_at, _old.sigil_type,
+                _old.lexicon, _old.params, _old.expansion, _old.provenance,
+                _old.promote_at_tokenize, ActionScript.is_action_trigger)
+            _tbl.entries["doAction"] = _patched
         end
     end
 

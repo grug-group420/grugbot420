@@ -35,7 +35,7 @@ using ..SigilRegistry
 using ..SigilPromoter
 using ..ArithmeticEngine
 
-export SigilMediation, mediate, has_math, has_multipart, kinds_for_bindings
+export SigilMediation, mediate, has_math, has_multipart, has_doaction, kinds_for_bindings
 
 # ==============================================================================
 # DATA SHAPE
@@ -92,14 +92,28 @@ has_multipart(bindings::Vector{SigilBinding})::Bool =
     any(b -> b.name == "conj", bindings)
 
 """
+    has_doaction(bindings) -> Bool
+
+True when the bindings contain at least one `&doAction` binding, indicating
+an action trigger verb (say, repeat, count, check, tell, etc.) was detected.
+"""
+has_doaction(bindings::Vector{SigilBinding})::Bool =
+    any(b -> b.name == "doAction", bindings)
+
+"""
     kinds_for_bindings(bindings) -> Vector{Symbol}
 
 Inspect `bindings` and return the deterministic-order list of routing kinds
-that apply. Order is fixed: [:math, :multipart] (when both apply) so that
-downstream dispatch is stable across runs.
+that apply. Order is fixed: [:doaction, :math, :multipart] (when multiple
+apply) so that downstream dispatch is stable across runs.
+
+GRUG v7.36: :doaction added! Action sigil nodes must be routed when the
+promoter detects an action trigger verb, otherwise "say hello 3 times" has
+no path to node_75 and the vote competition is never entered.
 """
 function kinds_for_bindings(bindings::Vector{SigilBinding})::Vector{Symbol}
     out = Symbol[]
+    has_doaction(bindings) && push!(out, :doaction)
     has_math(bindings)      && push!(out, :math)
     has_multipart(bindings) && push!(out, :multipart)
     return out

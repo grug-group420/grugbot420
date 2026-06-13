@@ -651,6 +651,17 @@ Routes to the appropriate memory layer:
 function resolve_reference(ref::AbstractString)::String
     r = lowercase(strip(ref))
 
+    # GRUG v7.36.3: Strip leading articles so "the date", "my time",
+    # "a timestamp" all resolve correctly. The user says "check the date"
+    # and _extract_action_slots! captures "the date" as the target —
+    # RESOLVE needs to see just "date" to match the clock_refs set.
+    for article in ["the ", "a ", "an ", "my ", "our ", "this ", "that "]
+        if startswith(r, article)
+            r = strip(r[length(article)+1:end])
+            break
+        end
+    end
+
     # ── SYSTEM CLOCK ───────────────────────────────────────
     clock_refs = Set(["date", "time", "now", "today", "datetime",
                       "clock", "timestamp", "day", "year"])
@@ -1032,12 +1043,13 @@ function action_to_dict(entry::ActionEntry)::Dict{String, Any}
     )
 end
 
-function dict_to_action(d::Dict{String, Any})::ActionEntry
+function dict_to_action(d::AbstractDict)::ActionEntry
+    d_dict = isa(d, Dict{String, Any}) ? d : Dict{String, Any}(String(k) => v for (k, v) in d)
     return ActionEntry(
-        d["trigger_verb"],
-        Symbol(d["action_type"]),
-        d["template"],
-        get(d, "description", "")
+        d_dict["trigger_verb"],
+        Symbol(d_dict["action_type"]),
+        d_dict["template"],
+        get(d_dict, "description", "")
     )
 end
 
@@ -1054,10 +1066,20 @@ function serialize_registry()::Vector{Dict{String, Any}}
     return out
 end
 
-function restore_registry!(entries::Vector{Dict{String, Any}})
+function restore_registry!(entries::AbstractVector)
     reset_action_registry!()
     for d in entries
-        entry = dict_to_action(d)
+        # Ensure each entry is a Dict{String,Any} (JSON.Object from JSON.jl
+        # or Vector{Any} from deep-converted specimen need this coercion).
+        d_dict = if isa(d, Dict{String, Any})
+            d
+        elseif isa(d, AbstractDict)
+            Dict{String, Any}(String(k) => v for (k, v) in d)
+        else
+            @warn "[ActionScript] restore_registry: skipping non-dict entry: $d"
+            continue
+        end
+        entry = dict_to_action(d_dict)
         _GLOBAL_REGISTRY[].entries[entry.trigger_verb] = entry
         # Re-register synonyms
         syns = SemanticVerbs.synonyms_of(entry.trigger_verb)
