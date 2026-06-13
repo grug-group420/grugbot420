@@ -355,7 +355,8 @@ export GroupOrganizerStats, run_group_organizer!
 
 # GRUG v7.31: ActionScript exports --- &doAction reserved sigil system
 export ActionEntry, ActionRegistry, register_action!, unregister_action!
-export lookup_action, list_actions, execute_action, resolve_reference
+export lookup_action, list_actions, execute_action, resolve_reference,
+       resolve_multi_reference, set_resolve_conflict_mode!, get_resolve_conflict_mode
 export is_action_trigger, get_action_triggers, ACTION_OPS
 export action_to_dict, dict_to_action, serialize_registry, restore_registry!
 export reset_action_registry!, action_registry
@@ -415,11 +416,49 @@ ActionScript.set_recent_callback!(function(query::String)
 end)
 
 # Subconscious callback: deep memory traces from ages ago.
+# GRUG v7.36: Now wired to SelfObserver.peek_pattern for actual
+# deep memory recall. Queries the subconscious store by node_id
+# and query string, returning the best-matching deep trace.
 ActionScript.set_subconscious_callback!(function(query::String)
-    # GRUG: This callback queries the subconscious signal layer.
-    # Currently returns a placeholder; the subconscious layer will be
-    # wired to Hopfield/strength decay traces in a future update.
-    return "(deep memory trace: not yet wired)"
+    # GRUG: This callback queries the subconscious signal layer
+    # via SelfObserver.peek_pattern. It searches for entries that
+    # match the query across all known nodes, returning the
+    # strongest deep trace as a formatted string.
+    try
+        store = SelfObserver.default_store()
+        # Collect all node IDs from the Lobe table
+        node_ids = String[]
+        try
+            node_ids = collect(keys(Lobe._LOBE_TABLE[].node_to_lobe))
+        catch
+            # Lobe table may not have nodes yet - that is fine
+        end
+
+        best_trace = "(deep memory trace not found)"
+        best_count = 0  # number of payload strings as tiebreaker
+
+        for nid in node_ids
+            result = SelfObserver.peek_pattern(store, nid, query;
+                                                max_entries=1,
+                                                timeout_ms=50)
+            if result !== nothing && !isempty(result)
+                hint = result[1]
+                n_entries = length(hint.payload_strings)
+                if n_entries > best_count
+                    best_count = n_entries
+                    # Format the hint into a readable trace string
+                    tag_str = string(hint.tag)
+                    pvals = join(collect(values(hint.payload_strings))[1:min(3, end)], "; ")
+                    best_trace = "$(tag_str): $(pvals)"
+                end
+            end
+        end
+
+        return best_trace
+    catch ex
+        @debug "[SUBCONSCIOUS] Deep trace query failed" exception=ex
+        return "(deep memory trace unavailable)"
+    end
 end)
 
 end # module GrugBot420

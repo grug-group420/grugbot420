@@ -4898,7 +4898,9 @@ function save_specimen_to_file!(filepath::String)::String
                 "node_cap"           => rec.node_cap,
                 "fire_count"         => rec.fire_count,
                 "inhibit_count"      => rec.inhibit_count,
-                "created_at"         => rec.created_at
+                "created_at"         => rec.created_at,
+                "negative_mult"      => rec.negative_mult,
+                "neutral_mult"       => rec.neutral_mult
             ))
         end
     end
@@ -5185,6 +5187,11 @@ function save_specimen_to_file!(filepath::String)::String
     # User-definable action entries (the "side list") for &doAction.
     # Without this, all runtime-registered actions are lost on reload.
     specimen["actions"] = ActionScript.serialize_registry()
+
+    # GRUG v7.36: 28b. RESOLVE CONFLICT MODE
+    # Without this, any runtime change to the conflict resolution mode
+    # (:merge, :priority, :first_wins) is lost on reload.
+    specimen["resolve_conflict_mode"] = string(ActionScript.get_resolve_conflict_mode())
 
     # GRUG v7.35: 29. DECOMPOSER CONFIG (InputDecomposer) ─────────────────────
     # Without this, any runtime tweaks to compound_pairs, split_conjunctions,
@@ -5668,7 +5675,12 @@ function load_specimen_from_file!(filepath::String)::String
                         Int(get(ldata, "node_cap", Lobe.LOBE_NODE_CAP)),
                         Int(get(ldata, "fire_count", 0)),
                         Int(get(ldata, "inhibit_count", 0)),
-                        Float64(get(ldata, "created_at", time()))
+                        Float64(get(ldata, "created_at", time())),
+                        # GRUG v7.35: Per-lobe polarity sensitivity overrides.
+                        # nothing = use global defaults. Old specimens without these
+                        # fields will default to nothing (no override).
+                        get(ldata, "negative_mult", nothing),
+                        get(ldata, "neutral_mult", nothing)
                     )
                     Lobe.LOBE_REGISTRY[rec.id] = rec
                     n_lobes += 1

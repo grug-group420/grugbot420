@@ -25,8 +25,10 @@ using Test
 using Random
 using Base.Threads: @spawn
 
-# GRUG: load module directly (test files run as isolated subprocesses).
+# GRUG: load modules directly (test files run as isolated subprocesses).
+# RelationalJitter must be loaded first since SelfObserver uses `using ..RelationalJitter`.
 const REPO_ROOT = abspath(joinpath(@__DIR__, ".."))
+include(joinpath(REPO_ROOT, "src", "RelationalJitter.jl"))
 include(joinpath(REPO_ROOT, "src", "SelfObserver.jl"))
 using .SelfObserver
 

@@ -29,6 +29,11 @@
 # associative recall via bounded depth-2 walks. Eviction is salience-and-decay
 # weighted, so a vivid one-off can outlive a noisy repeat.
 #
+# IFS UPGRADE: The Microlog now uses an Intuitionistic Fuzzy Set triple (mu, nu, pi)
+# instead of a scalar weight. Novel data gets full IFML treatment (high hesitation pi).
+# Seen-a-lot data degrades to standard fuzzy (pi collapsed, just mu matters).
+# Key variables get RelationalJitter — ephemeral in activity, state persists in table.
+#
 # This module is ARCHITECTURALLY ISOLATED from vote ranking, candidate scoring,
 # and routing. Its public hint type contains zero Float64 fields. The only
 # integration point is the generation / system-prompt layer.
@@ -39,6 +44,7 @@ module SelfObserver
 using Base.Threads
 using Base.Threads: Atomic, atomic_add!, atomic_sub!, ReentrantLock
 using Random
+using ..RelationalJitter
 
 # ==============================================================================
 # EXPORTS
@@ -48,7 +54,11 @@ export Microlog, SubconsciousStore, SubconsciousHint
 export SelfObserverError, SelfObserverConfigError, SelfObserverArgumentError
 export observe!, peek_exact, peek_pattern, audit_trail, drop_store!
 export reset_audit!, store_size, key_count
+export serialize_store, restore_store!, restore_global_store!
 export FUZZY_BUCKETS
+# GRUG: IFS exports for the growth/link system to inspect fuzzy/IFML state
+export IFS_MATURE_THRESHOLD, IFS_INITIAL_MU, IFS_INITIAL_NU, IFS_INITIAL_PI
+export is_entry_mature, ifs_state, ifs_reinforce_entry!
 
 # ==============================================================================
 # ERROR TYPES — GRUG: no silent failures on programmer errors.
@@ -88,12 +98,27 @@ end
 
 # GRUG: write-side defaults
 const DEFAULT_P_WRITE          = 0.25      # stochastic write probability
-const DEFAULT_SALIENCE         = 1.0       # baseline interest weight
+const DEFAULT_SALIENCE         = 1.0       # baseline interest weight (maps to initial mu)
 const SALIENCE_FLOOR           = 0.0
 const SALIENCE_CEILING         = 10.0
-const REINFORCE_GAIN           = 0.5       # how much repeat-write boosts existing weight
-const WEIGHT_CEILING           = 10.0      # max weight after reinforcement
-const DECAY_PER_TICK           = 0.02      # weight loss per maintenance tick (parked use)
+const REINFORCE_GAIN           = 0.5       # how much repeat-write boosts existing mu
+const WEIGHT_CEILING           = 10.0      # max mu after reinforcement (legacy compat)
+const DECAY_PER_TICK           = 0.02      # mu loss per maintenance tick (parked use)
+
+# GRUG: IFS (Intuitionistic Fuzzy Set) constants for the fuzzy/IFML upgrade.
+# GRUG say: new data gets full IFML treatment (mu, nu, pi). Seen-a-lot data
+# degrades to standard fuzzy (just mu) because pi collapsed near zero.
+# GRUG say: key variables get jitter — ephemeral in activity, state persists.
+const IFS_INITIAL_MU    = 0.15     # slight positive bias for novel observation (it was observed)
+const IFS_INITIAL_NU    = 0.05     # minimal non-membership (no counter-evidence yet)
+const IFS_INITIAL_PI    = 0.80     # lots of hesitation — we barely know this thing
+const IFS_MATURE_THRESHOLD = 0.20  # pi below this → mature, standard fuzzy (just mu)
+const IFS_REINFORCE_MU_GAIN = 0.08 # how much pi→mu transfer on positive reinforcement
+const IFS_REINFORCE_NU_GAIN = 0.08 # how much pi→nu transfer on negative reinforcement
+const IFS_MU_FLOOR       = 0.0
+const IFS_MU_CEIL        = 1.0
+const IFS_NU_FLOOR       = 0.0
+const IFS_NU_CEIL        = 1.0
 
 # GRUG: store sizing
 const MAX_ENTRIES_PER_KEY      = 32
@@ -135,31 +160,180 @@ const FUZZY_BUCKET_JITTER = 0.15  # ±15% jitter on boundaries per query
 
 # GRUG: single fragment of subconscious observation.
 # `payload` is symbol-or-string keyed for serialization friendliness.
-# `weight` is internal — it shapes survival under eviction, NEVER returned to
-# callers as a number. This is part of the no-Float64 invariant.
+# IFS triple (mu, nu, pi) replaces the old scalar weight.
+#   mu = membership (positive evidence strength)
+#   nu = non-membership (negative evidence strength)
+#   pi = hesitation margin = 1 - mu - nu (shrinks as evidence accumulates)
+# Novel data: high pi (IFML mode — full triple evaluation).
+# Seen-a-lot data: pi near zero (standard fuzzy — just mu matters).
+# Key variables get jitter on activity (ephemeral shake), state persists in table.
 mutable struct Microlog
     key::String
     tag::Symbol
     payload::Dict{String, Any}
-    weight::Float64                 # INTERNAL ONLY — never escapes via public API
+    mu::Float64                     # IFS membership — INTERNAL ONLY, never escapes via public API
+    nu::Float64                     # IFS non-membership — INTERNAL ONLY
+    pi::Float64                     # IFS hesitation — INTERNAL ONLY
     timestamp::Float64              # INTERNAL ONLY — fuzzed before returning
     provenance::Symbol              # why this microlog was written (e.g. :no_relations_extracted)
     drop_table::Vector{String}      # per-entry associated keys (moment-specific)
 end
 
+# GRUG: IFS invariant enforcer. After ANY mutation to mu or nu, call this.
+# Ensures mu+nu <= 1.0 and recalculates pi = 1 - mu - nu >= 0.
+# This is the single chokepoint that guarantees the IFS triple never violates
+# the Atanassov constraint. All mutation sites must call this afterward.
+function _ifs_enforce_invariant!(ml::Microlog)
+    # GRUG: if mu+nu > 1.0, shrink mu to make room. Mu is the "winner" that
+    # absorbs overflow — positive evidence is stronger than lack of negation.
+    if ml.mu + ml.nu > IFS_MU_CEIL + 1e-12
+        overflow = ml.mu + ml.nu - 1.0
+        ml.mu = max(IFS_MU_FLOOR, ml.mu - overflow)
+    end
+    ml.pi = max(0.0, 1.0 - ml.mu - ml.nu)
+    return nothing
+end
+
 function Microlog(key::String, tag::Symbol, payload::Dict{String,Any},
-                  weight::Float64, provenance::Symbol,
+                  mu::Float64, nu::Float64, pi::Float64, provenance::Symbol,
                   drop_table::Vector{String} = String[])
     if tag ∉ VALID_TAGS
         throw(SelfObserverArgumentError(
             "tag must be one of $(collect(VALID_TAGS))", "tag"))
     end
-    if !(SALIENCE_FLOOR <= weight <= SALIENCE_CEILING)
+    # GRUG: validate IFS triple. pi = 1 - mu - nu must be >= 0.
+    if !(IFS_MU_FLOOR <= mu <= IFS_MU_CEIL)
         throw(SelfObserverArgumentError(
-            "weight out of range [$(SALIENCE_FLOOR), $(SALIENCE_CEILING)]", "weight"))
+            "mu out of range [$IFS_MU_FLOOR, $IFS_MU_CEIL]", "mu"))
     end
-    return Microlog(key, tag, payload, weight, time(), provenance,
+    if !(IFS_NU_FLOOR <= nu <= IFS_NU_CEIL)
+        throw(SelfObserverArgumentError(
+            "nu out of range [$IFS_NU_FLOOR, $IFS_NU_CEIL]", "nu"))
+    end
+    if pi < 0.0
+        throw(SelfObserverArgumentError(
+            "pi (hesitation) is negative: mu=$mu, nu=$nu, pi=$pi", "pi"))
+    end
+    if mu + nu + pi > 1.0 + 1e-9  # GRUG: tiny tolerance for float arithmetic
+        throw(SelfObserverArgumentError(
+            "IFS invariant violated: mu+nu+pi = $(mu+nu+pi) > 1.0", "ifs_triple"))
+    end
+    # GRUG: snap pi to exact invariant
+    pi = max(0.0, 1.0 - mu - nu)
+    return Microlog(key, tag, payload, mu, nu, pi, time(), provenance,
                     copy(drop_table))
+end
+
+# GRUG: backward-compatible constructor from salience (maps to mu, rest is IFML defaults).
+# Old code that passes weight/salience as a single Float64 still works.
+function Microlog(key::String, tag::Symbol, payload::Dict{String,Any},
+                  salience::Float64, provenance::Symbol,
+                  drop_table::Vector{String} = String[])
+    if tag ∉ VALID_TAGS
+        throw(SelfObserverArgumentError(
+            "tag must be one of $(collect(VALID_TAGS))", "tag"))
+    end
+    if !(SALIENCE_FLOOR <= salience <= SALIENCE_CEILING)
+        throw(SelfObserverArgumentError(
+            "salience out of range [$SALIENCE_FLOOR, $SALIENCE_CEILING]", "salience"))
+    end
+    # GRUG: map salience to mu. Salience 0→mu=0.05, salience 10→mu=0.85.
+    # High-salience first write still starts with hesitation (IFML) but higher mu.
+    mu = 0.05 + 0.08 * salience   # salience 1.0 → mu=0.13, salience 10 → mu=0.85
+    mu = min(mu, IFS_MU_CEIL)
+    nu = IFS_INITIAL_NU
+    pi = max(0.0, 1.0 - mu - nu)
+    return Microlog(key, tag, payload, mu, nu, pi, time(), provenance,
+                    copy(drop_table))
+end
+
+# ==============================================================================
+# IFS HELPERS — GRUG fuzzy/IFML evaluation with jitter
+# ==============================================================================
+
+"""
+    _is_mature(ml::Microlog)::Bool
+
+GRUG: True when hesitation pi is below IFS_MATURE_THRESHOLD. Mature entries
+behave as standard fuzzy — just mu matters, the IFML triple has collapsed.
+"""
+_is_mature(ml::Microlog)::Bool = ml.pi < IFS_MATURE_THRESHOLD
+
+"""
+    _effective_weight(ml::Microlog)::Float64
+
+GRUG: Compute the effective weight for scoring/eviction from the IFS triple.
+  - Mature entry (pi < threshold): standard fuzzy — just mu, slightly jittered.
+  - Novel entry (pi >= threshold): IFML — mu + modal possibility bonus.
+    ◇mu = mu + pi (possibly true if hesitation resolves favorably).
+    The effective weight is weighted between mu and ◇mu based on how
+    much reinforcement the entry has seen (captured by mu itself).
+    Also lightly jittered on both paths — ephemeral shake, state persists.
+
+Internal only — never escapes via public API.
+"""
+function _effective_weight(ml::Microlog)::Float64
+    if _is_mature(ml)
+        # GRUG: Standard fuzzy. Mu is the whole story. Slight jitter.
+        mu_j = RelationalJitter.jitter_value(ml.mu; ratio=0.02)
+        return clamp(mu_j, IFS_MU_FLOOR, IFS_MU_CEIL)
+    else
+        # GRUG: IFML. Mu is the floor (what we know for sure). ◇mu = mu + pi
+        # (possibility operator) adds a proportional bonus for hesitation.
+        # The bonus is MULTIPLICATIVE on mu so that high-mu entries always
+        # score higher than low-mu entries, regardless of pi. This matters
+        # for eviction: a vivid (high-mu, moderate-pi) entry must survive
+        # over a barely-noticed (low-mu, high-pi) one.
+        #
+        # Formula: effective = mu * (1 + PI_BOOST_SCALE * pi)
+        #   - pi=0 (mature): just mu (no bonus)
+        #   - pi=0.80 (novel): mu * 1.40 — 40% possibility bonus
+        #   - pi=1.0 (pure hesitation): mu * 1.50 — 50% possibility bonus
+        #
+        # ◇mu is the theoretical ceiling if all hesitation resolves positively.
+        # The multiplicative form keeps mu as the dominant term while still
+        # rewarding the possibility that hesitation resolves favorably.
+        PI_BOOST_SCALE = 0.5
+        raw = ml.mu * (1.0 + PI_BOOST_SCALE * ml.pi)
+        # GRUG: also jitter mu slightly — ephemeral entropy, state persists
+        mu_j = RelationalJitter.jitter_value(ml.mu; ratio=0.02)
+        raw_j = mu_j * (1.0 + PI_BOOST_SCALE * ml.pi)
+        # GRUG: jitter nu slightly — it affects eviction scoring
+        nu_j = RelationalJitter.jitter_value(ml.nu; ratio=0.02)
+        nu_j = clamp(nu_j, IFS_NU_FLOOR, IFS_NU_CEIL)
+        # GRUG: non-membership dampens effective weight
+        raw_j = max(0.0, raw_j - nu_j * 0.3)
+        return clamp(raw_j, IFS_MU_FLOOR, IFS_MU_CEIL)
+    end
+end
+
+"""
+    _ifs_reinforce!(ml::Microlog; positive::Bool=true, gain::Float64=IFS_REINFORCE_MU_GAIN)
+
+GRUG: Shrink hesitation pi by transferring to mu (positive evidence) or nu
+(negative evidence). The transition from IFML → standard fuzzy is automatic
+as pi drops below IFS_MATURE_THRESHOLD. This is what makes "I keep noticing X"
+stick — repeated positive reinforcement collapses pi and grows mu.
+
+The actual IFS state (mu, nu, pi) is NOT jittered — only ephemeral activity
+uses jitter. State persists cleanly in the hash table.
+
+Uses _ifs_enforce_invariant! after mutation to guarantee mu+nu+pi = 1.0.
+"""
+function _ifs_reinforce!(ml::Microlog; positive::Bool=true,
+                         gain::Float64=IFS_REINFORCE_MU_GAIN)
+    if positive
+        # GRUG: positive evidence → mu grows, pi shrinks
+        transfer = min(gain, ml.pi)  # can't transfer more than what's hesitating
+        ml.mu = min(IFS_MU_CEIL, ml.mu + transfer)
+        _ifs_enforce_invariant!(ml)
+    else
+        # GRUG: negative evidence → nu grows, pi shrinks
+        transfer = min(gain, ml.pi)
+        ml.nu = min(IFS_NU_CEIL, ml.nu + transfer)
+        _ifs_enforce_invariant!(ml)
+    end
+    return nothing
 end
 
 # GRUG: the public hint type. ZERO Float64 fields. Symbols + strings + a fuzzy
@@ -234,6 +408,57 @@ function SubconsciousStore(; rng::Random.AbstractRNG = Random.default_rng())
         Atomic{Int}(0), Atomic{Int}(0), Atomic{Int}(0), Atomic{Int}(0),
         rng,
     )
+end
+
+# ==============================================================================
+# PUBLIC IFS HELPERS — for the growth/link system to inspect fuzzy/IFML state
+# ==============================================================================
+
+"""
+    is_entry_mature(ml::Microlog)::Bool
+
+GRUG: Public wrapper around _is_mature. True when hesitation pi is below
+IFS_MATURE_THRESHOLD — the entry behaves as standard fuzzy (just mu).
+"""
+is_entry_mature(ml::Microlog)::Bool = _is_mature(ml)
+
+"""
+    ifs_state(ml::Microlog)::NamedTuple{(:mu, :nu, :pi, :mature), Tuple{Float64, Float64, Float64, Bool}}
+
+GRUG: Read-only snapshot of the IFS triple + maturity flag. For callers that
+need to know the fuzzy/IFML state without directly touching Microlog fields.
+"""
+function ifs_state(ml::Microlog)::NamedTuple{(:mu, :nu, :pi, :mature), Tuple{Float64, Float64, Float64, Bool}}
+    return (mu=ml.mu, nu=ml.nu, pi=ml.pi, mature=_is_mature(ml))
+end
+
+"""
+    ifs_reinforce_entry!(store::SubconsciousStore, key::String, tag::Symbol,
+                         provenance::Symbol; positive::Bool=true,
+                         gain::Float64=IFS_REINFORCE_MU_GAIN)::Bool
+
+GRUG: Public API for the growth/link system to reinforce a specific entry
+without going through the full observe! path. Finds the matching microlog
+and applies IFS reinforcement. Returns true if reinforced, false if not found.
+"""
+function ifs_reinforce_entry!(store::SubconsciousStore, key::String, tag::Symbol,
+                              provenance::Symbol; positive::Bool=true,
+                              gain::Float64=IFS_REINFORCE_MU_GAIN)::Bool
+    lock(store.write_lock)
+    try
+        bucket = get(store.table, key, nothing)
+        bucket === nothing && return false
+        for ml in bucket
+            if ml.tag == tag && ml.provenance == provenance
+                _ifs_reinforce!(ml; positive=positive, gain=gain)
+                ml.timestamp = time()
+                return true
+            end
+        end
+        return false
+    finally
+        unlock(store.write_lock)
+    end
 end
 
 # ==============================================================================
@@ -421,8 +646,10 @@ function _make_hint(ml::Microlog, fuzzy_when::Symbol,
     )
 end
 
-# GRUG: salience-aware eviction. Score = weight * recency_factor.
+# GRUG: IFS-aware eviction. Score = _effective_weight(ml) * recency_factor.
 # Recency factor decays exponentially with age. Lowest score evicted.
+# _effective_weight uses jitter (ephemeral) so eviction is slightly non-deterministic
+# but statistically fair — same snap-back property as all jitter usage.
 function _evict_lowest!(entries::Vector{Microlog})::Microlog
     if isempty(entries)
         throw(SelfObserverError("eviction called on empty bucket", "evict_lowest"))
@@ -434,7 +661,7 @@ function _evict_lowest!(entries::Vector{Microlog})::Microlog
         age = max(0.0, now - ml.timestamp)
         # GRUG: half-life ~ 1 day; clamp to avoid underflow weirdness.
         recency = exp(-age / 86400.0)
-        score = ml.weight * recency
+        score = _effective_weight(ml) * recency
         if score < worst_score
             worst_score = score
             worst_idx = i
@@ -472,7 +699,7 @@ Stochastically record a microlog fragment in the subconscious store.
 - `tag::Symbol`            — must be one of `:timing, :lexical, :mood, :relational, :meta`.
 - `payload::Dict{String,Any}` — descriptive fields. Float values are NOT exposed in hints.
 - `p_write`                — probability of actually writing (caller may override).
-- `salience`               — initial weight, clamped to [0.0, 10.0].
+- `salience`               — initial interest, clamped to [0.0, 10.0]. Maps to IFS mu via salience→mu formula.
 - `provenance`             — why this fragment was written (e.g. `:no_relations_extracted`).
 - `drop_table`             — moment-specific co-activated keys for this entry.
 
@@ -524,12 +751,22 @@ function observe!(store::SubconsciousStore, key::String, tag::Symbol,
         end
 
         # GRUG: reinforcement — if a recent matching entry exists (same tag &
-        # provenance), boost its weight and refresh timestamp instead of adding
+        # provenance), IFS-reinforce it and refresh timestamp instead of adding
         # a brand-new entry. This is what makes "I keep noticing X" stick.
+        # Positive reinforcement: mu grows, pi shrinks. IFML → standard fuzzy
+        # happens automatically when pi drops below IFS_MATURE_THRESHOLD.
         reinforced = false
         for ml in bucket
             if ml.tag == tag && ml.provenance == provenance
-                ml.weight = min(WEIGHT_CEILING, ml.weight + REINFORCE_GAIN * salience)
+                # GRUG: IFS reinforcement — transfer pi→mu. Gain proportional to salience.
+                gain = IFS_REINFORCE_MU_GAIN * (0.5 + 0.05 * salience)
+                _ifs_reinforce!(ml; positive=true, gain=gain)
+                # GRUG: also bump mu directly for backward-compat salience ceiling behavior.
+                # This gives salience-heavy observations a faster climb even after pi=0.
+                # _ifs_enforce_invariant! (called inside _ifs_reinforce!) guarantees
+                # mu+nu+pi = 1.0 at all times, so the direct bump needs the same treatment.
+                ml.mu = ml.mu + REINFORCE_GAIN * salience * 0.01
+                _ifs_enforce_invariant!(ml)
                 ml.timestamp = time()
                 # Merge new payload keys (additive, not destructive).
                 for (k, v) in payload
@@ -593,7 +830,7 @@ function _evict_globally_lowest!(store::SubconsciousStore)
         for (i, ml) in enumerate(bucket)
             age = max(0.0, now - ml.timestamp)
             recency = exp(-age / 86400.0)
-            score = ml.weight * recency
+            score = _effective_weight(ml) * recency
             if score < worst_score
                 worst_score = score
                 worst_key = k
@@ -668,7 +905,7 @@ function peek_exact(store::SubconsciousStore, node_id::String, key::String;
             return nothing
         end
 
-        # Filter by tag if requested. Sort by weight*recency descending; cap.
+        # Filter by tag if requested. Sort by _effective_weight*recency descending; cap.
         now = time()
         scored = Tuple{Float64, Microlog}[]
         for ml in bucket
@@ -677,7 +914,7 @@ function peek_exact(store::SubconsciousStore, node_id::String, key::String;
             end
             age = max(0.0, now - ml.timestamp)
             recency = exp(-age / 86400.0)
-            push!(scored, (ml.weight * recency, ml))
+            push!(scored, (_effective_weight(ml) * recency, ml))
         end
         if isempty(scored)
             atomic_add!(store.n_peeks_miss, 1)
@@ -714,7 +951,7 @@ end
 Pattern-style fuzzy lookup. Two recall sources are merged:
 
 1. Token-overlap: tokenize `query`, score each stored key by the count of
-   shared tokens (tied with stored microlog weight*recency).
+   shared tokens (tied with stored microlog effective_weight*recency).
 2. Drop-table walk: starting from the best-overlap keys, walk per-key drop
    tables up to `walk_depth` hops, depth-discounted.
 
@@ -778,7 +1015,7 @@ function peek_pattern(store::SubconsciousStore, node_id::String, query::String;
                 end
                 age = max(0.0, now - ml.timestamp)
                 recency = exp(-age / 86400.0)
-                s = ml.weight * recency
+                s = _effective_weight(ml) * recency
                 if s > best
                     best = s
                 end
@@ -836,7 +1073,7 @@ function peek_pattern(store::SubconsciousStore, node_id::String, query::String;
                 end
                 age = max(0.0, now - ml.timestamp)
                 recency = exp(-age / 86400.0)
-                s = shared * (ml.weight * recency)
+                s = shared * (_effective_weight(ml) * recency)
                 push!(candidates, (s, k, ml))
                 push!(seen_pairs, (k, i))
             end
@@ -853,7 +1090,7 @@ function peek_pattern(store::SubconsciousStore, node_id::String, query::String;
                 end
                 age = max(0.0, now - ml.timestamp)
                 recency = exp(-age / 86400.0)
-                push!(candidates, (disc * ml.weight * recency, k, ml))
+                push!(candidates, (disc * _effective_weight(ml) * recency, k, ml))
             end
         end
 
@@ -1008,8 +1245,9 @@ Dict(
 )
 ```
 Each microlog dict has: key, tag (String), payload (Dict{String,Any}),
-weight (Float64), timestamp (Float64), provenance (String), drop_table
-(Vector{String}).
+mu (Float64), nu (Float64), pi (Float64), timestamp (Float64),
+provenance (String), drop_table (Vector{String}).
+Backward compat: old snapshots with "weight" are auto-migrated to IFS triple.
 """
 function serialize_store(store::SubconsciousStore)::Dict{String, Any}
     out = Dict{String, Any}()
@@ -1023,7 +1261,9 @@ function serialize_store(store::SubconsciousStore)::Dict{String, Any}
                     "key"        => ml.key,
                     "tag"        => String(ml.tag),
                     "payload"    => ml.payload,
-                    "weight"     => ml.weight,
+                    "mu"         => ml.mu,
+                    "nu"         => ml.nu,
+                    "pi"         => ml.pi,
                     "timestamp"  => ml.timestamp,
                     "provenance" => String(ml.provenance),
                     "drop_table" => copy(ml.drop_table),
@@ -1051,6 +1291,11 @@ end
 GRUG: Wipe `store` and rehydrate it from a `serialize_store` snapshot.
 Returns the number of microlog entries restored. Tolerant of missing
 keys --- a partial / older snapshot just restores what's there.
+
+IFS SAFETY: Serialized mu/nu/pi values may drift slightly from the IFS
+invariant (mu+nu+pi=1.0) due to floating-point arithmetic or historical
+reinforcement. The restore path clamps mu+nu <= 1.0 and recalculates pi
+before constructing the Microlog, ensuring the invariant is always clean.
 """
 function restore_store!(store::SubconsciousStore, data::AbstractDict)::Int
     drop_store!(store)  # wipe table + drop_tables + buckets
@@ -1075,13 +1320,35 @@ function restore_store!(store::SubconsciousStore, data::AbstractDict)::Int
                     payload = isa(payload_raw, AbstractDict) ?
                         Dict{String, Any}(String(k2) => v2 for (k2, v2) in payload_raw) :
                         Dict{String, Any}()
-                    weight_raw = get(raw, "weight", DEFAULT_SALIENCE)
-                    weight = clamp(Float64(weight_raw), SALIENCE_FLOOR, SALIENCE_CEILING)
-                    timestamp = Float64(get(raw, "timestamp", time()))
+                    # GRUG: prov and dt needed before IFS/weight branch
                     prov = Symbol(String(get(raw, "provenance", "restored")))
                     dt_raw = get(raw, "drop_table", String[])
                     dt = isa(dt_raw, AbstractVector) ? String[String(x) for x in dt_raw] : String[]
-                    ml = Microlog(key, tag_sym, payload, weight, timestamp, prov, dt)
+                    timestamp = Float64(get(raw, "timestamp", time()))
+                    # GRUG: IFS restore. New snapshots have mu/nu/pi.
+                    # Old snapshots have weight — auto-migrate to IFS triple.
+                    if haskey(raw, "mu")
+                        mu = clamp(Float64(get(raw, "mu", IFS_INITIAL_MU)), IFS_MU_FLOOR, IFS_MU_CEIL)
+                        nu = clamp(Float64(get(raw, "nu", IFS_INITIAL_NU)), IFS_NU_FLOOR, IFS_NU_CEIL)
+                        # GRUG: enforce IFS invariant mu+nu <= 1.0 BEFORE constructing.
+                        # Serialized values may have drifted (e.g. mu+nu > 1.0 from
+                        # historical reinforcement). Shrink mu to fit.
+                        if mu + nu > IFS_MU_CEIL + 1e-12
+                            overflow = mu + nu - 1.0
+                            mu = max(IFS_MU_FLOOR, mu - overflow)
+                        end
+                        pi = max(0.0, 1.0 - mu - nu)
+                        ml = Microlog(key, tag_sym, payload, mu, nu, pi, prov, dt)
+                    else
+                        # GRUG: backward compat — old weight-based snapshot.
+                        # Map weight to mu using same formula as salience constructor.
+                        weight_raw = get(raw, "weight", DEFAULT_SALIENCE)
+                        weight = clamp(Float64(weight_raw), SALIENCE_FLOOR, SALIENCE_CEILING)
+                        # Treat old weight as salience for migration
+                        ml = Microlog(key, tag_sym, payload, weight, prov, dt)
+                    end
+                    # GRUG: override constructor's time() with saved timestamp
+                    ml.timestamp = timestamp
                     push!(mls, ml)
                     n_restored += 1
                 end
@@ -1111,7 +1378,7 @@ end
 """
     restore_global_store!(data::AbstractDict)::Int
 
-GRUG: Convenience wrapper for the canonical load path --- replaces the
+GRUG: Convenience wrapper for the canonical load path — replaces the
 process-wide singleton's contents from a snapshot. Returns count restored.
 """
 restore_global_store!(data::AbstractDict)::Int = restore_store!(_GLOBAL_STORE[], data)

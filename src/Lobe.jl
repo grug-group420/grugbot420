@@ -58,6 +58,13 @@ mutable struct LobeRecord
     fire_count         ::Int
     inhibit_count      ::Int
     created_at         ::Float64
+    # GRUG v7.35: Per-lobe polarity sensitivity overrides.
+    # When set, these override the engine's global polarity gate multipliers
+    # for nodes in this lobe. nothing means "use global default".
+    # negative_mult: confidence multiplier when context polarity is NEGATIVE (default 0.3)
+    # neutral_mult:  confidence multiplier when context polarity is NEUTRAL  (default 0.7)
+    negative_mult      ::Union{Float64, Nothing}
+    neutral_mult       ::Union{Float64, Nothing}
 end
 
 # ============================================================================
@@ -101,7 +108,9 @@ function create_lobe!(id::String, subject::String; node_cap::Int = LOBE_NODE_CAP
             node_cap,
             0,
             0,
-            time()
+            time(),
+            nothing,   # negative_mult: use global default (0.3)
+            nothing    # neutral_mult:  use global default (0.7)
         )
         LOBE_REGISTRY[id] = rec
         # GRUG: Init LobeTable for this lobe immediately on creation.
@@ -369,6 +378,89 @@ function get_node_to_lobe_snapshot()::Dict{String, String}
 end
 
 # ============================================================================
+# PER-LOBE POLARITY SENSITIVITY - v7.35
+# GRUG: Some lobes care more about negativity than others. The math lobe
+# might want to suppress hard on negative polarity (0.1x), while a general
+# knowledge lobe might want softer suppression (0.5x). This lets each lobe
+# override the engine's global polarity gate multipliers.
+#
+# set_lobe_polarity_sensitivity!("math_lobe"; negative_mult=0.1, neutral_mult=0.5)
+# set_lobe_polarity_sensitivity!("biology_lobe"; negative_mult=0.5)
+# reset_lobe_polarity_sensitivity!("math_lobe")  # back to global defaults
+# ============================================================================
+
+"""
+    set_lobe_polarity_sensitivity!(lobe_id; negative_mult=nothing, neutral_mult=nothing)
+
+Override the polarity gate multipliers for a specific lobe. When a node in
+this lobe is gated by context polarity, the lobe's overrides take precedence
+over the engine's global defaults. Pass `nothing` for either multiplier to
+keep the current value (or the global default if not previously set).
+
+Valid range: 0.0 ≤ mult ≤ 1.0. Throws LobeError on invalid lobe or range.
+"""
+function set_lobe_polarity_sensitivity!(lobe_id::String;
+    negative_mult::Union{Float64, Nothing} = nothing,
+    neutral_mult::Union{Float64, Nothing} = nothing
+)
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found.", "set_lobe_polarity_sensitivity!")
+        end
+        rec = LOBE_REGISTRY[lobe_id]
+        if negative_mult !== nothing
+            if !(0.0 <= negative_mult <= 1.0)
+                throw_lobe_error("negative_mult must be in [0.0, 1.0], got $negative_mult",
+                                 "set_lobe_polarity_sensitivity!")
+            end
+            rec.negative_mult = negative_mult
+        end
+        if neutral_mult !== nothing
+            if !(0.0 <= neutral_mult <= 1.0)
+                throw_lobe_error("neutral_mult must be in [0.0, 1.0], got $neutral_mult",
+                                 "set_lobe_polarity_sensitivity!")
+            end
+            rec.neutral_mult = neutral_mult
+        end
+    end
+    return nothing
+end
+
+"""
+    reset_lobe_polarity_sensitivity!(lobe_id)
+
+Reset a lobe's polarity sensitivity overrides back to `nothing`, meaning
+the engine's global defaults will be used for nodes in this lobe.
+"""
+function reset_lobe_polarity_sensitivity!(lobe_id::String)
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found.", "reset_lobe_polarity_sensitivity!")
+        end
+        rec = LOBE_REGISTRY[lobe_id]
+        rec.negative_mult = nothing
+        rec.neutral_mult = nothing
+    end
+    return nothing
+end
+
+"""
+    get_lobe_polarity_sensitivity(lobe_id) -> (negative_mult, neutral_mult)
+
+Return the polarity sensitivity multipliers for a lobe. If no override is
+set, returns (nothing, nothing), meaning global defaults apply.
+"""
+function get_lobe_polarity_sensitivity(lobe_id::String)::Tuple{Union{Float64, Nothing}, Union{Float64, Nothing}}
+    lock(LOBE_LOCK) do
+        if !haskey(LOBE_REGISTRY, lobe_id)
+            throw_lobe_error("Lobe '$lobe_id' not found.", "get_lobe_polarity_sensitivity")
+        end
+        rec = LOBE_REGISTRY[lobe_id]
+        return (rec.negative_mult, rec.neutral_mult)
+    end
+end
+
+# ============================================================================
 # LOBE STATUS SUMMARY - For /status and /lobes commands
 # ============================================================================
 
@@ -393,7 +485,14 @@ function get_lobe_status_summary()::String
             else
                 "tbl[NO TABLE]"
             end
-            push!(lines, "  $id | subject='$(rec.subject)' | nodes=$fullness | fires=$(rec.fire_count) | inhibits=$(rec.inhibit_count) | connected=[$connected] | $table_info")
+            # GRUG v7.35: Show polarity sensitivity overrides if set
+            pol_info = ""
+            if rec.negative_mult !== nothing || rec.neutral_mult !== nothing
+                neg_s = rec.negative_mult !== nothing ? "$(rec.negative_mult)x" : "default"
+                neu_s = rec.neutral_mult !== nothing ? "$(rec.neutral_mult)x" : "default"
+                pol_info = "pol[neg=$neg_s neu=$neu_s]"
+            end
+            push!(lines, "  $id | subject='$(rec.subject)' | nodes=$fullness | fires=$(rec.fire_count) | inhibits=$(rec.inhibit_count) | connected=[$connected] | $table_info $pol_info")
         end
     end
     return join(lines, "\n")

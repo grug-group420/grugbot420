@@ -1692,6 +1692,14 @@ const _CURRENT_PREDICTION = Ref{Any}(nothing)
 # without threading the polarity through every internal function signature.
 const _ATTENUATED_FIRE = Ref{Bool}(false)
 
+# GRUG v7.35: GLOBAL DEFAULT POLARITY GATE MULTIPLIERS.
+# These are the fallback values used when no per-lobe override is set.
+# NEGATIVE: confidence multiplier for suppression (0.3 = fire at 30%)
+# NEUTRAL:  confidence multiplier for attenuation (0.7 = fire at 70%)
+# These can be overridden per-lobe via Lobe.set_lobe_polarity_sensitivity!().
+const POLARITY_NEGATIVE_MULT = 0.3
+const POLARITY_NEUTRAL_MULT  = 0.7
+
 # GRUG v7.21: _mission_has_deterministic_answer() — predicate that detects
 # whether this mission cycle produced a deterministic (computable) answer.
 # When true, the rendering pipeline skips the entire SUPPORT block — the
@@ -3737,18 +3745,22 @@ function cast_vote(id, conf, u_trips, n_trips)
     # GRUG NEW: Bump strength on a coinflip when a node votes (used = maybe stronger)
     bump_strength!(node)
 
-    # GRUG v7.34: UNIVERSAL POLARITY GATE for knowledge nodes.
+    # GRUG v7.34/v7.35: UNIVERSAL POLARITY GATE for knowledge nodes.
     # Non-sigil nodes (:none kind) now also respect the context polarity gate.
     # The same tri-state logic that gates sigil votes applies here:
-    #   NEGATIVE  → suppress  (0.3x confidence, :suppressed bundle_role)
-    #   NEUTRAL   → attenuate (0.7x confidence, normal bundle_role)
+    #   NEGATIVE  → suppress  (per-lobe or 0.3x default, :suppressed bundle_role)
+    #   NEUTRAL   → attenuate (per-lobe or 0.7x default, normal bundle_role)
     #   POSITIVE  → fire normally (1.0x, normal bundle_role)
+    # Per-lobe sensitivity overrides via Lobe.set_lobe_polarity_sensitivity!()
+    # take precedence over the global POLARITY_NEGATIVE_MULT / POLARITY_NEUTRAL_MULT.
     # This ensures "don't tell me about X" suppresses the X knowledge node,
     # "maybe explain Y" attenuates it, and "explain Y" fires at full strength.
     _polarity = _context_polarity_for(:none)
 
     if _polarity === ActionTonePredictor.POLARITY_NEGATIVE
-        @info "[ENGINE] 🔇 Knowledge node $id SUPPRESSED by context polarity (negative) — firing at 0.3x"
+        # GRUG v7.35: Per-lobe sensitivity override for negative multiplier.
+        neg_mult = _polarity_mult_for_node(id, :negative)
+        @info "[ENGINE] 🔴 Knowledge node $id SUPPRESSED by context polarity (negative) — firing at $(neg_mult)x"
         # GRUG: Record suppression in SelfObserver for post-vote audit.
         try
             SelfObserver.observe!(
@@ -3762,7 +3774,8 @@ function cast_vote(id, conf, u_trips, n_trips)
                     "outcome"    => "suppressed",
                     "polarity"   => "negative",
                     "action"     => winning_action,
-                    "conf"       => conf * 0.3,
+                    "conf"       => conf * neg_mult,
+                    "neg_mult"   => neg_mult,
                 );
                 p_write    = 1.0,
                 salience   = 6.0,
@@ -3771,11 +3784,13 @@ function cast_vote(id, conf, u_trips, n_trips)
         catch ex_obs
             @warn "[ENGINE] SelfObserver post-vote observe! (negative, knowledge) failed: $ex_obs"
         end
-        return Vote(id, winning_action, conf * 0.3, negatives, u_trips, n_trips,
+        return Vote(id, winning_action, conf * neg_mult, negatives, u_trips, n_trips,
                      "", UInt64(0), :suppressed)
     elseif _polarity === ActionTonePredictor.POLARITY_NEUTRAL
-        @info "[ENGINE] 🔈 Knowledge node $id ATTENUATED by context polarity (neutral) — firing at 0.7x"
-        return Vote(id, winning_action, conf * 0.7, negatives, u_trips, n_trips)
+        # GRUG v7.35: Per-lobe sensitivity override for neutral multiplier.
+        neu_mult = _polarity_mult_for_node(id, :neutral)
+        @info "[ENGINE] 🔵 Knowledge node $id ATTENUATED by context polarity (neutral) — firing at $(neu_mult)x"
+        return Vote(id, winning_action, conf * neu_mult, negatives, u_trips, n_trips)
     end
 
     # POSITIVE — fire normally, no modification
@@ -3958,6 +3973,34 @@ function _context_polarity_for(kind::Symbol)
     end
 end
 
+# GRUG v7.35: PER-LOBE POLARITY MULTIPLIER RESOLUTION.
+# When a node is in a lobe that has polarity sensitivity overrides,
+# use the lobe's values instead of the global defaults. This lets
+# specific lobes be more or less sensitive to negativity/neutrality.
+# Falls back to POLARITY_NEGATIVE_MULT / POLARITY_NEUTRAL_MULT when
+# the node has no lobe or the lobe has no overrides set.
+
+function _polarity_mult_for_node(node_id::String, polarity::Symbol)::Float64
+    if polarity === :negative
+        lobe_id = try Lobe.find_lobe_for_node(node_id) catch; nothing end
+        if lobe_id !== nothing
+            neg_m, _ = try Lobe.get_lobe_polarity_sensitivity(lobe_id) catch; (nothing, nothing) end
+            return neg_m !== nothing ? neg_m : POLARITY_NEGATIVE_MULT
+        end
+        return POLARITY_NEGATIVE_MULT
+    elseif polarity === :neutral
+        lobe_id = try Lobe.find_lobe_for_node(node_id) catch; nothing end
+        if lobe_id !== nothing
+            _, neu_m = try Lobe.get_lobe_polarity_sensitivity(lobe_id) catch; (nothing, nothing) end
+            return neu_m !== nothing ? neu_m : POLARITY_NEUTRAL_MULT
+        end
+        return POLARITY_NEUTRAL_MULT
+    else
+        # POSITIVE polarity → always 1.0x
+        return 1.0
+    end
+end
+
 """
     cast_sigil_votes(id, conf, bindings, original_text, u_trips, n_trips) -> Vector{Vote}
 
@@ -4050,16 +4093,19 @@ function cast_sigil_votes(
     # cast_sigil_votes call so it doesn't leak from a previous invocation.
     _ATTENUATED_FIRE[] = false
 
-    # GRUG v7.32: CONTEXT POLARITY GATE — tri-state: NEGATIVE / NEUTRAL / POSITIVE.
+    # GRUG v7.32/v7.35: CONTEXT POLARITY GATE — tri-state: NEGATIVE / NEUTRAL / POSITIVE.
     # The gate reads the ATP prediction and decides how this sigil vote fires:
-    #   NEGATIVE  → suppress (0.3x, no computation, :suppressed bundle_role)
-    #   NEUTRAL   → attenuate (0.7x, computation happens, :attenuated bundle_role)
+    #   NEGATIVE  → suppress (per-lobe or 0.3x default, no computation, :suppressed)
+    #   NEUTRAL   → attenuate (per-lobe or 0.7x default, computation happens, :attenuated)
     #   POSITIVE  → fire normally (1.0x, normal computation)
-    # All sigil kinds are polarity-gated; only :none passes through as POSITIVE.
+    # All sigil kinds are polarity-gated. Per-lobe sensitivity overrides via
+    # Lobe.set_lobe_polarity_sensitivity!() take precedence over global defaults.
     _polarity = _context_polarity_for(kind)
 
     if _polarity === ActionTonePredictor.POLARITY_NEGATIVE
-        @info "[ENGINE] 🔇 Sigil kind :$kind SUPPRESSED by context polarity (negative) on node $id"
+        # GRUG v7.35: Per-lobe sensitivity override for sigil negative multiplier.
+        neg_mult = _polarity_mult_for_node(id, :negative)
+        @info "[ENGINE] 🔴 Sigil kind :$kind SUPPRESSED by context polarity (negative) on node $id — firing at $(neg_mult)x"
         opener = _select_opener(node.action_packet)
         if !haskey(COMMANDS, opener)
             opener = "observe"  # fallback: the node still speaks, just doesn't compute
@@ -4067,7 +4113,7 @@ function cast_sigil_votes(
         _, negatives = select_action(node.action_packet)
         obj_id = fresh_objective_id()
         # GRUG: Emit a single :suppressed vote. No computation happens.
-        # The node's voice is heard ("I see what you did there") at reduced confidence.
+        # The node's voice is heard at reduced confidence.
         # GRUG v7.32: POST-VOTE SELF-OBSERVATION — record that this sigil was
         # suppressed by context polarity.
         try
@@ -4082,7 +4128,8 @@ function cast_sigil_votes(
                     "outcome"      => "suppressed",
                     "polarity"     => "negative",
                     "opener"       => opener,
-                    "conf"         => conf * 0.3,
+                    "conf"         => conf * neg_mult,
+                    "neg_mult"     => neg_mult,
                     "objective_id" => obj_id,
                 );
                 p_write    = 1.0,
@@ -4092,23 +4139,21 @@ function cast_sigil_votes(
         catch ex_obs
             @warn "[ENGINE] SelfObserver post-vote observe! (negative) failed: $ex_obs"
         end
-        return Vote[Vote(node.id, opener, conf * 0.3, negatives, u_trips, n_trips,
+        return Vote[Vote(node.id, opener, conf * neg_mult, negatives, u_trips, n_trips,
                          "", obj_id, :suppressed)]
     end
 
     if _polarity === ActionTonePredictor.POLARITY_NEUTRAL
-        @info "[ENGINE] 🔈 Sigil kind :$kind ATTENUATED by context polarity (neutral) on node $id — firing at 0.7x"
+        # GRUG v7.35: Per-lobe sensitivity override for sigil neutral multiplier.
+        neu_mult = _polarity_mult_for_node(id, :neutral)
+        @info "[ENGINE] 🔵 Sigil kind :$kind ATTENUATED by context polarity (neutral) on node $id — firing at $(neu_mult)x"
         # GRUG: Neutral polarity — the intent is hedged/ambiguous. The sigil still
-        # fires (computation happens), but at reduced confidence (0.7x). The votes
-        # keep their normal bundle_role (:final, :step_n, etc.) so downstream
-        # processing isn't disrupted. The reduced confidence IS the signal.
-        # The _observe_sigil_fired helper at the return will record the neutral
-        # polarity in the post-vote observation.
-        conf = conf * 0.7
+        # fires (computation happens), but at reduced confidence. The votes
+        # keep their normal bundle_role so downstream processing isn't disrupted.
+        # The reduced confidence IS the signal.
+        conf = conf * neu_mult
         # GRUG: Track that this fire was attenuated so _observe_sigil_fired can
         # include it in the post-vote observation.
-        # We use a task-local flag to avoid threading the polarity through every
-        # internal function signature.
         _ATTENUATED_FIRE[] = true
     end
 
