@@ -1,0 +1,1130 @@
+#!/usr/bin/env julia
+# ==============================================================================
+# comprehensive_test_v828.jl — GrugBot420 v8.28 Conversational Learning Loop Tests
+# ==============================================================================
+# Tests the new v8.28 conversational learning loop:
+#   - Unknown question → clarification → user teaches → node created
+#   - Knowledge classification (static/procedural/relational)
+#   - Subject→lobe routing
+#   - Sigil node creation for procedural/relational knowledge
+#   - Dictionary entry creation for static knowledge
+#   - Pending teach state expiry
+#   - Partial answers (subject-only, definition-only)
+#   - Pending teach state save/load round-trip
+#   - Existing define/answer/correct behavior preserved
+# Also runs core tests from v826i to verify no regressions.
+# ==============================================================================
+
+using Dates
+using JSON
+
+include(joinpath(@__DIR__, "src", "GrugBot420.jl"))
+using .GrugBot420
+
+import .GrugBot420:
+    process_mission, load_specimen_from_file!, save_specimen_to_file!,
+    _LAST_VOICE_OUTPUT, _LAST_VOICE_OUTPUT_LOCK,
+    NODE_MAP, NODE_LOCK,
+    MESSAGE_HISTORY, MESSAGE_HISTORY_LOCK
+
+# Internal API for /answer teach step (bypasses CLI loop)
+import .GrugBot420:
+    _base_answer_data, _create_answer_node, _plant_answer_cluster,
+    _VALID_ANSWER_MODES, _ANSWER_MODE_CONFIG,
+    _HIPPOCAMPAL_PENDING_ASK, _HIPPOCAMPAL_PENDING_ASK_LOCK,
+    _FANOUT_ENABLED, _FANOUT_MODES,
+    _dissolve_solo_group!,
+    register_group!, group_for, add_to_group!,
+    immune_gate, dampen_strain!,
+    create_node
+
+# Dictionary system internals
+import .GrugBot420:
+    _dict_define_word!, _dict_lookup_word, _dict_lookup_for_mission,
+    _dict_all_definitions, _dict_definitions_count,
+    _dict_save_state, _dict_load_state!,
+    _LOBE_DICTIONARIES, _LOBE_DICTIONARIES_LOCK
+
+# ConversationLobe pre-scan
+import .GrugBot420: _conversation_prescan, _conversation_answer_question
+
+# /wrong feedback path
+import .GrugBot420:
+    LAST_VOTER_IDS, LAST_VOTER_LOCK,
+    LAST_CONTRIBUTOR_IDS, LAST_LOCKED_NODE_IDS,
+    apply_wrong_feedback!, apply_last_selected_feedback!,
+    CONTEXT_FEEDBACK_WRONG_DELTA
+
+# v8.28: Conversational learning loop internals
+import .GrugBot420:
+    _classify_knowledge, _find_lobe_for_subject, _extract_teach_parts,
+    _conv_set_pending_teach!, _conv_get_pending_teach,
+    _conv_clear_pending_teach!, _conv_pending_teach_is_expired,
+    _CONV_PENDING_TEACH, _CONV_PENDING_TEACH_LOCK
+
+# Sigil node internals
+import .GrugBot420:
+    create_sigil_node, extract_relational_triples,
+    node_sigil_kind, list_sigil_node_ids, SIGIL_TAG_PREFIX,
+    Node
+
+import .GrugBot420.Lobe:
+    add_node_to_lobe!, find_lobe_for_node, lobe_is_full, LOBE_REGISTRY,
+    create_lobe!
+
+import .GrugBot420: count_alive_nodes_in_lobe
+
+import .GrugBot420.EphemeralMLP: get_strain_energy, register_wrong_feedback!
+
+# ── Configuration ──────────────────────────────────────────────────────────
+const SPEC_PATH  = get(ARGS, 1, "/workspace/grugbot420_repo/grug_v87_post_test.specimen")
+const LOG_PATH   = "/workspace/grugbot420_repo/grug_v828_comprehensive_test.md"
+const SAVE_PATH  = "/workspace/grugbot420_repo/grug_v828_post_test.specimen"
+
+# ── In-program MD log buffer ────────────────────────────────────────────────
+const _log_lines = String[]
+
+function log_md(line::String)
+    push!(_log_lines, line)
+end
+
+function flush_log_md(filepath::String)
+    open(filepath, "w") do f
+        for line in _log_lines
+            println(f, line)
+        end
+    end
+end
+
+# ── Voice output capture ──────────────────────────────────────────────────
+function read_last_output()::String
+    lock(_LAST_VOICE_OUTPUT_LOCK) do; _LAST_VOICE_OUTPUT[]; end
+end
+
+function run_mission(text::String)::String
+    lock(_LAST_VOICE_OUTPUT_LOCK) do; _LAST_VOICE_OUTPUT[] = ""; end
+    try
+        process_mission(text)
+    catch e
+        @warn "process_mission error" exception=e
+    end
+    return read_last_output()
+end
+
+function clean_output(raw::String)::String
+    ti = findfirst("--- DEBUG TELEMETRY", raw)
+    if ti !== nothing
+        raw = strip(raw[1:first(ti)-1])
+    end
+    lines = split(raw, '\n')
+    filtered = filter(l -> !startswith(strip(l), "> "), lines)
+    return strip(join(filtered, '\n'))
+end
+
+# ── Failure detection ─────────────────────────────────────────────────────
+const FAILURE_PHRASES = [
+    "Nothing in the cave",
+    "nothing in the cave",
+    "cave is empty",
+    "Grug shrugs",
+    "grug shrugs",
+    "no match found",
+    "CAVE-EMPTY",
+]
+
+function is_failure_response(answer::String)::Bool
+    for phrase in FAILURE_PHRASES
+        occursin(phrase, answer) && return true
+    end
+    return false
+end
+
+function is_ask_response(answer::String)::Bool
+    occursin("Use /answer", answer) || occursin("use /answer", answer)
+end
+
+function is_clarification_response(answer::String)::Bool
+    occursin("Grug not know", answer) || occursin("What does it mean", answer) ||
+    occursin("What subject", answer)
+end
+
+# ── Test runners with MD logging ───────────────────────────────────────────
+turn_counter = Ref{Int}(0)
+
+# Helper: extract pass/fail from mixed tuple formats in the results vector.
+# - run_conv_prescan_test returns (label, kind_ok::Bool, ...)  -> r[2] is Bool
+# - Direct 2-tuples like ("label", ok::Bool)                  -> r[2] is Bool
+# - run_test returns (turn, category::String, query, answer, status::String, verdict)
+#   where status starts with check mark for pass, cross/warn for fail -> check r[5]
+function _result_passed(r)::Bool
+    if length(r) >= 6 && r[2] isa String
+        # run_test 6-tuple: r[5] is status string
+        _s = String(r[5])
+        return occursin("✅", _s) || occursin("PASS", _s) || occursin("OK", _s) || startswith(_s, "ASK")
+    elseif length(r) >= 2 && r[2] isa Bool
+        return r[2]
+    else
+        return false
+    end
+end
+
+
+function run_test(category::String, query::String; expect_ask::Bool=false)
+    global turn_counter
+    turn_counter[] += 1
+    turn = turn_counter[]
+
+    raw = run_mission(query)
+    answer = clean_output(raw)
+
+    if isempty(answer)
+        status = "❌ EMPTY"
+        verdict = "EMPTY"
+    elseif is_ask_response(answer) && expect_ask
+        status = "✅ ASK"
+        verdict = "ASK generated"
+    elseif is_failure_response(answer) && !expect_ask
+        status = "❌ CAVE-EMPTY"
+        verdict = "CAVE-EMPTY"
+    elseif is_failure_response(answer) && expect_ask
+        status = "✅ ASK"
+        verdict = "ASK generated"
+    elseif length(answer) < 5
+        status = "⚠️ SHORT"
+        verdict = "SHORT"
+    else
+        status = "✅"
+        verdict = "OK"
+    end
+
+    log_md("## Turn $turn — $category")
+    log_md("")
+    log_md("**User:** $query")
+    log_md("")
+    log_md("> $answer")
+    log_md("")
+    log_md("**Verdict:** $status $verdict")
+    log_md("")
+    log_md("---")
+    log_md("")
+
+    display_answer = length(answer) > 150 ? first(answer, 150) * "…" : answer
+    println("[$status] T$turn $category: \"$query\" → $(display_answer)")
+
+    return (turn, category, query, answer, status, verdict)
+end
+
+# ── Conversation prescan test helper ──────────────────────────────────────
+function run_conv_prescan_test(label::String, text::String, expect_kind::Symbol)
+    log_md("## ConvPrescan: $label")
+    log_md("")
+    log_md("**Input:** \"$text\"")
+    log_md("**Expected kind:** $expect_kind")
+    log_md("")
+    result = _conversation_prescan(text)
+    if result !== nothing
+        kind, word, def, lobe_hint = result
+        kind_ok = kind == expect_kind
+        status = kind_ok ? "✅ Detected as :$kind" : "❌ Got :$kind, expected :$expect_kind"
+        log_md("> $status — word='$word' def='$def' lobe_hint='$lobe_hint'")
+    else
+        kind_ok = expect_kind == :nothing
+        status = kind_ok ? "✅ Correctly returned nothing" : "❌ Returned nothing, expected :$expect_kind"
+        log_md("> $status")
+    end
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[conv-prescan] $label: $status")
+    return (label, kind_ok, result)
+end
+
+# ── Knowledge classifier test helper ──────────────────────────────────────
+function run_classify_test(label::String, definition::String, expect_kind::Symbol)
+    log_md("## ClassifyKnowledge: $label")
+    log_md("")
+    log_md("**Input:** \"$definition\"")
+    log_md("**Expected:** $expect_kind")
+    log_md("")
+    result = _classify_knowledge(definition)
+    ok = result == expect_kind
+    status = ok ? "✅ Classified as :$result" : "❌ Got :$result, expected :$expect_kind"
+    log_md("> $status")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[classify] $label: $status")
+    return (label, ok)
+end
+
+# ── Subject→lobe routing test helper ──────────────────────────────────────
+function run_lobe_routing_test(label::String, subject::String, expect_contains::String="")
+    log_md("## LobeRouting: $label")
+    log_md("")
+    log_md("**Subject:** \"$subject\"")
+    log_md("")
+    result = _find_lobe_for_subject(subject)
+    ok = isempty(expect_contains) || occursin(expect_contains, result)
+    status = ok ? "✅ Routed to '$result'" : "❌ Routed to '$result', expected containing '$expect_contains'"
+    log_md("> $status")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[lobe-route] $label: $status")
+    return (label, ok, result)
+end
+
+# ── _extract_teach_parts test helper ──────────────────────────────────────
+function run_teach_parts_test(label::String, input::String, expect_subj::String, expect_def::String="")
+    log_md("## TeachParts: $label")
+    log_md("")
+    log_md("**Input:** \"$input\"")
+    log_md("**Expected subject:** \"$expect_subj\"")
+    if !isempty(expect_def)
+        log_md("**Expected definition contains:** \"$expect_def\"")
+    end
+    log_md("")
+    subj, def = _extract_teach_parts(input)
+    subj_ok = lowercase(subj) == lowercase(expect_subj) ||
+              (isempty(expect_subj) && isempty(subj))
+    def_ok = isempty(expect_def) || occursin(lowercase(expect_def), lowercase(def))
+    ok = subj_ok && def_ok
+    status = ok ? "✅ Parsed: subj='$subj' def='$(first(def, 80))'" :
+                  "❌ Got subj='$subj' def='$(first(def, 80))', expected subj='$expect_subj'"
+    log_md("> $status")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[teach-parts] $label: $status")
+    return (label, ok)
+end
+
+# ── Conversational learning loop test helper ──────────────────────────────
+# Multi-turn test: ask unknown → get clarification → teach → verify node created
+function run_conv_learn_test(label::String, question::String, teach_response::String;
+                             expect_node_type::Symbol=:static,
+                             expect_lobe::String="",
+                             expect_dict_fragment::String="",
+                             expect_sigil_kind::Symbol=:none)
+    log_md("## ConvLearn: $label")
+    log_md("")
+    log_md("**Step 1 — Ask:** \"$question\"")
+    log_md("")
+
+    # Step 1: Ask the unknown question
+    _conv_clear_pending_teach!()  # ensure clean state
+    raw1 = run_mission(question)
+    ans1 = clean_output(raw1)
+    has_clarification = is_clarification_response(ans1)
+    step1_status = has_clarification ? "✅ Clarification asked" : "⚠️ No clarification (maybe known)"
+    log_md("**Answer 1:** $(first(ans1, 200))")
+    log_md("**Step 1 result:** $step1_status")
+    log_md("")
+
+    # Step 2: Teach the response
+    log_md("**Step 2 — Teach:** \"$teach_response\"")
+    log_md("")
+    raw2 = run_mission(teach_response)
+    ans2 = clean_output(raw2)
+    log_md("**Answer 2:** $(first(ans2, 200))")
+    log_md("")
+
+    # Step 3: Verify the result
+    _ok = true
+    _details = String[]
+
+    # Check the teach acknowledgment
+    if expect_node_type == :static
+        if occursin("📖", ans2) || occursin("Grug learned", ans2)
+            push!(_details, "✅ Static knowledge acknowledged")
+        else
+            push!(_details, "❌ No static acknowledgment")
+            _ok = false
+        end
+    elseif expect_node_type == :procedural
+        if occursin("⚡", ans2) || occursin("procedure", lowercase(ans2))
+            push!(_details, "✅ Procedural knowledge acknowledged")
+        else
+            push!(_details, "❌ No procedural acknowledgment")
+            _ok = false
+        end
+    elseif expect_node_type == :relational
+        if occursin("🔗", ans2) || occursin("relationship", lowercase(ans2))
+            push!(_details, "✅ Relational knowledge acknowledged")
+        else
+            push!(_details, "❌ No relational acknowledgment")
+            _ok = false
+        end
+    end
+
+    # Check dictionary entry for static knowledge
+    if !isempty(expect_dict_fragment) && has_clarification
+        # Re-ask the question to verify the knowledge was stored
+        raw3 = run_mission(question)
+        ans3 = clean_output(raw3)
+        if occursin(lowercase(expect_dict_fragment), lowercase(ans3)) || occursin("📖", ans3)
+            push!(_details, "✅ Re-ask confirms knowledge stored")
+        else
+            push!(_details, "⚠️ Re-ask did not confirm: $(first(ans3, 100))")
+        end
+    end
+
+    # Check lobe creation
+    if !isempty(expect_lobe) && has_clarification
+        if haskey(LOBE_REGISTRY, expect_lobe)
+            push!(_details, "✅ Lobe '$expect_lobe' exists")
+        else
+            push!(_details, "❌ Lobe '$expect_lobe' not found")
+            _ok = false
+        end
+    end
+
+    # Check sigil node creation
+    if expect_sigil_kind != :none && has_clarification
+        _sigil_ids = list_sigil_node_ids(expect_sigil_kind)
+        if !isempty(_sigil_ids)
+            push!(_details, "✅ Sigil node(s) of kind :$(expect_sigil_kind) exist ($(length(_sigil_ids)))")
+        else
+            push!(_details, "❌ No sigil nodes of kind :$(expect_sigil_kind)")
+            _ok = false
+        end
+    end
+
+    # Check pending state cleared
+    _pending = _conv_get_pending_teach()
+    if isempty(_pending)
+        push!(_details, "✅ Pending teach state cleared")
+    else
+        push!(_details, "⚠️ Pending teach state not cleared")
+    end
+
+    for d in _details
+        log_md("- $d")
+    end
+
+    overall = _ok ? "✅ PASS" : "❌ FAIL"
+    log_md("")
+    log_md("**Overall:** $overall")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[conv-learn] $label: $overall")
+    return (label, _ok)
+end
+
+# ── Pending teach expiry test helper ─────────────────────────────────────
+function run_expiry_test(label::String, question::String, unrelated_input::String)
+    log_md("## TeachExpiry: $label")
+    log_md("")
+
+    # Step 1: Ask unknown question → triggers clarification
+    _conv_clear_pending_teach!()
+    raw1 = run_mission(question)
+    ans1 = clean_output(raw1)
+    has_clarification = is_clarification_response(ans1)
+    log_md("**Step 1:** Ask \"$question\" → $(first(ans1, 100))")
+    log_md("")
+
+    if !has_clarification
+        log_md("⚠️ No clarification asked (topic may be known) — skipping expiry test")
+        log_md("---")
+        println("[teach-expiry] $label: ⚠️ SKIPPED (topic known)")
+        return (label, true)  # can't test if topic is already known
+    end
+
+    # Step 2: Verify pending state is set
+    _pending_after_q = _conv_get_pending_teach()
+    pending_was_set = !isempty(_pending_after_q)
+    log_md("**Pending state after question:** $pending_was_set")
+
+    # Step 3: Override the timestamp to make it expired
+    if pending_was_set
+        lock(_CONV_PENDING_TEACH_LOCK) do
+            _CONV_PENDING_TEACH[]["timestamp"] = time() - 200  # 200 seconds ago
+        end
+    end
+
+    # Step 4: Send unrelated input → should clear expired pending
+    raw2 = run_mission(unrelated_input)
+    ans2 = clean_output(raw2)
+
+    # Step 5: Verify pending state was cleared (expired)
+    _pending_after = _conv_get_pending_teach()
+    expired_ok = isempty(_pending_after)
+    status = expired_ok ? "✅ Pending state expired and cleared" : "❌ Pending state not cleared after expiry"
+    log_md("**Step 2:** Send \"$unrelated_input\" → $status")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[teach-expiry] $label: $status")
+    return (label, expired_ok)
+end
+
+# ── Save/load round-trip test helper ────────────────────────────────────
+function run_pending_teach_saveload_test(label::String)
+    log_md("## PendingTeachSaveLoad: $label")
+    log_md("")
+
+    # Set up a pending teach state
+    _conv_clear_pending_teach!()
+    _conv_set_pending_teach!("test_topic", "What does test_topic mean?")
+
+    # Verify it's set
+    _before = _conv_get_pending_teach()
+    before_ok = !isempty(_before) && get(_before, "topic", "") == "test_topic"
+    log_md("**Before save:** topic='$(get(_before, "topic", ""))' ok=$before_ok")
+
+    # Save specimen
+    try
+        save_specimen_to_file!(SAVE_PATH)
+        log_md("**Save:** ✅ Saved to $SAVE_PATH")
+    catch e
+        log_md("**Save:** ❌ Failed: $e")
+        return (label, false)
+    end
+
+    # Clear the pending state
+    _conv_clear_pending_teach!()
+    _after_clear = _conv_get_pending_teach()
+    clear_ok = isempty(_after_clear)
+    log_md("**After clear:** empty=$clear_ok")
+
+    # Load specimen
+    try
+        load_specimen_from_file!(SAVE_PATH)
+    catch e
+        log_md("**Load:** ❌ Failed: $e")
+        return (label, false)
+    end
+
+    # Verify pending teach state restored
+    _after_load = _conv_get_pending_teach()
+    after_topic = get(_after_load, "topic", "")
+    load_ok = after_topic == "test_topic"
+    status = load_ok ? "✅ Pending teach state survived round-trip" :
+                       "❌ Pending teach state NOT restored (topic='$after_topic')"
+    log_md("**After load:** topic='$after_topic' $status")
+    log_md("")
+    log_md("---")
+    log_md("")
+    println("[saveload] $label: $status")
+
+    # Clean up
+    _conv_clear_pending_teach!()
+    return (label, load_ok)
+end
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MAIN TEST SEQUENCE
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Write MD header ──────────────────────────────────────────────────────
+log_md("# GrugBot420 Comprehensive Test Log v8.28")
+log_md("")
+log_md("**Date:** $(now())")
+log_md("**Specimen:** $SPEC_PATH")
+log_md("**Chatter:** DISABLED")
+log_md("**Capture method:** _LAST_VOICE_OUTPUT (application internals)")
+log_md("**v8.28 features:** Conversational Learning Loop, Knowledge Classification, Subject→Lobe Routing, Sigil Node Growth, Pending Teach State")
+log_md("")
+log_md("---")
+log_md("")
+
+# ── Load specimen ──────────────────────────────────────────────────────────
+println("=" ^ 70)
+println("GRUGBOT420 COMPREHENSIVE TEST v8.28")
+println("=" ^ 70)
+println("Specimen: $SPEC_PATH")
+println("Time: $(now())")
+println()
+
+println("Loading specimen...")
+try
+    load_specimen_from_file!(SPEC_PATH)
+    n_nodes = length(lock(() -> collect(keys(NODE_MAP)), NODE_LOCK))
+    println("✅ Loaded! $n_nodes nodes in memory")
+    log_md("## Specimen Loaded")
+    log_md("")
+    log_md("**Nodes in memory:** $n_nodes")
+    log_md("")
+
+    # Expand lobe caps for testing
+    for (lobe_name, rec) in LOBE_REGISTRY
+        alive = count_alive_nodes_in_lobe(lobe_name)
+        needed = alive + 40
+        if needed > rec.node_cap
+            old_cap = rec.node_cap
+            rec.node_cap = needed
+            println("  📦 Lobe '$lobe_name' cap expanded: $old_cap → $(needed) (alive=$alive)")
+        end
+    end
+
+    _dc = _dict_definitions_count()
+    println("📖 Dictionary definitions loaded: $_dc")
+    log_md("**Dictionary definitions after load:** $_dc")
+    log_md("")
+    log_md("---")
+    log_md("")
+catch e
+    println("❌ LOAD FAILED: $e")
+    log_md("❌ LOAD FAILED: $e")
+    flush_log_md(LOG_PATH)
+    exit(1)
+end
+
+# Result collectors
+results = []
+classify_results = []
+lobe_route_results = []
+teach_parts_results = []
+conv_learn_results = []
+teach_expiry_results = []
+saveload_results = []
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 1: KNOWLEDGE CLASSIFICATION (_classify_knowledge)
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 1: Knowledge Classification (_classify_knowledge)")
+log_md("")
+println("─" ^ 70)
+println("SECTION 1: KNOWLEDGE CLASSIFICATION")
+println("─" ^ 70)
+println()
+
+# Static knowledge — simple facts
+push!(classify_results, run_classify_test("static-simple", "fire is oxidation and heat", :static))
+push!(classify_results, run_classify_test("static-identity", "gravity is a force", :static))
+push!(classify_results, run_classify_test("static-definition", "a mammal is a warm-blooded animal", :static))
+push!(classify_results, run_classify_test("static-means", "pi means the ratio of circumference to diameter", :static))
+push!(classify_results, run_classify_test("static-short", "oxygen is an element", :static))
+
+# Procedural knowledge — how to, calculations, methods
+push!(classify_results, run_classify_test("procedural-howto", "how to multiply two numbers", :procedural))
+push!(classify_results, run_classify_test("procedural-calculate", "calculate the factorial of n", :procedural))
+push!(classify_results, run_classify_test("procedural-steps", "step 1 open the file step 2 read data", :procedural))
+push!(classify_results, run_classify_test("procedural-method", "the method for sorting an array", :procedural))
+push!(classify_results, run_classify_test("procedural-algorithm", "the algorithm computes fibonacci", :procedural))
+push!(classify_results, run_classify_test("procedural-formula", "the formula for area", :procedural))
+push!(classify_results, run_classify_test("procedural-iterate", "iterate over the collection", :procedural))
+push!(classify_results, run_classify_test("procedural-convert", "convert celsius to fahrenheit", :procedural))
+push!(classify_results, run_classify_test("procedural-solve", "solve the equation for x", :procedural))
+
+# Relational knowledge — A does X to B, relationships
+push!(classify_results, run_classify_test("relational-pulls", "gravity pulls masses together", :relational))
+push!(classify_results, run_classify_test("relational-attracts", "magnets attract iron", :relational))
+push!(classify_results, run_classify_test("relational-causes", "heat causes expansion", :relational))
+push!(classify_results, run_classify_test("relational-requires", "fire requires oxygen", :relational))
+push!(classify_results, run_classify_test("relational-depends", "life depends on water", :relational))
+push!(classify_results, run_classify_test("relational-leads", "education leads to opportunity", :relational))
+push!(classify_results, run_classify_test("relational-produces", "photosynthesis produces oxygen", :relational))
+push!(classify_results, run_classify_test("relational-absorbs", "black surfaces absorb heat", :relational))
+push!(classify_results, run_classify_test("relational-consumes", "fire consumes fuel", :relational))
+
+# Edge cases
+push!(classify_results, run_classify_test("edge-ambiguous", "water is composed of hydrogen and oxygen", :static))
+push!(classify_results, run_classify_test("edge-mixed", "evaporation converts liquid to gas", :relational))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2: SUBJECT→LOBE ROUTING (_find_lobe_for_subject)
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 2: Subject→Lobe Routing (_find_lobe_for_subject)")
+log_md("")
+println("─" ^ 70)
+println("SECTION 2: SUBJECT→LOBE ROUTING")
+println("─" ^ 70)
+println()
+
+# Basic routing — default for unknown subjects
+push!(lobe_route_results, run_lobe_routing_test("empty-subject", "", "default"))
+push!(lobe_route_results, run_lobe_routing_test("generic-subject", "thing", "default"))
+push!(lobe_route_results, run_lobe_routing_test("unknown-subject", "xyzabc", "default"))
+
+# Existing lobe routing (the specimen has lobes like "science", "mathematics", etc.)
+# We check if the function returns a non-default lobe for matching subjects
+# (depends on what lobes exist in the loaded specimen)
+println("Existing lobes: $(sort(collect(keys(LOBE_REGISTRY))))")
+for (_lid, _rec) in sort(collect(LOBE_REGISTRY); by=first)
+    println("  Lobe '$_lid': subject='$(_rec.subject)' whitelist=$(_rec.subject_whitelist)")
+end
+
+# Test that known subjects route to their lobes
+push!(lobe_route_results, run_lobe_routing_test("math-subject", "math"))
+push!(lobe_route_results, run_lobe_routing_test("science-subject", "science"))
+push!(lobe_route_results, run_lobe_routing_test("physics-subject", "physics"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3: TEACH PARTS PARSING (_extract_teach_parts)
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 3: Teach Parts Parsing (_extract_teach_parts)")
+log_md("")
+println("─" ^ 70)
+println("SECTION 3: TEACH PARTS PARSING")
+println("─" ^ 70)
+println()
+
+# Standard formats
+push!(teach_parts_results, run_teach_parts_test("comma-sep", "math, factorial is multiply all numbers", "math", "multiply"))
+push!(teach_parts_results, run_teach_parts_test("colon-sep", "science: fire is oxidation and heat", "science", "oxidation"))
+push!(teach_parts_results, run_teach_parts_test("dash-sep", "physics - gravity pulls masses together", "physics", "pulls"))
+
+# With "subject" prefix
+push!(teach_parts_results, run_teach_parts_test("subject-comma", "subject math, factorial is multiply all numbers", "math", "multiply"))
+push!(teach_parts_results, run_teach_parts_test("subject-colon", "subject science: fire is oxidation", "science", "oxidation"))
+push!(teach_parts_results, run_teach_parts_test("subject-space", "subject math factorial is multiply", "math", "multiply"))
+
+# Definition-only (no subject)
+push!(teach_parts_results, run_teach_parts_test("def-only", "it's a chemical reaction", "", "chemical"))
+
+# Edge cases
+push!(teach_parts_results, run_teach_parts_test("stopword-subject", "it, some definition here", "", ""))  # "it" is stopword
+push!(teach_parts_results, run_teach_parts_test("empty-input", "", "", ""))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4: CONVERSATION PRESCAN — :teach detection
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 4: Conversation Prescan — :teach Detection")
+log_md("")
+println("─" ^ 70)
+println("SECTION 4: CONVERSATION PRESCAN — :teach")
+println("─" ^ 70)
+println()
+
+# First verify existing prescan patterns still work
+push!(results, run_conv_prescan_test("prescan-define", "fire is oxidation and heat", :define))
+push!(results, run_conv_prescan_test("prescan-question", "what is fire?", :question))
+push!(results, run_conv_prescan_test("prescan-correct", "no, fire is plasma not oxidation", :correct))
+push!(results, run_conv_prescan_test("prescan-nothing", "hello there", :nothing))
+
+# :teach detection requires pending state
+# Test 1: Without pending state, teaching responses are NOT detected as :teach
+_conv_clear_pending_teach!()
+_result_no_pending = _conversation_prescan("math, factorial is multiply all numbers")
+_teach_ok_no_pending = _result_no_pending === nothing || (
+    _result_no_pending !== nothing && first(_result_no_pending) != :teach)
+log_md("## Prescan Teach: No Pending State")
+log_md("")
+log_md("**Input:** \"math, factorial is multiply all numbers\"")
+log_md("**Pending:** NONE")
+if _result_no_pending !== nothing
+    log_md("**Result:** :$(first(_result_no_pending)) (not :teach — correct)")
+else
+    log_md("**Result:** nothing (not :teach — correct)")
+end
+log_md("")
+log_md("---")
+log_md("")
+println("[prescan-teach] no-pending: $(_teach_ok_no_pending ? "✅" : "❌") — no :teach without pending state")
+
+# Test 2: WITH pending state, teaching responses ARE detected as :teach
+_conv_clear_pending_teach!()
+_conv_set_pending_teach!("factorial", "What does factorial mean?")
+_result_with_pending = _conversation_prescan("math, factorial is multiply all numbers from 1 to n")
+_teach_ok_with_pending = _result_with_pending !== nothing && first(_result_with_pending) == :teach
+log_md("## Prescan Teach: With Pending State")
+log_md("")
+log_md("**Input:** \"math, factorial is multiply all numbers from 1 to n\"")
+log_md("**Pending:** topic='factorial'")
+if _result_with_pending !== nothing
+    _pk, _pw, _pd, _ph = _result_with_pending
+    log_md("**Result:** :$_pk word='$_pw' def='$(first(_pd, 60))' hint='$_ph'")
+else
+    log_md("**Result:** nothing")
+end
+log_md("")
+_teach_prescan_status = _teach_ok_with_pending ? "✅ Detected as :teach" : "❌ Not detected as :teach"
+log_md("**Verdict:** $_teach_prescan_status")
+log_md("---")
+log_md("")
+println("[prescan-teach] with-pending: $_teach_prescan_status")
+push!(results, ("prescan-teach-with-pending", _teach_ok_with_pending))
+
+# Test 3: Pending state with subject-only answer (no definition)
+_conv_clear_pending_teach!()
+_conv_set_pending_teach!("factorial", "What does factorial mean?")
+_result_subj_only = _conversation_prescan("math")
+# Subject-only should return :teach with empty definition
+_teach_subj_only_ok = _result_subj_only !== nothing && first(_result_subj_only) == :teach
+log_md("## Prescan Teach: Subject-Only Answer")
+log_md("")
+log_md("**Input:** \"math\"")
+if _result_subj_only !== nothing
+    _sk, _sw, _sd, _sh = _result_subj_only
+    log_md("**Result:** :$_sk word='$_sw' def='$_sd' hint='$_sh'")
+    # Subject-only: def should be empty, hint should have the subject
+    _teach_subj_only_ok = _teach_subj_only_ok && isempty(_sd)
+end
+log_md("**Verdict:** $(_teach_subj_only_ok ? "✅" : "❌") Subject-only detected")
+log_md("---")
+log_md("")
+println("[prescan-teach] subject-only: $(_teach_subj_only_ok ? "✅" : "❌")")
+push!(results, ("prescan-teach-subject-only", _teach_subj_only_ok))
+
+# Test 4: Acknowledgment responses clear pending
+_conv_clear_pending_teach!()
+_conv_set_pending_teach!("factorial", "What does factorial mean?")
+_result_ack = _conversation_prescan("yes")
+_ack_ok = _result_ack === nothing
+log_md("## Prescan Teach: Acknowledgment (\"yes\")")
+log_md("")
+log_md("**Input:** \"yes\"")
+log_md("**Result:** $(_result_ack === nothing ? "nothing (pending cleared)" : ":$(first(_result_ack))")")
+log_md("**Verdict:** $(_ack_ok ? "✅" : "❌") Ack cleared pending")
+log_md("---")
+log_md("")
+println("[prescan-teach] ack-yes: $(_ack_ok ? "✅" : "❌")")
+push!(results, ("prescan-teach-ack", _ack_ok))
+
+# Clean up pending state
+_conv_clear_pending_teach!()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 5: CONVERSATIONAL LEARNING LOOP — LIVE TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 5: Conversational Learning Loop — Live Tests")
+log_md("")
+println("─" ^ 70)
+println("SECTION 5: CONVERSATIONAL LEARNING LOOP — LIVE")
+println("─" ^ 70)
+println()
+
+# 5a: Static fact → dictionary entry
+# Use a truly unknown topic to guarantee clarification
+push!(conv_learn_results, run_conv_learn_test(
+    "static-dict-science",
+    "what is fluorosis",
+    "science, fluorosis is a dental condition from excess fluoride",
+    expect_node_type=:static,
+    expect_lobe="science",
+    expect_dict_fragment="fluorosis",
+))
+
+# 5b: Procedural knowledge → sigil node
+push!(conv_learn_results, run_conv_learn_test(
+    "procedural-sigil-math",
+    "what is quicksort",
+    "math, quicksort is how to sort by dividing and conquering",
+    expect_node_type=:procedural,
+    expect_lobe="mathematics",
+    expect_sigil_kind=:procedural,
+))
+
+# 5c: Relational knowledge → sigil node with relational triple
+push!(conv_learn_results, run_conv_learn_test(
+    "relational-sigil-physics",
+    "what is tides",
+    "physics, tides are caused by the moon pulling the ocean",
+    expect_node_type=:relational,
+    expect_lobe="science",
+    expect_sigil_kind=:relational,
+))
+
+# 5d: Static fact with "X is Y" format → clean definition
+push!(conv_learn_results, run_conv_learn_test(
+    "static-clean-def",
+    "what is keratin",
+    "biology, keratin is a structural protein in hair and nails",
+    expect_node_type=:static,
+    expect_dict_fragment="structural protein",
+))
+
+# 5e: Definition-only (no subject) → goes to default lobe
+push!(conv_learn_results, run_conv_learn_test(
+    "static-no-subject",
+    "what is zyzyx",
+    "it is an imaginary word used as a placeholder",
+    expect_node_type=:static,
+))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 6: PENDING TEACH EXPIRY
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 6: Pending Teach Expiry")
+log_md("")
+println("─" ^ 70)
+println("SECTION 6: PENDING TEACH EXPIRY")
+println("─" ^ 70)
+println()
+
+push!(teach_expiry_results, run_expiry_test(
+    "expiry-basic",
+    "what is qwertyuiop",
+    "hello there",
+))
+
+push!(teach_expiry_results, run_expiry_test(
+    "expiry-greeting",
+    "what is asdfghjkl",
+    "hi",
+))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 7: EXISTING BEHAVIOR PRESERVATION
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 7: Existing Behavior Preservation")
+log_md("")
+println("─" ^ 70)
+println("SECTION 7: EXISTING BEHAVIOR PRESERVATION")
+println("─" ^ 70)
+println()
+
+# 7a: Direct define still works (no pending state needed)
+log_md("## 7a: Direct Define (\"X is Y\" without prior question)")
+log_md("")
+_conv_clear_pending_teach!()
+_define_raw = run_mission("stalactite is a mineral formation hanging from cave ceiling")
+_define_ans = clean_output(_define_raw)
+_define_ok = occursin("Learned", _define_ans) || occursin("📖", _define_ans)
+log_md("**Input:** \"stalactite is a mineral formation hanging from cave ceiling\"")
+log_md("**Output:** $(first(_define_ans, 200))")
+log_md("**Result:** $(_define_ok ? "✅ Define still works" : "❌ Define broken")")
+log_md("---")
+log_md("")
+println("[preserve] direct-define: $(_define_ok ? "✅" : "❌")")
+push!(results, ("preserve-direct-define", _define_ok))
+
+# 7b: Correction still works
+log_md("## 7b: Correction (\"no, X is Y\")")
+log_md("")
+_conv_clear_pending_teach!()
+_corr_raw = run_mission("no, stalactite hangs from ceiling not grows from floor")
+_corr_ans = clean_output(_corr_raw)
+_corr_ok = occursin("correction", lowercase(_corr_ans)) || occursin("Correct", _corr_ans) ||
+           occursin("adjust", lowercase(_corr_ans)) || !isempty(_corr_ans)
+log_md("**Input:** \"no, stalactite hangs from ceiling not grows from floor\"")
+log_md("**Output:** $(first(_corr_ans, 200))")
+log_md("**Result:** $(_corr_ok ? "✅ Correction still works" : "⚠️ Correction response changed")")
+log_md("---")
+log_md("")
+println("[preserve] correction: $(_corr_ok ? "✅" : "⚠️")")
+push!(results, ("preserve-correction", _corr_ok))
+
+# 7c: Known question still answered organically (not asking for clarification)
+log_md("## 7c: Known Question Answered (not asking for clarification)")
+log_md("")
+_conv_clear_pending_teach!()
+# Ask about something we defined earlier in this test
+_known_raw = run_mission("what is fire")
+_known_ans = clean_output(_known_raw)
+_known_ok = !is_clarification_response(_known_ans)
+log_md("**Input:** \"what is fire\"")
+log_md("**Output:** $(first(_known_ans, 200))")
+log_md("**Result:** $(_known_ok ? "✅ Known question answered" : "❌ Known question triggered clarification")")
+log_md("---")
+log_md("")
+println("[preserve] known-question: $(_known_ok ? "✅" : "❌")")
+push!(results, ("preserve-known-question", _known_ok))
+
+# 7d: Greeting still works (not caught by teach system)
+log_md("## 7d: Greeting (not caught by teach system)")
+log_md("")
+_conv_clear_pending_teach!()
+_greet_raw = run_mission("hello")
+_greet_ans = clean_output(_greet_raw)
+_greet_ok = !occursin("Grug not know", _greet_ans) && !isempty(_greet_ans)
+log_md("**Input:** \"hello\"")
+log_md("**Output:** $(first(_greet_ans, 200))")
+log_md("**Result:** $(_greet_ok ? "✅ Greeting works" : "⚠️ Greeting changed")")
+log_md("---")
+log_md("")
+println("[preserve] greeting: $(_greet_ok ? "✅" : "⚠️")")
+push!(results, ("preserve-greeting", _greet_ok))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 8: PENDING TEACH STATE SAVE/LOAD ROUND-TRIP
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 8: Pending Teach State Save/Load Round-Trip")
+log_md("")
+println("─" ^ 70)
+println("SECTION 8: PENDING TEACH SAVE/LOAD")
+println("─" ^ 70)
+println()
+
+push!(saveload_results, run_pending_teach_saveload_test("pending-teach-roundtrip"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 9: CORE REGRESSION TESTS (abbreviated from v826i)
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 9: Core Regression Tests")
+log_md("")
+println("─" ^ 70)
+println("SECTION 9: CORE REGRESSION TESTS")
+println("─" ^ 70)
+println()
+
+# Basic questions
+push!(results, run_test("greeting", "hello"))
+push!(results, run_test("math-add", "3 + 5"))
+push!(results, run_test("math-factorial", "factorial of 5"))
+push!(results, run_test("science-fire", "what is fire"))
+push!(results, run_test("philosophy", "what is consciousness"))
+push!(results, run_test("emotion", "how are you feeling"))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 10: SIGIL NODE VERIFICATION
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Section 10: Sigil Node Verification")
+log_md("")
+println("─" ^ 70)
+println("SECTION 10: SIGIL NODE VERIFICATION")
+println("─" ^ 70)
+println()
+
+# List all sigil nodes and their kinds
+_procedural_sigils = list_sigil_node_ids(:procedural)
+_relational_sigils = list_sigil_node_ids(:relational)
+_all_sigils = list_sigil_node_ids(:any)
+
+log_md("## Sigil Node Census")
+log_md("")
+log_md("| Kind | Count | IDs |")
+log_md("|------|-------|-----|")
+log_md("| procedural | $(length(_procedural_sigils)) | $(join(_procedural_sigils[1:min(5, length(_procedural_sigils))], ", "))$(length(_procedural_sigils) > 5 ? "…" : "") |")
+log_md("| relational | $(length(_relational_sigils)) | $(join(_relational_sigils[1:min(5, length(_relational_sigils))], ", "))$(length(_relational_sigils) > 5 ? "…" : "") |")
+log_md("| any | $(length(_all_sigils)) | — |")
+log_md("")
+
+# Verify procedural sigils have correct properties
+# NOTE: Cannot modify outer-scope vars inside lock() do..end closure in Julia,
+# so we collect results outside the lock and count afterwards.
+_proc_results = String[]
+for _sid in _procedural_sigils
+    _kind_result = lock(NODE_LOCK) do
+        if haskey(NODE_MAP, _sid)
+            _sn = NODE_MAP[_sid]
+            node_sigil_kind(_sn)
+        else
+            :missing
+        end
+    end
+    if _kind_result == :procedural
+        push!(_proc_results, "ok")
+    else
+        log_md("- ⚠️ Sigil '$_sid' has kind :$_kind_result (expected :procedural)")
+        push!(_proc_results, "fail")
+    end
+end
+_proc_verify_ok = count(x -> x == "ok", _proc_results)
+_proc_status = "✅ All $(length(_procedural_sigils)) procedural sigils verified"
+if _proc_verify_ok != length(_procedural_sigils)
+    _proc_status = "⚠️ $_proc_verify_ok/$(length(_procedural_sigils)) procedural sigils verified"
+end
+log_md("**Procedural sigil verification:** $_proc_status")
+log_md("")
+
+# Verify relational sigils have relational triples
+_rel_results = String[]
+for _sid in _relational_sigils
+    _rel_check = lock(NODE_LOCK) do
+        if haskey(NODE_MAP, _sid)
+            _sn = NODE_MAP[_sid]
+            _kind = node_sigil_kind(_sn)
+            _has_triples = !isempty(_sn.relational_patterns)
+            (kind=_kind, has_triples=_has_triples)
+        else
+            (kind=:missing, has_triples=false)
+        end
+    end
+    if _rel_check.kind == :relational
+        if _rel_check.has_triples
+            push!(_rel_results, "ok")
+        else
+            log_md("- ⚠️ Relational sigil '$_sid' has no relational triples")
+            push!(_rel_results, "fail_no_triples")
+        end
+    else
+        log_md("- ⚠️ Sigil '$_sid' has kind :$(_rel_check.kind) (expected :relational)")
+        push!(_rel_results, "fail_wrong_kind")
+    end
+end
+_rel_verify_ok = count(x -> x == "ok", _rel_results)
+_rel_status = "✅ All $(length(_relational_sigils)) relational sigils verified"
+if _rel_verify_ok != length(_relational_sigils)
+    _rel_status = "⚠️ $_rel_verify_ok/$(length(_relational_sigils)) relational sigils verified"
+end
+log_md("**Relational sigil verification:** $_rel_status")
+log_md("")
+
+log_md("---")
+log_md("")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SUMMARY
+# ══════════════════════════════════════════════════════════════════════════════
+log_md("# Test Summary")
+log_md("")
+
+classify_pass = count(r -> r[2], classify_results)
+classify_total = length(classify_results)
+
+lobe_route_pass = count(r -> r[2], lobe_route_results)
+lobe_route_total = length(lobe_route_results)
+
+teach_parts_pass = count(r -> r[2], teach_parts_results)
+teach_parts_total = length(teach_parts_results)
+
+conv_learn_pass = count(r -> r[2], conv_learn_results)
+conv_learn_total = length(conv_learn_results)
+
+teach_expiry_pass = count(r -> r[2], teach_expiry_results)
+teach_expiry_total = length(teach_expiry_results)
+
+saveload_pass = count(r -> r[2], saveload_results)
+saveload_total = length(saveload_results)
+
+prescan_pass = count(_result_passed, results)
+prescan_total = length(results)
+
+log_md("| Metric | Pass | Total |")
+log_md("|--------|------|-------|")
+log_md("| Knowledge Classification | $classify_pass | $classify_total |")
+log_md("| Subject→Lobe Routing | $lobe_route_pass | $lobe_route_total |")
+log_md("| Teach Parts Parsing | $teach_parts_pass | $teach_parts_total |")
+log_md("| Conversational Learning Loop | $conv_learn_pass | $conv_learn_total |")
+log_md("| Pending Teach Expiry | $teach_expiry_pass | $teach_expiry_total |")
+log_md("| Pending Teach Save/Load | $saveload_pass | $saveload_total |")
+log_md("| Prescan + Regression | $prescan_pass | $prescan_total |")
+log_md("")
+
+# Print failures for review
+all_test_collections = [
+    ("Knowledge Classification", classify_results),
+    ("Subject→Lobe Routing", lobe_route_results),
+    ("Teach Parts Parsing", teach_parts_results),
+    ("Conversational Learning Loop", conv_learn_results),
+    ("Pending Teach Expiry", teach_expiry_results),
+    ("Pending Teach Save/Load", saveload_results),
+]
+
+for (section_name, collection) in all_test_collections
+    failures = filter(r -> !r[2], collection)
+    if !isempty(failures)
+        log_md("## $section_name — Items Needing Attention")
+        log_md("")
+        for (label, ok, extras...) in failures
+            log_md("- ❌ $label")
+        end
+        log_md("")
+    end
+end
+
+log_md("---")
+log_md("")
+log_md("Done at $(now())")
+
+# ── FLUSH LOG TO FILE ──────────────────────────────────────────────────────
+flush_log_md(LOG_PATH)
+println()
+println("=" ^ 70)
+println("TEST COMPLETE — Log written to $LOG_PATH")
+println("=" ^ 70)

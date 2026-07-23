@@ -1,0 +1,310 @@
+#!/usr/bin/env julia
+# test_v93_conv_procedural_teach.jl — Tests for GRUG v9.3 conversational
+# procedural/math learning (the "learn math through the sigil-in-node
+# system" part of Phase B).
+#
+# Verifies:
+#   1. ActionEngine.parse_arith_expr correctly parses supported arithmetic
+#      procedure phrasings into ArithOpStep sequences, and confidently
+#      REFUSES (returns nothing) on ambiguous/unsupported text — this is
+#      the "lazy/conservative unless very obvious" requirement.
+#   2. register_learned_arith_callback! compiles a REAL working callback
+#      (not just descriptive text) that computes correct answers for
+#      arbitrary inputs, including multi-step chains.
+#   3. End-to-end: teaching Grug a computable procedure through
+#      _conversation_prescan's :teach path creates an :action sigil node
+#      with a working action_callback, NOT a purely descriptive
+#      :procedural node — and that node actually computes correct answers
+#      via process_mission for held-out numbers never mentioned during
+#      teaching.
+#   4. Conservative fallback: teaching Grug a genuinely non-computable
+#      procedure (prose that doesn't match the arithmetic mini-DSL) still
+#      falls back to the OLD descriptive :procedural sigil node behavior,
+#      proving we didn't regress the fallback path.
+#
+# Real assertions only — no stdout scraping for the pass/fail signal
+# (though a few sanity checks do parse captured voice output text).
+
+using Dates
+include(joinpath(@__DIR__, "src", "GrugBot420.jl"))
+using .GrugBot420
+
+import .GrugBot420: process_mission, _conversation_prescan,
+    _LAST_VOICE_OUTPUT, _LAST_VOICE_OUTPUT_LOCK,
+    NODE_MAP, NODE_LOCK, list_sigil_node_ids, node_sigil_kind
+
+import .GrugBot420.ActionEngine:
+    parse_arith_expr, register_learned_arith_callback!, compute_action,
+    has_action_callback, ArithOpStep, ActionResult
+
+import .GrugBot420.SigilPromoter: SigilBinding
+
+const _log_path = joinpath(@__DIR__, "test_v93_conv_procedural_teach.log.md")
+open(_log_path, "w") do f
+    write(f, "# V9.3 Conversational Procedural/Math Teaching Test Log\n\n")
+    write(f, "_Generated: $(now())_\n\n")
+end
+
+_total = 0
+_passed = 0
+_failed = 0
+
+function log_md(msg::String)
+    open(_log_path, "a") do f
+        write(f, msg * "\n")
+    end
+end
+
+function check(name::String, cond::Bool, detail::String="")
+    global _total, _passed, _failed
+    _total += 1
+    if cond
+        _passed += 1
+        println("  ✅ PASS: $name")
+        log_md("- ✅ **PASS**: $name $(isempty(detail) ? "" : "— $detail")")
+    else
+        _failed += 1
+        println("  ❌ FAIL: $name $(isempty(detail) ? "" : "— $detail")")
+        log_md("- ❌ **FAIL**: $name $(isempty(detail) ? "" : "— $detail")")
+    end
+end
+
+function get_voice()::String
+    lock(_LAST_VOICE_OUTPUT_LOCK) do
+        return _LAST_VOICE_OUTPUT[]
+    end
+end
+
+println("="^70)
+println("V9.3 CONVERSATIONAL PROCEDURAL/MATH TEACHING TEST SUITE")
+println("="^70)
+
+# ── Section 1: parse_arith_expr — positive cases ────────────────────────
+log_md("\n## Section 1: parse_arith_expr positive cases\n")
+println("\n[Section 1] parse_arith_expr positive cases")
+
+let ops = parse_arith_expr("multiply n by 2 and add 1")
+    check("'multiply n by 2 and add 1' parses to 2 steps",
+          ops !== nothing && length(ops) == 2, "ops=$(ops)")
+    if ops !== nothing && length(ops) == 2
+        check("  step 1 is (:mul, 2.0)", ops[1].op == :mul && ops[1].operand == 2.0)
+        check("  step 2 is (:add, 1.0)", ops[2].op == :add && ops[2].operand == 1.0)
+    end
+end
+
+let ops = parse_arith_expr("double it then subtract 3")
+    check("'double it then subtract 3' parses to 2 steps",
+          ops !== nothing && length(ops) == 2, "ops=$(ops)")
+    if ops !== nothing && length(ops) == 2
+        check("  step 1 is (:mul, 2.0) [double]", ops[1].op == :mul && ops[1].operand == 2.0)
+        check("  step 2 is (:sub, 3.0)", ops[2].op == :sub && ops[2].operand == 3.0)
+    end
+end
+
+let ops = parse_arith_expr("square it and negate it")
+    check("'square it and negate it' parses to 2 steps",
+          ops !== nothing && length(ops) == 2, "ops=$(ops)")
+    if ops !== nothing && length(ops) == 2
+        check("  step 1 is (:square, NaN)", ops[1].op == :square)
+        check("  step 2 is (:negate, NaN)", ops[2].op == :negate)
+    end
+end
+
+let ops = parse_arith_expr("divide by 4")
+    check("'divide by 4' parses to 1 step",
+          ops !== nothing && length(ops) == 1, "ops=$(ops)")
+    if ops !== nothing && length(ops) == 1
+        check("  step 1 is (:div, 4.0)", ops[1].op == :div && ops[1].operand == 4.0)
+    end
+end
+
+let ops = parse_arith_expr("cube it")
+    check("'cube it' parses to 1 step (:cube)",
+          ops !== nothing && length(ops) == 1 && ops[1].op == :cube, "ops=$(ops)")
+end
+
+let ops = parse_arith_expr("half of it")
+    check("'half of it' parses to 1 step (:div, 2.0)",
+          ops !== nothing && length(ops) == 1 && ops[1].op == :div && ops[1].operand == 2.0, "ops=$(ops)")
+end
+
+# ── Section 2: parse_arith_expr — conservative negative cases ───────────
+# GRUG v9.3 UPDATE (user directive): learning must be lazy/conservative —
+# unless the phrasing is VERY obviously one of the supported arithmetic
+# steps, parse_arith_expr must return nothing so Main.jl falls back to the
+# old safe descriptive-node behavior instead of guessing.
+log_md("\n## Section 2: parse_arith_expr conservative negative cases\n")
+println("\n[Section 2] parse_arith_expr conservative negative cases (should return nothing)")
+
+for (desc, text) in [
+        ("vague prose with no arithmetic structure", "it pulls all the smaller rocks toward it over time"),
+        ("procedure prose using unsupported verbs", "gather the numbers and combine them somehow"),
+        ("ambiguous partial arithmetic phrase", "multiply the values together in some order"),
+        ("empty string", ""),
+        ("just a topic word, no operation", "math"),
+        ("relational-sounding text (should never be treated as arithmetic)", "gravity causes objects to fall toward the ground"),
+    ]
+    ops = parse_arith_expr(text)
+    check("conservative refusal: $desc", ops === nothing, "text='$text' got=$(ops)")
+end
+
+# ── Section 3: register_learned_arith_callback! compiles REAL callbacks ─
+log_md("\n## Section 3: register_learned_arith_callback! produces working callbacks\n")
+println("\n[Section 3] register_learned_arith_callback! produces working callbacks")
+
+function mk_binding(n::Number)
+    return [SigilBinding(1, "n", n, :lambda, string(n), 1)]
+end
+
+let ops = parse_arith_expr("multiply n by 2 and add 1")
+    register_learned_arith_callback!("test_double_plus_one", ops)
+    check("callback registered", has_action_callback("test_double_plus_one"))
+
+    r5 = compute_action("test_double_plus_one", mk_binding(5))
+    check("f(5) = 5*2+1 = 11", r5.answer == 11, "got=$(r5.answer) error=$(r5.error)")
+
+    r10 = compute_action("test_double_plus_one", mk_binding(10))
+    check("f(10) = 10*2+1 = 21 (held-out input never seen during 'teaching')",
+          r10.answer == 21, "got=$(r10.answer)")
+
+    r0 = compute_action("test_double_plus_one", mk_binding(0))
+    check("f(0) = 0*2+1 = 1", r0.answer == 1, "got=$(r0.answer)")
+
+    rneg = compute_action("test_double_plus_one", mk_binding(-3))
+    check("f(-3) = -3*2+1 = -5", rneg.answer == -5, "got=$(rneg.answer)")
+end
+
+let ops = parse_arith_expr("square it and negate it")
+    register_learned_arith_callback!("test_neg_square", ops)
+    r4 = compute_action("test_neg_square", mk_binding(4))
+    check("neg_square(4) = -(4*4) = -16", r4.answer == -16, "got=$(r4.answer)")
+    r_minus3 = compute_action("test_neg_square", mk_binding(-3))
+    check("neg_square(-3) = -((-3)*(-3)) = -9", r_minus3.answer == -9, "got=$(r_minus3.answer)")
+end
+
+let ops = parse_arith_expr("divide by 0")
+    register_learned_arith_callback!("test_div_zero", ops)
+    r = compute_action("test_div_zero", mk_binding(10))
+    check("division-by-zero taught procedure fails gracefully (error set, no crash)",
+          r.error !== nothing, "error=$(r.error) answer=$(r.answer)")
+end
+
+# ── Section 4: end-to-end conversational teaching → computable node ────
+log_md("\n## Section 4: end-to-end conversational teaching creates a COMPUTABLE action node\n")
+println("\n[Section 4] end-to-end conversational teaching (computable procedure)")
+
+_topic_name = "gorbling"   # deliberately novel/unknown word — must trigger the teach-loop clarification
+try
+    process_mission("what is $_topic_name")
+    _voice1 = get_voice()
+    check("unknown topic '$_topic_name' triggers a clarification/teach prompt",
+          occursin(_topic_name, lowercase(_voice1)) || length(_voice1) > 0,
+          "voice='$_voice1'")
+
+    # Teach it a computable procedure: gorbling(n) = n*3 - 2
+    # NOTE: deliberately avoid a colon here — "X: Y" phrasing is intercepted
+    # by the earlier, more-specific quick-teach `_parse_question_answer`
+    # shortcut (see the `_conv_teach_pending_now` guard added in Main.jl),
+    # which is correct behavior when there's NO pending teach state, but
+    # since we DO have pending state from "what is gorbling" above, plain
+    # comma-separated "math, <definition>" phrasing correctly flows through
+    # the teach-loop's `_conv_pending_teach_turn` classifier instead.
+    process_mission("math, multiply n by 3 and subtract 2")
+    _voice2 = get_voice()
+    println("  [teach ack]: $_voice2")
+
+    # Find sigil nodes with pattern containing our topic and kind == :action
+    _action_ids = list_sigil_node_ids(:action)
+    _found_nid = nothing
+    lock(NODE_LOCK) do
+        for nid in _action_ids
+            if haskey(NODE_MAP, nid)
+                _nd = NODE_MAP[nid]
+                if occursin(_topic_name, lowercase(_nd.pattern))
+                    _found_nid = nid
+                end
+            end
+        end
+    end
+    check("teaching created an :action sigil node for '$_topic_name' (not a purely descriptive :procedural node)",
+          _found_nid !== nothing, "action_ids=$(_action_ids)")
+
+    if _found_nid !== nothing
+        _cb_name = ""
+        lock(NODE_LOCK) do
+            _cb_name = String(get(NODE_MAP[_found_nid].json_data, "action_callback", ""))
+        end
+        check("action node has a non-empty action_callback wired", !isempty(_cb_name), "cb_name='$_cb_name'")
+
+        if !isempty(_cb_name)
+            # Held-out check: n=7 was never mentioned while teaching.
+            r7 = compute_action(_cb_name, mk_binding(7))
+            check("learned callback computes $_topic_name(7) = 7*3-2 = 19 correctly (held-out input)",
+                  r7.answer == 19, "got=$(r7.answer) error=$(r7.error)")
+
+            r100 = compute_action(_cb_name, mk_binding(100))
+            check("learned callback computes $_topic_name(100) = 100*3-2 = 298 correctly (held-out input)",
+                  r100.answer == 298, "got=$(r100.answer) error=$(r100.error)")
+        end
+    end
+catch e
+    check("end-to-end computable-procedure teaching did not throw", false, "exception: $e")
+end
+
+# ── Section 5: conservative fallback for non-computable procedure ──────
+log_md("\n## Section 5: non-computable procedure still falls back to descriptive :procedural node\n")
+println("\n[Section 5] conservative fallback for non-computable procedure prose")
+
+_topic_name2 = "flibberwocking"
+try
+    process_mission("what is $_topic_name2")
+    # Teach it something procedural-SOUNDING but NOT arithmetic-parseable —
+    # this must NOT produce a computable action node (conservative refusal),
+    # and must still classify as :procedural (not :static) so it falls
+    # through to the descriptive-sigil-node branch. "steps to" and "sort by"
+    # are both _classify_knowledge procedure indicators, but the clause
+    # itself has no arithmetic mini-DSL structure parse_arith_expr
+    # recognizes, so this exercises exactly the conservative-refusal path.
+    # (Same colon-avoidance rationale as Section 4 above.)
+    process_mission("math, the steps to do this are gather all the small pebbles and sort by how shiny they look")
+    _voice3 = get_voice()
+    println("  [teach ack, non-computable]: $_voice3")
+
+    _action_ids2 = list_sigil_node_ids(:action)
+    _found_action2 = false
+    lock(NODE_LOCK) do
+        for nid in _action_ids2
+            if haskey(NODE_MAP, nid) && occursin(_topic_name2, lowercase(NODE_MAP[nid].pattern))
+                _found_action2 = true
+            end
+        end
+    end
+    check("non-computable procedure prose does NOT create a computable :action node",
+          !_found_action2)
+
+    _proc_ids2 = list_sigil_node_ids(:procedural)
+    _found_proc2 = false
+    lock(NODE_LOCK) do
+        for nid in _proc_ids2
+            if haskey(NODE_MAP, nid) && occursin(_topic_name2, lowercase(NODE_MAP[nid].pattern))
+                _found_proc2 = true
+            end
+        end
+    end
+    check("non-computable procedure prose DOES fall back to a descriptive :procedural sigil node",
+          _found_proc2, "proc_ids=$(_proc_ids2)")
+catch e
+    check("conservative-fallback end-to-end test did not throw", false, "exception: $e")
+end
+
+# ── Summary ──────────────────────────────────────────────────────────────
+println("\n" * "="^70)
+println("SUMMARY: $_passed/$_total passed, $_failed failed")
+println("="^70)
+
+log_md("\n## Summary\n")
+log_md("**$_passed / $_total passed** ($_failed failed)\n")
+
+if _failed > 0
+    exit(1)
+end

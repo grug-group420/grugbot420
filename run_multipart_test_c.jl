@@ -150,7 +150,13 @@ out = Dict{String,Any}(
     "multipart_turns" => results,
 )
 out_path = joinpath(@__DIR__, "threadC_multipart_telemetry.json")
-open(out_path, "w") do io
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endout_path, "w") do io
     JSON.print(io, out, 2)
 end
 println("\n[SAVED] Multipart raw telemetry JSON -> $out_path")

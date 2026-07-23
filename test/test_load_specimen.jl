@@ -173,11 +173,23 @@ let
     
     # Compress
     filepath = joinpath(TEST_DIR, "roundtrip_test.gz")
-    proc_c = open(`gzip -c`, "r+")
+
+try
+        proc_c = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
     write(proc_c, json_str)
     close(proc_c.in)
     compressed = read(proc_c)
-    open(filepath, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endfilepath, "w") do io
         write(io, compressed)
     end
     
@@ -186,7 +198,13 @@ let
     
     # Decompress
     compressed_bytes = read(filepath)
-    proc_d = open(`gunzip -c`, "r+")
+
+try
+        proc_d = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
     write(proc_d, compressed_bytes)
     close(proc_d.in)
     decompressed = String(read(proc_d))
@@ -631,11 +649,23 @@ let
     
     # Compress and write
     filepath = joinpath(TEST_DIR, "full_specimen.specimen.gz")
-    proc = open(`gzip -c`, "r+")
+
+try
+        proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
     write(proc, json_str)
     close(proc.in)
     compressed = read(proc)
-    open(filepath, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endfilepath, "w") do io
         write(io, compressed)
     end
     
@@ -644,7 +674,13 @@ let
     
     # Read back and verify
     compressed_bytes = read(filepath)
-    proc_d = open(`gunzip -c`, "r+")
+
+try
+        proc_d = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
     write(proc_d, compressed_bytes)
     close(proc_d.in)
     decompressed = String(read(proc_d))
@@ -674,17 +710,35 @@ println("── GROUP 11: Validation Edge Cases ──")
 let
     # Test: invalid JSON in compressed file
     bad_filepath = joinpath(TEST_DIR, "bad_json.gz")
-    proc = open(`gzip -c`, "r+")
+
+try
+        proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
     write(proc, "{ this is not valid json !!!")
     close(proc.in)
     compressed = read(proc)
-    open(bad_filepath, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endbad_filepath, "w") do io
         write(io, compressed)
     end
     
     # The file exists and decompresses, but JSON parsing should fail
     compressed_bytes = read(bad_filepath)
-    proc_d = open(`gunzip -c`, "r+")
+
+try
+        proc_d = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
     write(proc_d, compressed_bytes)
     close(proc_d.in)
     decompressed = String(read(proc_d))
@@ -694,16 +748,34 @@ let
     
     # Test: valid JSON but wrong structure (array instead of dict)
     bad_struct_path = joinpath(TEST_DIR, "bad_struct.gz")
-    proc2 = open(`gzip -c`, "r+")
+
+try
+        proc2 = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
     write(proc2, "[1, 2, 3]")
     close(proc2.in)
     compressed2 = read(proc2)
-    open(bad_struct_path, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endbad_struct_path, "w") do io
         write(io, compressed2)
     end
     
     compressed_bytes2 = read(bad_struct_path)
-    proc_d2 = open(`gunzip -c`, "r+")
+
+try
+        proc_d2 = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
     write(proc_d2, compressed_bytes2)
     close(proc_d2.in)
     decompressed2 = String(read(proc_d2))
@@ -717,11 +789,23 @@ let
     
     # Test: empty compressed file
     empty_path = joinpath(TEST_DIR, "empty.gz")
-    proc3 = open(`gzip -c`, "r+")
+
+try
+        proc3 = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
     write(proc3, "")
     close(proc3.in)
     compressed3 = read(proc3)
-    open(empty_path, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endempty_path, "w") do io
         write(io, compressed3)
     end
     test("Empty compressed file created", isfile(empty_path))

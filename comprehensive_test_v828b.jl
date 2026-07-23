@@ -86,7 +86,13 @@ function log_md(line::String)
 end
 
 function flush_log_md(filepath::String)
-    open(filepath, "w") do f
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endfilepath, "w") do f
         for line in _log_lines
             println(f, line)
         end

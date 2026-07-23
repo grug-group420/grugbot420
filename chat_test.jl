@@ -135,7 +135,13 @@ chat("/status")
 
 # ── Write transcript ──
 transcript_path = "specimens/chat_transcript.md"
-open(transcript_path, "w") do io
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endtranscript_path, "w") do io
     println(io, "# GrugBot420 Comprehensive Specimen — Chat Transcript")
     println(io, "")
     println(io, "Generated from specimen: `specimens/comprehensive_specimen.json`")

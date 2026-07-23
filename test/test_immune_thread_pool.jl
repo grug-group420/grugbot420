@@ -225,7 +225,13 @@ end
         
         for w in pool.workers
             @test w.id >= 1 && w.id <= NUM_IMMUNE_WORKERS
-            @test isopen(w.inbox)
+
+try
+                @test isopen( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endw.inbox)
         end
         
         @test pool.tripwire !== nothing

@@ -108,7 +108,13 @@ for r in qa_results
 end
 push!(qa_md, "")
 
-open("qa_section_tmp.md", "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end"qa_section_tmp.md", "w") do f
     println(f, join(qa_md, "\n"))
 end
 println("[DONE] QA section written to qa_section_tmp.md")

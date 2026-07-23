@@ -21,7 +21,13 @@ println("[BOOT] Specimen loaded.")
 
 # ── Fast capture helpers ──────────────────────────────────────────────────────
 read_voice() = lock(_LAST_VOICE_OUTPUT_LOCK) do; _LAST_VOICE_OUTPUT[]; end
-const _devnull = open("/dev/null", "w")
+
+try
+    const _devnull = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end"/dev/null", "w")
 
 function strip_debug_telemetry(voice::String)::String
     sep = "--- DEBUG TELEMETRY"
@@ -417,7 +423,13 @@ end
 println("[TEST] Thesaurus-on-answer-recall variation check complete.")
 
 # ── Write the log ─────────────────────────────────────────────────────────────
-open(LOG_PATH, "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f
     println(f, join(log_lines, "\n"))
 end
 println("[DONE] Log written to $LOG_PATH")

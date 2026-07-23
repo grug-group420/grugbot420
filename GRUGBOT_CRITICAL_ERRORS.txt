@@ -1,0 +1,27 @@
+CRITICAL ERRORS:
+================
+1. Files with syntax errors:
+
+2. Missing imports:
+
+3. Undefined variables (common):
+./test_comprehensive_v81.jl:59:    occursin(r"undefined|UndefVarError|MethodError|LoadError", conv) && push!(flags, "STACK_LEAK")
+./src/PhagyMode.jl:2856:# avoids mutation-during-iteration undefined behavior.
+./src/ArithmeticEngine.jl:114:  - `answer_str`   — human-readable answer string (e.g. "4", "true", "undefined (division by zero)")
+./src/ArithmeticEngine.jl:403:        return "undefined"
+./src/ActionEngine.jl:385:            ActionComputationStep[], "reciprocal of zero is undefined")
+./src/ActionEngine.jl:625:            ActionComputationStep[], "division by zero is undefined")
+./test_comprehensive_v82.jl:42:    occursin(r"undefined|UndefVarError|MethodError|LoadError", conv) && push!(flags, "STACK_LEAK")
+./test_grug_live.jl:75:    occursin(r"undefined|UndefVarError|MethodError|LoadError", conversational) && push!(flags, "STACK_LEAK")
+
+4. Broken tests:
+./comprehensive_test_v823.jl
+./test_v9.jl
+./test_v826f.jl
+./test_comprehensive_v81.jl
+./run_multipart_teach_test.jl
+./test_autogrowth_relational.jl
+./test_v9_math_routing.jl
+./comprehensive_test_v828e.jl
+./comprehensive_test_v828.jl
+./coherence_test.jl

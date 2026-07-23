@@ -1,0 +1,177 @@
+=== SYNTAX ERRORS ===
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+find: ‘julia’: No such file or directory
+
+=== PYTHON SYNTAX ERRORS ===
+
+=== MISSING IMPORTS/DEPENDENCIES ===
+
+=== TODO/FIXME/XXX COMMENTS ===
+./comprehensive_test_v823.jl:79:    ti = findfirst("--- DEBUG TELEMETRY", raw)
+./comprehensive_test_v823.jl:826:# DEBUG: Check for auto-grown placeholder nodes that might interfere with /answer recall
+./comprehensive_test_v823.jl:831:    println("[DEBUG] Auto-grown nodes alive: $(length(autogrown))")
+./debug_multipart2.jl:14:    ti = findfirst("--- DEBUG TELEMETRY", r)
+./debug_sequential.jl:44:    ti = findfirst("--- DEBUG TELEMETRY", result)
+./debug_turn50.jl:21:    parts = split(r, "--- DEBUG TELEMETRY")
+./test_log.md:90:3. **BUG-004 pattern length warnings**: Multi-token patterns penalized by bidirectional scan. Specimen-side fix: use shorter patterns.
+./test_v826f.jl:32:    # v8.26g: Remove ALL DEBUG TELEMETRY blocks (not just truncate at first).
+./test_v826f.jl:34:    # Each block is: --- DEBUG TELEMETRY ... =========================================
+./test_v826f.jl:36:        m = match(r"--- DEBUG TELEMETRY[\s\S]*?=========================================", s)
+./test_v826f.jl:38:        s = replace(s, r"--- DEBUG TELEMETRY[\s\S]*?=========================================" => "")
+./test_comprehensive_v81.jl:53:    ti = findfirst("--- DEBUG TELEMETRY", output)
+./test_comprehensive_v81.jl:172:        conv = resp; ti=findfirst("--- DEBUG TELEMETRY",resp); if ti !== nothing; conv=strip(resp[1:first(ti)-1]); end
+./generate_log.py:41:            tel = '--- DEBUG TELEMETRY'
+./test_decoherence_deep.jl:68:        ti = findfirst("--- DEBUG TELEMETRY", resp)
+./SPECIMEN_GUIDE.md:161:**CRITICAL: Use single-token (one-word) patterns for maximum confidence.** Multi-word patterns suffer from BUG-004 (see below) which dramatically lowers confidence scores when the pattern is longer than the input. The default specimen uses 1–2 token patterns and achieves conf=0.60–0.70. Single-token patterns can achieve conf=0.33–1.00 depending on input length.
+./SPECIMEN_GUIDE.md:183:**DO NOT:** Use multi-word patterns unless absolutely necessary. A 4-token pattern like `"calculate solve equation arithmetic"` will score conf=0.14–0.33 against typical inputs due to BUG-004 and Jaccard dilution.
+./SPECIMEN_GUIDE.md:187:### BUG-004: Pattern Length vs Input Length
+./SPECIMEN_GUIDE.md:195:| 1 | `"hello"` | 0.33–1.00 | Best. No BUG-004. Jaccard-only dilution. |
+./SPECIMEN_GUIDE.md:196:| 2 | `"hello hi"` | 0.25–0.50 | BUG-004 triggers on 1-word inputs. |
+./SPECIMEN_GUIDE.md:197:| 3+ | `"hello hi hey"` | 0.14–0.25 | Severe BUG-004. Avoid. |
+./SPECIMEN_GUIDE.md:199:**Workaround:** Use multiple nodes with single-token patterns instead of one node with a multi-token pattern. This completely eliminates BUG-004.
+./SPECIMEN_GUIDE.md:245:**Why not one node with multiple keywords?** A pattern like `"hello hi hey howdy"` is 4 tokens long. When a user types just `"hello"` (1 word), BUG-004 triggers because the pattern (4 tokens) is longer than the input (1 token). This drops confidence to 0.14–0.25. Four separate single-token nodes each achieve conf=0.33–1.00.
+./SPECIMEN_GUIDE.md:1121:### 8b. Multi-word patterns cause low confidence (BUG-004)
+./SPECIMEN_GUIDE.md:1125:**Reason:** When `length(node.signal) > length(input_signal)`, the engine swaps scan roles (BUG-004), dramatically lowering confidence. Single-token patterns completely avoid this. See "BUG-004: Pattern Length vs Input Length" section for details.
+./test_stripping.jl:4:    parts = split(r, "--- DEBUG TELEMETRY")
+./test_stripping.jl:24:test1 = "Here is the picture: Grug speak of fire.\n--- DEBUG TELEMETRY (orchestration internals, not for speech) ---\nMission: 'what is fire'\nPrimary Action: explain\n========================================="
+./test_stripping.jl:29:test2 = "Here is the picture: Grug speak of fire.\n--- DEBUG TELEMETRY (orchestration internals, not for speech) ---\nMission: 'what is fire'\n\nHere is more content."
+./test_stripping.jl:34:test3 = "\n--- DEBUG TELEMETRY (orchestration internals, not for speech) ---\nMission: 'what do you know'\nPrimary Action: explain\n========================================="
+./test_stripping.jl:39:test4 = "To acknowledge what matters here: Grug live in cave. Grug think and feel and learn. Grug is friend. You are talking to Grug and Grug is listening. Grug turn to identity.\n--- DEBUG TELEMETRY (orchestration internals, not for speech) ---\nMission: 'what do you know'\nPrimary Action: acknowledge  (conf=0.87, certainty=UNSURE)\nSure Actions: [acknowledge, explain]\nUnsure Actions (Coinflip Side-Features): [None]\nConstraints: [be honest, be humble]\nWinning Node: node_17\nLobe Context: [metacognition (21/0 active (whom | you | &doAction &rest))]\nUser Triples: None\nNode Triples: (grug, is, friend), (you, talk_to, grug)\nAnti-Match Detected: false\nEvaluated Rules (shaping): [explain \"Grug sheds light\"]\nArithmetic: no math bindings this cycle\nTied Alternatives (not selected):\n  🧪 node_256 | action=explain | conf=0.87 | relations=(knowing, requires, learning)\nAIML Memory Bank:\nDeep Memory (Pinned): No pinned rocks\nFresh Memory [threshold=0.75 eligible=6] (Recent): [User]: what is gravity (intensity=1.12)\nMemory-Pull Policy: pull_fresh=false\nLobe Curve (∫base × top² = score):\n  👑 metacognition: base=0.867 × top=0.867 = 0.6992 [hard_votes=2]\nTime Orientation: none\n========================================="
+
+=== UNUSED VARIABLES ===
+./compute_signals.jl:8:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./specimen_v3_nodes.jl:13:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./build_specimen.jl:11:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./test_comprehensive_v81.jl:10:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./test_decoherence_deep.jl:10:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./test_autogrowth_relational.jl:24:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./interaction_harness_v3.jl:7:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./interact_specimen.jl:12:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./coherence_test.jl:9:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/VoteOrchestrator.jl:25:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/LobeOrchestrator.jl:8:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/PettyLearner.jl:38:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/InverseSigil.jl:67:# ║     antimatch logic. That entire concept was deprecated and deleted.         ║
+./src/PhagyMode.jl:40:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/ArithmeticEngine.jl:41:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/engine.jl:23:# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+./src/engine.jl:4710:    # GRUG v7.60: Anti-match nodes are deprecated. If one somehow reaches this
+./src/engine.jl:4714:        @warn "[ENGINE] Antimatch node $id reached cast_vote — deprecated, returning empty vote."
+./src/engine.jl:4763:    # GRUG v7.60: Anti-match nodes are deprecated. Silently return empty vote.
+./src/engine.jl:4765:        @warn "[ENGINE] Antimatch node $id reached cast_vote_with_group — deprecated, returning empty vote."
+
+=== POTENTIAL NULL/NIL ERRORS ===
+./comprehensive_test_v823.jl:80:    if ti !== nothing
+./comprehensive_test_v823.jl:92:    "nothing in the cave",
+./comprehensive_test_v823.jl:307:                            if !isnothing(grp)
+./comprehensive_test_v823.jl:336:            if !isnothing(m)
+./comprehensive_test_v823.jl:408:                            if !isnothing(grp)
+./comprehensive_test_v823.jl:490:    lobe_of = teach_ok ? find_lobe_for_node(primary_id) : nothing
+./comprehensive_test_v823.jl:491:    lobe_info = !isnothing(lobe_of) ? " (lobe: $lobe_of)" : ""
+./comprehensive_test_v823.jl:1081:    if idx === nothing
+./gen_comprehensive_specimen.py:40:def make_node(pat, signal, action, json_data=None, drop_table=None, throttle=1.0,
+./gen_comprehensive_specimen.py:41:              relational_patterns=None, required_relations=None, relation_weights=None,
+./gen_comprehensive_specimen.py:43:              neighbor_ids=None, is_unlinkable=False, max_neighbors=12,
+./gen_comprehensive_specimen.py:45:              original_pattern=None, original_action_packet=None):
+./gen_comprehensive_specimen.py:47:    if json_data is None:
+./gen_comprehensive_specimen.py:49:    if drop_table is None:
+./gen_comprehensive_specimen.py:51:    if neighbor_ids is None:
+./gen_comprehensive_specimen.py:53:    if required_relations is None:
+./gen_comprehensive_specimen.py:55:    if relation_weights is None:
+./gen_comprehensive_specimen.py:57:    if original_pattern is None:
+./gen_comprehensive_specimen.py:59:    if original_action_packet is None:
+./gen_comprehensive_specimen.py:841:def make_lobe_table(lobe_id, flashcards=None):
+
+=== HARDCODED PATHS/CREDENTIALS ===
+./comprehensive_test_v823.jl:174:    if !haskey(LOBE_REGISTRY, lobe)
+./comprehensive_test_v823.jl:294:            if haskey(NODE_MAP, proc_ids[i])
+./comprehensive_test_v823.jl:302:                if haskey(NODE_MAP, first_id)
+./comprehensive_test_v823.jl:305:                        if haskey(NODE_MAP, other_id)
+./comprehensive_test_v823.jl:375:            if haskey(NODE_MAP, pid)
+./comprehensive_test_v823.jl:378:                    if haskey(NODE_MAP, other_pid)
+./comprehensive_test_v823.jl:387:                    if haskey(NODE_MAP, sid)
+./comprehensive_test_v823.jl:403:                if haskey(NODE_MAP, first_id)
+./comprehensive_test_v823.jl:406:                        if haskey(NODE_MAP, other_id)
+./comprehensive_test_v823.jl:423:        math_tokens = split(lowercase(content))
+./comprehensive_test_v823.jl:425:        for tok in math_tokens
+./comprehensive_test_v823.jl:504:    # Check for content anchors (keywords from the taught content)
+./comprehensive_test_v823.jl:581:    n_nodes = length(lock(() -> collect(keys(NODE_MAP)), NODE_LOCK))
+./comprehensive_test_v823.jl:1008:    n_nodes = length(lock(() -> collect(keys(NODE_MAP)), NODE_LOCK))
+./gen_comprehensive_specimen.py:44:              is_grave=False, grave_reason="", hopfield_key="0",
+./gen_comprehensive_specimen.py:153:        "hopfield_key": hopfield_key,
+./gen_comprehensive_specimen.py:846:        "hopfield": {},  # hopfield_key -> node_id
+./gen_comprehensive_specimen.py:876:        key_add = f"{a}+{b}"
+./gen_comprehensive_specimen.py:877:        key_mul = f"{a}*{b}"
+./gen_comprehensive_specimen.py:878:        math_flashcards[key_add] = {"question": f"{a}+{b}", "answer": str(a + b), "type": "addition"}
+
+=== BROKEN FILE REFERENCES ===
+
+=== TYPE INSTABILITY WARNINGS ===
+13:# ║     triples are not limited to literal words. Any triple field may            ║
+7:E() = Dict{String,Any}()  # empty extra shorthand
+18:# ║     triples are not limited to literal words. Any triple field may            ║
+36:     ["addition","number","rock","sum","four"], 6.5, Dict{String,Any}(
+41:     ["addition","add","number","pile","count"], 6.0, Dict{String,Any}(
+46:     ["subtraction","minus","take","fewer","number"], 5.8, Dict{String,Any}(
+51:     ["multiply","times","group","product","number"], 5.5, Dict{String,Any}(
+56:     ["division","divide","share","equal","fair"], 5.5, Dict{String,Any}(
+61:     ["fraction","half","part","piece","whole"], 5.0, Dict{String,Any}(
+66:     ["equation","solve","equal","unknown","balance"], 7.0, Dict{String,Any}(
+72:     ["geometry","shape","circle","triangle","angle"], 6.0, Dict{String,Any}(
+80:     ["zero","none","empty","nothing","number"], 5.0, Dict{String,Any}(
+91:     ["gravity","force","pull","mass","earth"], 7.5, Dict{String,Any}(
+98:     ["energy","power","heat","motion","force"], 7.0, Dict{String,Any}(
+103:     ["atom","tiny","particle","matter","stuff"], 6.8, Dict{String,Any}(
+108:     ["sky","blue","light","color","sun"], 6.0, Dict{String,Any}(
+113:     ["electricity","charge","flow","lightning","power"], 6.5, Dict{String,Any}(
+118:     ["sound","air","wave","vibration","ear"], 6.0, Dict{String,Any}(
+123:     ["heat","hot","temperature","fire","cold"], 6.0, Dict{String,Any}(
+128:     ["planet","sun","earth","mars","space"], 6.5, Dict{String,Any}(

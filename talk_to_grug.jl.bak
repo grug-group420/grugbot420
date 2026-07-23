@@ -1,0 +1,171 @@
+#!/usr/bin/env julia
+# ═══════════════════════════════════════════════════════════════
+# Talk to Grug — Conversation test with telemetry logging
+# Runs real back-and-forth inputs, captures scan results + AIML output,
+# logs everything to interaction_log.md
+# ═══════════════════════════════════════════════════════════════
+using Pkg; Pkg.activate(".")
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  ⚠️  ARCHITECTURE REMINDERS — READ THESE OR SUFFER                          ║
+# ║                                                                              ║
+# ║  1. ANTIMATCH NODES WERE REMOVED. They do not exist. Do not reference        ║
+# ║     is_antimatch_node, antimatch scoring, antimatch drains, or any           ║
+# ║     antimatch logic. That entire concept was deprecated and deleted.          ║
+# ║                                                                              ║
+# ║  2. SIGILS CAN AND DO APPEAR IN RELATIONAL TRIPLES. A triple like           ║
+# ║     (&n, is_greater_than, &n) is DYNAMIC — it evaluates at match time        ║
+# ║     with sigil-bound values, NOT a fixed string comparison. Relational       ║
+# ║     triples are not limited to literal words. Any triple field may            ║
+# ║     contain &sigil tokens. Code that consumes triples MUST handle this.      ║
+# ║     Forgetting this means you break arithmetic, comparisons, and             ║
+# ║     any dynamic relational outcome.                                          ║
+# ║                                                                              ║
+# ║  3. HOPFIELD CACHING WAS REMOVED. The hopfield_key field on Node is         ║
+# ║     a DEAD FIELD — it exists only for specimen save/load round-trip           ║
+# ║     compatibility. Do not use it for caching, lookups, or any logic.         ║
+# ║     Pattern scanning does NOT use hopfield caching. It was disabled          ║
+# ║     ages ago. New code must never depend on hopfield_key.                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+include("src/Main.jl")
+using Dates
+
+load_specimen_from_file!("comprehensive_specimen_v10.json")
+
+function run_talk_test()
+    # Conversation inputs — realistic chat queries covering all node types
+    conversation = [
+        "hello",
+        "what is gravity",
+        "explain photosynthesis",
+        "i am sad",
+        "danger radiation",
+        "predator eats prey",
+        "define entropy",
+        "calculate integral",
+        "what is evolution",
+        "what is biodiversity",
+        "explain relativity",
+        "define ecosystem",
+        "what is quantum computing",
+        "explain machine learning",
+        "what is the meaning of life",
+        "what is consciousness",
+        "danger extinction",
+        "explain the water cycle",
+        "what is dark matter",
+        "what is climate change",
+    ]
+
+    log_lines = String[]
+    timestamp = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+
+    push!(log_lines, "# GrugBot420 — Interaction Log")
+    push!(log_lines, "")
+    push!(log_lines, "**Date:** $(timestamp)")
+    push!(log_lines, "**Specimen:** comprehensive_specimen_v10.json (55 nodes)")
+    push!(log_lines, "**Engine fixes applied:**")
+    push!(log_lines, "- FORWARD_PASSTHROUGH_THRESHOLD=0.7 (bidirectional short-circuit)")
+    push!(log_lines, "- Signal recomputation on load (words_to_signal always)")
+    push!(log_lines, "- n119 required_relations=[] (removed deadlock)")
+    push!(log_lines, "")
+    push!(log_lines, "---")
+    push!(log_lines, "")
+
+    for (i, user_input) in enumerate(conversation)
+        push!(log_lines, "## Turn $(i)")
+        push!(log_lines, "")
+        push!(log_lines, "**User:** $(user_input)")
+        push!(log_lines, "")
+
+        # ── Scan telemetry ──
+        votes = scan_specimens(user_input)
+        sorted = sort(votes, by=x->x[2], rev=true)
+
+        # Top-5 vote table
+        push!(log_lines, "### Scan Telemetry")
+        push!(log_lines, "")
+        push!(log_lines, "| Rank | Node ID | Confidence | Rel. Triples | Lobe |")
+        push!(log_lines, "|------|---------|------------|--------------|------|")
+        for (rank, v) in enumerate(sorted[1:min(5, length(sorted))])
+            node_id = v[1]
+            conf = round(v[2]; digits=4)
+            n_triples = length(v[4])
+            lobe_name = "?"
+            try
+                lobe_name = something(Lobe.find_lobe_for_node(node_id), "?")
+            catch
+            end
+            push!(log_lines, "| $(rank) | $(node_id) | $(conf) | $(n_triples) | $(lobe_name) |")
+        end
+        push!(log_lines, "")
+
+        # ── Full process_mission response ──
+        # Capture stdout to a temp file (Julia redirect_stdout requires IOStream)
+        outfile = tempname()
+        open(outfile, "w") do io
+            old_stdout = stdout
+            redirect_stdout(io)
+            try
+                process_mission(user_input)
+            catch e
+                println("ERROR in process_mission: $e")
+            finally
+                redirect_stdout(old_stdout)
+            end
+        end
+        response = read(outfile, String)
+
+        # Extract AIML Output Scaffold or AIML Ask Question from response
+        scaffold_match = match(r"🤖 AIML Output Scaffold:\n(.*)"s, response)
+        ask_match = match(r"🤖 AIML Ask Question:\n(.*)"s, response)
+
+        if scaffold_match !== nothing
+            grug_response = strip(scaffold_match[1])
+            push!(log_lines, "### Grug Response (AIML Output Scaffold)")
+        elseif ask_match !== nothing
+            grug_response = strip(ask_match[1])
+            push!(log_lines, "### Grug Response (AIML Ask Question)")
+        else
+            lines = split(response, "\n")
+            non_empty = filter(l -> strip(l) != "", lines)
+            grug_response = length(non_empty) > 0 ? strip(non_empty[end]) : "(no response captured)"
+            push!(log_lines, "### Grug Response (raw capture)")
+        end
+
+        push!(log_lines, "")
+        # Truncate very long responses for readability
+        if length(grug_response) > 800
+            grug_display = grug_response[1:800] * "...(truncated)"
+        else
+            grug_display = grug_response
+        end
+        push!(log_lines, "> $(grug_display)")
+        push!(log_lines, "")
+
+        # ── Winner summary ──
+        if !isempty(sorted)
+            winner_id = sorted[1][1]
+            winner_conf = round(sorted[1][2]; digits=4)
+            push!(log_lines, "**Winner:** `$(winner_id)` (conf=$(winner_conf))")
+        else
+            push!(log_lines, "**Winner:** NONE (no votes)")
+        end
+        push!(log_lines, "")
+        push!(log_lines, "---")
+        push!(log_lines, "")
+
+        # Print progress to console
+        if !isempty(sorted)
+            println("Turn $(i)/$(length(conversation)): '$(user_input)' → $(sorted[1][1]) (conf=$(round(sorted[1][2]; digits=3)))")
+        else
+            println("Turn $(i)/$(length(conversation)): '$(user_input)' → NO VOTES")
+        end
+    end
+
+    # Write log file
+    log_content = join(log_lines, "\n")
+    write("interaction_log.md", log_content)
+    println("\n✅ Interaction log written to interaction_log.md")
+end
+
+run_talk_test()

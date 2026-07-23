@@ -75,7 +75,13 @@ for q in queries
 end
 
 # Save results to JSON for analysis
-open(joinpath(@__DIR__, "coherence_test_results.json"), "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endjoinpath(@__DIR__, "coherence_test_results.json"), "w") do f
     JSON.print(f, results, 2)
 end
 println("\n=== Results saved to coherence_test_results.json ===")

@@ -109,7 +109,13 @@ println("CHAT TEST COMPLETE — $(length(results)) results")
 println("=" ^ 60)
 
 # Save results
-open(results_file, "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endresults_file, "w") do f
     for (input_text, status, conversational_reply, full_scaffold, digest) in results
         println(f, "=== INPUT ===")
         println(f, input_text)

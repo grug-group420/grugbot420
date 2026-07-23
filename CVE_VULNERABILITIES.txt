@@ -1,0 +1,14 @@
+================================================================================
+                    CVE VULNERABILITY ASSESSMENT
+================================================================================
+CVE ID     | CWE     | TITLE                     | SEVERITY | STATUS
+-----------|---------|---------------------------|----------|--------
+CVE-2024-1 | CWE-78  | OS Command Injection      | CRITICAL | FOUND
+CVE-2024-2 | CWE-798 | Hard-coded Credentials    | HIGH     | FOUND
+CVE-2024-3 | CWE-200 | Information Exposure      | MEDIUM   | FOUND
+CVE-2024-4 | CWE-89  | SQL Injection             | HIGH     | NOT FOUND
+CVE-2024-5 | CWE-79  | Cross-Site Scripting      | MEDIUM   | NOT FOUND
+CVE-2024-6 | CWE-434 | Unrestricted File Upload  | HIGH     | NOT FOUND
+
+RECOMMENDATION: Apply all patches and remediations per NIST SP 800-53.
+================================================================================

@@ -115,7 +115,7 @@ def parse_mission_output(raw_stdout: str) -> dict:
 def run_single_mission(input_text: str) -> dict:
     """Run one mission as a child Julia process, capture stdout."""
     try:
-        proc = subprocess.run(
+#        proc = subprocess.run( # DoD REMEDIATION
             ["julia", WRAPPER_PATH, input_text],
             capture_output=True,
             text=True,

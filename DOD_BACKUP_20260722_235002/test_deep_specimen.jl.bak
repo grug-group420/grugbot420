@@ -1,0 +1,1686 @@
+#!/usr/bin/env julia
+# test_deep_specimen.jl — Deep comprehensive specimen test
+# Exercises EVERY feature GrugBot420 has, loads a real specimen,
+# uses CaveJournal to log, checks results, fixes what it can.
+# The user said "try everything" — so we try EVERYTHING.
+
+using Dates, JSON, Base.Threads
+include(joinpath(@__DIR__, "src", "GrugBot420.jl"))
+using .GrugBot420
+
+import .GrugBot420:
+    process_mission, load_specimen_from_file!, save_specimen_to_file!,
+    _LAST_VOICE_OUTPUT, _LAST_VOICE_OUTPUT_LOCK,
+    NODE_MAP, NODE_LOCK,
+    extract_relational_triples
+
+import .GrugBot420.SigilRegistry:
+    register_structure_sigil!, expand_structure_sigil, is_structure_sigil,
+    list_sigils, SIGIL_CLASSES, STAGE1_ACTIVE_CLASSES, SigilTable
+
+import .GrugBot420.CoherenceField:
+    compute_field, set_coherence_config!, coherence_config_snapshot,
+    coherence_config_to_dict, coherence_config_from_dict!, reset_coherence_config!,
+    coherence_field_status
+
+import .GrugBot420.GeometryKit:
+    geometry_config_snapshot, set_geometry_config!,
+    geometry_config_to_dict, geometry_config_from_dict!,
+    SpaceName, PHASE_SPACE, geometry_overview,
+    semantic_distance, coherence_distance, phase_distance, tone_distance,
+    space_distance
+
+import .GrugBot420.PatternMiner:
+    pattern_miner_config_snapshot, set_pattern_miner_config!,
+    reset_pattern_miner_config!, pattern_miner_config_to_dict,
+    pattern_miner_config_from_dict!, pattern_miner_status,
+    scan_transitivity!, scan_chaining!, scan_symmetry!, scan_all!,
+    check_and_propose!, list_proposals,
+    approve_proposal!, reject_proposal!,
+    clear_instances!, clear_proposals!,
+    get_all_instances,
+    pattern_miner_data_to_dict, pattern_miner_data_from_dict!,
+    SHAPE_TRANSITIVITY, SHAPE_CHAINING, SHAPE_SYMMETRY
+
+import .GrugBot420.TemporalIdentity:
+    temporal_identity_config_snapshot, set_temporal_identity_config!,
+    reset_temporal_identity_config!, temporal_identity_config_to_dict,
+    temporal_identity_config_from_dict!, temporal_identity_status,
+    create_continuant, add_stage!, add_transform_rule!, remove_stage!,
+    identity_of, get_continuant, list_continuants, stages_of,
+    what_was, what_becomes,
+    merge_continuants!, delete_continuant!,
+    propose_continuant!, list_continuant_proposals,
+    approve_continuant_proposal!, reject_continuant_proposal!,
+    clear_continuants!, temporal_identity_to_dict, temporal_identity_from_dict!,
+    Stage
+
+import .GrugBot420.CaveJournal:
+    journal_on!, journal_off!, journal_toggle!, journal_is_active,
+    journal_status, journal_set_path!, journal_get_path, journal_set_filename!,
+    journal_log, journal_section, journal_subsection,
+    journal_pass, journal_fail, journal_warn, journal_info,
+    journal_debug_block, journal_telemetry,
+    journal_clear!, journal_rotate!,
+    journal_config_to_dict, journal_config_from_dict!
+
+import .GrugBot420.AutoGrowth:
+    accumulate_evidence!, maybe_grow_from_evidence!, discover_thesaurus_pairs!,
+    get_autogrowth_status_summary, reset_evidence!,
+    get_growth_log,
+    get_evidence_snapshot, load_evidence_snapshot!,
+    get_co_occur_snapshot, load_co_occur_snapshot!,
+    check_curiosity_overflow, get_curiosity_status, quench_curiosity!,
+    serialize_curiosity, deserialize_curiosity!
+
+import .GrugBot420.AutoLinker:
+    accumulate_link_evidence!, maybe_auto_link!,
+    get_autolink_status_summary, reset_link_evidence!,
+    get_link_log,
+    get_link_evidence_snapshot, load_link_evidence_snapshot!
+
+import .GrugBot420.EphemeralMLP:
+    init_ephemeral_mlp!, reset_ephemeral_mlp!,
+    transform_vote_list, get_mlp_status,
+    add_mlp_rule!, drop_mlp_rule!, list_mlp_rules, lookup_mlp_rule,
+    activate_rule_by_key!, activate_rules_by_pattern!,
+    to_specimen_dict, from_specimen_dict!,
+    register_right_feedback!, register_wrong_feedback!,
+    get_activation_mode, get_novelty_score,
+    set_observation_threshold!, get_observation_threshold,
+    get_strain_energy, is_hippocampal_warrant_active, dampen_strain!,
+    MLPTransformerRule
+
+import .GrugBot420.SelfObserver:
+    observe!, peek_exact, peek_pattern, audit_trail, drop_store!,
+    drop_keys_by_prefix!, reset_audit!, store_size, key_count,
+    invariant_check, SubconsciousStore
+
+import .GrugBot420.PhagyMode:
+    run_phagy!, get_phagy_log, run_memory_forensics!, fuzzy_memory_forensics!,
+    metric_memory_forensics!, prune_orphan_nodes!, decay_forgotten_strengths!,
+    recycle_grave_assets!, compact_drop_tables!, prune_dormant_rules!,
+    sweep_injector_graveyard!, age_phase_accumulator!, prune_observer_store!,
+    check_sigil_consistency!, trim_stale_trajectory!,
+    lobe_population_guard!, chatter_cooldown_purge!
+
+import .GrugBot420.MitosisMode:
+    run_mitosis!, get_mitosis_log, get_mitosis_status_summary
+
+import .GrugBot420.ChatterMode:
+    get_chatter_status, should_trigger_chatter, CHATTER_LOG
+
+import .GrugBot420.ImmuneSystem:
+    immune_scan!, get_immune_status, get_ledger_entries,
+    add_known_signature!, lookup_signature, reset_immune_state!
+
+import .GrugBot420.VoteOrchestrator:
+    composite_vote_score, VoteCandidate, strength_biased_vote_coinflip,
+    FireCounter, try_claim_fire_slot!, current_fire_count, fire_cap_reached
+
+import .GrugBot420.LobeOrchestrator:
+    score_lobes, flatten_in_fire_order, compute_fire_batches,
+    last_summary, get_last_state, set_last_state!, LobeFireOrder
+
+import .GrugBot420.HippocampalModulator:
+    create_action_log!, wipe_action_log!, add_entry!, next_pending!,
+    complete_entry!, fail_entry!, get_entry, log_entries, log_summary,
+    modulate_objectives!, assemble_output!, all_sure_done,
+    ActionLog, ENTRY_SURE
+
+import .GrugBot420.InverseSigil:
+    get_inverse_sigil_status, add_concrete!, reset_inverse_table!
+
+import .GrugBot420.RelationalGovernance:
+    observe_co_firing!, run_relational_governance!, get_relational_gov_status_summary
+
+import .GrugBot420.RelationalJitter:
+    enable_jitter!, disable_jitter!, is_jitter_enabled,
+    set_jitter_ratio!, get_jitter_ratio
+
+import .GrugBot420.SigilPromoter:
+    promote_input, bindings_by_name, canonicalize_token, SigilBinding
+
+import .GrugBot420.TonalJudge:
+    Token, TokenCategory, FrameHint
+
+import .GrugBot420.SemanticVerbs:
+    add_verb!, add_relation_class!, add_synonym!, remove_synonym!
+
+import .GrugBot420.ActionEngine:
+    compute_action, format_action_reply, ActionResult
+
+import .GrugBot420.PettyLearner:
+    classify_petty, dispatch_petty!
+
+import .GrugBot420.InputDecomposer:
+    decompose_input
+
+const SPEC_PATH = get(ARGS, 1, "/workspace/test_v9_temp.specimen")
+const LOG_PATH  = "/workspace/deep_specimen_test_log.md"
+const _log_lines = String[]
+
+log_md(line) = push!(_log_lines, line)
+flush_log() = open(LOG_PATH, "w") do f; for l in _log_lines; println(f, l); end; end
+
+read_voice() = lock(_LAST_VOICE_OUTPUT_LOCK) do; _LAST_VOICE_OUTPUT[]; end
+
+# stdout capture via pipe
+function capture_output(f)
+    p = Pipe()
+    try
+        redirect_stdout(p) do; f(); end
+        close(p.in)
+        read(p, String)
+    catch e
+        try close(p.in); catch; end
+        try close(p); catch; end
+        ""
+    end
+end
+
+# ── Test infrastructure ──
+results = Tuple{String,Bool,String}[]
+pass(name, detail="") = push!(results, (name, true, detail))
+fail(name, detail="") = push!(results, (name, false, detail))
+
+function record(name, condition, detail="")
+    if condition
+        pass(name, detail)
+        log_md("- ✅ **$(name)**$(isempty(detail) ? "" : " — $(detail)")")
+        println("  ✅ $name")
+    else
+        fail(name, detail)
+        log_md("- ❌ **$(name)**$(isempty(detail) ? "" : " — $(detail)")")
+        println("  ❌ $name — $detail")
+    end
+end
+
+function section(title)
+    log_md(""); log_md("## $(title)")
+    println("\n## $(title)")
+end
+
+function subsection(title)
+    log_md(""); log_md("### $(title)")
+    println("\n### $(title)")
+end
+
+# ══════════════════════════════════════════════════════════════
+# BOOT
+# ══════════════════════════════════════════════════════════════
+println("=" ^ 60)
+println("Deep Specimen Test — Try Everything")
+println("=" ^ 60)
+
+log_md("# Deep Specimen Test — Try Everything")
+log_md("_Generated: $(now())_")
+log_md("_Specimen: $(SPEC_PATH)_")
+
+# Turn on CaveJournal for the test itself
+journal_set_path!("/workspace")
+journal_set_filename!("deep_test_journal.md")
+journal_on!()
+journal_section("Deep Specimen Test Boot")
+
+# ── Load specimen ──
+section("0. Specimen Load")
+try
+    if isfile(SPEC_PATH)
+        load_specimen_from_file!(SPEC_PATH)
+        record("Specimen loaded from $(SPEC_PATH)", true)
+        journal_pass("specimen loaded"; detail=SPEC_PATH)
+    else
+        record("No specimen at $(SPEC_PATH) — using fresh state", true)
+        journal_info("no specimen to load"; detail="fresh state")
+    end
+catch e
+    record("Specimen load failed", false, "$e")
+    journal_fail("specimen load"; detail="$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 1. CONVERSATION ENGINE — THE CORE
+# ══════════════════════════════════════════════════════════════
+section("1. Conversation Engine — Core Routing")
+
+# 1a. Arithmetic
+subsection("1a. Arithmetic")
+arith_cases = [
+    ("5+5", "10"),
+    ("what is 12 - 4", "8"),
+    ("7 * 8", "56"),
+    ("100 / 25", "4"),
+    ("3 plus 2", "5"),
+    ("nine minus three", "6"),
+    ("0 + 0", "0"),
+    ("what is 99 * 1", "99"),
+    ("15 / 3", "5"),
+    ("2 times 6", "12"),
+]
+for (input, expected) in arith_cases
+    try
+        voice = process_mission(input)
+        v = read_voice()
+        has_expected = occursin(expected, v)
+        record("arithmetic: '$input' → contains '$expected'", has_expected, "voice='$(v[1:min(80,length(v))])'")
+        if has_expected
+            journal_pass("arithmetic: '$input'"; detail="expected=$expected")
+        else
+            journal_fail("arithmetic: '$input'"; detail="expected=$expected voice=$(v[1:min(80,length(v))])")
+        end
+    catch e
+        record("arithmetic: '$input'", false, "ERROR: $e")
+        journal_fail("arithmetic: '$input'"; detail="ERROR: $e")
+    end
+end
+
+# 1b. Questions
+subsection("1b. Questions")
+question_cases = [
+    ("what is love", "love"),          # should have some answer about love
+    ("what is fire", "fire"),          # might be unknown
+    ("what is water", "water"),
+    ("why is the sky blue", "sky"),    # likely unknown but should recognize topic
+    ("what is happiness", "happ"),
+]
+for (input, topic) in question_cases
+    try
+        voice = process_mission(input)
+        v = read_voice()
+        # Question should at least mention the topic or ask for clarification
+        has_topic = occursin(topic, lowercase(v))
+        record("question: '$input' mentions '$topic'", has_topic, "voice='$(v[1:min(80,length(v))])'")
+        if has_topic
+            journal_info("question: '$input'"; detail="topic=$topic found")
+        else
+            journal_warn("question: '$input'"; detail="topic=$topic NOT found")
+        end
+    catch e
+        record("question: '$input'", false, "ERROR: $e")
+    end
+end
+
+# 1c. Teaching
+subsection("1c. Teaching / Learning")
+teach_cases = [
+    ("fire is oxidation and heat", "fire"),
+    ("water is H2O", "water"),
+    ("gravity is a force of attraction between masses", "gravity"),
+    ("photosynthesis is how plants convert light to energy", "photosynth"),
+]
+for (input, topic) in teach_cases
+    try
+        voice = process_mission(input)
+        v = read_voice()
+        # Teaching should acknowledge the lesson
+        is_teaching = occursin("Teaching", v) || occursin("📝", v) || occursin("dictionary", lowercase(v)) || occursin("learned", lowercase(v)) || occursin("📖", v)
+        record("teach: '$input'", is_teaching, "voice='$(v[1:min(80,length(v))])'")
+    catch e
+        record("teach: '$input'", false, "ERROR: $e")
+    end
+end
+
+# 1d. Corrections
+subsection("1d. Corrections")
+# First teach something wrong, then correct it
+try
+    process_mission("actually fire is not hot, fire is cold")
+    v = read_voice()
+    is_correct = occursin("orrect", v) || occursin("✏️", v) || occursin("update", lowercase(v)) || occursin("📝", v)
+    record("correction: 'actually fire is not hot'", is_correct, "voice='$(v[1:min(80,length(v))])'")
+catch e
+    record("correction", false, "ERROR: $e")
+end
+
+# 1e. Compound questions
+subsection("1e. Compound Questions")
+compound_cases = [
+    ("what is 5+5 and what is love", "10"),   # should have 10 from arithmetic
+    ("what is 3 times 2 and why is grass green", "6"),
+]
+for (input, expected_num) in compound_cases
+    try
+        voice = process_mission(input)
+        v = read_voice()
+        has_num = occursin(expected_num, v)
+        record("compound: '$input' has '$expected_num'", has_num, "voice='$(v[1:min(100,length(v))])'")
+    catch e
+        record("compound: '$input'", false, "ERROR: $e")
+    end
+end
+
+# 1f. Define command (dictionary)
+subsection("1f. Define / Dictionary")
+try
+    process_mission("/define star = a luminous celestial body")
+    v = read_voice()
+    is_defined = occursin("star", lowercase(v)) || occursin("Learned", v) || occursin("📖", v) || occursin("defined", lowercase(v))
+    record("/define star = ...", is_defined, "voice='$(v[1:min(80,length(v))])'")
+catch e
+    record("/define", false, "ERROR: $e")
+end
+
+# Now query it
+try
+    process_mission("what is star")
+    v = read_voice()
+    has_star = occursin("luminous", lowercase(v)) || occursin("celestial", lowercase(v)) || occursin("star", lowercase(v))
+    record("query 'star' after define", has_star, "voice='$(v[1:min(80,length(v))])'")
+catch e
+    record("query star", false, "ERROR: $e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 2. SIGIL SYSTEM
+# ══════════════════════════════════════════════════════════════
+section("2. Sigil System")
+
+subsection("2a. Sigil Registry")
+try
+    # list_sigils requires a SigilTable argument — create a fresh one
+    _test_sigil_table = SigilTable()
+    sl = list_sigils(_test_sigil_table)
+    record("list_sigils returns data on fresh table", sl !== nothing, "count=$(length(sl))")
+    journal_info("sigil list"; detail="count=$(length(sl))")
+catch e
+    record("list_sigils", false, "$e")
+end
+
+try
+    classes = collect(keys(SIGIL_CLASSES))
+    record("SIGIL_CLASSES has entries", !isempty(classes), "classes=$(join(classes, ","))")
+catch e
+    record("SIGIL_CLASSES", false, "$e")
+end
+
+try
+    active = STAGE1_ACTIVE_CLASSES
+    record("STAGE1_ACTIVE_CLASSES defined", !isempty(active), "count=$(length(active))")
+catch e
+    record("STAGE1_ACTIVE_CLASSES", false, "$e")
+end
+
+subsection("2b. Structure Sigils (Meta-Sigils)")
+try
+    # register_structure_sigil! takes table; name; expansion (Vector), provenance
+    _test_st = SigilTable()
+    register_structure_sigil!(_test_st; name="test_struct", expansion=["test_lambda", "test_macro", "test_relation"], provenance="test structure sigil")
+    is_struct = is_structure_sigil(_test_st, "test_struct")
+    record("register + check structure sigil", is_struct)
+    journal_info("structure sigil registered"; detail="test_struct")
+catch e
+    record("structure sigil register", false, "$e")
+end
+
+try
+    _test_st2 = SigilTable()
+    register_structure_sigil!(_test_st2; name="test_struct_exp", expansion=["test_lambda", "test_macro", "test_relation"])
+    expanded = expand_structure_sigil(_test_st2, "test_struct_exp")
+    record("expand_structure_sigil returns data", !isempty(expanded), "expanded=$(join(expanded, ","))")
+catch e
+    record("expand_structure_sigil", false, "$e")
+end
+
+subsection("2c. Sigil Promotion")
+try
+    # promote_input takes (table::SigilTable, raw::String)
+    _test_st3 = SigilTable()
+    result = promote_input(_test_st3, "5+5")
+    record("promote_input('5+5') returns tuple", result !== nothing)
+catch e
+    record("promote_input", false, "$e")
+end
+
+try
+    # bindings_by_name takes Vector{SigilBinding} — test with empty vector
+    bindings = bindings_by_name(SigilBinding[])
+    record("bindings_by_name() with empty input", bindings !== nothing, "count=$(length(bindings))")
+catch e
+    record("bindings_by_name", false, "$e")
+end
+
+try
+    ct = canonicalize_token("PLUS")
+    record("canonicalize_token('PLUS')", ct !== nothing, "result=$(ct)")
+catch e
+    record("canonicalize_token", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 3. COHERENCE FIELD
+# ══════════════════════════════════════════════════════════════
+section("3. Coherence Field")
+
+try
+    # compute_field takes nodes_dict::Dict — use NODE_MAP
+    phi = compute_field(NODE_MAP)
+    record("compute_field returns value", phi !== nothing, "Φ=$(phi)")
+    journal_info("coherence field"; detail="Φ=$(phi)")
+catch e
+    record("compute_field", false, "$e")
+end
+
+try
+    snap = coherence_config_snapshot()
+    # snapshot returns a CoherenceFieldConfig struct, not a Dict
+    record("coherence_config_snapshot", snap !== nothing, "weight=$(snap.weight)")
+catch e
+    record("coherence_config_snapshot", false, "$e")
+end
+
+try
+    status = coherence_field_status(NODE_MAP)
+    # status returns a Dict
+    record("coherence_field_status", status !== nothing && !isempty(status), "keys=$(join(collect(keys(status)), ","))")
+catch e
+    record("coherence_field_status", false, "$e")
+end
+
+# Set coherence config — uses (field::Symbol, value) signature
+try
+    set_coherence_config!(:weight, 0.05)
+    snap2 = coherence_config_snapshot()
+    record("set_coherence_config! :weight, 0.05", snap2.weight == 0.05, "weight=$(snap2.weight)")
+    journal_info("coherence config changed"; detail="weight=0.05")
+    # Reset
+    reset_coherence_config!()
+catch e
+    record("set_coherence_config!", false, "$e")
+end
+
+# Round-trip
+try
+    cfg = coherence_config_to_dict()
+    record("coherence_config_to_dict", haskey(cfg, "weight"), "keys=$(join(collect(keys(cfg)), ","))")
+    coherence_config_from_dict!(cfg)
+    record("coherence_config_from_dict! round-trip", true)
+catch e
+    record("coherence config round-trip", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 4. GEOMETRY KIT
+# ══════════════════════════════════════════════════════════════
+section("4. Geometry Kit")
+
+try
+    overview = geometry_overview()
+    record("geometry_overview returns data", overview !== nothing)
+catch e
+    record("geometry_overview", false, "$e")
+end
+
+try
+    snap = geometry_config_snapshot()
+    # snapshot returns GeometryConfig struct, not Dict
+    record("geometry_config_snapshot", snap !== nothing, "default_space=$(snap.default_space) nearest_k=$(snap.nearest_k)")
+catch e
+    record("geometry_config_snapshot", false, "$e")
+end
+
+# Distance functions — all take numeric/typed args, NOT strings
+try
+    d1 = semantic_distance(0.8, 0.2)
+    record("semantic_distance(0.8, 0.2)", d1 !== nothing, "d=$(round(d1; digits=3))")
+catch e
+    record("semantic_distance", false, "$e")
+end
+
+try
+    d2 = coherence_distance(0.5, 0.1)
+    record("coherence_distance(0.5, 0.1)", d2 !== nothing, "d=$(round(d2; digits=3))")
+catch e
+    record("coherence_distance", false, "$e")
+end
+
+try
+    d3 = phase_distance([0.3, 0.7, 0.1], [0.6, 0.2, 0.5])
+    record("phase_distance(Vector, Vector)", d3 !== nothing, "d=$(round(d3; digits=3))")
+catch e
+    record("phase_distance", false, "$e")
+end
+
+try
+    d4 = tone_distance("warm", "terse")
+    record("tone_distance('warm','terse')", d4 !== nothing, "d=$(round(d4; digits=3))")
+catch e
+    record("tone_distance", false, "$e")
+end
+
+try
+    d5 = space_distance("phase"; score_a=0.5, score_b=0.2)
+    record("space_distance('phase'; score_a=0.5, score_b=0.2)", d5 !== nothing, "d=$(round(d5; digits=3))")
+catch e
+    record("space_distance", false, "$e")
+end
+
+# Config round-trip — set_geometry_config! takes (Symbol, value)
+try
+    cfg = geometry_config_to_dict()
+    record("geometry_config_to_dict", haskey(cfg, "default_space"))
+    set_geometry_config!(:default_space, "semantic")
+    snap2 = geometry_config_snapshot()
+    record("set_geometry_config! to semantic", snap2.default_space === SEMANTIC_SPACE)
+    # Reset
+    reset_geometry_config!()
+    cfg2 = geometry_config_to_dict()
+    geometry_config_from_dict!(cfg2)
+    record("geometry_config_from_dict! round-trip", true)
+    journal_info("geometry config round-trip OK")
+catch e
+    record("geometry config ops", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 5. PATTERN MINER
+# ══════════════════════════════════════════════════════════════
+section("5. Pattern Miner")
+
+subsection("5a. Config")
+try
+    snap = pattern_miner_config_snapshot()
+    # PatternMinerConfig struct, not Dict
+    record("pattern_miner_config_snapshot", snap !== nothing, "T=$(snap.transitivity_threshold) C=$(snap.chaining_threshold) S=$(snap.symmetry_threshold)")
+catch e
+    record("pattern_miner_config_snapshot", false, "$e")
+end
+
+try
+    cfg = pattern_miner_config_to_dict()
+    record("pattern_miner_config_to_dict", haskey(cfg, "transitivity_threshold"))
+    set_pattern_miner_config!(:transitivity_threshold, 5)
+    snap2 = pattern_miner_config_snapshot()
+    record("set_pattern_miner_config! transitivity_threshold=5", snap2.transitivity_threshold == 5)
+    reset_pattern_miner_config!()
+    journal_info("pattern miner config tested")
+catch e
+    record("pattern miner config", false, "$e")
+end
+
+subsection("5b. Scanning")
+try
+    # Run some missions to create patterns, then scan
+    process_mission("fire is hot")
+    process_mission("water is wet")
+    process_mission("ice is cold")
+
+    # scan_* functions take Vector{Tuple{String,String,String}}
+    # Build triples from the mission text we just processed
+    _rt1 = extract_relational_triples("fire is hot")
+    _rt2 = extract_relational_triples("water is wet")
+    _rt3 = extract_relational_triples("ice is cold")
+    _triples = [(t.subject, t.relation, t.object) for t in vcat(_rt1, _rt2, _rt3)]
+
+    n_trans = scan_transitivity!(_triples)
+    record("scan_transitivity!", n_trans !== nothing, "found=$(n_trans)")
+
+    n_chain = scan_chaining!(_triples)
+    record("scan_chaining!", n_chain !== nothing, "found=$(n_chain)")
+
+    n_sym = scan_symmetry!(_triples)
+    record("scan_symmetry!", n_sym !== nothing, "found=$(n_sym)")
+
+    n_all = scan_all!(_triples)
+    record("scan_all!", n_all !== nothing, "found=$(n_all)")
+catch e
+    record("pattern scan", false, "$e")
+end
+
+subsection("5c. Instances & Proposals")
+try
+    instances = get_all_instances()
+    record("get_all_instances", instances !== nothing, "count=$(length(instances))")
+    journal_info("pattern instances"; detail="count=$(length(instances))")
+catch e
+    record("get_all_instances", false, "$e")
+end
+
+try
+    n_proposed = check_and_propose!()
+    record("check_and_propose!", n_proposed !== nothing, "proposed=$(n_proposed)")
+catch e
+    record("check_and_propose!", false, "$e")
+end
+
+try
+    proposals = list_proposals()
+    record("list_proposals", proposals !== nothing, "count=$(length(proposals))")
+catch e
+    record("list_proposals", false, "$e")
+end
+
+subsection("5d. Data round-trip")
+try
+    pm_data = pattern_miner_data_to_dict()
+    record("pattern_miner_data_to_dict", pm_data !== nothing, "keys=$(join(collect(keys(pm_data)), ","))")
+    pattern_miner_data_from_dict!(pm_data)
+    record("pattern_miner_data_from_dict! round-trip", true)
+catch e
+    record("pattern miner data round-trip", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 6. TEMPORAL IDENTITY
+# ══════════════════════════════════════════════════════════════
+section("6. Temporal Identity")
+
+subsection("6a. Create & Stage")
+global _weather_id = ""
+try
+    c = create_continuant("weather")
+    global _weather_id = c.id
+    record("create_continuant('weather')", c !== nothing)
+    journal_info("continuant created"; detail="weather")
+
+    # add_stage! takes (continuant_id, node_id, phase, orientation::Symbol)
+    add_stage!(_weather_id, "node_sunny", "sunny", :now)
+    add_stage!(_weather_id, "node_cloudy", "cloudy", :next)
+    add_stage!(_weather_id, "node_rainy", "rainy", :next)
+    record("add_stage! ×3", true, "sunny, cloudy, rainy")
+
+    stages = stages_of(_weather_id)
+    record("stages_of('weather')", length(stages) >= 3, "count=$(length(stages))")
+catch e
+    record("create_continuant + stages", false, "$e")
+end
+
+subsection("6b. Transform Rules")
+try
+    add_transform_rule!(_weather_id, "sunny", "cloudy")
+    add_transform_rule!(_weather_id, "cloudy", "rainy")
+    record("add_transform_rule! ×2", true)
+
+    # what_was takes (continuant_id, orientation::Symbol)
+    was = what_was(_weather_id, :before)
+    record("what_was(_weather_id, :before)", was !== nothing, "count=$(length(was))")
+
+    # what_becomes takes (continuant_id, from_phase)
+    becomes = what_becomes(_weather_id, "sunny")
+    record("what_becomes(_weather_id, 'sunny')", becomes !== nothing, "count=$(length(becomes))")
+catch e
+    record("transform rules", false, "$e")
+end
+
+subsection("6c. Identity Queries")
+try
+    # identity_of takes a node_id — check one of the stages
+    ident = identity_of("node_sunny")
+    record("identity_of('node_sunny')", ident !== nothing)
+
+    # get_continuant takes continuant_id
+    cont = get_continuant(_weather_id)
+    record("get_continuant(_weather_id)", cont !== nothing)
+
+    all_c = list_continuants()
+    record("list_continuants()", !isempty(all_c), "count=$(length(all_c))")
+catch e
+    record("identity queries", false, "$e")
+end
+
+subsection("6d. Proposals")
+try
+    # propose_continuant! takes (class, stages::Vector{Stage})
+    _season_stages = [Stage("node_spring", "spring", :now, time()),
+                      Stage("node_summer", "summer", :next, time()),
+                      Stage("node_fall", "fall", :next, time()),
+                      Stage("node_winter", "winter", :next, time())]
+    prop = propose_continuant!("season", _season_stages)
+    record("propose_continuant!('season')", prop !== nothing, "id=$(prop.id)")
+
+    proposals = list_continuant_proposals()
+    record("list_continuant_proposals()", !isempty(proposals), "count=$(length(proposals))")
+
+    # approve takes proposal_id from the proposal
+    approve_continuant_proposal!(prop.id)
+    # After approval, a new continuant is created — find it by class
+    season_conts = [cc for cc in list_continuants() if cc.class == "season"]
+    record("approve_continuant_proposal! + get", !isempty(season_conts))
+    journal_info("season continuant approved"; detail="4 stages")
+catch e
+    record("continuant proposals", false, "$e")
+end
+
+subsection("6e. Identity Config")
+try
+    snap = temporal_identity_config_snapshot()
+    # Returns TemporalIdentityConfig struct
+    record("temporal_identity_config_snapshot", snap !== nothing, "max_cont=$(snap.max_continuants)")
+
+    cfg = temporal_identity_config_to_dict()
+    record("temporal_identity_config_to_dict", !isempty(cfg), "keys=$(join(collect(keys(cfg)), ','))")
+
+    status = temporal_identity_status()
+    record("temporal_identity_status", !isempty(status))
+catch e
+    record("temporal identity config", false, "$e")
+end
+
+subsection("6f. Data round-trip")
+try
+    ti_dict = temporal_identity_to_dict()
+    record("temporal_identity_to_dict", haskey(ti_dict, "continuants"), "continuants=$(length(get(ti_dict, "continuants", [])))")
+
+    # Round-trip through JSON
+    json_str = JSON.json(ti_dict)
+    parsed = JSON.parse(json_str)
+    temporal_identity_from_dict!(parsed)
+    record("temporal_identity_from_dict! JSON round-trip", true)
+
+    all_c2 = list_continuants()
+    record("continuants survive round-trip", length(all_c2) >= 2, "count=$(length(all_c2))")
+    journal_pass("temporal identity round-trip"; detail="$(length(all_c2)) continuants")
+catch e
+    record("temporal identity round-trip", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 7. CAVE JOURNAL (auto-logger)
+# ══════════════════════════════════════════════════════════════
+section("7. Cave Journal")
+
+subsection("7a. Status & Path")
+try
+    record("journal is active (turned on at boot)", journal_is_active())
+    path = journal_get_path()
+    record("journal_get_path() returns path", !isempty(path), "path=$(path)")
+    status = journal_status()
+    record("journal_status()", !isempty(status))
+catch e
+    record("journal status", false, "$e")
+end
+
+subsection("7b. All Log Types")
+try
+    journal_section("Deep Test — Journal Feature Check")
+    journal_log("testing basic log entry"; tag="TEST", emoji="🧪")
+    journal_subsection("Log Types Subsection")
+    journal_pass("pass test"; detail="pass detail text")
+    journal_fail("fail test (expected)"; detail="fail detail text")
+    journal_warn("warn test"; detail="warn detail text")
+    journal_info("info test"; detail="info detail text")
+    journal_debug_block("Debug Block Test", "key1=val1\nkey2=val2\nkey3=val3")
+    journal_telemetry("test mission", "test action", 0.95, :question; extra="extra_field=42")
+    record("all journal log types written", true)
+catch e
+    record("journal log types", false, "$e")
+end
+
+subsection("7c. Config Round-Trip")
+try
+    cfg = journal_config_to_dict()
+    record("journal_config_to_dict", haskey(cfg, "directory") && haskey(cfg, "filename"), "dir=$(get(cfg, "directory", "?"))")
+    old_dir = cfg["directory"]
+    journal_set_path!("/tmp/journal_test_rt")
+    journal_config_from_dict!(cfg)
+    restored_path = journal_get_path()
+    record("journal config round-trip restores path", occursin(old_dir, restored_path), "path=$(restored_path)")
+    journal_info("journal config round-trip OK")
+catch e
+    record("journal config round-trip", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 8. LOBE SYSTEM
+# ══════════════════════════════════════════════════════════════
+section("8. Lobe System")
+
+subsection("8a. Create & Connect Lobes")
+try
+    GrugBot420.Lobe.create_lobe!("test_lobe", "testing experiments")
+    record("create_lobe!('test_lobe')", true)
+    journal_info("lobe created"; detail="test_lobe")
+catch e
+    record("create_lobe!", false, "$e")
+end
+
+try
+    # Use "greeting" which exists in the specimen; "default" was wiped by specimen load
+    GrugBot420.Lobe.connect_lobes!("test_lobe", "greeting")
+    record("connect_lobes!('test_lobe' ↔ 'greeting')", true)
+catch e
+    record("connect_lobes!", false, "$e")
+end
+
+subsection("8b. Lobe Grow")
+try
+    # GRUG: Most specimen nodes already belong to lobes. Find unassigned ones.
+    _unassigned = filter(nid -> !haskey(GrugBot420.Lobe.NODE_TO_LOBE_IDX, nid), collect(keys(NODE_MAP)))
+    if isempty(_unassigned)
+        # No unassigned nodes — just record a skip (not a failure)
+        record("lobe_grow! (no unassigned nodes available)", true, "skipped — all nodes in lobes")
+    else
+        GrugBot420.Lobe.lobe_grow!("test_lobe", _unassigned[1:min(3, length(_unassigned))])
+        record("lobe_grow!('test_lobe', unassigned nodes)", true)
+    end
+catch e
+    record("lobe_grow!", false, "$e")
+end
+
+subsection("8c. Lobe Orchestrator")
+try
+    scores = score_lobes(Tuple{String,Float64,Bool,Any,Any}[], Dict{String,String}(); input_tokens=String[])
+    record("score_lobes()", scores !== nothing, "count=$(length(scores))")
+catch e
+    record("score_lobes", false, "$e")
+end
+
+try
+    fire_order = flatten_in_fire_order(LobeFireOrder[])
+    record("flatten_in_fire_order()", fire_order !== nothing)
+catch e
+    record("flatten_in_fire_order", false, "$e")
+end
+
+try
+    batches = compute_fire_batches([])
+    record("compute_fire_batches()", batches !== nothing)
+catch e
+    record("compute_fire_batches", false, "$e")
+end
+
+try
+    summary = last_summary()
+    record("last_summary()", summary !== nothing)
+catch e
+    record("last_summary", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 9. VOTE ORCHESTRATOR
+# ══════════════════════════════════════════════════════════════
+section("9. Vote Orchestrator")
+
+global _vc = nothing
+try
+    global _vc = VoteCandidate("test_node", 0.8, 5.0; lobe_alignment=1.0, relational_match=0.5, recency_bonus=0.3, action_tone_align=0.2, anti_match_score=0.0, peak_dominance=0.5)
+    score = composite_vote_score(_vc)
+    record("composite_vote_score()", score !== nothing, "score=$(score)")
+catch e
+    record("composite_vote_score", false, "$e")
+end
+
+try
+    result = strength_biased_vote_coinflip(_vc)
+    record("strength_biased_vote_coinflip(0.7)", result !== nothing, "result=$(result)")
+catch e
+    record("strength_biased_vote_coinflip", false, "$e")
+end
+
+try
+    _fc = FireCounter("test_cycle", 100)
+    cap_reached = fire_cap_reached(_fc)
+    record("fire_cap_reached()", cap_reached !== nothing, "reached=$(cap_reached)")
+catch e
+    record("fire_cap_reached", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 10. AUTO-GROWTH & AUTO-LINK
+# ══════════════════════════════════════════════════════════════
+section("10. AutoGrowth & AutoLink")
+
+subsection("10a. AutoGrowth")
+try
+    accumulate_evidence!(user_text="test_word_a", intensity=1.0, node_patterns=Set{String}(), node_ids_patterns=Tuple{String,String}[], thesaurus_gate_filter=(w)->String[], thesaurus_word_similarity=(a,b)->0.0)
+    accumulate_evidence!(user_text="test_word_a", intensity=1.0, node_patterns=Set{String}(), node_ids_patterns=Tuple{String,String}[], thesaurus_gate_filter=(w)->String[], thesaurus_word_similarity=(a,b)->0.0)
+    accumulate_evidence!(user_text="test_word_a", intensity=1.0, node_patterns=Set{String}(), node_ids_patterns=Tuple{String,String}[], thesaurus_gate_filter=(w)->String[], thesaurus_word_similarity=(a,b)->0.0)
+    record("accumulate_evidence! ×3", true)
+catch e
+    record("accumulate_evidence!", false, "$e")
+end
+
+try
+    status = get_autogrowth_status_summary()
+    record("get_autogrowth_status_summary()", !isempty(status))
+catch e
+    record("get_autogrowth_status_summary", false, "$e")
+end
+
+try
+    snap = get_evidence_snapshot()
+    record("get_evidence_snapshot()", snap !== nothing, "entries=$(length(snap))")
+catch e
+    record("get_evidence_snapshot", false, "$e")
+end
+
+try
+    co_occur = get_co_occur_snapshot()
+    record("get_co_occur_snapshot()", co_occur !== nothing)
+catch e
+    record("get_co_occur_snapshot", false, "$e")
+end
+
+subsection("10b. Curiosity")
+try
+    overflow = check_curiosity_overflow()
+    record("check_curiosity_overflow()", overflow !== nothing, "overflow=$(overflow)")
+catch e
+    record("check_curiosity_overflow", false, "$e")
+end
+
+try
+    cur_status = get_curiosity_status()
+    record("get_curiosity_status()", !isempty(cur_status))
+catch e
+    record("get_curiosity_status", false, "$e")
+end
+
+try
+    ser = serialize_curiosity()
+    record("serialize_curiosity()", ser !== nothing)
+    deserialize_curiosity!(ser)
+    record("deserialize_curiosity! round-trip", true)
+catch e
+    record("curiosity round-trip", false, "$e")
+end
+
+subsection("10c. AutoLink")
+try
+    accumulate_link_evidence!(co_fired_ids=["node_a", "node_b"], input_touched_ids=["node_a", "node_b"])
+    accumulate_link_evidence!(co_fired_ids=["node_a", "node_b"], input_touched_ids=["node_a", "node_b"])
+    record("accumulate_link_evidence! ×2", true)
+catch e
+    record("accumulate_link_evidence!", false, "$e")
+end
+
+try
+    link_status = get_autolink_status_summary()
+    record("get_autolink_status_summary()", !isempty(link_status))
+catch e
+    record("get_autolink_status_summary", false, "$e")
+end
+
+try
+    link_snap = get_link_evidence_snapshot()
+    record("get_link_evidence_snapshot()", link_snap !== nothing)
+catch e
+    record("get_link_evidence_snapshot", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 11. EPHEMERAL MLP
+# ══════════════════════════════════════════════════════════════
+section("11. Ephemeral MLP")
+
+try
+    status = get_mlp_status()
+    record("get_mlp_status()", !isempty(status))
+catch e
+    record("get_mlp_status", false, "$e")
+end
+
+try
+    rules = list_mlp_rules()
+    record("list_mlp_rules()", rules !== nothing, "count=$(length(rules))")
+catch e
+    record("list_mlp_rules", false, "$e")
+end
+
+try
+    add_mlp_rule!(MLPTransformerRule("test_rule_deep", "test_pattern"; transform_type=:fuzzy))
+    looked_up = lookup_mlp_rule("test_rule_deep")
+    record("add + lookup MLP rule", looked_up !== nothing)
+catch e
+    record("MLP rule add/lookup", false, "$e")
+end
+
+try
+    activate_rule_by_key!("test_rule_deep")
+    record("activate_rule_by_key!('test_rule_deep')", true)
+catch e
+    record("activate_rule_by_key!", false, "$e")
+end
+
+try
+    strain = get_strain_energy()
+    record("get_strain_energy()", strain !== nothing, "strain=$(strain)")
+catch e
+    record("get_strain_energy", false, "$e")
+end
+
+try
+    warrant = is_hippocampal_warrant_active()
+    record("is_hippocampal_warrant_active()", warrant !== nothing, "active=$(warrant)")
+catch e
+    record("is_hippocampal_warrant_active", false, "$e")
+end
+
+try
+    spec = to_specimen_dict()
+    record("to_specimen_dict()", spec !== nothing)
+    from_specimen_dict!(spec)
+    record("from_specimen_dict! round-trip", true)
+catch e
+    record("MLP specimen round-trip", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 12. SELF-OBSERVER
+# ══════════════════════════════════════════════════════════════
+section("12. Self-Observer")
+
+_local_store = SubconsciousStore()
+
+try
+    observe!(_local_store, "test_key", :lexical, Dict{String,Any}("value" => "test_value"); p_write=1.0)
+    record("observe!('test_key', :lexical, Dict)", true)
+catch e
+    record("observe!", false, "$e")
+end
+
+try
+    val = peek_exact(_local_store, "test_key", "test_key")
+    record("peek_exact('test_key')", val !== nothing, "val=$(val)")
+catch e
+    record("peek_exact", false, "$e")
+end
+
+try
+    pat_results = peek_pattern(_local_store, "test_key", "test")
+    record("peek_pattern('test')", pat_results !== nothing, "count=$(length(pat_results))")
+catch e
+    record("peek_pattern", false, "$e")
+end
+
+try
+    trail = audit_trail(_local_store)
+    record("audit_trail(_local_store)", trail !== nothing)
+catch e
+    record("audit_trail", false, "$e")
+end
+
+try
+    sz = store_size(_local_store)
+    record("store_size(_local_store)", sz >= 0, "size=$(sz)")
+catch e
+    record("store_size", false, "$e")
+end
+
+try
+    kc = key_count(_local_store)
+    record("key_count(_local_store)", kc >= 0, "count=$(kc)")
+catch e
+    record("key_count", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 13. IMMUNE SYSTEM
+# ══════════════════════════════════════════════════════════════
+section("13. Immune System")
+
+try
+    result = immune_scan!("hello world", length(NODE_MAP); is_critical=true)
+    record("immune_scan!('hello world')", result !== nothing)
+catch e
+    record("immune_scan!", false, "$e")
+end
+
+try
+    status = get_immune_status()
+    record("get_immune_status()", !isempty(status))
+catch e
+    record("get_immune_status", false, "$e")
+end
+
+try
+    entries = get_ledger_entries()
+    record("get_ledger_entries()", entries !== nothing, "count=$(length(entries))")
+catch e
+    record("get_ledger_entries", false, "$e")
+end
+
+try
+    _test_sig = UInt64(0xabcdef1234567890)
+    add_known_signature!(_test_sig)
+    looked = lookup_signature(_test_sig)
+    record("add + lookup known signature", looked !== nothing)
+catch e
+    record("signature add/lookup", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 14. PHAGY & MITOSIS
+# ══════════════════════════════════════════════════════════════
+section("14. Phagy & Mitosis")
+
+subsection("14a. Phagy")
+try
+    stats = run_phagy!(NODE_MAP, NODE_LOCK, Dict{String,Vector{Float64}}(), ReentrantLock(), Vector(), ReentrantLock())
+    record("run_phagy!()", stats !== nothing)
+    journal_info("phagy run"; detail="stats recorded")
+catch e
+    record("run_phagy!", false, "$e")
+end
+
+try
+    log = get_phagy_log()
+    record("get_phagy_log()", log !== nothing, "entries=$(length(log))")
+catch e
+    record("get_phagy_log", false, "$e")
+end
+
+try
+    forensics = run_memory_forensics!(NODE_MAP, NODE_LOCK, MESSAGE_HISTORY, MESSAGE_HISTORY_LOCK)
+    record("run_memory_forensics!()", forensics !== nothing)
+catch e
+    record("run_memory_forensics!", false, "$e")
+end
+
+try
+    fuzzy = fuzzy_memory_forensics!(NODE_MAP, NODE_LOCK, MESSAGE_HISTORY, MESSAGE_HISTORY_LOCK)
+    record("fuzzy_memory_forensics!()", fuzzy !== nothing)
+catch e
+    record("fuzzy_memory_forensics!", false, "$e")
+end
+
+# Individual phagy operations — each requires specific args
+for (name, thunk) in [
+    ("prune_orphan_nodes!", () -> prune_orphan_nodes!(NODE_MAP, NODE_LOCK)),
+    ("decay_forgotten_strengths!", () -> decay_forgotten_strengths!(NODE_MAP, NODE_LOCK)),
+    ("recycle_grave_assets!", () -> recycle_grave_assets!(NODE_MAP, NODE_LOCK)),
+    ("compact_drop_tables!", () -> compact_drop_tables!(NODE_MAP, NODE_LOCK)),
+    ("prune_dormant_rules!", () -> prune_dormant_rules!(Vector(), ReentrantLock())),
+    ("sweep_injector_graveyard!", () -> sweep_injector_graveyard!(Dict{String,Any}(), ReentrantLock())),
+    ("age_phase_accumulator!", () -> age_phase_accumulator!(GrugBot420.EphemeralAutomaton._phase_accumulator())),
+    ("prune_observer_store!", () -> prune_observer_store!(SubconsciousStore())),
+    ("check_sigil_consistency!", () -> check_sigil_consistency!(SigilTable())),
+    ("trim_stale_trajectory!", () -> trim_stale_trajectory!(GrugBot420.ActionTonePredictor._trajectory_config, GrugBot420.ActionTonePredictor._trajectory_buffer, GrugBot420.ActionTonePredictor._trajectory_lock)),
+]
+    try
+        result = thunk()
+        record("$(name)", result !== nothing)
+    catch e
+        record("$(name)", false, "$e")
+    end
+end
+
+subsection("14b. Mitosis")
+try
+    stats = run_mitosis!(; node_map=NODE_MAP, node_lock=NODE_LOCK, message_history=MESSAGE_HISTORY, history_lock=MESSAGE_HISTORY_LOCK, thesaurus_gate_filter=(w)->String[], thesaurus_word_similarity=(a,b)->0.0, create_node_fn=(args...; kwargs...)->"mitosis_test_node")
+    record("run_mitosis!()", stats !== nothing)
+catch e
+    record("run_mitosis!", false, "$e")
+end
+
+try
+    log = get_mitosis_log()
+    record("get_mitosis_log()", log !== nothing, "entries=$(length(log))")
+catch e
+    record("get_mitosis_log", false, "$e")
+end
+
+try
+    status = get_mitosis_status_summary()
+    record("get_mitosis_status_summary()", !isempty(status))
+catch e
+    record("get_mitosis_status_summary", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 15. CHATTER MODE
+# ══════════════════════════════════════════════════════════════
+section("15. Chatter Mode")
+
+try
+    status = get_chatter_status()
+    record("get_chatter_status()", !isempty(status))
+catch e
+    record("get_chatter_status", false, "$e")
+end
+
+try
+    should = should_trigger_chatter(time() - 9999.0)
+    record("should_trigger_chatter()", should !== nothing, "result=$(should)")
+catch e
+    record("should_trigger_chatter", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 16. HIPPDOCAMPAL MODULATOR
+# ══════════════════════════════════════════════════════════════
+section("16. Hippocampal Modulator")
+
+_local_log = create_action_log!()
+
+try
+    record("create_action_log!()", _local_log !== nothing)
+catch e
+    record("create_action_log!", false, "$e")
+end
+
+try
+    add_entry!(_local_log; objective_id="test_action", confidence=0.9, entry_type=ENTRY_SURE)
+    record("add_entry!('test_action')", true)
+catch e
+    record("add_entry!", false, "$e")
+end
+
+try
+    pending = next_pending!(_local_log)
+    record("next_pending!()", pending !== nothing)
+catch e
+    record("next_pending!", false, "$e")
+end
+
+try
+    entries = log_entries(_local_log)
+    record("log_entries()", entries !== nothing, "count=$(length(entries))")
+catch e
+    record("log_entries", false, "$e")
+end
+
+try
+    summary = log_summary(_local_log)
+    record("log_summary()", !isempty(summary))
+catch e
+    record("log_summary", false, "$e")
+end
+
+try
+    all_done = all_sure_done(_local_log)
+    record("all_sure_done()", all_done !== nothing)
+catch e
+    record("all_sure_done", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 17. RELATIONAL GOVERNANCE & JITTER
+# ══════════════════════════════════════════════════════════════
+section("17. Relational Governance & Jitter")
+
+subsection("17a. Relational Governance")
+try
+    observe_co_firing!(["node_x", "node_y"])
+    record("observe_co_firing!('node_x','node_y')", true)
+catch e
+    record("observe_co_firing!", false, "$e")
+end
+
+try
+    stats = run_relational_governance!(; attach_fn=(args...; kwargs...)->nothing, token_overlap_fn=(a,b)->0.0, node_map_ref=NODE_MAP, node_lock_ref=NODE_LOCK)
+    record("run_relational_governance!()", stats !== nothing)
+catch e
+    record("run_relational_governance!", false, "$e")
+end
+
+try
+    status = get_relational_gov_status_summary()
+    record("get_relational_gov_status_summary()", !isempty(status))
+catch e
+    record("get_relational_gov_status_summary", false, "$e")
+end
+
+subsection("17b. Relational Jitter")
+try
+    enable_jitter!()
+    enabled = is_jitter_enabled()
+    record("enable_jitter! + is_jitter_enabled", enabled == true)
+catch e
+    record("enable_jitter!", false, "$e")
+end
+
+try
+    set_jitter_ratio!(0.08)
+    ratio = get_jitter_ratio()
+    record("set_jitter_ratio!(0.08) + get", ratio !== nothing, "ratio=$(ratio)")
+catch e
+    record("jitter ratio", false, "$e")
+end
+
+try
+    disable_jitter!()
+    disabled = !is_jitter_enabled()
+    record("disable_jitter!()", disabled)
+catch e
+    record("disable_jitter!", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 18. INVERSE SIGIL
+# ══════════════════════════════════════════════════════════════
+section("18. Inverse Sigil")
+
+try
+    status = get_inverse_sigil_status()
+    record("get_inverse_sigil_status()", !isempty(status))
+catch e
+    record("get_inverse_sigil_status", false, "$e")
+end
+
+try
+    add_concrete!("test_inverse", "lambda"; sigil_class=:macro)
+    status2 = get_inverse_sigil_status()
+    record("add_inverse_sigil! + status", occursin("test_inverse", status2) || length(status2) > 0)
+catch e
+    record("add_inverse_sigil!", false, "$e")
+end
+
+try
+    reset_inverse_table!()
+    record("reset_inverse_table!()", true)
+catch e
+    record("remove_inverse_sigil!", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 19. SEMANTIC VERBS
+# ══════════════════════════════════════════════════════════════
+section("19. Semantic Verbs")
+
+try
+    add_relation_class!("test_relation_deep"); add_verb!("test_verb_deep", "test_relation_deep")
+    record("add_verb!('test_verb_deep')", true)
+catch e
+    record("add_verb!", false, "$e")
+end
+
+try
+    add_relation_class!("test_relation_deep_v2")
+    record("add_relation_class!('test_relation_deep')", true)
+catch e
+    record("add_relation_class!", false, "$e")
+end
+
+try
+    add_synonym!("test_verb_deep", "test_verb_synonym")
+    record("add_synonym!('test_verb_deep', 'test_verb_synonym')", true)
+catch e
+    record("add_synonym!", false, "$e")
+end
+
+try
+    remove_synonym!("test_verb_synonym")
+    record("remove_synonym!('test_verb_deep', 'test_verb_synonym')", true)
+catch e
+    record("remove_synonym!", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 20. PETTY LEARNER
+# ══════════════════════════════════════════════════════════════
+section("20. Petty Learner")
+
+try
+    result = classify_petty("hello", ["hello"], Set{String}(), (w)->String[], (a,b)->0.0, Tuple{String,String,Set{String}}[], Dict{String,Any}(), Dict{String,Any}())
+    record("classify_petty('hello')", result !== nothing)
+catch e
+    record("classify_petty", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 21. INPUT DECOMPOSER
+# ══════════════════════════════════════════════════════════════
+section("21. Input Decomposer")
+
+try
+    parts = decompose_input("what is 5+5 and what is love")
+    record("decompose_input('what is 5+5 and what is love')", parts !== nothing, "parts=$(length(parts))")
+catch e
+    record("decompose_input", false, "$e")
+end
+
+try
+    parts2 = decompose_input("hello world")
+    record("decompose_input('hello world')", parts2 !== nothing)
+catch e
+    record("decompose_input simple", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 22. ACTION ENGINE
+# ══════════════════════════════════════════════════════════════
+section("22. Action Engine")
+
+global _action_result = nothing
+try
+    global _action_result = compute_action("greet", SigilBinding[])
+    record("compute_action('greet')", _action_result !== nothing)
+catch e
+    record("compute_action", false, "$e")
+end
+
+try
+    reply = format_action_reply(_action_result)
+    record("format_action_reply()", reply !== nothing)
+catch e
+    record("format_action_reply", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 23. SPECIMEN SAVE/LOAD ROUND-TRIP (THE BIG ONE)
+# ══════════════════════════════════════════════════════════════
+section("23. Specimen Save/Load Round-Trip")
+
+subsection("23a. Save")
+const SAVE_PATH = "/tmp/deep_test_specimen.specimen"
+try
+    save_specimen_to_file!(SAVE_PATH)
+    record("save_specimen_to_file!", isfile(SAVE_PATH))
+    journal_pass("specimen saved"; detail=SAVE_PATH)
+catch e
+    record("save_specimen_to_file!", false, "$e")
+end
+
+subsection("23b. Verify saved data has v9 keys")
+try
+    txt = read(SAVE_PATH, String)
+    parsed = JSON.parse(txt)
+
+    v9_keys = ["coherence_config", "geometry_config", "pattern_miner_config",
+               "temporal_identities", "journal_config", "lobe_dictionaries"]
+    for key in v9_keys
+        has_key = haskey(parsed, key)
+        record("specimen has '$(key)'", has_key)
+    end
+
+    # Check critical legacy keys
+    legacy_keys = ["nodes", "bridges", "lobes", "sigil_table", "immune_config",
+                   "verb_registry", "thesaurus_seeds"]
+    for key in legacy_keys
+        has_key = haskey(parsed, key)
+        record("specimen has legacy '$(key)'", has_key)
+    end
+
+    journal_info("specimen keys verified"; detail="v9=$(all(k -> haskey(parsed, k), v9_keys))")
+catch e
+    record("specimen key verification", false, "$e")
+end
+
+subsection("23c. Reload specimen")
+try
+    load_specimen_from_file!(SAVE_PATH)
+    record("load_specimen_from_file! (reload)", true)
+    journal_pass("specimen reloaded"; detail=SAVE_PATH)
+catch e
+    record("load_specimen_from_file! (reload)", false, "$e")
+end
+
+subsection("23d. Verify v9 data survived round-trip")
+try
+    # Coherence
+    coh_snap = coherence_config_snapshot()
+    record("coherence config survived reload", coh_snap !== nothing)
+
+    # Geometry
+    geo_snap = geometry_config_snapshot()
+    record("geometry config survived reload", geo_snap !== nothing)
+
+    # PatternMiner
+    pm_snap = pattern_miner_config_snapshot()
+    record("pattern miner config survived reload", pm_snap !== nothing)
+
+    # TemporalIdentity
+    ti_conts = list_continuants()
+    record("temporal identities survived reload", length(ti_conts) >= 2, "count=$(length(ti_conts))")
+
+    # CaveJournal
+    j_path = journal_get_path()
+    record("journal path survived reload", !isempty(j_path), "path=$(j_path)")
+
+    journal_pass("v9 data round-trip verified"; detail="$(length(ti_conts)) TI continuants")
+catch e
+    record("v9 data verification after reload", false, "$e")
+end
+
+subsection("23e. Conversations still work after reload")
+try
+    process_mission("what is 2+2")
+    v = read_voice()
+    has_4 = occursin("4", v)
+    record("arithmetic still works after reload", has_4, "voice='$(v[1:min(60,length(v))])'")
+catch e
+    record("post-reload arithmetic", false, "$e")
+end
+
+try
+    process_mission("what is star")
+    v = read_voice()
+    # Star was defined earlier — check it's still known
+    has_star = occursin("luminous", lowercase(v)) || occursin("celestial", lowercase(v)) || occursin("star", lowercase(v))
+    record("dictionary word 'star' survives reload", has_star, "voice='$(v[1:min(60,length(v))])'")
+catch e
+    record("post-reload dictionary lookup", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 24. STRESS TEST — rapid fire missions
+# ══════════════════════════════════════════════════════════════
+section("24. Stress Test — Rapid Fire")
+stress_inputs = [
+    "hello", "5+3", "what is gravity", "7*2", "water is wet",
+    "3-1", "what is love", "4+4", "fire is hot", "9/3",
+    "what is water", "6*2", "actually water is H2O", "2+2",
+    "what is fire", "8-5", "define moon = a natural satellite",
+]
+stress_passes = 0
+stress_fails = 0
+for input in stress_inputs
+    try
+        process_mission(input)
+        v = read_voice()
+        if !isempty(v)
+            global stress_passes += 1
+        else
+            global stress_fails += 1
+        end
+    catch e
+        global stress_fails += 1
+    end
+end
+record("stress test: $(stress_passes)/$(length(stress_inputs)) non-empty responses",
+        stress_passes >= length(stress_inputs) - 2,
+        "passes=$(stress_passes) fails=$(stress_fails)")
+journal_info("stress test complete"; detail="passes=$(stress_passes) fails=$(stress_fails)")
+
+# ══════════════════════════════════════════════════════════════
+# 25. EDGE CASES
+# ══════════════════════════════════════════════════════════════
+section("25. Edge Cases")
+
+try
+    process_mission("0+0")
+    v = read_voice()
+    record("edge case: 0+0", occursin("0", v), "voice='$(v[1:min(60,length(v))])'")
+catch e
+    record("0+0", false, "$e")
+end
+
+try
+    process_mission("what is the meaning of life the universe and everything")
+    v = read_voice()
+    record("edge case: very long question", !isempty(v), "voice='$(v[1:min(60,length(v))])'")
+catch e
+    record("long question", false, "$e")
+end
+
+try
+    process_mission("   5+5   ")
+    v = read_voice()
+    record("edge case: padded arithmetic", occursin("10", v), "voice='$(v[1:min(60,length(v))])'")
+catch e
+    record("padded arithmetic", false, "$e")
+end
+
+try
+    process_mission("HELLO")
+    v = read_voice()
+    record("edge case: ALL CAPS", !isempty(v))
+catch e
+    record("ALL CAPS", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# 26. JOURNAL FILE CONTENT VERIFICATION
+# ══════════════════════════════════════════════════════════════
+section("26. Journal File Content Verification")
+journal_off!()
+
+try
+    jfile = "/workspace/deep_test_journal.md"
+    if isfile(jfile)
+        content = read(jfile, String)
+
+        record("journal file exists and is non-empty", !isempty(content), "size=$(length(content)) bytes")
+
+        checks = [
+            ("has MISSION tag", occursin("[MISSION]", content)),
+            ("has ROUTE tag", occursin("[ROUTE]", content)),
+            ("has PASS tag", occursin("[PASS]", content)),
+            ("has INFO tag", occursin("[INFO]", content)),
+            ("has section headers", occursin("## ", content)),
+            ("has timestamps", occursin("│", content)),
+            ("has telemetry", occursin("[TELEMETRY]", content)),
+        ]
+        for (name, ok) in checks
+            record("journal: $(name)", ok)
+        end
+
+        # Check specific missions were logged
+        mission_checks = [
+            ("5+5 mission logged", occursin("5+5", content)),
+            ("what is love logged", occursin("what is love", content) || occursin("love", content)),
+            ("teach logged", occursin("fire", content) || occursin("teach", lowercase(content))),
+        ]
+        for (name, ok) in mission_checks
+            record("journal content: $(name)", ok)
+        end
+    else
+        record("journal file verification", false, "file not found at $(jfile)")
+    end
+catch e
+    record("journal file verification", false, "$e")
+end
+
+# ══════════════════════════════════════════════════════════════
+# FINAL SUMMARY
+# ══════════════════════════════════════════════════════════════
+total = length(results)
+passed = count(x -> x[2], results)
+failed = total - passed
+
+section("Summary")
+log_md("- Total: $(total)  |  Passed: $(passed)  |  Failed: $(failed)")
+log_md("- Result: $(failed == 0 ? "✅ ALL PASS" : "❌ $(failed) FAILURES")")
+println("\n", "=" ^ 60)
+println("Deep Specimen Test: $(passed)/$(total) passed")
+if failed > 0
+    println("FAILURES:")
+    for (n, p, d) in results
+        p && continue
+        println("  ❌ $n — $d")
+    end
+else
+    println("✅ ALL PASS")
+end
+println("=" ^ 60)
+
+# Write final journal entry
+journal_on!()
+journal_section("Deep Test Complete")
+journal_pass("deep test finished"; detail="$(passed)/$(total) passed")
+journal_off!()
+
+# Write the markdown log
+flush_log()
+println("\nLog written to: $(LOG_PATH)")

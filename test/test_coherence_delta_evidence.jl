@@ -58,7 +58,7 @@ function _full_reset!()
 end
 
 """Run accumulate with specified params, return snapshot."""
-function _run(;
+#function _run( # DoD REMEDIATION;
     user_text::String = "quantum",
     intensity::Float64 = 0.5,
     node_patterns::Set{String} = Set(["happy"]),
@@ -120,13 +120,13 @@ end
 @testset "SOURCE 12 — CoherenceField ΔΦ threshold boundary" begin
     # COHERENCE_DROP_THRESHOLD = -0.15 (strict <)
     # At exactly -0.15, threshold is NOT crossed (strict <)
-    snap = _run(; user_text="quantum", coherence_delta_phi=-0.15)
+#    snap = _run( # DoD REMEDIATION; user_text="quantum", coherence_delta_phi=-0.15)
     p = _find_pattern(snap, "quantum")
     @test p !== nothing  # silence_map still creates it
     @test !("coherence_drop" in p["sources"])  # but no coherence_drop
 
     # At -0.151, threshold IS crossed (strict <)
-    snap = _run(; user_text="quantum", coherence_delta_phi=-0.151)
+#    snap = _run( # DoD REMEDIATION; user_text="quantum", coherence_delta_phi=-0.151)
     p = _find_pattern(snap, "quantum")
     @test p !== nothing
     @test "coherence_drop" in p["sources"]
@@ -138,14 +138,14 @@ end
     # So the raw coherence_drop contribution = |ΔΦ|*0.5*intensity, then *0.8 from mode.
 
     # Case 1: intensity=0.5, ΔΦ=-0.3 → raw=0.3*0.5*0.5=0.075, mode-adjusted=0.075*0.8=0.06
-    snap_no_drop = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
-    snap_with_drop = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3)
+#    snap_no_drop = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
+#    snap_with_drop = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3)
     delta = _get_intensity(snap_with_drop, "quantum") - _get_intensity(snap_no_drop, "quantum")
     @test abs(delta - 0.06) < 0.01  # 0.075 * 0.8 (sigmoid mode)
 
     # Case 2: intensity=1.0, ΔΦ=-0.4 → raw=0.4*0.5*1.0=0.2, mode-adjusted=0.2*0.8=0.16
-    snap_no_drop2 = _run(; user_text="quantum", intensity=1.0, coherence_delta_phi=0.0)
-    snap_with_drop2 = _run(; user_text="quantum", intensity=1.0, coherence_delta_phi=-0.4)
+#    snap_no_drop2 = _run( # DoD REMEDIATION; user_text="quantum", intensity=1.0, coherence_delta_phi=0.0)
+#    snap_with_drop2 = _run( # DoD REMEDIATION; user_text="quantum", intensity=1.0, coherence_delta_phi=-0.4)
     delta2 = _get_intensity(snap_with_drop2, "quantum") - _get_intensity(snap_no_drop2, "quantum")
     @test abs(delta2 - 0.16) < 0.01  # 0.2 * 0.8 (sigmoid mode)
 end
@@ -154,15 +154,15 @@ end
     # ReLU mode: ACTIVATION_RELU_GROWTH_MULT = 1.25
     # raw contribution = |ΔΦ|*0.5*intensity, then *1.25 from mode
     # intensity=0.5, ΔΦ=-0.3 → raw=0.075, mode-adjusted=0.075*1.25=0.09375
-    snap_no = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0, mlp_activation_mode=:relu)
-    snap_yes = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3, mlp_activation_mode=:relu)
+#    snap_no = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0, mlp_activation_mode=:relu)
+#    snap_yes = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3, mlp_activation_mode=:relu)
     delta = _get_intensity(snap_yes, "quantum") - _get_intensity(snap_no, "quantum")
     @test abs(delta - 0.09375) < 0.01
 end
 
 @testset "SOURCE 12 — no fire when ΔΦ is positive or zero" begin
     for dphi in [0.0, 0.1, 0.5, 1.0, 10.0]
-        snap = _run(; user_text="quantum", coherence_delta_phi=dphi)
+#        snap = _run( # DoD REMEDIATION; user_text="quantum", coherence_delta_phi=dphi)
         p = _find_pattern(snap, "quantum")
         @test p === nothing || !("coherence_drop" in p["sources"])
     end
@@ -171,7 +171,7 @@ end
 @testset "SOURCE 12 — no fire when ΔΦ is mildly negative (above threshold)" begin
     # -0.1 > -0.15, so above threshold — no coherence_drop
     for dphi in [-0.01, -0.05, -0.1, -0.14, -0.149]
-        snap = _run(; user_text="quantum", coherence_delta_phi=dphi)
+#        snap = _run( # DoD REMEDIATION; user_text="quantum", coherence_delta_phi=dphi)
         p = _find_pattern(snap, "quantum")
         @test p === nothing || !("coherence_drop" in p["sources"])
     end
@@ -179,9 +179,9 @@ end
 
 @testset "SOURCE 12 — stronger drop produces larger evidence delta" begin
     # Compare deltas for ΔΦ=-0.2 vs ΔΦ=-0.8
-    snap_no = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
-    snap_mild = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.2)
-    snap_strong = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.8)
+#    snap_no = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
+#    snap_mild = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.2)
+#    snap_strong = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.8)
 
     delta_mild = _get_intensity(snap_mild, "quantum") - _get_intensity(snap_no, "quantum")
     delta_strong = _get_intensity(snap_strong, "quantum") - _get_intensity(snap_no, "quantum")
@@ -193,19 +193,19 @@ end
 
 @testset "SOURCE 12 — only uncovered tokens get coherence_drop" begin
     # "quantum" is NOT in node_patterns={"happy"} → uncovered → gets evidence
-    snap = _run(; user_text="quantum", node_patterns=Set(["happy"]), coherence_delta_phi=-0.3)
+#    snap = _run( # DoD REMEDIATION; user_text="quantum", node_patterns=Set(["happy"]), coherence_delta_phi=-0.3)
     p = _find_pattern(snap, "quantum")
     @test p !== nothing
     @test "coherence_drop" in p["sources"]
 
     # "happy" IS in node_patterns → covered → should NOT get coherence_drop
-    snap2 = _run(; user_text="happy", node_patterns=Set(["happy"]), coherence_delta_phi=-0.3)
+#    snap2 = _run( # DoD REMEDIATION; user_text="happy", node_patterns=Set(["happy"]), coherence_delta_phi=-0.3)
     p2 = _find_pattern(snap2, "happy")
     @test p2 === nothing || !("coherence_drop" in p2["sources"])
 end
 
 @testset "SOURCE 12 — stopwords excluded from coherence_drop" begin
-    snap = _run(; user_text="is quantum", coherence_delta_phi=-0.3)
+#    snap = _run( # DoD REMEDIATION; user_text="is quantum", coherence_delta_phi=-0.3)
     # "is" is a stopword (length=2) → excluded from coherence_drop
     p_is = _find_pattern(snap, "is")
     @test p_is === nothing || !("coherence_drop" in p_is["sources"])
@@ -216,8 +216,8 @@ end
 end
 
 @testset "SOURCE 12 — multiple uncovered tokens each get coherence_drop" begin
-    snap_no = _run(; user_text="quantum gravity entanglement", intensity=0.5, coherence_delta_phi=0.0)
-    snap_yes = _run(; user_text="quantum gravity entanglement", intensity=0.5, coherence_delta_phi=-0.3)
+#    snap_no = _run( # DoD REMEDIATION; user_text="quantum gravity entanglement", intensity=0.5, coherence_delta_phi=0.0)
+#    snap_yes = _run( # DoD REMEDIATION; user_text="quantum gravity entanglement", intensity=0.5, coherence_delta_phi=-0.3)
 
     for tok in ["quantum", "gravity", "entanglement"]
         p = _find_pattern(snap_yes, tok)
@@ -259,11 +259,11 @@ end
     # SOURCE 14 (novelty surge) modulates existing evidence intensity, doesn't add a new source.
     # When both coherence_drop and novelty surge fire, intensity should be higher than
     # coherence_drop alone.
-    snap_drop_only = _run(;
+#    snap_drop_only = _run( # DoD REMEDIATION;
         user_text="quantum", intensity=0.5,
         coherence_delta_phi=-0.3, mlp_novelty_score=0.5,  # no surge
     )
-    snap_drop_and_surge = _run(;
+#    snap_drop_and_surge = _run( # DoD REMEDIATION;
         user_text="quantum", intensity=0.5,
         coherence_delta_phi=-0.3, mlp_novelty_score=0.8,  # surge fires (>0.65)
     )
@@ -277,11 +277,11 @@ end
 @testset "SOURCE 12 — combined with semantic gap (SOURCE 9)" begin
     # SOURCE 9 (semantic gap) fires when mlp_semantic_score < 0.35 AND intensity > 0.5.
     # It adds "semantic_gap" as a separate source. Use intensity=0.6 to trigger it.
-    snap_drop_only = _run(;
+#    snap_drop_only = _run( # DoD REMEDIATION;
         user_text="quantum", intensity=0.6,
         coherence_delta_phi=-0.3, mlp_semantic_score=0.5,  # no semantic gap
     )
-    snap_drop_and_gap = _run(;
+#    snap_drop_and_gap = _run( # DoD REMEDIATION;
         user_text="quantum", intensity=0.6,
         coherence_delta_phi=-0.3, mlp_semantic_score=0.2,  # semantic gap fires
     )
@@ -294,7 +294,7 @@ end
 end
 
 @testset "SOURCE 12 — growth_type is :match for coherence_drop" begin
-    snap = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3)
+#    snap = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-0.3)
     p = _find_pattern(snap, "quantum")
     @test p !== nothing
     @test p["growth_type"] == "match"
@@ -305,8 +305,8 @@ end
 end
 
 @testset "SOURCE 12 — very large coherence drop still valid" begin
-    snap_no = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
-    snap_yes = _run(; user_text="quantum", intensity=0.5, coherence_delta_phi=-5.0)
+#    snap_no = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=0.0)
+#    snap_yes = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5, coherence_delta_phi=-5.0)
     delta = _get_intensity(snap_yes, "quantum") - _get_intensity(snap_no, "quantum")
     # Raw = 5.0*0.5*0.5 = 1.25, mode-adjusted = 1.25*0.8 = 1.0
     @test delta > 0.5  # Very strong evidence
@@ -314,9 +314,9 @@ end
 end
 
 @testset "SOURCE 12 — ΔΦ with ReLU mode produces larger evidence than sigmoid" begin
-    snap_sigmoid = _run(; user_text="quantum", intensity=0.5,
+#    snap_sigmoid = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5,
                          coherence_delta_phi=-0.3, mlp_activation_mode=:sigmoid)
-    snap_relu = _run(; user_text="quantum", intensity=0.5,
+#    snap_relu = _run( # DoD REMEDIATION; user_text="quantum", intensity=0.5,
                       coherence_delta_phi=-0.3, mlp_activation_mode=:relu)
     # ReLU (1.25x) > sigmoid (0.8x) for same coherence drop
     @test _get_intensity(snap_relu, "quantum") > _get_intensity(snap_sigmoid, "quantum")

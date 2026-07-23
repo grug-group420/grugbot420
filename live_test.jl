@@ -207,7 +207,13 @@ println("Saved to $(SAVE_PATH)")
 # WRITE FILES
 # ═══════════════════════════════════════
 
-open(LOG_PATH, "w") do f; print(f, join(log, "")); end
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f; print(f, join(log, "")); end
 println("✅ Log → $(LOG_PATH)")
 
 json_out = Dict(
@@ -216,7 +222,13 @@ json_out = Dict(
     "answer_math"    => Dict("ask"=>r_ask2,"recall"=>r_recall2),
     "answer_reason"  => Dict("ask"=>r_ask3,"recall"=>r_recall3),
 )
-open(JSON_PATH, "w") do f; JSON.print(f, json_out, 2); end
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endJSON_PATH, "w") do f; JSON.print(f, json_out, 2); end
 println("✅ JSON → $(JSON_PATH)")
 
 println("\n═══ DONE ═══")

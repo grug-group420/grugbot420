@@ -25,7 +25,13 @@ import .GrugBot420.RoutingJudge:
     set_bias_adjustments!, reset_bias_adjustments!
 
 const _log_path = joinpath(@__DIR__, "test_v93_routing_selfimprove.log.md")
-open(_log_path, "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end_log_path, "w") do f
     write(f, "# V9.3 Routing Self-Improvement Test Log\n\n")
     write(f, "_Generated: $(now())_\n\n")
 end
@@ -35,7 +41,13 @@ _passed = 0
 _failed = 0
 
 function log_md(msg::String)
-    open(_log_path, "a") do f
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end_log_path, "a") do f
         write(f, msg * "\n")
     end
 end

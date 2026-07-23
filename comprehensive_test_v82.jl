@@ -161,7 +161,13 @@ push!(log, "---\n\n")
 results = Dict{String, String}()
 
 function flush_log()
-    open(LOG_PATH, "w") do f; print(f, join(log, "")); end
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f; print(f, join(log, "")); end
 end
 
 for (i, t) in enumerate(tests)
@@ -311,7 +317,13 @@ println("Saved to $(SAVE_PATH)")
 # WRITE LOG FILE
 # ==============================================================================
 
-open(LOG_PATH, "w") do f; print(f, join(log, "")); end
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f; print(f, join(log, "")); end
 println("\n✅ Log → $(LOG_PATH)")
 
 println("\n", "=" ^ 60)

@@ -68,7 +68,13 @@ function main()
         "what is 10 minus 3",
     ]
 
-    open(LOG_PATH, "w") do io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do io
         println(io, "=== Arithmetic Fix Test ===")
         for input in inputs
             print("Testing: \"$input\" ... ")

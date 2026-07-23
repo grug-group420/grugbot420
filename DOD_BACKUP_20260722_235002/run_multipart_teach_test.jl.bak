@@ -1,0 +1,148 @@
+#!/usr/bin/env julia
+# =============================================================================
+# GRUG v9.1 TEST — Multipart/compound "ask only for what's unknown, and teach
+# on the spot" clarification loop. Verifies:
+#   1. Compound question where ALL sub-topics unknown → all get queued/asked.
+#   2. Compound question where SOME parts known, some not → ONLY unknown
+#      parts trigger a clarification ask (known parts answered normally).
+#   3. Generalization to 3+ sub-topics ("and so on") via the transient
+#      multi-topic pending-teach queue — teaching one at a time drains the
+#      queue and Grug keeps asking about the rest.
+#   4. Thesaurus-aware avoidance of false "unknown" — a sub-topic phrased as
+#      a synonym of something Grug already knows (dictionary word) should be
+#      ANSWERED, not treated as a knowledge gap.
+#
+# Uses direct internal-state telemetry (module-level Refs), no stdout scraping,
+# per established Thread C testing methodology. Boots from a fresh in-memory
+# engine state (no specimen needed — we teach everything the test requires).
+# =============================================================================
+
+println("[BOOT] Loading GrugBot420 module …")
+include(joinpath(@__DIR__, "src", "GrugBot420.jl"))
+using .GrugBot420
+using JSON
+
+import .GrugBot420:
+    process_mission,
+    _LAST_VOICE_OUTPUT, _LAST_VOICE_OUTPUT_LOCK,
+    _conv_get_pending_teach, _conv_get_pending_teach_queue, _conv_pending_teach_queue_size,
+    _dict_define_word!, _dict_has_word, Thesaurus
+
+println("[BOOT] GrugBot420 module loaded.")
+
+function run_turn(you_text::String)
+    process_mission(you_text)
+    output = lock(() -> _LAST_VOICE_OUTPUT[], _LAST_VOICE_OUTPUT_LOCK)
+    queue = _conv_get_pending_teach_queue()
+    return Dict{String,Any}(
+        "you" => you_text,
+        "raw_output" => output,
+        "pending_queue_size" => length(queue),
+        "pending_queue_topics" => [get(e, "topic", "") for e in queue],
+    )
+end
+
+results = Vector{Dict{String,Any}}()
+function log_turn!(label::String, you_text::String)
+    r = run_turn(you_text)
+    r["label"] = label
+    println("\n[$label] YOU: $you_text")
+    println("[$label] GRUG: $(r["raw_output"])")
+    println("[$label] pending_queue=$(r["pending_queue_topics"])")
+    push!(results, r)
+    return r
+end
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCENARIO 1 — Compound question, ALL sub-topics unknown (2-part), "and"-joined
+# so it routes through RoutingJudge's :compound splitter.
+# ═══════════════════════════════════════════════════════════════════════════
+log_turn!("S1-Q", "What is glorbnak and what is snarfum?")
+
+# Teach the FIRST unknown — queue should still hold the second after this.
+# GRUG: format is "subject, definition" (NOT repeating the topic word, and NO
+# colon) — colon syntax triggers the EARLIER _parse_question_answer quick-teach
+# shortcut which bypasses the pending-teach loop entirely; comma format routes
+# through _extract_teach_parts/_conv_get_pending_teach as intended.
+log_turn!("S1-TEACH1", "biology, a small furry cave creature")
+
+# Teach the SECOND unknown — queue should now be empty.
+log_turn!("S1-TEACH2", "biology, a glowing cave mushroom")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCENARIO 2 — Compound question, SOME known / SOME unknown. Grug should
+# answer the known part directly and ONLY ask about the unknown part.
+# ═══════════════════════════════════════════════════════════════════════════
+_dict_define_word!("default", "brontosaurus", "a giant long-necked plant-eating dinosaur")
+log_turn!("S2-Q", "What is brontosaurus and what is quaggleworth?")
+# Expect: answer for brontosaurus present in reply, clarification ask ONLY
+# for quaggleworth, and pending queue should contain ONLY quaggleworth (not
+# brontosaurus, since Grug already knew that part).
+log_turn!("S2-TEACH", "nature, a rare purple flower that blooms at night")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCENARIO 3 — Generalize to 3+ parts ("and so on"). All three unknown at
+# first; teach them one at a time and confirm the queue drains sequentially,
+# with Grug continuing to ask about the remaining ones after each teach.
+# ═══════════════════════════════════════════════════════════════════════════
+log_turn!("S3-Q", "What is fexbolt and what is trundlewick and what is ozzmire?")
+log_turn!("S3-TEACH1", "technology, a small tool grug uses to sharpen rocks")
+log_turn!("S3-TEACH2", "nature, a slow rolling stone that moves downhill")
+log_turn!("S3-TEACH3", "nature, a misty swamp full of strange sounds")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SCENARIO 4 — Thesaurus-aware avoidance of false "unknown". Teach "gather"
+# via dictionary, register "forage" as a seed synonym of "gather", then ask
+# a compound question using "forage" — it should be ANSWERED via the
+# synonym match, NOT queued as an unknown clarification topic.
+# ═══════════════════════════════════════════════════════════════════════════
+_dict_define_word!("default", "gather", "to collect food or items from the land")
+Thesaurus.add_seed_synonym!("gather", ["forage"])
+log_turn!("S4-Q", "What is forage and what is zubrinthax?")
+# Expect: forage answered via synonym (score>=0.70, seed match=0.95), zubrinthax
+# queued as the only genuinely-unknown topic.
+log_turn!("S4-TEACH", "nature, a tall spiky plant found near rivers")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Write results to JSON for inspection + build the markdown log.
+# ═══════════════════════════════════════════════════════════════════════════
+open(joinpath(@__DIR__, "multipart_teach_test_results.json"), "w") do io
+    JSON.print(io, results, 2)
+end
+
+println("\n[DONE] Results written to multipart_teach_test_results.json")
+
+# ── Assertions (fail loudly if the new behavior regresses) ──────────────────
+function must_contain(s::String, needle::String, ctx::String)
+    if !occursin(lowercase(needle), lowercase(s))
+        error("ASSERTION FAILED [$ctx]: expected to find '$needle' in: $s")
+    end
+end
+
+# S1: after Q, both unknown should be queued (2 pending)
+@assert results[1]["pending_queue_size"] == 2 "S1-Q expected 2 pending topics, got $(results[1]["pending_queue_size"])"
+# after teaching first, 1 should remain
+@assert results[2]["pending_queue_size"] == 1 "S1-TEACH1 expected 1 pending topic remaining, got $(results[2]["pending_queue_size"])"
+# after teaching second, 0 should remain
+@assert results[3]["pending_queue_size"] == 0 "S1-TEACH2 expected 0 pending topics remaining, got $(results[3]["pending_queue_size"])"
+
+# S2: brontosaurus known, quaggleworth unknown → only 1 queued, and reply mentions brontosaurus answer
+must_contain(results[4]["raw_output"], "brontosaurus", "S2-Q known-part-answered")
+@assert results[4]["pending_queue_size"] == 1 "S2-Q expected exactly 1 pending (quaggleworth only), got $(results[4]["pending_queue_size"]) topics=$(results[4]["pending_queue_topics"])"
+@assert "quaggleworth" in [lowercase(x) for x in results[4]["pending_queue_topics"]] "S2-Q expected quaggleworth to be the pending topic"
+@assert results[5]["pending_queue_size"] == 0 "S2-TEACH expected 0 pending remaining, got $(results[5]["pending_queue_size"])"
+
+# S3: 3-part generalization
+@assert results[6]["pending_queue_size"] == 3 "S3-Q expected 3 pending topics, got $(results[6]["pending_queue_size"])"
+@assert results[7]["pending_queue_size"] == 2 "S3-TEACH1 expected 2 pending remaining, got $(results[7]["pending_queue_size"])"
+@assert results[8]["pending_queue_size"] == 1 "S3-TEACH2 expected 1 pending remaining, got $(results[8]["pending_queue_size"])"
+@assert results[9]["pending_queue_size"] == 0 "S3-TEACH3 expected 0 pending remaining, got $(results[9]["pending_queue_size"])"
+
+# S4: forage answered via synonym (not queued), zubrinthax queued alone
+@assert results[10]["pending_queue_size"] == 1 "S4-Q expected exactly 1 pending (zubrinthax only, forage answered via synonym), got $(results[10]["pending_queue_size"]) topics=$(results[10]["pending_queue_topics"])"
+@assert "zubrinthax" in [lowercase(x) for x in results[10]["pending_queue_topics"]] "S4-Q expected zubrinthax to be the pending topic"
+@assert !("forage" in [lowercase(x) for x in results[10]["pending_queue_topics"]]) "S4-Q forage should NOT be pending — should have been answered via thesaurus synonym match"
+must_contain(results[10]["raw_output"], "gather", "S4-Q forage-answered-via-synonym (expect mention of known synonym 'gather')")
+@assert results[11]["pending_queue_size"] == 0 "S4-TEACH expected 0 pending remaining, got $(results[11]["pending_queue_size"])"
+
+println("\n✅ ALL ASSERTIONS PASSED — multipart partial-knowledge clarification + thesaurus-aware synonym avoidance confirmed working.")

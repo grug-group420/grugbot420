@@ -49,7 +49,7 @@ include("../src/Main.jl")
 println("\n[1] PASSWORD HASHING")
 
 # GRUG: Test that default password hash is correct
-default_password = "grug_cave_master_420"
+default_password = ENV["DOD_PASSWORD"] # DoD REMEDIATION
 expected_hash = bytes2hex(sha256(default_password))
 @test Main.ADMIN_PASSWORD_HASH == expected_hash
 println("  ✓ Default password hash is correct")

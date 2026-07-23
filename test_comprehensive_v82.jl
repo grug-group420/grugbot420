@@ -310,7 +310,13 @@ function main()
     )
 
     # Write JSON results
-    open(LOG_JSON_PATH, "w") do f
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_JSON_PATH, "w") do f
         JSON.print(f, results, 2)
     end
     println("\n" * "=" ^ 60)

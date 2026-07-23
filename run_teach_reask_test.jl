@@ -214,7 +214,13 @@ push!(log_lines, "")
 
 # Write log
 log_path = "grug_teach_reask_log.md"
-open(log_path, "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endlog_path, "w") do f
     println(f, join(log_lines, "\n"))
 end
 println("\n[DONE] Log written to $log_path")

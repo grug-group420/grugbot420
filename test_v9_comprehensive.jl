@@ -60,7 +60,13 @@ const LOG_PATH  = "/workspace/v9_comprehensive_test_log.md"
 const _log_lines = String[]
 
 log_md(line) = push!(_log_lines, line)
-flush_log() = open(LOG_PATH, "w") do f; for l in _log_lines; println(f, l); end; end
+
+try
+    flush_log() = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f; for l in _log_lines; println(f, l); end; end
 
 read_voice() = lock(_LAST_VOICE_OUTPUT_LOCK) do; _LAST_VOICE_OUTPUT[]; end
 

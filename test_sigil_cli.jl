@@ -362,7 +362,13 @@ log("Results: $_total_pass ✅ / $_total_fail ❌")
 log("")
 
 # Write log to file
-open("sigil_cli_test_log.md", "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end"sigil_cli_test_log.md", "w") do f
     println(f, "# GrugBot420 v8.19 — Sigil CLI Registration Test Log")
     println(f, "")
     println(f, "Date: $(Dates.now())")

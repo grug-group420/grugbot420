@@ -469,7 +469,13 @@ println("Saved to $SAVE_PATH")
 # WRITE LOG FILE
 # ═══════════════════════════════════════════════════════════════════════════
 
-open(LOG_PATH, "w") do f; print(f, join(log_lines, "\n")); end
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do f; print(f, join(log_lines, "\n")); end
 println("\n✅ Log → $LOG_PATH")
 
 println("\n", "=" ^ 60)

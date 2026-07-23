@@ -44,7 +44,7 @@ function _reset!()
 end
 
 """Run accumulate_link_evidence! with specified knobs, return snapshot."""
-function _run(;
+#function _run( # DoD REMEDIATION;
     co_fired_ids::Vector{String} = String[],
     lobe_of_fn::Function = id -> nothing,
     mlp_disambiguation::Float64 = 0.5,
@@ -86,7 +86,7 @@ _lobe_same  = id -> "lobe_a"
     # BASELINE: Co-fire only, no MLP boosts, no lobe info
     # =====================================================================
     @testset "Baseline — Co-fire, no MLP boosts" begin
-        snap = _run(co_fired_ids = ["n1", "n2"])
+#        snap = _run( # DoD REMEDIATIONco_fired_ids = ["n1", "n2"])
         @test length(snap) == 1
         rec = _find_pair(snap, "n1", "n2")
         @test rec !== nothing
@@ -98,7 +98,7 @@ _lobe_same  = id -> "lobe_a"
     # SOURCE 4: CROSS-LOBE CO-ACTIVATION
     # =====================================================================
     @testset "SOURCE 4 — Cross-Lobe Co-Activation" begin
-        snap = _run(co_fired_ids = ["n1", "n2"], lobe_of_fn = _lobe_cross)
+#        snap = _run( # DoD REMEDIATIONco_fired_ids = ["n1", "n2"], lobe_of_fn = _lobe_cross)
         rec = _find_pair(snap, "n1", "n2")
         @test rec !== nothing
         @test "opposing_lobe_co_act" in rec["sources"]
@@ -107,7 +107,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec["accumulated_intensity"] ≈ 4.0 atol=0.001
 
         # Same-lobe pair: no opposing_lobe_co_act
-        snap2 = _run(co_fired_ids = ["n1", "n2"], lobe_of_fn = _lobe_same)
+#        snap2 = _run( # DoD REMEDIATIONco_fired_ids = ["n1", "n2"], lobe_of_fn = _lobe_same)
         rec2 = _find_pair(snap2, "n1", "n2")
         @test rec2 !== nothing
         @test "opposing_lobe_co_act" ∉ rec2["sources"]
@@ -120,7 +120,7 @@ _lobe_same  = id -> "lobe_a"
     # =====================================================================
     @testset "SOURCE 9 — Disambiguation Bridge" begin
         # High disambiguation (0.8) with cross-lobe pair
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.8,
@@ -133,7 +133,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec["accumulated_intensity"] ≈ 4.48 atol=0.001
 
         # High disambiguation (0.8) with SAME-lobe pair
-        snap2 = _run(
+#        snap2 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_same,
             mlp_disambiguation = 0.8,
@@ -146,7 +146,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec2["accumulated_intensity"] ≈ 1.32 atol=0.001
 
         # Below threshold (0.5 < 0.6) — no disambiguation bridge
-        snap3 = _run(
+#        snap3 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.5,
@@ -156,7 +156,7 @@ _lobe_same  = id -> "lobe_a"
         @test "disambiguation_bridge" ∉ rec3["sources"]
 
         # At threshold (0.6) — strict >, no bridge
-        snap4 = _run(
+#        snap4 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.6,
@@ -166,7 +166,7 @@ _lobe_same  = id -> "lobe_a"
         @test "disambiguation_bridge" ∉ rec4["sources"]
 
         # Just above threshold (0.61)
-        snap5 = _run(
+#        snap5 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.61,
@@ -181,7 +181,7 @@ _lobe_same  = id -> "lobe_a"
     # =====================================================================
     @testset "SOURCE 10 — Relevance Cross-Lobe" begin
         # Low relevance (0.3) with cross-lobe pair
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_relevance_score = 0.3,
@@ -195,7 +195,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec["accumulated_intensity"] ≈ 4.35 atol=0.001
 
         # Low relevance with SAME-lobe pair — NO relevance_cross_lobe
-        snap2 = _run(
+#        snap2 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_same,
             mlp_relevance_score = 0.3,
@@ -205,7 +205,7 @@ _lobe_same  = id -> "lobe_a"
         @test "relevance_cross_lobe" ∉ rec2["sources"]
 
         # Above threshold (0.5) — no relevance cross-lobe
-        snap3 = _run(
+#        snap3 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_relevance_score = 0.5,
@@ -215,7 +215,7 @@ _lobe_same  = id -> "lobe_a"
         @test "relevance_cross_lobe" ∉ rec3["sources"]
 
         # At threshold (0.45) — strict <, no relevance
-        snap4 = _run(
+#        snap4 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_relevance_score = 0.45,
@@ -225,7 +225,7 @@ _lobe_same  = id -> "lobe_a"
         @test "relevance_cross_lobe" ∉ rec4["sources"]
 
         # Just below threshold (0.44)
-        snap5 = _run(
+#        snap5 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_relevance_score = 0.44,
@@ -240,7 +240,7 @@ _lobe_same  = id -> "lobe_a"
     # =====================================================================
     @testset "SOURCE 12 — Novelty-Amplified Co-Fire" begin
         # High novelty (0.8) with cross-lobe pair
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 0.8,
@@ -255,7 +255,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec["accumulated_intensity"] ≈ 4.3 atol=0.001
 
         # High novelty with SAME-lobe pair
-        snap2 = _run(
+#        snap2 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_same,
             mlp_novelty_score = 0.8,
@@ -268,7 +268,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec2["accumulated_intensity"] ≈ 1.2 atol=0.001
 
         # Below threshold (0.5) — no novelty co-fire
-        snap3 = _run(
+#        snap3 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 0.5,
@@ -278,7 +278,7 @@ _lobe_same  = id -> "lobe_a"
         @test "novelty_co_fire" ∉ rec3["sources"]
 
         # At threshold (0.6) — strict >, no novelty co-fire
-        snap4 = _run(
+#        snap4 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 0.6,
@@ -288,7 +288,7 @@ _lobe_same  = id -> "lobe_a"
         @test "novelty_co_fire" ∉ rec4["sources"]
 
         # Just above threshold (0.61)
-        snap5 = _run(
+#        snap5 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 0.61,
@@ -301,7 +301,7 @@ _lobe_same  = id -> "lobe_a"
         # novelty_mult = 1 + 0.4 * (1.0 - 0.6) / 0.4 = 1.4
         # increment = 1.0 * 0.4 * 1.5 = 0.6 (cross-lobe)
         # total = 1.0 + 3.0 + 0.6 = 4.6
-        snap6 = _run(
+#        snap6 = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 1.0,
@@ -315,7 +315,7 @@ _lobe_same  = id -> "lobe_a"
     # SOURCE 11: CHATTER RESIDUAL CO-OCCURRENCE
     # =====================================================================
     @testset "SOURCE 11 — Chatter Residual Co-Occurrence" begin
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             node_ids_patterns = [("n1", "gravity"), ("n2", "quantum")],
             lobe_of_fn = _lobe_cross,
             chatter_co_occur_pairs = [("gravity", "quantum", 0.5)],
@@ -327,7 +327,7 @@ _lobe_same  = id -> "lobe_a"
         @test rec["accumulated_intensity"] ≈ 0.15 atol=0.001
 
         # Below minimum intensity (< 0.1)
-        snap2 = _run(
+#        snap2 = _run( # DoD REMEDIATION
             node_ids_patterns = [("n1", "gravity"), ("n2", "quantum")],
             lobe_of_fn = _lobe_cross,
             chatter_co_occur_pairs = [("gravity", "quantum", 0.05)],
@@ -335,7 +335,7 @@ _lobe_same  = id -> "lobe_a"
         @test length(snap2) == 0  # filtered out
 
         # High intensity
-        snap3 = _run(
+#        snap3 = _run( # DoD REMEDIATION
             node_ids_patterns = [("n1", "gravity"), ("n2", "quantum")],
             lobe_of_fn = _lobe_cross,
             chatter_co_occur_pairs = [("gravity", "quantum", 1.0)],
@@ -350,7 +350,7 @@ _lobe_same  = id -> "lobe_a"
     # COMBINED: All 3 MLP knobs active simultaneously
     # =====================================================================
     @testset "Combined — All MLP knobs active (cross-lobe)" begin
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.8,
@@ -377,7 +377,7 @@ _lobe_same  = id -> "lobe_a"
     # COMBINED: All MLP knobs, same-lobe (limited sources)
     # =====================================================================
     @testset "Combined — All MLP knobs active (same-lobe)" begin
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1", "n2"],
             lobe_of_fn = _lobe_same,
             mlp_disambiguation = 0.8,
@@ -403,7 +403,7 @@ _lobe_same  = id -> "lobe_a"
     # NEGATIVE: No co-fired IDs → no MLP-based link evidence
     # =====================================================================
     @testset "Negative — No co-fired IDs" begin
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = String[],
             lobe_of_fn = _lobe_cross,
             mlp_disambiguation = 0.8,
@@ -417,7 +417,7 @@ _lobe_same  = id -> "lobe_a"
     # NEGATIVE: Single node → no pairs
     # =====================================================================
     @testset "Negative — Single co-fired node" begin
-        snap = _run(
+#        snap = _run( # DoD REMEDIATION
             co_fired_ids = ["n1"],
             lobe_of_fn = _lobe_cross,
             mlp_novelty_score = 0.8,

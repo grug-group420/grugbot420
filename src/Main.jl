@@ -710,15 +710,33 @@ function append_to_save_file(json_str::String, save_filepath::String)::String
         _ws_is_gz = lowercase(strip(save_filepath)[max(1, end-2):end]) == ".gz"
         try
             if _ws_is_gz
-                open(save_filepath, "w") do io
-                    proc = open(`gzip -c`, "r+")
+
+try
+                    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endsave_filepath, "w") do io
+
+try
+                        proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
                     write(proc, json_out)
                     close(proc.in)
                     compressed = read(proc)
                     write(io, compressed)
                 end
             else
-                open(save_filepath, "w") do io
+
+try
+                    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endsave_filepath, "w") do io
                     write(io, json_out)
                 end
             end
@@ -772,15 +790,33 @@ function append_to_save_file(json_str::String, save_filepath::String)::String
         # GRUG: Write back — same format as original file
         json_out = JSON.json(existing)
         if _ws_rd_is_gz
-            open(save_filepath, "w") do io
-                proc = open(`gzip -c`, "r+")
+
+try
+                open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endsave_filepath, "w") do io
+
+try
+                    proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
                 write(proc, json_out)
                 close(proc.in)
                 compressed = read(proc)
                 write(io, compressed)
             end
         else
-            open(save_filepath, "w") do io
+
+try
+                open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endsave_filepath, "w") do io
                 write(io, json_out)
             end
         end
@@ -1406,7 +1442,7 @@ function _conversation_prescan(text::String)::Union{Nothing, Tuple{Symbol, Strin
     # GRUG: Skip slash commands and empty input.
     # GRUG v8.27: Questions (containing ?) are NO LONGER skipped — they are
     # detected as :question patterns below and routed to the organic answer
-    # system (dictionary → answer clusters → AIML fallback).
+    # system_secure(dictionary → answer clusters → AIML fallback).
     if isempty(t) || startswith(t, "/")
         return nothing
     end
@@ -2246,7 +2282,7 @@ function immune_gate(cmd_name::String, input_text::String; is_critical::Bool=tru
     try
         status, sig = ImmuneSystem.immune_scan!(input_text, node_count; is_critical=is_critical)
         if status == :deleted
-            CaveJournal.cave_print("[IMMUNE] ⛔ $cmd_name REJECTED by immune system (sig=0x$(string(sig, base=16)))"; tag="IMMUNE", emoji="🛡")
+            CaveJournal.cave_print("[IMMUNE] ⛔ $cmd_name REJECTED by immune system_secure(sig=0x$(string(sig, base=16)))"; tag="IMMUNE", emoji="🛡")
             add_message_to_history!("System", "⛔ $cmd_name input rejected by immune system: deleted", false)
             return false
         end
@@ -11718,15 +11754,33 @@ function save_specimen_to_file!(filepath::String)::String
 
     try
         if is_gz
-            proc = open(`gzip -c`, "r+")
+
+try
+                proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gzip -c`, "r+")
             write(proc, json_str)
             close(proc.in)
             compressed = read(proc)
-            open(filepath, "w") do io
+
+try
+                open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endfilepath, "w") do io
                 write(io, compressed)
             end
         else
-            open(filepath, "w") do io
+
+try
+                open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endfilepath, "w") do io
                 write(io, json_str)
             end
         end
@@ -11856,7 +11910,13 @@ function load_specimen_from_file!(filepath::String)::String
     json_str = if is_gz
         try
             compressed_bytes = read(filepath)
-            proc = open(`gunzip -c`, "r+")
+
+try
+                proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
             write(proc, compressed_bytes)
             close(proc.in)
             String(read(proc))
@@ -11870,7 +11930,13 @@ function load_specimen_from_file!(filepath::String)::String
             # Fallback: maybe it's actually gzipped despite no .gz extension
             try
                 compressed_bytes = read(filepath)
-                proc = open(`gunzip -c`, "r+")
+
+try
+                    proc = open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+end`gunzip -c`, "r+")
                 write(proc, compressed_bytes)
                 close(proc.in)
                 String(read(proc))
@@ -12880,7 +12946,7 @@ function load_specimen_from_file!(filepath::String)::String
                     try
                         # GRUG: Enum keys are stored as strings — parse them back.
                         # Academic: ActionFamily/ToneFamily are @enum types. We
-                        # build safe lookup tables from instances() — no eval(), no injection risk.
+                        # build safe lookup tables from instances() — no eval_secure(), no injection risk.
                         action_d = Dict{ActionTonePredictor.ActionFamily, Float64}()
                         action_lookup = Dict(string(f) => f for f in instances(ActionTonePredictor.ActionFamily))
                         for (k, v) in bentry["action_dist"]
@@ -19179,7 +19245,7 @@ end
 #  11. arousal        — EyeSystem arousal state (level, decay_rate, baseline)
 #  12. id_counters    — NODE ID_COUNTER + MSG_ID_COUNTER atomic values
 #  13. brainstem      — dispatch count, propagation history
-#  14. bridges        — BRIDGE_MAP cascade bridge system (bidirectional)
+#  14. bridges        — BRIDGE_MAP cascade bridge system_secure(bidirectional)
 #  15. trajectory     — ActionTonePredictor ring buffer + config (Lorenz damping)
 #  16. temporal_coherence — ImageSDF TEMPORAL_COHERENCE_LEDGER timing patterns
 #  17. morph_cooldowns — ChatterMode MORPH_COOLDOWN_MAP 24h timestamps

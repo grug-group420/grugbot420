@@ -127,7 +127,13 @@ end
 function main()
     specimen_path = abspath(joinpath(@__DIR__, "specimens", "comprehensive_kitchensink.json"))
 
-    open(LOG_PATH, "w") do log_io
+
+try
+        open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endLOG_PATH, "w") do log_io
         println(log_io, "# Grug Live Test Log — Comprehensive Kitchensink Specimen")
         println(log_io, "_Generated: $(Dates.format(now(), Dates.dateformat"yyyy-mm-dd HH:MM:SS"))_")
         println(log_io, "")

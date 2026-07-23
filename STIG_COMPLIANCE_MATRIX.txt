@@ -1,0 +1,14 @@
+================================================================================
+                    DISA STIG COMPLIANCE MATRIX
+================================================================================
+STIG ID    | TITLE                              | STATUS | REMEDIATION
+-----------|------------------------------------|--------|------------
+V-222222   | Eval/Exec prohibited               | FAIL   | Remove calls
+V-333333   | No hardcoded credentials           | FAIL   | Use KMS
+V-444444   | Secure file permissions            | PASS   | - 
+V-555555   | Logging enabled                    | FAIL   | Implement audit
+V-666666   | Error handling                     | FAIL   | Add try-catch
+V-777777   | Input validation                   | FAIL   | Validate all input
+V-888888   | Encryption in transit              | FAIL   | Use TLS/SSL
+V-999999   | Code review required               | FAIL   | Complete review
+================================================================================

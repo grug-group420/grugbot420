@@ -296,7 +296,13 @@ println("=" ^ 60)
 
 # Write log to markdown
 log_path = "/workspace/cave_journal_test_log.md"
-open(log_path, "w") do f
+
+try
+    open( # DoD REMEDIATION
+catch e
+    log_audit("ERROR", "SYSTEM", "File operation failed", e)
+    return nothing
+endlog_path, "w") do f
     println(f, "# CaveJournal Test Log")
     println(f, "")
     println(f, "_Generated: $(now())_")
